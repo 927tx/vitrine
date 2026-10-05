@@ -28,6 +28,7 @@
 // (SGRPinnedMore) draws and fires it from the top trailing corner of the page, level with the back button.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Artist.h"
 
 // How much of the photo's height the dissolve into the field covers, and the scrim over the top of it that
@@ -60,6 +61,23 @@ static void setFrame(UIView *view, CGRect frame) {
 static NSString *trimmed(NSString *text) {
     NSString *clean = [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     return clean.length ? clean : nil;
+}
+
+static char kLogoNameKey;
+
+// Apple Music's logo for the artist in place of the name, where Apple Music has one. Asked once per name;
+// the catalog remembers the answer for the launch.
+static void showLogo(SGRHeaderInfo *info, NSString *name) {
+    if (!name.length || [objc_getAssociatedObject(info, &kLogoNameKey) isEqualToString:name]) return;
+    objc_setAssociatedObject(info, &kLogoNameKey, name, OBJC_ASSOCIATION_COPY_NONATOMIC);
+    __weak SGRHeaderInfo *weakInfo = info;
+    CGFloat pixels = UIScreen.mainScreen.bounds.size.width * UIScreen.mainScreen.scale;
+    SGMotionArtistLogo(name, pixels, ^(UIImage *logo) {
+        SGRHeaderInfo *shown = weakInfo;
+        if (!shown || ![objc_getAssociatedObject(shown, &kLogoNameKey) isEqualToString:name]) return;
+        [shown showTitleImage:logo];
+        if (logo) SGLog(@"redesign artist: Apple Music's logo for %@", name);
+    });
 }
 
 static NSString *firstText(UIView *root) {
@@ -274,6 +292,7 @@ static void applyHeader(UIView *header) {
     UIView *listeners = SGRFindByIdentifier(header, @"Components.Header.UI.Metadata", &kMetaKey);
     NSString *name = firstText(title) ?: firstText(bar);
     [info showTitle:name creator:nil length:firstText(listeners) about:nil];
+    showLogo(info, name);
 
     UIView *shuffle = SGRFindByIdentifier(header, @"Components.UI.ShuffleButton", &kShuffleKey);
     UIView *play = SGRFindByIdentifier(header, @"header-play-button", &kPlayKey);

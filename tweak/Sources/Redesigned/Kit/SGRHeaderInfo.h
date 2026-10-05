@@ -38,6 +38,9 @@ extern const CGFloat SGRHeaderInfoTitleRise;  // 56, of the content over the pic
 // has no image to copy. `playColor` is the colour of the capsule's glyph and word.
 - (void)showShuffle:(UIView *)shuffle play:(UIView *)play trailing:(UIView *)trailing
    trailingFallback:(UIImage *)trailingFallback playColor:(UIColor *)playColor;
+// A picture drawn in the title's place, such as an artist's logo; the title stays its spoken name. nil
+// draws the title again.
+- (void)showTitleImage:(UIImage *)image;
 // The height the content wants at `width`, from the top of the title to the bottom of the description.
 - (CGFloat)contentHeightForWidth:(CGFloat)width;
 @end
