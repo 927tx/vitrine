@@ -232,8 +232,9 @@ Redesigned:
                   controls -- play and shuffle float over the album page outside its header, so they are concealed
                   there and the row carries the Kit's stand-ins, which draw their glyph and fire them. Under the tracks
                   everything the server sends is dropped -- more by the artist, videos, concerts, merch, you might also
-                  like, and whatever it adds next -- but the album's own line and its copyright (Album.h lists its
-                  files). A podcast's episode page is the same template, so it is given the same field, and what it
+                  like, and whatever it adds next -- but the album's own line and its copyright, each section back
+                  once its switch on the Albums & artists page is off (told apart by its English heading; in another
+                  language Everything else covers them all; Album.h lists its files). A podcast's episode page is the same template, so it is given the same field, and what it
                   paints over it is taken off. Laid out on the Mac against harness/album/
 
 App:

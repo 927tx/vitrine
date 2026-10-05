@@ -17,6 +17,11 @@
 // Threading: main thread only.
 #import <UIKit/UIKit.h>
 
+// What the redesign takes off the page, on until switched off (Redesigned/Album/AlbumSettings.m): the videos
+// in the Music list (ArtistSections.x) and the Music / Video / Merch strip (ArtistField.x).
+#define SGRKeyArtistHideVideos @"spotifyglass.redesign.artist.hide.videos"
+#define SGRKeyArtistHideTabs @"spotifyglass.redesign.artist.hide.tabs"
+
 // The artist page `view` is on, or nil: the TemplateView with the identifier creator-page.
 UIView *SGRArtistPageOf(UIView *view);
 

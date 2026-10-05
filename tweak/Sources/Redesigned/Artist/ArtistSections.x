@@ -11,7 +11,8 @@
 // So the rule is by kind, never by the heading's words, which are the app's language: a video shelf reports
 // no height, and so do the heading and the spacer in the two cells before it. They were sized before it, so
 // the list is asked to lay out again once they are known. Every carousel is the same kind whatever it holds,
-// so the carousels all stay; merch has a tab of its own, which ArtistField.x takes away.
+// so the carousels all stay; merch has a tab of its own, which ArtistField.x takes away. With the videos'
+// switch off (SGRKeyArtistHideVideos) a video shelf is any other cell and stays.
 //
 // A dropped cell is 0 tall but what it holds keeps the height it measured at, hidden and cut off by the
 // cell: content squeezed to 0 breaks Spotify's required constraints on every pass (Album/AlbumSections.x).
@@ -20,6 +21,7 @@
 #import "Artist.h"
 
 static char kSettledKey, kKindsKey, kDroppedKey;
+static BOOL hideVideos;
 
 typedef NS_ENUM(NSInteger, SGRArtistCell) {
     SGRArtistCellOther,
@@ -142,6 +144,7 @@ static void logOnce(NSString *what) {
     NSIndexPath *path = attributes.indexPath;
     UIView *content = cell.contentView.subviews.firstObject ?: cell.contentView;
     SGRArtistCell kind = kindOf(content, result.size.height);
+    if (kind == SGRArtistCellVideos && !hideVideos) kind = SGRArtistCellOther;
     kindsOf(list)[path] = @(kind);
 
     BOOL drop = kind == SGRArtistCellVideos || [droppedOf(list) containsObject:path];
@@ -181,6 +184,7 @@ static void logOnce(NSString *what) {
 
 %ctor {
     if (!SGRedesignedUI()) return;
+    hideVideos = SGEnabled(SGRKeyArtistHideVideos);
     %init;
     SGRequireClasses(@[@"_TtC12Element_List18CollectionViewCell"]);
 }

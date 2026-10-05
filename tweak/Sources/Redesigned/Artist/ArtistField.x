@@ -11,7 +11,7 @@
 // and the merch have their own tabs only so that they can be left out, so the strip goes and the Music list
 // stays. The strip sits in an AutoLayoutStackView, which traps when a view in it hides, so it goes invisible
 // and the pages under it move up into its place and stop paging, the way the native look's switch does it
-// (Native/Artist/Artist.x).
+// (Native/Artist/Artist.x). With its switch off (SGRKeyArtistHideTabs) the strip and the paging stay Spotify's.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Artist.h"
@@ -22,6 +22,7 @@ static NSString *const kPageIdentifier = @"creator-page";
 static const UIEdgeInsets kBleed = {600, 0, 600, 0};
 
 static char kFieldKey;
+static BOOL hideTabs;
 
 #pragma mark - the page
 
@@ -117,7 +118,7 @@ static void hideStrip(UIView *strip) {
     %orig;
     for (UIView *v = ((UIView *)self).superview; v; v = v.superview) {
         if (![v.accessibilityIdentifier isEqualToString:@"Components.UI.TabsSectionHeading"]) continue;
-        if (SGRArtistPageOf(v)) hideStrip(v);
+        if (hideTabs && SGRArtistPageOf(v)) hideStrip(v);
         return;
     }
 }
@@ -130,6 +131,7 @@ static void hideStrip(UIView *strip) {
     // updateConstraints], OverflowStackViewLayoutBuilder.Line.tallestView nil). The row stays Spotify's, and
     // ArtistHeader.x draws more itself.
     if (!SGRedesignedUI()) return;
+    hideTabs = SGEnabled(SGRKeyArtistHideTabs);
     %init;
     SGRequireClasses(@[
         @"_TtC32CreativeWorkPlatform_TemplateKit12TemplateView",

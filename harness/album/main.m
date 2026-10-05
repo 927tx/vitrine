@@ -333,20 +333,29 @@ static NSString *trailingLabel(UIView *root) {
     _tracksBottom = y;
 
     // and under it the footer Spotify sends: the album's own line, the copyright, and the sections the
-    // redesign drops -- each with the 16pt spacer Spotify puts between them.
+    // redesign drops -- each with the 16pt spacer Spotify puts between them. Fans also like stands for a
+    // section no switch names. They sit in a real collection view, which is what AlbumSections.x keeps what
+    // it has read of them on.
     _footerCells = [NSMutableArray array];
+    UICollectionView *footerList = [[UICollectionView alloc] initWithFrame:collection.bounds
+                                                      collectionViewLayout:[UICollectionViewFlowLayout new]];
+    footerList.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    footerList.backgroundColor = UIColor.clearColor;
+    footerList.userInteractionEnabled = NO;
+    [collection addSubview:footerList];
     NSArray *footer = @[@[@"", @16], @[@"Album.ConsumptionExperience", @15.33], @[@"", @16],
                         @[@"heading:More by The Weeknd", @52.67], @[@"cards", @194.33], @[@"", @16],
                         @[@"heading:Related Music Videos", @52.67], @[@"cards", @235.67], @[@"", @16],
                         @[@"heading:Merch", @52.67], @[@"cards", @197], @[@"", @16],
                         @[@"heading:You might also like", @52.67], @[@"cards", @193.33], @[@"", @16],
+                        @[@"heading:Fans also like", @52.67], @[@"cards", @190], @[@"", @16],
                         @[@"Album.Copyright", @60.67]];
     for (NSArray *item in footer) {
         NSString *kind = item[0];
         CGFloat height = [item[1] doubleValue];
         _TtC12Element_List18CollectionViewCell *cell =
             [[_TtC12Element_List18CollectionViewCell alloc] initWithFrame:CGRectMake(0, 0, W, height)];
-        [collection addSubview:cell];
+        [footerList addSubview:cell];
         UIView *content = box(cell.contentView, MockAlbum_PageImpl20FooterStructuredDataView.class, cell.contentView.bounds, nil);
         if ([kind isEqualToString:@"Album.ConsumptionExperience"]) {
             UIView *line = box(content, UIView.class, content.bounds, kind);
@@ -557,7 +566,8 @@ static NSString *trailingLabel(UIView *root) {
     CGFloat y = _tracksBottom;
     for (_TtC12Element_List18CollectionViewCell *cell in _footerCells) {
         CGFloat natural = cell.bounds.size.height;
-        UICollectionViewLayoutAttributes *attributes = [UICollectionViewLayoutAttributes layoutAttributesForCellWithIndexPath:[NSIndexPath indexPathForItem:0 inSection:0]];
+        NSIndexPath *path = [NSIndexPath indexPathForItem:[_footerCells indexOfObject:cell] inSection:0];
+        UICollectionViewLayoutAttributes *attributes = [UICollectionViewLayoutAttributes layoutAttributesForCellWithIndexPath:path];
         attributes.frame = CGRectMake(0, y, width, natural);
         UICollectionViewLayoutAttributes *answer = [cell preferredLayoutAttributesFittingAttributes:attributes];
         cell.frame = CGRectMake(0, y, width, answer.size.height);

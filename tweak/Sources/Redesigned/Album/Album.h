@@ -14,7 +14,8 @@
 //                      SGRHeaderInfo over it -- title, artist, kind and date, shuffle, a white Play, add
 //     AlbumRows.x      the track rows on the field with no surface of their own and a hairline between them
 //     AlbumSections.x  everything under the tracks dropped but the album's own line and its copyright: no
-//                      more by the artist, no videos, no concerts, no merch, no you might also like
+//                      more by the artist, no videos, no concerts, no merch, no you might also like, each
+//                      back once its switch is off
 //
 // Every hook installs only while Redesigned UI is on (SGRedesignedUI); the native look's do not then.
 // Threading: main thread only.
@@ -25,6 +26,15 @@
 #define SGRKeyAlbumMotion @"spotifyglass.redesign.album.motion"
 #define SGRKeyArtistLogo @"spotifyglass.redesign.artist.logo"
 UIViewController *SGRAlbumSettingsPage(void);
+
+// AlbumSections.x. The sections under the tracks, one switch each, all dropped until switched off; the last
+// is every section none of the others names.
+#define SGRKeyAlbumHideMoreBy @"spotifyglass.redesign.album.hide.moreBy"
+#define SGRKeyAlbumHideVideos @"spotifyglass.redesign.album.hide.videos"
+#define SGRKeyAlbumHideConcerts @"spotifyglass.redesign.album.hide.concerts"
+#define SGRKeyAlbumHideMerch @"spotifyglass.redesign.album.hide.merch"
+#define SGRKeyAlbumHideYouMightLike @"spotifyglass.redesign.album.hide.youMightLike"
+#define SGRKeyAlbumHideOther @"spotifyglass.redesign.album.hide.other"
 
 // The album page `view` is on, or nil: the CreativeWorkTemplateView that carries the header, the list and
 // the two floating controls (trees/clean/album/01.txt:22).

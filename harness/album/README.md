@@ -22,8 +22,10 @@ each with the 16pt spacer between them.
 
 At 1.5 s it measures the footer the way the page's collection does, asking every cell
 `preferredLayoutAttributesFittingAttributes:` and stacking the answers: that is where `AlbumSections.x`
-answers 0 for what it drops, and the log says how much footer was left (108pt of 1230pt, the album's
-own line and its copyright).
+answers 0 for what it drops, and the log says how much footer was left (108pt of 1489pt, the album's
+own line and its copyright). A switch is turned off from the launch line, as an argument default, and
+brings its section back: `-spotifyglass.redesign.album.hide.merch NO` measures 374pt, `.moreBy` 371pt,
+`.videos` 412pt, `.youMightLike` 370pt, and `.other` 367pt for Fans also like, the section no switch names.
 
 Since 2026-09-18 the header is the Kit's `SGRHeaderInfo` over Spotify's blanked column, so what follows no
 longer tests anything the redesign moves; it still shows Spotify's column staying blank. The metadata row's
