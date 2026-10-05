@@ -2,7 +2,7 @@
 // so SpeedPitchMenu.x's hook adds Speed and pitch the way it would on the phone.
 //
 //     THEOS=$HOME/theos ./build.sh && xcrun simctl install <udid> build/MenuHarness.app
-//     xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open]
+//     xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open] [animated]
 //
 // The plain run opens the menu at 1 s, opens the block at 3 s, moves the sliders at 5 s, checks what the
 // block says at 6 s (PASS or FAIL lines), closes the block at 7 s and checks its row at 8 s. `loading` builds the sheet the way Spotify's is (the ivars of ContextMenuViewController in
@@ -11,6 +11,8 @@
 // once its item factories have answered; `stuck` never hands them over. `open` opens the block on a first
 // menu, closes it, and brings up a second one with the block open, as it stays for the session. Every frame of the first second the block is on screen
 // is checked for a colour of the system tint on anything it draws, and what the sheet shows is reported.
+// `animated` offers the redesign's Animated artwork switch: it is flipped, then the block opened and
+// closed, and where the switch's row sits is reported each time.
 #import <UIKit/UIKit.h>
 
 #pragma mark - what SpeedPitchMenu.x calls
@@ -29,6 +31,10 @@ BOOL SGPlayerPitchAvailable(void) { return YES; }
 static BOOL sg_follows = YES;
 BOOL SGPlayerPitchFollowsSpeed(void) { return sg_follows; }
 void SGSetPlayerPitchFollowsSpeed(BOOL follows) { sg_follows = follows; NSLog(@"[harness] pitch follows speed %d", follows); }
+static BOOL sg_animated;
+BOOL SGPlayerMenuOffersAnimatedArtwork(void) { return [NSProcessInfo.processInfo.arguments containsObject:@"animated"]; }
+BOOL SGPlayerMenuAnimatedArtwork(void) { return sg_animated; }
+void SGPlayerMenuSetAnimatedArtwork(BOOL on) { sg_animated = on; NSLog(@"[harness] animated artwork %d", on); }
 // The audio effects' settings, kept in a dictionary: the reverb slider reads and writes them.
 static NSMutableDictionary *sg_dsp;
 BOOL SGDSPSwitch(NSString *key) { return [sg_dsp[key] boolValue]; }
@@ -323,6 +329,33 @@ static void tapRow(UIViewController *menu) {
         [[CADisplayLink displayLinkWithTarget:watch selector:@selector(tick:)] addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
         [player presentViewController:navigation animated:YES completion:nil];
     };
+    if (argument(@"animated")) {
+        void (^where)(NSString *) = ^(NSString *when) {
+            UIView *block = findBlock(menu.view);
+            UISwitch *toggle = nil;
+            for (UIView *row in block.subviews) {
+                for (UIView *view in row.subviews) {
+                    if ([view isKindOfClass:UISwitch.class] && [view.accessibilityLabel isEqualToString:@"Animated artwork"]) toggle = (UISwitch *)view;
+                }
+            }
+            CGRect row = [toggle.superview convertRect:toggle.superview.bounds toView:block];
+            BOOL inside = CGRectContainsRect(block.bounds, row) && row.size.height > 0;
+            NSLog(@"[harness] %@: block %.0f tall, the Animated artwork row at %.0f (%@), switch %@ -- %@", when,
+                  block.bounds.size.height, row.origin.y, inside ? @"inside the block" : @"cut off", toggle.on ? @"on" : @"off",
+                  toggle && inside && toggle.on == sg_animated ? @"PASS" : @"FAIL");
+            if (toggle && ![when isEqualToString:@"closed"]) {
+                toggle.on = !toggle.on;
+                [toggle sendActionsForControlEvents:UIControlEventValueChanged];
+            }
+        };
+        after(1, present);
+        after(2.5, ^{ where(@"shown"); });
+        after(3, ^{ tapRow(menu); });
+        after(4.5, ^{ where(@"opened"); });
+        after(5, ^{ tapRow(menu); });
+        after(6.5, ^{ where(@"closed"); });
+        return;
+    }
     if (argument(@"open")) {
         // The block keeps whether it was open for the session: open it on a first menu, close that menu,
         // and watch a second one come up with the block already open.

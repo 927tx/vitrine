@@ -38,6 +38,12 @@ come late, out of order, or not at all.
   that brings the controls back, with `ok` or `WRONG`. At 6 s it logs the sheet's frame: a card inside
   the safe area with a grabber, where the sheet before it covered the whole screen.
 
+- `motion` is Animated artwork. The clip, `HARNESS_CANVAS_FILE` (any mp4, `harness/fluid-clip` writes one),
+  is served as the track's Canvas before the player's background has laid out; then the background lays
+  out, the lyrics open and close, the background is built again, and the ⋯ menu's switch goes off, on, and
+  off with the player out of its window. Each step is checked (the clip on the field, the cover hidden, the
+  foot and the blur, the thumbnail) and the log ends with `motion checks: n of 9 right -- PASS` or `FAIL`.
+
 `HARNESS_VOLUME=0` leaves out the volume row that the phone has and the tree does not.
 
 A screen recording is the way to see a move:

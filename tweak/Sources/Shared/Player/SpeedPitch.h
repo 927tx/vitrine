@@ -2,7 +2,8 @@
 // Nothing here draws on a Spotify screen of its own: the block goes into Spotify's own context menu
 // sheet, and the rest is audio.
 //
-//     SpeedPitchMenu.x   the expandable row and its two sliders, put into Spotify's context menu
+//     SpeedPitchMenu.x   the expandable row and its two sliders, put into Spotify's context menu, and under
+//                        the redesign the Animated artwork switch under them
 //     SpeedPitch.x       speed and pitch done to Spotify's audio, between its mixer and its speaker unit
 //     SGTimePitch.m      Apple's time and pitch unit, pulling the mixer or working in place
 //
@@ -30,3 +31,11 @@ BOOL SGPlayerPitchFollowsSpeed(void);
 void SGSetPlayerPitchFollowsSpeed(BOOL follows);
 // Whether the output could be reached to change its pitch.
 BOOL SGPlayerPitchAvailable(void);
+
+// The redesign's Animated artwork, switched in the same block: whether the player offers the switch (the
+// redesign is running and its background is Fluid or Animated, the two that share a field), whether it is
+// on, and switching it, which applies at once and is stored as the Background choice. Defined by
+// Redesigned/Player/PlayerMotion.x; NO from the first under the native look.
+BOOL SGPlayerMenuOffersAnimatedArtwork(void);
+BOOL SGPlayerMenuAnimatedArtwork(void);
+void SGPlayerMenuSetAnimatedArtwork(BOOL on);

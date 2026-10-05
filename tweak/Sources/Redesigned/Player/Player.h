@@ -15,6 +15,7 @@
 //     PlayerLyrics.x     the lyrics in the player: the cover as a thumbnail, the title up beside it
 //     PlayerGestures.x   the gestures' hookup
 //     PlayerMorph.x      the open and close grown out of the now playing bar's card, the cover flown
+//     PlayerMotion.x     Animated artwork: the Canvas or Apple Music's animated cover behind the player
 //
 // Speed and pitch, once the redesign's own, are Shared/Player/SpeedPitch.h's; PlayerHeader.x still hands
 // the more button over, so a menu opened from it is taken for the player's.
@@ -33,7 +34,8 @@ typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
     SGRPlayerBackgroundStill,      // the artwork blurred and held still
     SGRPlayerBackgroundColours,    // the artwork's colours drifting (SGRFlow.h)
     SGRPlayerBackgroundFluid,      // the artwork itself blurred and turning (SGRFluid.h)
-    SGRPlayerBackgroundAnimated,   // the track's Canvas or Apple Music's animated cover, over Fluid (PlayerMotion.x)
+    SGRPlayerBackgroundAnimated,   // the track's Canvas or Apple Music's animated cover, over Fluid (PlayerMotion.x);
+                                   // the player's ⋯ menu switches between this and Fluid
 };
 SGRPlayerBackgroundKind SGRPlayerBackground(void);
 // The names of the choices, in order.
@@ -78,6 +80,11 @@ void SGRPlayerShowLandscape(BOOL show);
 
 // The animated artwork follows the lyrics: blurred behind them (PlayerMotion.x).
 void SGRPlayerMotionLyricsChanged(void);
+// The field was laid out (PlayerField.x): the clip goes onto it, and the cover is hidden or shown again.
+void SGRPlayerMotionFieldLaidOut(void);
+// A clip is playing in place of the cover, which is then hidden: the lyrics' thumbnail and the open's
+// flown cover fade where they are rather than flying to or from it.
+BOOL SGRPlayerMotionShowing(void);
 
 // Alpha 0, no touches, hidden from accessibility, set again on every call: for Spotify's Swift views,
 // which SGRSuppress cannot keep (PlayerControls.x).

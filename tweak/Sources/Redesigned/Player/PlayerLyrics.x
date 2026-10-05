@@ -460,9 +460,13 @@ static void setOpen(BOOL open, BOOL animated) {
     SGRPlayerLyricsOverlay *overlay = overlayIn(host);
     place(overlay, host, l);
     CGAffineTransform away = thumbTransform(l);
+    // Over an animated artwork the cover is hidden, so the thumbnail fades where it sits rather than flying
+    // to or from an empty slot.
+    BOOL fades = SGRPlayerMotionShowing();
     // The state it starts from, so the animation has both ends of every value and nothing jumps into it.
-    overlay.thumb.transform = open ? CGAffineTransformIdentity : away;
-    overlay.cover.layer.cornerRadius = thumbRadius(l, !open);
+    overlay.thumb.transform = open && !fades ? CGAffineTransformIdentity : away;
+    overlay.thumb.alpha = open && fades ? 0 : 1;
+    overlay.cover.layer.cornerRadius = thumbRadius(l, fades || !open);
     if (open) {
         overlay.cover.image = SGRNowPlayingArtwork(NULL, NULL);
         overlay.stage.alpha = 0;
@@ -478,8 +482,9 @@ static void setOpen(BOOL open, BOOL animated) {
     }
 
     void (^move)(void) = ^{
-        overlay.thumb.transform = open ? away : CGAffineTransformIdentity;
-        overlay.cover.layer.cornerRadius = thumbRadius(l, open);
+        overlay.thumb.transform = open || fades ? away : CGAffineTransformIdentity;
+        overlay.thumb.alpha = !open && fades ? 0 : 1;
+        overlay.cover.layer.cornerRadius = thumbRadius(l, open || fades);
         placeTitleRow(l);
         sg_floating.viewIfLoaded.alpha = open ? 0 : 1;
     };

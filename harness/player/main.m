@@ -11,6 +11,9 @@
 //              checked by colour at the end of each step; the log says PASS or FAIL
 //     landscape the landscape lyrics at 3 s, a line's meanings over them, a pause and a resume; each
 //              step logs whether the controls are up and what a touch on the lines lands on
+//     motion   Animated artwork: a clip (HARNESS_CANVAS_FILE, an mp4) that comes in before the player has
+//              laid out, then the field, the lyrics, a field built again, the menu's switch and the player
+//              closed, each step checked; the log ends with motion checks n of m right -- PASS or FAIL
 // HARNESS_VOLUME=0 leaves out the volume row the phone has (trees/clean/player/01.txt has none).
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
@@ -60,7 +63,7 @@ static void serve(NSString *imageURI, UIImage *image, NSTimeInterval delay, BOOL
 }
 
 + (BOOL)canInitWithRequest:(NSURLRequest *)request {
-    return [request.URL.host isEqualToString:@"i.scdn.co"];
+    return [request.URL.host isEqualToString:@"i.scdn.co"] || [request.URL.host isEqualToString:@"canvas.harness"];
 }
 
 + (NSURLRequest *)canonicalRequestForRequest:(NSURLRequest *)request {
@@ -68,6 +71,12 @@ static void serve(NSString *imageURI, UIImage *image, NSTimeInterval delay, BOOL
 }
 
 - (void)startLoading {
+    // The motion scenario's clip, at once.
+    if ([self.request.URL.host isEqualToString:@"canvas.harness"]) {
+        const char *file = getenv("HARNESS_CANVAS_FILE");
+        [self answer:file ? [NSData dataWithContentsOfFile:@(file)] : nil];
+        return;
+    }
     NSString *name = self.request.URL.lastPathComponent;
     SGRHarnessPicture *picture = name.length >= 24 ? sg_pictures[[name substringFromIndex:name.length - 24]] : nil;
     NSThread *thread = NSThread.currentThread;
@@ -310,6 +319,8 @@ static void loadLyrics(void) {
     UIViewController *_bar;
     UICollectionView *_covers;
     UIScrollView *_list;
+    UIView *_plane, *_host;
+    UIViewController *_background;
     NSUInteger _failures, _checks;
 }
 
@@ -467,6 +478,14 @@ static void loadLyrics(void) {
     player.view = host;
     _units = @[info, duration, floating, playback, footer, scrollUnit, background, player];
     _covers = covers;
+    _plane = plane;
+    _host = host;
+    _background = background;
+    // The player has not been opened yet: its background plane is laid out only when it is.
+    if ([scenario() isEqualToString:@"motion"]) {
+        [plane removeFromSuperview];
+        _units = @[info, duration, floating, playback, footer, scrollUnit, player];
+    }
     [self start];
     [self layOut];
     // Spotify lays its units out again as a track's elements arrive, which is what the redesign's
@@ -490,6 +509,7 @@ static void loadLyrics(void) {
     else if ([scenario() isEqualToString:@"look"]) [self runLook];
     else if ([scenario() isEqualToString:@"scroll"]) [self runScrollChecks];
     else if ([scenario() isEqualToString:@"landscape"]) [self runLandscape];
+    else if ([scenario() isEqualToString:@"motion"]) [self runMotionChecks];
     // Opened, closed and opened again, so a screenshot can be taken of each state and of the move itself.
     else for (NSNumber *at in @[@2, @6, @10]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -652,6 +672,103 @@ static void logLandscape(NSString *step, NSString *want) {
 }
 
 // Up must be taken back to the top, down (the dismissal's pull) left where it went.
+#pragma mark - Animated artwork
+
+BOOL SGPlayerMenuAnimatedArtwork(void);
+void SGPlayerMenuSetAnimatedArtwork(BOOL on);
+
+static UIView *motionView(void) {
+    for (UIView *view in SGRPlayerField().subviews) {
+        if ([NSStringFromClass(view.class) isEqualToString:@"SGRPlayerMotionView"]) return view;
+    }
+    return nil;
+}
+
+- (void)expect:(BOOL)ok step:(NSString *)step detail:(NSString *)detail {
+    _checks++;
+    if (!ok) _failures++;
+    NSLog(@"[harness] motion check %@: %@ -- %@", step, detail, ok ? @"ok" : @"WRONG");
+}
+
+- (void)runMotionChecks {
+    // The clip comes in before the player has laid out, as for the track restored at launch.
+    after(3, ^{
+        [self expect:SGRPlayerMotionShowing() && !SGRPlayerField() step:@"before the player opened"
+              detail:[NSString stringWithFormat:@"clip %@, field %@", SGRPlayerMotionShowing() ? @"in" : @"missing", SGRPlayerField() ? @"made" : @"not made"]];
+    });
+    after(4, ^{
+        [self->_list insertSubview:self->_plane atIndex:0];
+        self->_units = [self->_units arrayByAddingObject:self->_background];
+        [self layOut];
+    });
+    after(5, ^{
+        UIView *motion = motionView();
+        CALayer *foot = [motion valueForKey:@"_foot"], *clip = [motion valueForKey:@"_clip"];
+        UIVisualEffectView *seam = [motion valueForKey:@"_seamBlur"], *lyrics = [motion valueForKey:@"_lyricsBlur"];
+        [self expect:motion != nil && self->_covers.layer.mask != nil step:@"the player opened"
+              detail:[NSString stringWithFormat:@"clip %@ the field, cover %@", motion ? @"on" : @"not on", self->_covers.layer.mask ? @"hidden" : @"shown"]];
+        CGFloat seamAt = round(clip.frame.size.height * 0.9);
+        BOOL footDown = foot && fabs(foot.frame.origin.y - seamAt) < 1 && CGRectGetMaxY(foot.frame) >= self.window.bounds.size.height
+            && foot.contents && foot.contentsRect.size.height < 0.05 && CGRectGetMaxY(foot.contentsRect) > 0.999;
+        [self expect:footDown step:@"the foot"
+              detail:[NSString stringWithFormat:@"clip %@, foot %@ from rows %@", NSStringFromCGRect(clip.frame), NSStringFromCGRect(foot.frame), NSStringFromCGRect(foot.contentsRect)]];
+        [self expect:seam.effect && !lyrics.effect step:@"the blur from the seam"
+              detail:[NSString stringWithFormat:@"seam blur %@, from %@ of the height, lyrics blur %@", seam.effect ? @"on" : @"off",
+                      [[seam.maskView.layer.sublayers.firstObject valueForKey:@"locations"] componentsJoinedByString:@" to "], lyrics.effect ? @"on" : @"off"]];
+        NSLog(@"[harness] motion: screenshot the clip now");
+    });
+    after(7, ^{ SGRPlayerToggleLyrics(); });
+    after(8.5, ^{
+        UIVisualEffectView *lyrics = [motionView() valueForKey:@"_lyricsBlur"];
+        UIView *thumb = nil;
+        for (UIView *view in self->_host.subviews) {
+            if ([NSStringFromClass(view.class) isEqualToString:@"SGRPlayerLyricsOverlay"]) thumb = [view valueForKey:@"thumb"];
+        }
+        BOOL away = thumb && !CGAffineTransformIsIdentity(thumb.transform) && thumb.alpha > 0.99;
+        [self expect:SGRPlayerLyricsOpen() && lyrics.effect && away step:@"the lyrics"
+              detail:[NSString stringWithFormat:@"lyrics %@, clip blurred %@, thumbnail %@ at alpha %.2f", SGRPlayerLyricsOpen() ? @"up" : @"down",
+                      lyrics.effect ? @"yes" : @"no", thumb && !CGAffineTransformIsIdentity(thumb.transform) ? @"in its corner" : @"at the cover", thumb.alpha]];
+        NSLog(@"[harness] motion: screenshot the lyrics now");
+    });
+    after(10, ^{ SGRPlayerToggleLyrics(); });
+    // Spotify builds the player's background again: the clip goes onto the new field.
+    after(11.5, ^{
+        UIView *old = SGRPlayerField();
+        UIView *plane = [[UIView alloc] initWithFrame:self->_plane.frame];
+        UIViewController *background = [_TtC21NowPlaying_ScrollImpl27NPVBackgroundViewController new];
+        background.view = plane;
+        [self->_plane removeFromSuperview];
+        [self->_list insertSubview:plane atIndex:0];
+        self->_plane = plane;
+        NSMutableArray *units = [self->_units mutableCopy];
+        [units replaceObjectAtIndex:[units indexOfObject:self->_background] withObject:background];
+        self->_units = units;
+        self->_background = background;
+        [self layOut];
+        [self expect:SGRPlayerField() != old && motionView() != nil step:@"a field built again" detail:motionView() ? @"the clip moved onto it" : @"the clip left behind"];
+    });
+    after(12.5, ^{
+        SGPlayerMenuSetAnimatedArtwork(NO);
+        [self expect:!SGRPlayerMotionShowing() && !motionView() && !self->_covers.layer.mask && !SGPlayerMenuAnimatedArtwork()
+                step:@"switched off from the menu" detail:[NSString stringWithFormat:@"clip %@, cover %@", motionView() ? @"still there" : @"gone",
+                                                                 self->_covers.layer.mask ? @"hidden" : @"back"]];
+        SGPlayerMenuSetAnimatedArtwork(YES);
+    });
+    after(14, ^{
+        [self expect:motionView() && self->_covers.layer.mask step:@"switched on again"
+              detail:[NSString stringWithFormat:@"clip %@, cover %@", motionView() ? @"back" : @"missing", self->_covers.layer.mask ? @"hidden" : @"shown"]];
+        // The player closed: the cover list cannot be found, and switching off must still bring its cover back.
+        [self->_host removeFromSuperview];
+        SGPlayerMenuSetAnimatedArtwork(NO);
+        [self expect:!self->_covers.layer.mask step:@"switched off with the player closed" detail:self->_covers.layer.mask ? @"cover still hidden" : @"cover back"];
+        [self->_list addSubview:self->_host];
+    });
+    after(15, ^{
+        NSLog(@"[harness] motion checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
+              self->_failures ? @"FAIL" : @"PASS");
+    });
+}
+
 - (void)runScrollChecks {
     after(2, ^{
         UIScrollView *list = self->_list;
@@ -708,6 +825,12 @@ static void logLandscape(NSString *step, NSString *want) {
 // Before every %ctor, so the redesign's gate reads on, and every session gets the picture server.
 __attribute__((constructor(101))) static void sgr_harnessDefaults(void) {
     [NSUserDefaults.standardUserDefaults setBool:YES forKey:@"spotifyglass.redesign"];
+    // Animated artwork, its clip served by the picture server to the shared session too.
+    if ([scenario() isEqualToString:@"motion"]) {
+        [NSUserDefaults.standardUserDefaults setInteger:3 forKey:@"spotifyglass.redesign.player.background"];
+        setenv("HARNESS_CANVAS", "https://canvas.harness/clip.mp4", 1);
+        [NSURLProtocol registerClass:SGRHarnessPictureServer.class];
+    }
     Method original = class_getClassMethod(NSURLSessionConfiguration.class, @selector(defaultSessionConfiguration));
     Method harness = class_getClassMethod(NSURLSessionConfiguration.class, @selector(sgr_harnessDefault));
     method_exchangeImplementations(original, harness);

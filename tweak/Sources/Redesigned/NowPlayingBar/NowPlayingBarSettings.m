@@ -12,7 +12,7 @@ UIViewController *SGRNowPlayingBarSettingsPage(void) {
             SGHideRow(@"Hide the device button", nil, SGRHideBarConnect),
         ]),
         SGSection(nil, @[
-            SGChoiceRow(@"Background", @"Animated plays the Canvas or Apple Music's animated cover, over Fluid",
+            SGChoiceRow(@"Background", @"Animated plays the Canvas or Apple Music's animated cover, over Fluid; the player's ⋯ menu switches between the two",
                         SGRKeyPlayerBackground, SGRPlayerBackgroundNames(), SGRPlayerBackground()),
             SGOptionRow(@"Download in Low Data Mode", @"Animated artwork, up to about 7 MB a song", SGKeyMotionLowData),
         ]),
