@@ -4,8 +4,8 @@
 //     THEOS=$HOME/theos ./build.sh && xcrun simctl install <udid> build/MenuHarness.app
 //     xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open]
 //
-// The plain run opens the menu at 1 s, opens the block at 3 s, moves both sliders at 5 s and closes the
-// block at 7 s. `loading` builds the sheet the way Spotify's is (the ivars of ContextMenuViewController in
+// The plain run opens the menu at 1 s, opens the block at 3 s, moves the sliders at 5 s, checks what the
+// block says at 6 s (PASS or FAIL lines), closes the block at 7 s and checks its row at 8 s. `loading` builds the sheet the way Spotify's is (the ivars of ContextMenuViewController in
 // 9.1.78: a header, a content container holding a ContextMenuTableView whose height follows its
 // contentSize by KVO, a loading spinner) and hands it its rows only 4 s after it is up, as Spotify does
 // once its item factories have answered; `stuck` never hands them over. `open` opens the block on a first
@@ -26,9 +26,22 @@ void SGSetPlayerSpeed(double speed) { sg_speed = speed; NSLog(@"[harness] speed 
 float SGPlayerPitch(void) { return sg_pitch; }
 void SGSetPlayerPitch(float semitones) { sg_pitch = semitones; NSLog(@"[harness] pitch %.0f", semitones); }
 BOOL SGPlayerPitchAvailable(void) { return YES; }
+static BOOL sg_follows = YES;
+BOOL SGPlayerPitchFollowsSpeed(void) { return sg_follows; }
+void SGSetPlayerPitchFollowsSpeed(BOOL follows) { sg_follows = follows; NSLog(@"[harness] pitch follows speed %d", follows); }
+// The audio effects' settings, kept in a dictionary: the reverb slider reads and writes them.
+static NSMutableDictionary *sg_dsp;
+BOOL SGDSPSwitch(NSString *key) { return [sg_dsp[key] boolValue]; }
+void SGDSPSetSwitch(NSString *key, BOOL on) { if (!sg_dsp) sg_dsp = [NSMutableDictionary dictionary]; sg_dsp[key] = @(on); NSLog(@"[harness] %@ %d", key, on); }
+double SGDSPNumber(NSString *key) { return [sg_dsp[key] doubleValue]; }
+void SGDSPSetNumber(NSString *key, double value) { if (!sg_dsp) sg_dsp = [NSMutableDictionary dictionary]; sg_dsp[key] = @(value); NSLog(@"[harness] %@ %.0f", key, value); }
 
 static BOOL argument(NSString *name) {
     return [NSProcessInfo.processInfo.arguments containsObject:name];
+}
+
+static void check(BOOL ok, NSString *what) {
+    NSLog(@"[harness] %@ %@", ok ? @"PASS" : @"FAIL", what);
 }
 
 static NSArray<NSArray<NSString *> *> *spotifyRows(void) {
@@ -336,14 +349,40 @@ static void tapRow(UIViewController *menu) {
     });
     after(5, ^{
         NSArray<UISlider *> *found = sliders(findBlock(menu.view));
-        found[0].value = 1.27;
-        [found[0] sendActionsForControlEvents:UIControlEventValueChanged];
-        [found[0] sendActionsForControlEvents:UIControlEventTouchUpInside];
+        // A disabled slider takes no finger, so `nospeed` leaves speed alone.
+        if (sg_speedAllowed) {
+            found[0].value = 1.27;
+            [found[0] sendActionsForControlEvents:UIControlEventValueChanged];
+            [found[0] sendActionsForControlEvents:UIControlEventTouchUpInside];
+        }
         found[1].value = -3.2;
         [found[1] sendActionsForControlEvents:UIControlEventValueChanged];
         [found[1] sendActionsForControlEvents:UIControlEventTouchUpInside];
+        found[2].value = 41;
+        [found[2] sendActionsForControlEvents:UIControlEventValueChanged];
+        [found[2] sendActionsForControlEvents:UIControlEventTouchUpInside];
+    });
+    // What the block says once the fingers are off: the reverb's thumb where it was let go, and while pitch
+    // follows a speed that is not normal, no semitones claimed. Without speed (`nospeed`) the switch is off
+    // limits and the pitch is the slider's.
+    BOOL speed = !argument(@"nospeed");
+    after(6, ^{
+        UIView *block = findBlock(menu.view);
+        NSArray<UISlider *> *found = sliders(block);
+        UIButton *pitch = [block valueForKey:@"_pitchValue"];
+        UISwitch *follows = [block valueForKey:@"_follows"];
+        check(found[2].value == 40, [NSString stringWithFormat:@"the reverb's thumb stays at 40 once let go (%.0f)", found[2].value]);
+        NSString *want = speed ? @"Follows speed" : @"−3 st";
+        check([[pitch titleForState:UIControlStateNormal] isEqualToString:want] && pitch.enabled == !speed,
+              [NSString stringWithFormat:@"the pitch reads %@ (%@, reset %@)", want, [pitch titleForState:UIControlStateNormal], pitch.enabled ? @"on" : @"off"]);
+        check(follows.enabled == speed, [NSString stringWithFormat:@"Pitch follows speed %@", speed ? @"enabled" : @"disabled without speed"]);
     });
     after(7, ^{ tapRow(menu); });
+    after(8, ^{
+        UILabel *summary = [findBlock(menu.view) valueForKey:@"_summary"];
+        NSString *want = speed ? @"1.25×  Reverb" : @"−3 st  Reverb";
+        check([summary.text isEqualToString:want], [NSString stringWithFormat:@"the closed row reads \"%@\" (\"%@\")", want, summary.text]);
+    });
 }
 
 @end

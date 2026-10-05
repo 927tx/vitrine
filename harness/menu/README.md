@@ -11,9 +11,13 @@ pitch the way it would on the phone. Speed and pitch themselves are stubs that l
 It has a scene delegate, so it runs on the iOS 27 simulator as well as 26. The mod's own lines
 (`SGLog`) go to the unified log: `xcrun simctl spawn <udid> log stream --predicate 'eventMessage CONTAINS "[spotifyglass]"'`.
 
-The plain run opens the menu at 1 s, the block at 3 s, moves both sliders at 5 s and closes the block
-at 7 s. `footer` gives the mock table a header of Spotify's, so the block goes to the footer;
-`nospeed` has the player refuse speed.
+The plain run opens the menu at 1 s, the block at 3 s, moves the three sliders at 5 s, and at 6 s logs
+`PASS` or `FAIL` for what the block then says: the Reverb thumb where it was let go, the Pitch reading
+"Follows speed" (its reset off) while Pitch follows speed is on at 1.25x, and the switch enabled. It
+closes the block at 7 s and at 8 s checks the closed row reads "1.25×  Reverb", no semitones claimed.
+`footer` gives the mock table a header of Spotify's, so the block goes to the footer;
+`nospeed` has the player refuse speed: the speed slider is left alone, the switch must be disabled, and
+the Pitch and the row read "−3 st".
 
 - `loading` builds the sheet the way Spotify's is laid out (a header, a content container holding a
   table sized to its content by KVO on `contentSize`, a spinner) and gives it its rows 4 s after it is

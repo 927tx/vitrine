@@ -394,7 +394,7 @@ static void applyEffect(SGDSPEngine *engine, NSString *effect) {
         what = [NSString stringWithFormat:@"Liveprog %@%@%@", onOff(on), on ? @", " : @"", on ? [NSString stringWithFormat:@"%@ compiled in %.0f ms",
                 path.lastPathComponent, (CFAbsoluteTimeGetCurrent() - start) * 1000] : @""];
     } else if ([effect isEqualToString:SGKeyDSPReverb]) {
-        SGDSPEngineSetReverb(engine, on, (int)SGDSPNumber(SGKeyDSPReverbPreset));
+        SGDSPEngineSetReverb(engine, on, (int)SGDSPNumber(SGKeyDSPReverbPreset), (float)SGDSPNumber(SGKeyDSPReverbAmount));
         what = [NSString stringWithFormat:@"reverb %@, %@", onOff(on), choice(SGDSPReverbPresetNames(), SGKeyDSPReverbPreset)];
     } else if ([effect isEqualToString:SGKeyDSPStereoWide]) {
         double level = SGDSPNumber(SGKeyDSPStereoWideLevel);

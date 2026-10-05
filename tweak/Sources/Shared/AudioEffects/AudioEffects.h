@@ -55,6 +55,7 @@
 
 #define SGKeyDSPReverb                  @"spotifyglass.dsp.reverb"
 #define SGKeyDSPReverbPreset            @"spotifyglass.dsp.reverb.preset"       // SGDSPReverbPresetNames index
+#define SGKeyDSPReverbAmount            @"spotifyglass.dsp.reverb.amount"       // %, 50 is the room's own mix
 
 #define SGKeyDSPStereoWide              @"spotifyglass.dsp.wide"
 #define SGKeyDSPStereoWideLevel         @"spotifyglass.dsp.wide.level"          // percent, 50 leaving the width as it is

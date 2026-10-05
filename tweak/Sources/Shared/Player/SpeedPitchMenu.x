@@ -24,6 +24,7 @@
 #import <CoreText/SFNTLayoutTypes.h>
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
+#import "Shared/AudioEffects/AudioEffects.h"
 #import "Shared/Haptics/Haptics.h"
 #import "SpeedPitch.h"
 
@@ -93,12 +94,12 @@ static char kBlockKey, kDecidedKey, kWatchedKey, kShownAtKey, kRowsInKey;
     UIImageView *_icon, *_chevron;
     UILabel *_title, *_summary;
     UIView *_panel;
-    UILabel *_speedName, *_pitchName;
-    UIButton *_speedValue, *_pitchValue;
-    UISlider *_speed, *_pitch;
+    UILabel *_speedName, *_pitchName, *_reverbName;
+    UIButton *_speedValue, *_pitchValue, *_reverbValue;
+    UISlider *_speed, *_pitch, *_reverb;
     UILabel *_followsName;
     UISwitch *_follows;
-    float _shownSpeed, _shownPitch;
+    float _shownSpeed, _shownPitch, _shownReverb;
     NSTimeInterval _speedSentAt;
     BOOL _speedPending;
 }
@@ -219,19 +220,25 @@ static void placeTick(UISlider *slider) {
     _speed.accessibilityLabel = @"Speed";
     _pitch = [self slider:-kMaxPitch max:kMaxPitch normal:0 minImage:@"arrow.down" maxImage:@"arrow.up"];
     _pitch.accessibilityLabel = @"Pitch";
+    _reverbName = makeLabel(nameFont, secondary());
+    _reverbName.text = @"Reverb";
+    _reverbValue = [self valueButton:@selector(resetReverb)];
+    _reverb = [self slider:0 max:100 normal:0 minImage:@"speaker" maxImage:@"building.columns"];
+    _reverb.accessibilityLabel = @"Reverb";
     _followsName = makeLabel(nameFont, primary());
     _followsName.text = @"Pitch follows speed";
     _follows = [UISwitch new];
     _follows.accessibilityLabel = @"Pitch follows speed";
     [_follows addTarget:self action:@selector(followsChanged) forControlEvents:UIControlEventValueChanged];
-    for (UIView *view in @[_speedName, _speedValue, _speed, _pitchName, _pitchValue, _pitch, _followsName, _follows]) [_panel addSubview:view];
+    for (UIView *view in @[_speedName, _speedValue, _speed, _pitchName, _pitchValue, _pitch, _reverbName, _reverbValue, _reverb,
+                           _followsName, _follows]) [_panel addSubview:view];
 
     [self refresh];
     return self;
 }
 
 + (CGFloat)heightOpen:(BOOL)open {
-    return kRowHeight + (open ? 2 * kSliderBlockHeight + kSwitchRowHeight + kPanelBottom : 0);
+    return kRowHeight + (open ? 3 * kSliderBlockHeight + kSwitchRowHeight + kPanelBottom : 0);
 }
 
 - (void)layoutSubviews {
@@ -246,9 +253,10 @@ static void placeTick(UISlider *slider) {
     CGFloat summaryX = CGRectGetMaxX(_title.frame) + kGrid;
     _summary.frame = CGRectMake(summaryX, 0, MAX(0, CGRectGetMinX(_chevron.frame) - kGrid - summaryX), kRowHeight);
 
-    _panel.frame = CGRectMake(0, kRowHeight, width, 2 * kSliderBlockHeight + kSwitchRowHeight + kPanelBottom);
+    _panel.frame = CGRectMake(0, kRowHeight, width, 3 * kSliderBlockHeight + kSwitchRowHeight + kPanelBottom);
     CGFloat y = 0;
-    for (NSArray<UIView *> *line in @[@[_speedName, _speedValue, _speed], @[_pitchName, _pitchValue, _pitch]]) {
+    for (NSArray<UIView *> *line in @[@[_speedName, _speedValue, _speed], @[_pitchName, _pitchValue, _pitch],
+                                       @[_reverbName, _reverbValue, _reverb]]) {
         line[0].frame = CGRectMake(side, y + 4, width / 2 - side, 24);
         line[1].frame = CGRectMake(width / 2, y + 4, width / 2 - side, 24);
         line[2].frame = CGRectMake(side, y + 30, width - 2 * side, 36);
@@ -262,6 +270,18 @@ static void placeTick(UISlider *slider) {
 }
 
 #pragma mark state
+
+// The audio effects' reverb, from the menu: any amount turns the effects and the reverb on, none turns the
+// reverb off and leaves the rest of the effects as they were.
+static void setReverb(float amount) {
+    if (amount > 0) {
+        SGDSPSetNumber(SGKeyDSPReverbAmount, amount);
+        if (!SGDSPSwitch(SGKeyDSPReverb)) SGDSPSetSwitch(SGKeyDSPReverb, YES);
+        if (!SGDSPSwitch(SGKeyDSP)) SGDSPSetSwitch(SGKeyDSP, YES);
+    } else if (SGDSPSwitch(SGKeyDSPReverb)) {
+        SGDSPSetSwitch(SGKeyDSPReverb, NO);
+    }
+}
 
 static float snappedSpeed(float value) {
     float speed = roundf(value / kSpeedStep) * kSpeedStep;
@@ -282,35 +302,52 @@ static NSString *pitchText(float pitch) {
     BOOL speedAllowed = SGPlayerSpeedAllowed(), pitchAvailable = SGPlayerPitchAvailable();
     if (!_speed.tracking) _shownSpeed = snappedSpeed(SGPlayerSpeed());
     if (!_pitch.tracking) _shownPitch = SGPlayerPitch();
+    if (!_reverb.tracking) _shownReverb = SGDSPSwitch(SGKeyDSP) && SGDSPSwitch(SGKeyDSPReverb) ? roundf(SGDSPNumber(SGKeyDSPReverbAmount)) : 0;
+    _reverb.value = _shownReverb;
     _speed.value = _shownSpeed;
     _pitch.value = _shownPitch;
     _speed.enabled = speedAllowed;
     _pitch.enabled = pitchAvailable;
     _speed.alpha = speedAllowed ? 1 : 0.4;
+    // Following needs the speed's unit, which the in place fallback does not have.
     _follows.on = SGPlayerPitchFollowsSpeed();
+    _follows.enabled = speedAllowed;
+    _follows.alpha = _followsName.alpha = speedAllowed ? 1 : 0.4;
     [self showValues];
 }
 
 - (void)showValues {
     BOOL speedAllowed = SGPlayerSpeedAllowed(), pitchAvailable = SGPlayerPitchAvailable();
+    // While pitch follows a speed that is not normal, the speed sets the pitch and the semitones are not
+    // played (SGTimePitch.h), so the slider stands aside and nothing claims them.
+    BOOL following = speedAllowed && _follows.on && _shownSpeed != 1;
+    float pitch = following ? 0 : _shownPitch;
     [UIView performWithoutAnimation:^{
         [_speedValue setTitle:speedAllowed ? speedText(_shownSpeed) : @"Unavailable here" forState:UIControlStateNormal];
-        [_pitchValue setTitle:pitchAvailable ? [pitchText(_shownPitch) stringByAppendingString:_shownPitch ? @" st" : @""] : @"Unavailable" forState:UIControlStateNormal];
+        [_pitchValue setTitle:!pitchAvailable ? @"Unavailable" : following ? @"Follows speed" : [pitchText(pitch) stringByAppendingString:pitch ? @" st" : @""]
+                     forState:UIControlStateNormal];
         [_speedValue layoutIfNeeded];
         [_pitchValue layoutIfNeeded];
     }];
-    // While pitch follows a speed that is not normal, the speed sets the pitch, so the slider stands aside.
-    BOOL pitchFree = pitchAvailable && !(_follows.on && _shownSpeed != 1);
+    BOOL pitchFree = pitchAvailable && !following;
     _pitch.enabled = pitchFree;
     _pitch.alpha = pitchFree ? 1 : 0.4;
     _speedValue.enabled = speedAllowed && _shownSpeed != 1;
-    _pitchValue.enabled = pitchAvailable && _shownPitch != 0;
+    _pitchValue.enabled = pitchFree && pitch != 0;
+    [UIView performWithoutAnimation:^{
+        [_reverbValue setTitle:_shownReverb > 0 ? [NSString stringWithFormat:@"%.0f%%", _shownReverb] : @"Off" forState:UIControlStateNormal];
+        [_reverbValue layoutIfNeeded];
+    }];
+    _reverbValue.enabled = _shownReverb > 0;
+    _reverb.accessibilityValue = _shownReverb > 0 ? [NSString stringWithFormat:@"%.0f percent", _shownReverb] : @"Off";
     _speed.accessibilityValue = speedAllowed ? speedText(_shownSpeed) : @"Unavailable";
-    _pitch.accessibilityValue = _shownPitch == 0 ? @"Original pitch" : [NSString stringWithFormat:@"%.0f semitones %@", fabsf(_shownPitch), _shownPitch > 0 ? @"up" : @"down"];
+    _pitch.accessibilityValue = following ? @"Follows speed" : pitch == 0 ? @"Original pitch"
+                                : [NSString stringWithFormat:@"%.0f semitones %@", fabsf(pitch), pitch > 0 ? @"up" : @"down"];
 
     NSMutableArray<NSString *> *changed = [NSMutableArray array];
     if (_shownSpeed != 1) [changed addObject:speedText(_shownSpeed)];
-    if (_shownPitch != 0) [changed addObject:[pitchText(_shownPitch) stringByAppendingString:@" st"]];
+    if (pitch != 0) [changed addObject:[pitchText(pitch) stringByAppendingString:@" st"]];
+    if (_shownReverb > 0) [changed addObject:@"Reverb"];
     _summary.text = sg_open ? nil : [changed componentsJoinedByString:@"  "];
     _row.accessibilityLabel = changed.count ? [@"Speed and pitch, " stringByAppendingString:[changed componentsJoinedByString:@", "]] : @"Speed and pitch";
     _row.accessibilityValue = sg_open ? @"Expanded" : @"Collapsed";
@@ -375,6 +412,12 @@ static NSString *pitchText(float pitch) {
                 if (view && view->_speedPending) [view sendSpeed];
             });
         }
+    } else if (slider == _reverb) {
+        float amount = roundf(slider.value / 5) * 5;
+        if (amount == _shownReverb) return;
+        if (amount == 0 || _shownReverb == 0) SGPlayFeedback(SGFeedbackDetent);
+        _shownReverb = amount;
+        setReverb(amount);
     } else {
         float pitch = roundf(slider.value);
         if (pitch == _shownPitch) return;
@@ -389,9 +432,18 @@ static NSString *pitchText(float pitch) {
     if (slider == _speed) {
         slider.value = _shownSpeed;
         if (_speedPending || snappedSpeed(SGPlayerSpeed()) != _shownSpeed) [self sendSpeed];
+    } else if (slider == _reverb) {
+        slider.value = _shownReverb;
     } else {
         slider.value = _shownPitch;
     }
+}
+
+- (void)resetReverb {
+    _shownReverb = 0;
+    setReverb(0);
+    [_reverb setValue:0 animated:YES];
+    [self showValues];
 }
 
 - (void)followsChanged {
