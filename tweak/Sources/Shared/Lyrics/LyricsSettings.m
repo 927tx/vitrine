@@ -13,7 +13,7 @@ SGModSection *SGLyricsSourcesSection(BOOL namingSource) {
         return names.count ? [names componentsJoinedByString:@", "] : @"Off";
     };
     NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObjects:sources,
-        SGOptionRow(@"Lyrics for every track", @"Even where Spotify has none", SGKeyLyricsAllTracks), nil];
+        SGOptionRow(@"Lyrics for every track", @"Even where Spotify has none", SGKeyLyricsAllTracks), SGSpicyLyricsKeyRow(), nil];
     if (namingSource) [rows addObject:SGOptionRow(@"Show source", nil, SGKeyLyricsCredit)];
     return SGSection(@"Sources", rows);
 }

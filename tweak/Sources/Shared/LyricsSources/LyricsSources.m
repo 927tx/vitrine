@@ -148,7 +148,7 @@ NSArray<SGLyricsProvider *> *SGLyricsAllProviders(void) {
             provider.detail = detail;
             // A source that matches by Spotify's own track id has everything it needs from the
             // start; the rest wait for the player to name the track before they can search.
-            provider.needsName = ![key isEqualToString:@"musixmatch"];
+            provider.needsName = ![key isEqualToString:@"musixmatch"] && ![key isEqualToString:SGSpicyLyricsKey];
             provider.ask = ask;
             return provider;
         };
@@ -158,6 +158,7 @@ NSArray<SGLyricsProvider *> *SGLyricsAllProviders(void) {
             make(@"unison", @"Unison", @"Hand-timed, few tracks", SGUnisonAsk),
             make(@"netease", @"NetEase", @"Word timing, censored", SGNetEaseAsk),
             make(@"lrclib", @"LRCLIB", @"Line timing, open fallback", SGLrcLibAsk),
+            make(SGSpicyLyricsKey, @"Spicy Lyrics", @"Community word syncs, your own key", SGSpicyLyricsAsk),
         ];
     });
     return all;
@@ -367,13 +368,13 @@ static void step(SGLyricsWalk *walk) {
         if (betterLines(merged, fresh)) {
             merged.karaokeLines = fresh.karaokeLines;
             merged.wordTimed = fresh.wordTimed;
-            merged.provider = provider.name;
+            merged.provider = fresh.provider ?: provider.name;
         }
         if (betterTexts(merged, fresh)) {
             merged.starts = fresh.starts;
             merged.texts = fresh.texts;
             merged.synced = fresh.synced;
-            if (!merged.provider) merged.provider = provider.name;
+            if (!merged.provider) merged.provider = fresh.provider ?: provider.name;
         }
         step(walk);
     });

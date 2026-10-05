@@ -21,7 +21,8 @@
 
 // What a source answers with, and what the chain merges several of into one.
 @interface SGLyricsResult : NSObject
-@property (nonatomic, copy) NSString *provider;   // the key of the source the lines came from
+// What the credit names: the source's name, unless it gave a fuller credit of its own.
+@property (nonatomic, copy) NSString *provider;
 @property (nonatomic) BOOL synced;                // the lines have starts of their own
 @property (nonatomic) BOOL wordTimed;             // the words inside them are timed, not estimated
 // Every line as Spotify's lyrics page takes it: ♪ over a break and an empty last line where the
@@ -127,5 +128,14 @@ extern SGLyricsAsk SGMusixmatchAsk;
 extern SGLyricsAsk SGUnisonAsk;
 extern SGLyricsAsk SGNetEaseAsk;
 extern SGLyricsAsk SGLrcLibAsk;
+extern SGLyricsAsk SGSpicyLyricsAsk;
+
+// SpicyLyrics.m. Its key in the order; whether the user's own API key is in the Keychain; the
+// Lyrics page's row that sets or removes it; and an API response as lines, nil when it has none.
+extern NSString *const SGSpicyLyricsKey;
+BOOL SGSpicyLyricsKeySet(void);
+@class SGModRow;
+SGModRow *SGSpicyLyricsKeyRow(void);
+SGLyricsResult *SGSpicyLyricsResult(id root);
 
 UIViewController *SGLyricsSourcesPage(void);   // the ordered list on the Lyrics page
