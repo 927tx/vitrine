@@ -10,6 +10,7 @@
 #import "Core/SGCore.h"
 #import "LyricsSources.h"
 #import "Shared/Lyrics/Lyrics.h"
+#import "Shared/LocalFiles/LocalFiles.h"
 #import "Headers/SPTPlayer.h"
 #import <stdatomic.h>
 
@@ -208,6 +209,15 @@ BOOL SGLyricsEnabled(void) {
 static SGLyricsQuery *queryFor(NSString *trackID) {
     SGLyricsQuery *query = [SGLyricsQuery new];
     query.trackID = trackID;
+    // A local file is named by its own key: its tags, and the names the user gave it over them.
+    NSDictionary *local = SGLocalFileInfo(trackID);
+    if (local) {
+        query.title = local[@"title"];
+        query.artist = local[@"artist"];
+        query.album = local[@"album"];
+        query.seconds = [local[@"seconds"] integerValue];
+        return query;
+    }
     SPTPlayerTrack *track = SGKaraokeTrackFor(trackID);
     if (!track) return query;
     query.title = track.trackTitle;

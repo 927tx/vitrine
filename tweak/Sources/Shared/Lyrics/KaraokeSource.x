@@ -6,6 +6,7 @@
 // hands the lines over.
 #import "Core/SGCore.h"
 #import "Lyrics.h"
+#import "Shared/LocalFiles/LocalFiles.h"
 #import "Shared/LockScreenLyrics/LockScreenLyrics.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/LyricsSources/LyricsSources.h"
@@ -208,8 +209,10 @@ void SGKaraokeAskSpotifyForTiming(NSString *trackID) {
 
 void SGKaraokeRequestLyrics(NSString *trackID) {
     if (!trackID || sg_lyrics[trackID] || [sg_requested containsObject:trackID]) return;
+    // spclient has nothing for a local file, which only the sources can name.
+    BOOL local = SGLocalFileIs(trackID);
     if (!sg_ownSources) {
-        requestFromSpotify(trackID);
+        if (!local) requestFromSpotify(trackID);
         return;
     }
     [sg_requested addObject:trackID];
@@ -222,6 +225,8 @@ void SGKaraokeRequestLyrics(NSString *trackID) {
             // Plain text is shown while Spotify is asked whether it has the song timed.
             if (SGKaraokeLinesTiming(lyrics.karaokeLines) != SGKaraokeTimingNone) return;
         }
+        // Left asked for: the readers ask on every tick, and an edit of its names gives it a new key.
+        if (local) return;
         [sg_requested removeObject:trackID];
         requestFromSpotify(trackID);
     });
@@ -237,9 +242,7 @@ static SPTPlayerState *playerState(void) {
 }
 
 NSString *SGKaraokePlayingTrack(void) {
-    id uri = playerState().track.URI;
-    NSString *text = [uri isKindOfClass:NSURL.class] ? ((NSURL *)uri).absoluteString : [uri description];
-    return [text hasPrefix:@"spotify:track:"] ? [text substringFromIndex:@"spotify:track:".length] : nil;
+    return idOf(playerState().track);
 }
 
 NSInteger SGKaraokePositionMs(void) {
@@ -254,10 +257,11 @@ void SGKaraokeSeek(NSInteger ms) {
     [(id<SPTPlayer>)player seekTo:ms / 1000.0];
 }
 
+// A Spotify track by its base62 id, a local file by its URI (Shared/LocalFiles/LocalFiles.h).
 static NSString *idOf(SPTPlayerTrack *track) {
     id uri = track.URI;
     NSString *text = [uri isKindOfClass:NSURL.class] ? ((NSURL *)uri).absoluteString : [uri description];
-    return [text hasPrefix:@"spotify:track:"] ? [text substringFromIndex:@"spotify:track:".length] : nil;
+    return [text hasPrefix:@"spotify:track:"] ? [text substringFromIndex:@"spotify:track:".length] : SGLocalFileLyricsKey(text);
 }
 
 // Tracks come in from the player and from every list that reads their metadata, so when the table
@@ -291,7 +295,10 @@ void SGKaraokeRememberTrack(SPTPlayerTrack *track) {
 // in is what puts the card there. The track is named here, so no walk waits for a name.
 static void prefetch(SPTPlayerTrack *track, NSString *trackID, SPTPlayerState *state) {
     if (!sg_ownSources) return;
-    SGLyricsPrefetch(trackID);
+    // Spotify never asks for a local file's lyrics, so they are asked for and kept here. The state is
+    // read on any thread, and the kept lines are the main queue's.
+    if (SGLocalFileIs(trackID)) dispatch_async(dispatch_get_main_queue(), ^{ SGKaraokeRequestLyrics(trackID); });
+    else SGLyricsPrefetch(trackID);
     SPTPlayerTrack *next = upNextIn(state);
     NSString *nextID = idOf(next);
     if (!nextID || [nextID isEqualToString:trackID]) return;

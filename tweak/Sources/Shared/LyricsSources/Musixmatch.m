@@ -2,9 +2,11 @@
 // has the time of every word (richsync), which Spotify never sends. The token is an anonymous one
 // asked for as Musixmatch's iOS app, so Musixmatch learns the track's id and nothing of the Spotify
 // account. It is the one source that matches by Spotify's own track id, so it never has to guess at
-// a title, and what it learns about the track is passed to the sources asked after it.
+// a title, and what it learns about the track is passed to the sources asked after it. A local file has
+// no id, so for one the matcher searches by its names and length (q_track, q_artist, q_album, q_duration).
 #import "Core/SGCore.h"
 #import "LyricsSources.h"
+#import "Shared/LocalFiles/LocalFiles.h"
 
 static NSString *const kAPI = @"https://apic-appmobile.musixmatch.com/ws/1.1/";
 static NSString *const kAppID = @"mac-ios-v2.0";
@@ -272,25 +274,27 @@ static SGLyricsResult *withTrack(SGLyricsResult *lyrics, id track) {
     return result;
 }
 
-static void ask(NSString *trackID, BOOL renewToken) {
+// `match` is what the matcher goes by: Spotify's id, or a local file's names.
+static void ask(NSString *trackID, NSDictionary<NSString *, NSString *> *match, BOOL renewToken) {
     withToken(^(NSString *token) {
         if (!token) {
             finish(trackID, nil, NO);
             return;
         }
-        call(@"macro.subtitles.get", @{
+        NSMutableDictionary<NSString *, NSString *> *query = [@{
             @"usertoken": token,
-            @"track_spotify_id": trackID,
             @"namespace": @"lyrics_richsynched",
             @"subtitle_format": @"mxm",
             @"optional_calls": @"track.richsync",
             @"richsync_compact_type": @"words",
-        }, ^(NSDictionary *message) {
+        } mutableCopy];
+        [query addEntriesFromDictionary:match];
+        call(@"macro.subtitles.get", query, ^(NSDictionary *message) {
             NSInteger status = [dig(message, @"header/status_code") integerValue];
             if (status == 401 && renewToken) {
                 SGLog(@"musixmatch: token no longer accepted (hint %@), asking for a new one", dig(message, @"header/hint"));
                 [NSUserDefaults.standardUserDefaults removeObjectForKey:kTokenKey];
-                ask(trackID, NO);
+                ask(trackID, match, NO);
                 return;
             }
             id calls = dig(message, @"body/macro_calls");
@@ -309,10 +313,24 @@ static void ask(NSString *trackID, BOOL renewToken) {
     });
 }
 
+// What the matcher goes by: Spotify's id, or for a local file, which has none, its names and length to
+// search by. nil when there is nothing to go by.
+static NSDictionary<NSString *, NSString *> *matchFor(NSString *trackID, NSString *title, NSString *artist, NSString *album, NSInteger seconds) {
+    if (!trackID.length) return nil;
+    if (!SGLocalFileIs(trackID)) return @{@"track_spotify_id": trackID};
+    if (!title.length) return nil;
+    NSMutableDictionary<NSString *, NSString *> *match = [NSMutableDictionary dictionaryWithObject:title forKey:@"q_track"];
+    match[@"q_artist"] = artist;
+    match[@"q_album"] = album;
+    if (seconds > 0) match[@"q_duration"] = [NSString stringWithFormat:@"%ld", (long)seconds];
+    return match;
+}
+
 SGLyricsAsk SGMusixmatchAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResult *lyrics)) {
     setUp();
     NSString *trackID = query.trackID;
-    if (!trackID.length) {
+    NSDictionary<NSString *, NSString *> *match = matchFor(trackID, query.title, query.artist, query.album, query.seconds);
+    if (!match) {
         done(nil);
         return;
     }
@@ -327,7 +345,7 @@ SGLyricsAsk SGMusixmatchAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResul
         return;
     }
     sg_waiting[trackID] = [NSMutableArray arrayWithObject:[done copy]];
-    ask(trackID, YES);
+    ask(trackID, match, YES);
 };
 
 #pragma mark - translations
@@ -403,6 +421,13 @@ static void translationsIn(NSString *token, NSString *commontrack, NSArray<NSStr
 // done gets what was found, and whether it is Musixmatch's whole answer rather than one cut short.
 static void askTranslations(NSString *trackID, NSString *language, BOOL renewToken,
                             void (^done)(NSDictionary<NSString *, NSString *> *found, BOOL answered)) {
+    // A local file is matched by the names it goes by, its key's edit over its tags, as its lyrics were.
+    NSDictionary *local = SGLocalFileInfo(trackID);
+    NSDictionary<NSString *, NSString *> *match = matchFor(trackID, local[@"title"], local[@"artist"], local[@"album"], [local[@"seconds"] integerValue]);
+    if (!match) {
+        done(nil, YES);
+        return;
+    }
     withToken(^(NSString *token) {
         if (!token) {
             done(nil, NO);
@@ -428,7 +453,9 @@ static void askTranslations(NSString *trackID, NSString *language, BOOL renewTok
             translate(known);
             return;
         }
-        call(@"matcher.track.get", @{@"usertoken": token, @"track_spotify_id": trackID}, ^(NSDictionary *message) {
+        NSMutableDictionary<NSString *, NSString *> *query = [match mutableCopy];
+        query[@"usertoken"] = token;
+        call(@"matcher.track.get", query, ^(NSDictionary *message) {
             NSInteger status = [dig(message, @"header/status_code") integerValue];
             noteCommontrack(trackID, dig(message, @"body/track/commontrack_id"));
             NSString *commontrack = status == 200 ? sg_commontracks[trackID] : nil;

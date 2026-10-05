@@ -136,6 +136,10 @@ void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *li
                                  void (^done)(NSArray<NSString *> *translations, NSString *error)) { done(nil, @"harness"); }
 UIViewController *SGTopController(void) { return UIApplication.sharedApplication.keyWindow.rootViewController; }
 
+// Local files: no edits in the harness, so the name is all PlayerLyrics.x needs to watch for one.
+#import "Shared/LocalFiles/LocalFiles.h"
+NSNotificationName const SGLocalFileEditsDidChangeNotification = @"harness.localFileEditsDidChange";
+
 // Speed and pitch: a number the harness keeps, with no audio behind it.
 static double sg_speed = 1;
 double SGPlayerSpeed(void) { return sg_speed; }
