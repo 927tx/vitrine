@@ -95,7 +95,13 @@ Shared:
                   Spotify has lyrics for, so one is added to any list without it: that is what makes the player ask for the
                   lyrics and show the card. has_lyrics is forced on for every track, the walk starts at the track change
                   for it and the next, and the player's card-loading timeout flag is forced to its 5 s maximum while a
-                  source is on
+                  source is on. In the redesign, with a translation language chosen, lines kept for the lyrics view with
+                  no translation of their own take Musixmatch's community translations (Musixmatch.m), whichever
+                  source won, Spotify's own included: matched by the line's folded text, as copies kept in place of the
+                  lines (KaraokeSource.x), which the view picks up
+    LyricsTranslation/ a song's lines translated by Gemini on the user's own key (Keychain), from the lyrics' corner
+                  menu, for the lines no source translated; the reply read and checked on the Mac against
+                  harness/lyrics-translation/
     LockScreenLyrics/ the line being sung in the system's now playing, and on iOS 26 the lyrics as the lock screen's
                   full-screen artwork (LyricsArtwork.x): a new artwork ID per line, its 3:4 H.264 clip (the line and the
                   next one dimmed over the blurred cover, SGLyricsClip.m) written only when the lock screen asks for it,
