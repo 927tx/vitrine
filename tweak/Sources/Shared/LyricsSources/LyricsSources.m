@@ -160,6 +160,8 @@ NSArray<SGLyricsProvider *> *SGLyricsAllProviders(void) {
             make(@"netease", @"NetEase", @"Word timing, censored", SGNetEaseAsk),
             make(@"lrclib", @"LRCLIB", @"Line timing, open fallback", SGLrcLibAsk),
             make(SGSpicyLyricsKey, @"Spicy Lyrics", @"Community word syncs, your own key", SGSpicyLyricsAsk),
+            make(@"qqmusic", @"QQ Music", @"Line timing, Chinese catalogue", SGQQMusicAsk),
+            make(@"kugou", @"KuGou", @"Word timing, Chinese catalogue", SGKuGouAsk),
         ];
     });
     return all;

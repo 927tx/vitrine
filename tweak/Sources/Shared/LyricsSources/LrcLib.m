@@ -64,23 +64,28 @@ static NSArray<SGKaraokeLine *> *linesFromLRC(NSString *lrc) {
     return SGKaraokeEstimatedLines(starts, texts);
 }
 
+SGLyricsResult *SGLyricsLRCResult(NSString *lrc) {
+    NSArray<SGKaraokeLine *> *lines = [lrc isKindOfClass:NSString.class] ? linesFromLRC(lrc) : nil;
+    if (!lines) return nil;
+    SGLyricsResult *result = [SGLyricsResult new];
+    result.synced = YES;
+    result.karaokeLines = lines;
+    NSArray<NSNumber *> *starts;
+    NSArray<NSString *> *texts;
+    SGLyricsPageLines(lines, &starts, &texts);
+    result.starts = starts;
+    result.texts = texts;
+    return result;
+}
+
 static SGLyricsResult *resultFrom(NSDictionary *record) {
     if (![record isKindOfClass:NSDictionary.class]) return nil;
     SGLyricsResult *result = [SGLyricsResult new];
     result.instrumental = [record[@"instrumental"] boolValue];
     if (result.instrumental) return result;
     id synced = record[@"syncedLyrics"], plain = record[@"plainLyrics"];
-    NSArray<SGKaraokeLine *> *lines = [synced isKindOfClass:NSString.class] ? linesFromLRC(synced) : nil;
-    if (lines) {
-        result.synced = YES;
-        result.karaokeLines = lines;
-        NSArray<NSNumber *> *starts;
-        NSArray<NSString *> *texts;
-        SGLyricsPageLines(lines, &starts, &texts);
-        result.starts = starts;
-        result.texts = texts;
-        return result;
-    }
+    SGLyricsResult *timed = SGLyricsLRCResult(synced);
+    if (timed) return timed;
     // Nothing timed, but the words still beat an empty page when no other source has any.
     if (![plain isKindOfClass:NSString.class] || ![plain length]) return nil;
     NSMutableArray<NSNumber *> *starts = [NSMutableArray array];

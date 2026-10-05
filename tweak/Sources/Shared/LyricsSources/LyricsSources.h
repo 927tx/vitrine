@@ -136,6 +136,24 @@ extern SGLyricsAsk SGUnisonAsk;
 extern SGLyricsAsk SGNetEaseAsk;
 extern SGLyricsAsk SGLrcLibAsk;
 extern SGLyricsAsk SGSpicyLyricsAsk;
+extern SGLyricsAsk SGQQMusicAsk;
+extern SGLyricsAsk SGKuGouAsk;
+
+// LrcLib.m. Timed LRC as a synced result, nil when no line in it is timed.
+SGLyricsResult *SGLyricsLRCResult(NSString *lrc);
+// NetEase.m. Word timed lines from NetEase's yrc, or with krc from KuGou's KRC text; nil for none.
+NSArray<SGKaraokeLine *> *SGLyricsPieceLines(NSString *body, BOOL krc);
+// QQMusic.m, for it and KuGou. A title as the two are matched by: lowercased, without spaces,
+// punctuation or symbols, ideographic and full width ones included. The artist without whoever is
+// featured ("A feat. B" is A). Whether a credited name and the track's artist name the same one: the
+// key of either holds the other's, the featured artists left out.
+NSString *SGLyricsMatchKey(NSString *text);
+NSString *SGLyricsLeadArtist(NSString *artist);
+BOOL SGLyricsSameArtist(NSString *credited, NSString *artist);
+// What the two catalogues are asked as: a browser.
+#define SGLyricsBrowserAgent @"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+// KuGou.m. A download's base64 content as lines, nil when it is not KRC or holds no timed line.
+NSArray<SGKaraokeLine *> *SGKuGouLines(NSString *content);
 
 // SpicyLyrics.m. Its key in the order; whether the user's own API key is in the Keychain; the
 // Lyrics page's row that sets or removes it; and an API response as lines, nil when it has none.
