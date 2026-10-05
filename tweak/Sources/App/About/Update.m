@@ -4,13 +4,13 @@
 // commit, each ending in a link to it. One request brings the last twenty releases rather than only
 // the newest, which is what lets the Updates page show every version between this build and the
 // newest one. Asked a few seconds after Spotify comes up (UpdateNotice.m) and when Mod Settings
-// opens, at most once every six hours either way, and on demand from the page. spoti.pw is asked
-// first and hands on GitHub's list; the request carries Usage.m's body. GitHub itself is the fallback.
+// opens, at most once every six hours either way, and on demand from the page. Off while
+// SGUpdateURL is nil.
 #import "Core/SGCore.h"
 #import "About.h"
 
-NSString *const SGUpdateURL = @"https://spoti.pw/api/update";
-static NSString *const kGitHubURL = @"https://api.github.com/repos/skopevoj/spoti.pw/releases?per_page=20";
+// The fork's GitHub releases, e.g. https://api.github.com/repos/<owner>/<repo>/releases?per_page=20
+NSString *const SGUpdateURL = nil;
 NSString *const SGUpdateCheckedNotification = @"spotifyglass.update.checked.notification";
 
 static NSString *const kChecked = @"spotifyglass.update.checked";
@@ -143,6 +143,7 @@ NSString *SGUpdateVersion(void) {
 // What the Updates row shows on the right; the page's own ticker reads it while the page is open,
 // so the async check lands in the cell without anything having to be told about it.
 NSString *SGUpdateStatus(void) {
+    if (!SGUpdateURL) return @"off";
     if (sg_running) return @"checking…";
     if (sg_failure) return sg_failure;
     NSString *latest = SGUpdateVersion();
@@ -203,10 +204,8 @@ static void ask(NSString *url, NSData *body, void (^done)(NSArray<NSDictionary *
 void SGCheckForUpdate(BOOL force) {
     NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
     NSTimeInterval last = [store doubleForKey:kChecked];
-    if (sg_running) return;
-    // The day's count goes out with the first check of the day, whatever the six hours say.
-    BOOL owed = SGUsageOwed();
-    if (!force && !owed && last > 0 && NSDate.date.timeIntervalSince1970 - last < kInterval) return;
+    if (!SGUpdateURL || sg_running) return;
+    if (!force && last > 0 && NSDate.date.timeIntervalSince1970 - last < kInterval) return;
 
     sg_running = YES;
     sg_failure = nil;
@@ -227,12 +226,5 @@ void SGCheckForUpdate(BOOL force) {
             [NSNotificationCenter.defaultCenter postNotificationName:SGUpdateCheckedNotification object:nil];
         });
     };
-    NSData *body = SGUsageBody();
-    if (body) SGUsageNoteAsked();
-    SGLog(@"update check: asking spoti.pw %@", body ? @"with the usage body" : @"without the usage body");
-    ask(SGUpdateURL, body, ^(NSArray<NSDictionary *> *releases, NSInteger status, NSError *error) {
-        if (releases) return finish(releases, status, error);
-        SGLog(@"update check: spoti.pw answered HTTP %ld, asking GitHub", (long)status);
-        ask(kGitHubURL, nil, finish);
-    });
+    ask(SGUpdateURL, nil, finish);
 }

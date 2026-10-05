@@ -30,7 +30,6 @@ CGFloat SGSectionFooterHeight(UITableView *table, NSString *text);
 UITableViewCell *SGDequeueCell(UITableView *table, NSString *identifier);
 
 void SGOpenURL(NSString *url);
-extern NSString *const SGSiteURL;
 extern NSString *const SGRepoURL;
 // The controller on top of the key window, through whatever is presented over it.
 UIViewController *SGTopController(void);

@@ -3,7 +3,6 @@
 #import "Onboarding.h"
 #import "App/About/About.h"
 #import "App/Pages.h"
-#import "App/Donate/Donate.h"
 
 static const CGFloat kMargin = 24;
 static const CGFloat kCardRadius = 22;
@@ -164,7 +163,7 @@ static UIButton *glassButton(NSString *title) {
     UIImageView *icon = SGSymbolView(@"exclamationmark.triangle.fill", 15, UIImageSymbolWeightSemibold, 22);
     icon.tintColor = UIColor.systemYellowColor;
     UILabel *text = [UILabel new];
-    text.text = @"The redesign is a beta. Expect lags, freezes and bugs, and if you find one, please report it.";
+    text.text = @"The redesign is a beta. Expect lags, freezes and bugs.";
     text.font = [UIFont systemFontOfSize:13];
     text.textColor = SGGrey();
     text.numberOfLines = 0;
@@ -182,7 +181,7 @@ static UIButton *glassButton(NSString *title) {
     }]];
     report.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
 
-    UIStackView *note = [[UIStackView alloc] initWithArrangedSubviews:@[line, report]];
+    UIStackView *note = [[UIStackView alloc] initWithArrangedSubviews:SGRepoURL ? @[line, report] : @[line]];
     note.axis = UILayoutConstraintAxisVertical;
     note.alignment = UIStackViewAlignmentLeading;
     note.spacing = 2;
@@ -315,7 +314,6 @@ static UIButton *glassButton(NSString *title) {
 }
 
 - (void)finish {
-    SGDonateAfterTour(self.needsRestart);
     SGSetEnabled(SGKeyOnboardingSeen, YES);
     SGSetRedesignedUI(_redesigned.selected);
     if (self.needsRestart) {

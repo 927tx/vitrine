@@ -22,7 +22,6 @@
 #import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/LiveActivity/LiveActivity.h"
 #import "App/About/About.h"
-#import "App/Donate/Donate.h"
 #import "Pages.h"
 
 static const CGFloat kRowHeight = 56;
@@ -40,7 +39,6 @@ static UIViewController *modSettingsPage(void) {
     // that no switch can put right, and it is worth reading before anything else.
     SGModRow *signing = SGSigningWarningRow();
     if (signing) [sections addObject:SGSection(nil, @[signing])];
-    [sections addObject:SGSection(nil, @[SGDonateRow()])];
     SGModRow *mod = pageRow(@"Mod", @"info.circle", ^UIViewController *{ return SGAboutPage(); });
     mod.value = ^NSString *{ return @(SG_VERSION); };
     // The audio effects work on the sound, so both looks have them, with what they are doing beside the chevron.
@@ -71,7 +69,7 @@ static UIViewController *modSettingsPage(void) {
             mod,
         ]),
     ]];
-    return [[SGModPage alloc] initWithTitle:@"spoti.pw" intro:nil sections:sections footer:nil];
+    return [[SGModPage alloc] initWithTitle:@"Vitrine" intro:nil sections:sections footer:nil];
 }
 
 #pragma mark - row in the settings list and the side drawer
@@ -249,5 +247,4 @@ static BOOL isSettingsRoot(UIViewController *list) {
     SGRegisterPages();
     SGCheckSigningOnce();
     SGWatchForUpdates();
-    SGWatchForDonate();
 }

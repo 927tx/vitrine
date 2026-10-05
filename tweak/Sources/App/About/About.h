@@ -6,7 +6,7 @@
 #import <UIKit/UIKit.h>
 #import "Settings/SGModPage.h"
 
-extern NSString *const SGUpdateURL;   // spoti.pw's; the site and the repo are in Settings/SGPageStyle.h
+extern NSString *const SGUpdateURL;   // nil turns the check off; the repo is in Settings/SGPageStyle.h
 extern NSString *const SGUpdateCheckedNotification;   // on the main thread, after a check ends either way
 
 // One line of a release's changelog: what changed, under the heading Release Please put it under,
@@ -34,25 +34,16 @@ void SGCheckForUpdate(BOOL force);
 UIViewController *SGUpdatePage(void);   // UpdatePage.m: the state and the changelog
 UIViewController *SGLicensesPage(void); // Licenses.m: the mod's license and the third-party ones it ships
 
-// Usage.m: the body the check posts to spoti.pw, nil while the switch is off. The key sits outside
-// "spotifyglass." so that Reset all settings neither switches the count off nor undoes an opt-out.
-#define SGKeyUsage @"spotipw.usage"
-NSData *SGUsageBody(void);
-BOOL SGUsageOwed(void);        // on, and not yet sent this UTC day
-void SGUsageNoteAsked(void);
-
 // UpdateNotice.m: the sheet a release newer than this build brings on its own, a few seconds after
 // Spotify comes up, once per release. Watched from the settings %ctor; the switch is on the Updates
 // page and takes effect at once.
 #define SGKeyUpdateNotice @"spotifyglass.update.notice"
 void SGWatchForUpdates(void);
-BOOL SGUpdateNoticeShown(void);   // this run, so the donate sheet stays out of its way
 
 
 // Whether the now playing card on the lock screen can open this build. It depends on the signature,
 // not on the mod: iOS launches by the App ID of the application-identifier entitlement, so a build
 // whose bundle id is not that App ID cannot be opened from the card. Signing.m says so once.
-extern NSString *const SGSigningHelpURL;
 NSString *SGSigningAppIdentifier(void);      // App ID without the team prefix, nil if unreadable
 BOOL SGSigningOpensFromLockScreen(void);     // YES when unreadable, so a build that works stays quiet
 SGModRow *SGSigningWarningRow(void);          // nil while the signature is sound

@@ -135,7 +135,7 @@ static NSArray<SGUpdateRelease *> *releasesToShow(void) {
     if (SGUpdateVersion() && newest.url.length)
         [top addObject:linkRow([@"Get " stringByAppendingString:newest.version],
                                @"The release on GitHub, where its .deb is", @"arrow.down.circle", newest.url)];
-    [top addObject:linkRow(@"All releases", @"Every version, this one and the ones before it",
+    if (SGRepoURL) [top addObject:linkRow(@"All releases", @"Every version, this one and the ones before it",
                            @"clock.arrow.circlepath", [SGRepoURL stringByAppendingString:@"/releases"])];
     [groups addObject:group(nil, top)];
 

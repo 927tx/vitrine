@@ -109,7 +109,7 @@ Shared:
                   in place (AudioEffects.x, SGDSPEngine.m). The buffers are in the unit's output format, the
                   hardware's, not the client format Spotify sets. The effects are the SGDSP*.m files, on Accelerate,
                   Apple's Reverb2 unit, libbs2b and EEL2 (vendor/audio). Settings apply as they change, on a queue of
-                  its own; the file effects read their files from Documents/spoti.pw/Audio effects
+                  its own; the file effects read their files from Documents/Vitrine/Audio effects
                   (AudioEffectsFiles.m). Tested on the Mac against harness/audio-effects/, the hook in the simulator
                   against its sim/
     Haptics/      Vibrations (Haptics.h lists its files): a tap of UIKit's feedback generators for the player's and the now
@@ -219,7 +219,7 @@ and Live Activity. The root page in `App/ModSettings.x` holds the Appearance car
 
 ## Make targets
 
-    make build      # out/spoti.pw-<version>.ipa with FLEX in it
+    make build      # out/vitrine-<version>.ipa with FLEX in it
     make release    # the same without FLEX
     make install    # build without FLEX, sign with your certificate, install over USB
     make install FLEX=1   # the same with FLEX, which is what make trees reads through

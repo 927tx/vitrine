@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="docs/icon.png" width="96" alt="">
-</p>
-
-<h1 align="center">spoti.pw</h1>
+<h1 align="center">Vitrine</h1>
 
 <p align="center">Spotify, in glass.</p>
 
@@ -15,10 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://spoti.pw">spoti.pw</a> ·
   <a href="#build-it">Build it</a> ·
-  <a href="docs/tweaks.md">Hack on it</a> ·
-  <a href="https://ko-fi.com/darkksh">Support</a>
+  <a href="docs/tweaks.md">Hack on it</a>
 </p>
 
 <p align="center">
@@ -32,6 +26,9 @@
 
 A no-jailbreak Theos tweak that rebuilds Spotify for iOS in Liquid Glass, injected into your own
 decrypted IPA and signed with your own certificate.
+
+Vitrine is a fork of [spoti.pw](https://github.com/skopevoj/spoti.pw) by Vojtěch Škopek, taken from
+0.21.1 (commit `c790445`, 2026-09-23), the last version released under GPL-3.0, and modified since.
 
 Built and tested on **Spotify 9.1.78** — use that version's IPA. The mod hooks Spotify's own classes,
 which change between releases, so another version may build and then break.
@@ -49,8 +46,7 @@ in Settings → Mod Settings.
 ## Build it
 
 No IPA is distributed. Bring a decrypted **Spotify 9.1.78** IPA; you get an unsigned
-`spoti.pw-<mod version>.ipa` to sign with SideStore, Feather or any certificate signer. Each
-[release](https://github.com/skopevoj/spoti.pw/releases) also carries the tweak's `.deb`.
+`vitrine-<mod version>.ipa` to sign with SideStore, Feather or any certificate signer.
 
 ### Build with GitHub Actions
 
@@ -68,7 +64,7 @@ alone builds too, but without the Live Activity. Then:
 
 Put the decrypted `.ipa` in `ipa/`, then:
 
-    make release    # out/spoti.pw-<version>.ipa, ready to sign
+    make release    # out/vitrine-<version>.ipa, ready to sign
     make install    # the same, signed with your certificate and pushed over USB
 
 `make install` reads `SIGN_P12`, `SIGN_PROFILE` and `SIGN_P12_PASSWORD` from `.signing.env`; copy
@@ -84,24 +80,6 @@ to use. In Feather, copy the App ID into **Identifier** and leave **PPQ protecti
 SideStore and Sideloadly get this right on their own.
 
 The app keeps Spotify's bundle id, so it installs over the real Spotify.
-
-## Support
-
-Free, and staying that way — no paid tier, no supporter-only builds. If it made your phone nicer
-to use, a coffee is a good way to say so.
-
-<a href="https://ko-fi.com/darkksh">
-  <img src="https://img.shields.io/badge/Ko--fi-Buy_me_a_coffee-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white" alt="Support on Ko-fi">
-</a>
-
-## Star history
-
-<a href="https://star-history.com/#skopevoj/spoti.pw&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=skopevoj/spoti.pw&type=Date&theme=dark">
-    <img src="https://api.star-history.com/svg?repos=skopevoj/spoti.pw&type=Date" alt="Star history chart">
-  </picture>
-</a>
 
 ## Credits
 

@@ -1,4 +1,4 @@
-# spoti.pw
+# Vitrine
 
 A Theos tweak (Objective-C + Logos) injected into the decrypted Spotify iOS app. The full guide is
 `docs/tweaks.md`; read it before changing code.
