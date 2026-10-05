@@ -22,6 +22,7 @@ API_AVAILABLE(ios(17.0))
                 tint:(NSString *)tint trackStart:(NSDate *)trackStart trackEnd:(NSDate *)trackEnd pausedAt:(NSNumber *)pausedAt
          translation:(NSString *)translation cover:(NSData *)cover textSize:(NSInteger)textSize;
 + (void)end;
++ (void)endBeforeExit;
 @end
 
 // The control menu's tabs, SGLyricsAttributes.Tab's values.
@@ -40,6 +41,9 @@ static const NSTimeInterval kPausedTick = 1;
 static const NSInteger kBreakMs = 4000;
 // Seconds between attempts to start one, so a refused request (activities turned off) is not retried every tick.
 static const NSTimeInterval kStartRetry = 10;
+// A card that has not changed for this long is sent again, so its stale date (the bridge's staleAfter,
+// three times this) keeps moving on while Spotify runs, and runs out only once Spotify is gone.
+static const NSTimeInterval kRefresh = 20;
 // Tracks up next: the queue view shows four on the lock screen (three in the Dynamic Island), the
 // control menu's queue tab three.
 static const NSUInteger kUpNextQueue = 4;
@@ -63,6 +67,7 @@ static NSTimeInterval sg_tickEvery;
 static NSString *sg_shown;
 static NSString *sg_missingLyrics;
 static NSDate *sg_lastStart;
+static NSDate *sg_lastSent;
 static SGLiveActivityTab sg_tab;
 // The sleep timer: an end, or the end of the track it was set on.
 static NSDate *sg_sleepEnd;
@@ -78,17 +83,18 @@ static void startTimer(NSTimeInterval every) API_AVAILABLE(ios(17.0)) {
     [NSRunLoop.mainRunLoop addTimer:sg_timer forMode:NSRunLoopCommonModes];
 }
 
-// Sends `shown`, what the activity is to show as one string, unless it is showing that already; starts
-// the activity when there is none and the app is in front.
+// Sends `shown`, what the activity is to show as one string, unless it is showing that already and was
+// sent within kRefresh; starts the activity when there is none and the app is in front.
 static void send(NSString *shown, void (^show)(void)) API_AVAILABLE(ios(17.0)) {
     if (SGLiveActivityBridge.isShowing) {
-        if ([shown isEqualToString:sg_shown]) return;
+        if ([shown isEqualToString:sg_shown] && -sg_lastSent.timeIntervalSinceNow < kRefresh) return;
     } else {
         if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
         if (sg_lastStart && -sg_lastStart.timeIntervalSinceNow < kStartRetry) return;
         sg_lastStart = [NSDate date];
     }
     sg_shown = shown;
+    sg_lastSent = [NSDate date];
     show();
 }
 
@@ -392,6 +398,14 @@ void SGSetLiveActivityEnabled(BOOL on) {
                 runAction(note.object);
                 if (sg_timer) tick();
             }];
+            // Swiped away while it plays, Spotify is told it is ending, and the card goes with it rather than
+            // staying up frozen over other apps' activities. No queue, so the block runs before the notification
+            // returns, and with it the process. Killed while suspended, Spotify is told nothing: the stale date
+            // and the %ctor's cleanup cover that.
+            [center addObserverForName:UIApplicationWillTerminateNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+                SGLog(@"live activity: app ending");
+                [SGLiveActivityBridge endBeforeExit];
+            }];
         });
         startTimer(kTick);
         SGLog(@"live activity: on");
@@ -404,10 +418,12 @@ void SGSetLiveActivityEnabled(BOOL on) {
         SGMigrateKey(SGKeyLiveActivityWas, SGKeyLiveActivity);
         SGMigrateKey(SGKeyLiveActivityViewWas, SGKeyLiveActivityView);
         BOOL on = SGFlag(SGKeyLiveActivity, NO);
-        // Off, one left from a launch before the switch went off is ended.
+        // One left from the launch before is ended, on or off: Spotify may have been killed under it, so it
+        // shows a moment long gone. On, a fresh one starts once it is: until then the first ticks update
+        // the leftover, which is harmless, an update after the end being ignored.
         dispatch_async(dispatch_get_main_queue(), ^{
+            [SGLiveActivityBridge end];
             if (on) SGSetLiveActivityEnabled(YES);
-            else [SGLiveActivityBridge end];
         });
     }
 }

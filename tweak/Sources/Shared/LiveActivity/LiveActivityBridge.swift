@@ -9,6 +9,9 @@ public final class SGLiveActivityBridge: NSObject {
     private static let log = Logger(subsystem: "spotifyglass", category: "live activity")
     // Under ActivityKit's 4096, with room for its own wrapping.
     private static let maxStateBytes = 3800
+    // Each state is stale this long after it is sent: three times LiveActivity.x's kRefresh, which sends
+    // even an unchanged card again, so only a card Spotify can no longer feed goes stale.
+    private static let staleAfter: TimeInterval = 60
 
     private typealias State = SGLyricsAttributes.ContentState
 
@@ -98,7 +101,7 @@ public final class SGLiveActivityBridge: NSObject {
             state.cover = nil
             log.notice("[spotifyglass] live activity: \(size, privacy: .public) bytes, sent without the cover")
         }
-        let content = ActivityContent(state: state, staleDate: nil)
+        let content = ActivityContent(state: state, staleDate: Date(timeIntervalSinceNow: staleAfter))
         if let id = showing.first {
             queue(.update(id, content))
             return
@@ -123,5 +126,25 @@ public final class SGLiveActivityBridge: NSObject {
     // Named now, so an activity requested after this call is not ended with them.
     @objc public static func end() {
         queue(.end(Activity<SGLyricsAttributes>.activities.map(\.id) + Activity<SGLyricsWatchAttributes>.activities.map(\.id)))
+    }
+
+    // At termination: ends them all, past the queue, and holds the calling thread until they are ended,
+    // two seconds at most, since the process is gone once the notification returns and an end still in
+    // flight goes with it. The cap also keeps an ActivityKit that waits on the main thread from hanging it.
+    @objc public static func endBeforeExit() {
+        if showing.isEmpty { return }
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            for activity in Activity<SGLyricsAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            for activity in Activity<SGLyricsWatchAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            done.signal()
+        }
+        if done.wait(timeout: .now() + 2) == .timedOut {
+            log.notice("[spotifyglass] live activity: not ended in time at exit")
+        }
     }
 }
