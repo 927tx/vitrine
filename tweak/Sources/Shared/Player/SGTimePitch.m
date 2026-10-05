@@ -8,6 +8,10 @@ enum { kFifoFrames = 16384 };
 
 struct SGTimePitch {
     AudioUnit unit;
+    AudioUnit vari;                   // pull mode only: Varispeed, NULL in place
+    atomic_bool follows;
+    _Atomic float rate, semitones;
+    atomic_bool resampling;           // which unit renders; changed only by SGTimePitchReset
     double sampleRate;
     UInt32 channels;
     SGTimePitchSource source;
@@ -85,6 +89,25 @@ SGTimePitch *SGTimePitchCreate(double sampleRate, UInt32 channels, SGTimePitchSo
     if (!status) status = AudioUnitSetProperty(unit->unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callback, sizeof callback);
     if (!status) status = AudioUnitSetParameter(unit->unit, kNewTimePitchParam_Rate, kAudioUnitScope_Global, 0, 1, 0);
     if (!status) status = AudioUnitInitialize(unit->unit);
+    atomic_store(&unit->rate, 1);
+    // Varispeed beside it, pulling the same source: a resampler, so speed and pitch move together.
+    AudioComponentDescription varispeed = {
+        .componentType = kAudioUnitType_FormatConverter,
+        .componentSubType = kAudioUnitSubType_Varispeed,
+        .componentManufacturer = kAudioUnitManufacturer_Apple,
+    };
+    AudioComponent variComponent = source ? AudioComponentFindNext(NULL, &varispeed) : NULL;
+    if (!status && variComponent && AudioComponentInstanceNew(variComponent, &unit->vari) == noErr) {
+        OSStatus vstatus = AudioUnitSetProperty(unit->vari, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, sizeof format);
+        if (!vstatus) vstatus = AudioUnitSetProperty(unit->vari, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, sizeof format);
+        if (!vstatus) vstatus = AudioUnitSetProperty(unit->vari, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFrames, sizeof maxFrames);
+        if (!vstatus) vstatus = AudioUnitSetProperty(unit->vari, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callback, sizeof callback);
+        if (!vstatus) vstatus = AudioUnitInitialize(unit->vari);
+        if (vstatus) {
+            AudioComponentInstanceDispose(unit->vari);
+            unit->vari = NULL;
+        }
+    }
     if (status) {
         AudioComponentInstanceDispose(unit->unit);
         free(unit);
@@ -113,23 +136,43 @@ UInt32 SGTimePitchChannels(const SGTimePitch *unit) {
 
 void SGTimePitchSetRate(SGTimePitch *unit, float rate) {
     AudioUnitSetParameter(unit->unit, kNewTimePitchParam_Rate, kAudioUnitScope_Global, 0, rate, 0);
+    if (unit->vari) AudioUnitSetParameter(unit->vari, kVarispeedParam_PlaybackRate, kAudioUnitScope_Global, 0, rate, 0);
+    atomic_store(&unit->rate, rate);
+}
+
+void SGTimePitchSetFollows(SGTimePitch *unit, bool follows) {
+    atomic_store(&unit->follows, follows);
 }
 
 void SGTimePitchSetSemitones(SGTimePitch *unit, float semitones) {
     AudioUnitSetParameter(unit->unit, kNewTimePitchParam_Pitch, kAudioUnitScope_Global, 0, semitones * 100, 0);
+    atomic_store(&unit->semitones, semitones);
+}
+
+// Varispeed while following, through normal speed too, so coming back to 1x never changes units; the time
+// and pitch unit for a stretch, and for pitch alone at normal speed.
+static bool wantsVarispeed(const SGTimePitch *unit) {
+    return unit->vari && atomic_load(&unit->follows)
+           && (atomic_load(&unit->rate) != 1 || atomic_load(&unit->semitones) == 0);
+}
+
+bool SGTimePitchSwitchPending(const SGTimePitch *unit) {
+    return wantsVarispeed(unit) != atomic_load(&unit->resampling);
 }
 
 void SGTimePitchReset(SGTimePitch *unit) {
     AudioUnitReset(unit->unit, kAudioUnitScope_Global, 0);
+    if (unit->vari) AudioUnitReset(unit->vari, kAudioUnitScope_Global, 0);
     unit->written = unit->read = 0;
     unit->sampleTime = 0;
+    atomic_store(&unit->resampling, wantsVarispeed(unit));
 }
 
 OSStatus SGTimePitchRender(SGTimePitch *unit, UInt32 frames, AudioBufferList *data) {
     if (!frames || frames > kSGTimePitchMaxFrames) return kAudioUnitErr_TooManyFramesToProcess;
     AudioTimeStamp timestamp = {.mSampleTime = unit->sampleTime, .mFlags = kAudioTimeStampSampleTimeValid};
     AudioUnitRenderActionFlags flags = 0;
-    OSStatus status = AudioUnitRender(unit->unit, &flags, &timestamp, 0, frames, data);
+    OSStatus status = AudioUnitRender(atomic_load(&unit->resampling) ? unit->vari : unit->unit, &flags, &timestamp, 0, frames, data);
     unit->sampleTime += frames;
     if (status != noErr) atomic_fetch_add_explicit(&unit->failures, 1, memory_order_relaxed);
     return status;

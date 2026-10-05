@@ -29,7 +29,7 @@
 
 // A menu this soon after the more button's tap is the player's.
 static const NSTimeInterval kMenuAfterTap = 3;
-static const CGFloat kRowHeight = 56, kSliderBlockHeight = 72, kPanelBottom = 12;
+static const CGFloat kRowHeight = 56, kSliderBlockHeight = 72, kSwitchRowHeight = 44, kPanelBottom = 12;
 // The block's own measures and type, so it stands on Spotify's sheet under either look rather than on
 // the redesign's Kit: the sheet's side margin, the gap everything else is a multiple of, and a spring
 // that settles without overshooting.
@@ -96,6 +96,8 @@ static char kBlockKey, kDecidedKey, kWatchedKey, kShownAtKey, kRowsInKey;
     UILabel *_speedName, *_pitchName;
     UIButton *_speedValue, *_pitchValue;
     UISlider *_speed, *_pitch;
+    UILabel *_followsName;
+    UISwitch *_follows;
     float _shownSpeed, _shownPitch;
     NSTimeInterval _speedSentAt;
     BOOL _speedPending;
@@ -217,14 +219,19 @@ static void placeTick(UISlider *slider) {
     _speed.accessibilityLabel = @"Speed";
     _pitch = [self slider:-kMaxPitch max:kMaxPitch normal:0 minImage:@"arrow.down" maxImage:@"arrow.up"];
     _pitch.accessibilityLabel = @"Pitch";
-    for (UIView *view in @[_speedName, _speedValue, _speed, _pitchName, _pitchValue, _pitch]) [_panel addSubview:view];
+    _followsName = makeLabel(nameFont, primary());
+    _followsName.text = @"Pitch follows speed";
+    _follows = [UISwitch new];
+    _follows.accessibilityLabel = @"Pitch follows speed";
+    [_follows addTarget:self action:@selector(followsChanged) forControlEvents:UIControlEventValueChanged];
+    for (UIView *view in @[_speedName, _speedValue, _speed, _pitchName, _pitchValue, _pitch, _followsName, _follows]) [_panel addSubview:view];
 
     [self refresh];
     return self;
 }
 
 + (CGFloat)heightOpen:(BOOL)open {
-    return kRowHeight + (open ? 2 * kSliderBlockHeight + kPanelBottom : 0);
+    return kRowHeight + (open ? 2 * kSliderBlockHeight + kSwitchRowHeight + kPanelBottom : 0);
 }
 
 - (void)layoutSubviews {
@@ -239,7 +246,7 @@ static void placeTick(UISlider *slider) {
     CGFloat summaryX = CGRectGetMaxX(_title.frame) + kGrid;
     _summary.frame = CGRectMake(summaryX, 0, MAX(0, CGRectGetMinX(_chevron.frame) - kGrid - summaryX), kRowHeight);
 
-    _panel.frame = CGRectMake(0, kRowHeight, width, 2 * kSliderBlockHeight + kPanelBottom);
+    _panel.frame = CGRectMake(0, kRowHeight, width, 2 * kSliderBlockHeight + kSwitchRowHeight + kPanelBottom);
     CGFloat y = 0;
     for (NSArray<UIView *> *line in @[@[_speedName, _speedValue, _speed], @[_pitchName, _pitchValue, _pitch]]) {
         line[0].frame = CGRectMake(side, y + 4, width / 2 - side, 24);
@@ -249,6 +256,9 @@ static void placeTick(UISlider *slider) {
         placeTick((UISlider *)line[2]);
         y += kSliderBlockHeight;
     }
+    CGSize toggle = [_follows sizeThatFits:CGSizeZero];
+    _follows.frame = CGRectMake(width - side - toggle.width, y + (kSwitchRowHeight - toggle.height) / 2, toggle.width, toggle.height);
+    _followsName.frame = CGRectMake(side, y, CGRectGetMinX(_follows.frame) - side - kGrid, kSwitchRowHeight);
 }
 
 #pragma mark state
@@ -277,7 +287,7 @@ static NSString *pitchText(float pitch) {
     _speed.enabled = speedAllowed;
     _pitch.enabled = pitchAvailable;
     _speed.alpha = speedAllowed ? 1 : 0.4;
-    _pitch.alpha = pitchAvailable ? 1 : 0.4;
+    _follows.on = SGPlayerPitchFollowsSpeed();
     [self showValues];
 }
 
@@ -289,6 +299,10 @@ static NSString *pitchText(float pitch) {
         [_speedValue layoutIfNeeded];
         [_pitchValue layoutIfNeeded];
     }];
+    // While pitch follows a speed that is not normal, the speed sets the pitch, so the slider stands aside.
+    BOOL pitchFree = pitchAvailable && !(_follows.on && _shownSpeed != 1);
+    _pitch.enabled = pitchFree;
+    _pitch.alpha = pitchFree ? 1 : 0.4;
     _speedValue.enabled = speedAllowed && _shownSpeed != 1;
     _pitchValue.enabled = pitchAvailable && _shownPitch != 0;
     _speed.accessibilityValue = speedAllowed ? speedText(_shownSpeed) : @"Unavailable";
@@ -378,6 +392,12 @@ static NSString *pitchText(float pitch) {
     } else {
         slider.value = _shownPitch;
     }
+}
+
+- (void)followsChanged {
+    SGSetPlayerPitchFollowsSpeed(_follows.on);
+    SGPlayFeedback(SGFeedbackDetent);
+    [self refresh];
 }
 
 - (void)resetSpeed {

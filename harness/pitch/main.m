@@ -121,11 +121,13 @@ static OSStatus sineSource(void *context, UInt32 frames, AudioBufferList *data) 
     return noErr;
 }
 
-static void runPull(float rate, float semitones) {
+static void runPull(float rate, float semitones, bool follows) {
     Sine sine = {0};
     SGTimePitch *unit = SGTimePitchCreate(kRate, 2, sineSource, &sine);
+    SGTimePitchSetFollows(unit, follows);
     SGTimePitchSetRate(unit, rate);
     SGTimePitchSetSemitones(unit, semitones);
+    SGTimePitchReset(unit);
     size_t total = (size_t)(kRate * 4);
     float *left = calloc(total, sizeof(float)), *right = calloc(total, sizeof(float));
     for (size_t done = 0; done < total; done += 1024) {
@@ -133,12 +135,77 @@ static void runPull(float rate, float semitones) {
         if (SGTimePitchRender(unit, 1024, &buffers.list) != noErr) printf("  render failed\n");
     }
     double measured = frequency(left + (size_t)kRate, total - (size_t)kRate);
-    double expected = 440 * pow(2, semitones / 12);
+    // Following speed, the pitch rises with the rate, the way a record played faster does.
+    double expected = follows && (rate != 1 || semitones == 0) ? 440 * rate : 440 * pow(2, semitones / 12);
     double consumedRate = (double)SGTimePitchConsumed(unit) / total;
-    printf("pull rate %.2f %+3.0f st: %6.1f Hz (want %6.1f, %+.2f%%), consumed %.3fx, largest pull %u, failures %u\n", rate, semitones,
+    printf("pull %-10s rate %.2f %+3.0f st: %6.1f Hz (want %6.1f, %+.2f%%), consumed %.3fx, largest pull %u, failures %u\n", follows ? "varispeed" : "stretch", rate, semitones,
            measured, expected, (measured / expected - 1) * 100, consumedRate, SGTimePitchLargestPull(unit), SGTimePitchFailures(unit));
     free(left);
     free(right);
+}
+
+// The longest run of near silence, in frames, after the unit's first sound.
+static size_t longestGap(const float *samples, size_t count) {
+    size_t longest = 0, run = 0;
+    for (size_t i = onset(samples, count); i < count; i++) {
+        run = fabsf(samples[i]) < 0.01f ? run + 1 : 0;
+        if (run > longest) longest = run;
+    }
+    return longest;
+}
+
+// One unit through a change of speed or pitch, the way the menu makes one: `before` for a second, then
+// `after`, resetting only when SGTimePitchSwitchPending says (SpeedPitch.x's switchIfAsked). A sine has no
+// silence longer than its zero crossings, about 2 frames, so a longer gap is the change heard.
+typedef struct { float rate, semitones; bool follows; } Setting;
+static bool runChange(const char *name, Setting before, Setting after, bool wantSwitch, size_t allowedGap) {
+    Sine sine = {0};
+    SGTimePitch *unit = SGTimePitchCreate(kRate, 2, sineSource, &sine);
+    SGTimePitchSetFollows(unit, before.follows);
+    SGTimePitchSetRate(unit, before.rate);
+    SGTimePitchSetSemitones(unit, before.semitones);
+    SGTimePitchReset(unit);
+    size_t half = (size_t)kRate, total = 2 * half;
+    float *left = calloc(total, sizeof(float)), *right = calloc(total, sizeof(float));
+    bool switched = false, changed = false;
+    for (size_t done = 0; done < total; done += 1024) {
+        if (done >= half && !changed) {
+            changed = true;
+            SGTimePitchSetFollows(unit, after.follows);
+            SGTimePitchSetRate(unit, after.rate);
+            SGTimePitchSetSemitones(unit, after.semitones);
+            switched = SGTimePitchSwitchPending(unit);
+            if (switched) SGTimePitchReset(unit);
+        }
+        struct { AudioBufferList list; AudioBuffer second; } buffers = {{2, {{1, 4096, left + done}}}, {1, 4096, right + done}};
+        SGTimePitchRender(unit, 1024, &buffers.list);
+    }
+    size_t gap = longestGap(left, total);
+    bool resamples = after.follows && (after.rate != 1 || after.semitones == 0);
+    double expected = resamples ? 440 * after.rate : 440 * pow(2, after.semitones / 12);
+    double measured = frequency(left + half + half / 2, half / 2);
+    bool ok = switched == wantSwitch && gap <= allowedGap && fabs(measured / expected - 1) < 0.005;
+    printf("%s change %-44s: %s units, longest gap %4zu frames (%.1f ms), then %6.1f Hz (want %6.1f)\n", ok ? "ok  " : "FAIL", name,
+           switched ? "switched" : "kept    ", gap, gap * 1000 / kRate, measured, expected);
+    free(left);
+    free(right);
+    return ok;
+}
+
+// The changes SpeedPitch.x makes while the unit is in, Pitch follows speed being on unless said.
+static bool runChanges(void) {
+    bool ok = true;
+    // A hold let go, Speed reset, a drag across 1: Varispeed all along, nothing lost.
+    ok &= runChange("follows, 2x to 1x", (Setting){2, 0, true}, (Setting){1, 0, true}, false, 8);
+    ok &= runChange("follows, 1x to 1.5x", (Setting){1, 0, true}, (Setting){1.5f, 0, true}, false, 8);
+    // Pitch alone at 1x is the stretch's, reset on the way in: its delay once, never sound from before.
+    ok &= runChange("follows, 1x, pitch 0 to +3", (Setting){1, 0, true}, (Setting){1, 3, true}, true, 4200);
+    ok &= runChange("follows, 1.5x +3 to 1x +3", (Setting){1.5f, 3, true}, (Setting){1, 3, true}, true, 4200);
+    ok &= runChange("follows switched off at 1.5x", (Setting){1.5f, 0, true}, (Setting){1.5f, 0, false}, true, 4200);
+    ok &= runChange("follows switched on at 1.5x", (Setting){1.5f, 0, false}, (Setting){1.5f, 0, true}, true, 64);
+    // Without following it stays the stretch.
+    ok &= runChange("stretch, 1.5x to 1x", (Setting){1.5f, 0, false}, (Setting){1, 0, false}, false, 8);
+    return ok;
 }
 
 int main(int argc, const char **argv) {
@@ -147,8 +214,13 @@ int main(int argc, const char **argv) {
             for (NSNumber *semitones in @[@-12, @-5, @-1, @0.5, @3, @7, @12]) runSine(semitones.floatValue, pattern);
         }
         for (NSNumber *rate in @[@0.5, @0.75, @1, @1.25, @1.5, @2]) {
-            runPull(rate.floatValue, 0);
-            runPull(rate.floatValue, 3);
+            runPull(rate.floatValue, 0, false);
+            runPull(rate.floatValue, 3, false);
+            runPull(rate.floatValue, 0, true);
+        }
+        if (!runChanges()) {
+            printf("a change failed\n");
+            return 1;
         }
         if (argc > 1) {
             NSString *song = @(argv[1]);

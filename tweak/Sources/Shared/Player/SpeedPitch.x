@@ -351,8 +351,10 @@ static SGTimePitch *unitForFormat(void) {
         disengage();
         unit = SGTimePitchCreate(rate, channels, pull ? pullForUnit : NULL, NULL);
         if (unit) {
+            SGTimePitchSetFollows(unit, SGPlayerPitchFollowsSpeed());
             SGTimePitchSetRate(unit, pull ? sg_speed : 1);
             SGTimePitchSetSemitones(unit, sg_semitones);
+            SGTimePitchReset(unit);
         }
         atomic_store(slot, unit);
         SGLog(@"redesign speed: %@ %@ for %.0f Hz, %u channels", unit ? @"a unit" : @"no unit", pull ? @"in the chain" : @"in place", rate, (unsigned)channels);
@@ -368,6 +370,16 @@ static void report(void) {
     SGLog(@"redesign speed: %.2fx, %+.0f st, %u underruns, %u failures, largest pull %u, %.1f s of input", sg_speed, sg_semitones,
           SGTimePitchUnderruns(unit), SGTimePitchFailures(unit), SGTimePitchLargestPull(unit),
           SGTimePitchConsumed(unit) / SGTimePitchSampleRate(unit));
+}
+
+// Hands the render thread to the unit's other half, reset, when the speed, the pitch or Pitch follows speed
+// now call for it. That costs the unit's delay once (93 ms going to the stretch), the same as putting it in,
+// where rendering the other half as it was left would play what it held from last time.
+static void switchIfAsked(SGTimePitch *unit) {
+    if (!atomic_load(&sg_engaged) || !SGTimePitchSwitchPending(unit)) return;
+    disengage();
+    SGTimePitchReset(unit);
+    atomic_store(&sg_engaged, true);
 }
 
 // Puts the unit in or takes it out for the current speed and pitch.
@@ -395,6 +407,7 @@ static void apply(void) {
         SGTimePitchReset(unit);
         atomic_store(&sg_engaged, true);
     }
+    switchIfAsked(unit);
 }
 
 #pragma mark - the menu's calls
@@ -421,6 +434,17 @@ float SGPlayerPitch(void) {
 void SGSetPlayerPitch(float semitones) {
     if (!sg_startOutput && !tapped()) return;
     sg_semitones = semitones;
+    apply();
+}
+
+BOOL SGPlayerPitchFollowsSpeed(void) {
+    return SGEnabled(SGKeyPitchFollowsSpeed);
+}
+
+void SGSetPlayerPitchFollowsSpeed(BOOL follows) {
+    SGSetEnabled(SGKeyPitchFollowsSpeed, follows);
+    SGTimePitch *unit = atomic_load(&sg_pull);
+    if (unit) SGTimePitchSetFollows(unit, follows);
     apply();
 }
 

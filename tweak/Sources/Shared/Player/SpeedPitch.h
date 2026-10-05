@@ -23,5 +23,10 @@ void SGSetPlayerSpeed(double speed);
 // Semitones Spotify's output is moved by, 0 when it is not.
 float SGPlayerPitch(void);
 void SGSetPlayerPitch(float semitones);
+// Speed and pitch move together, like a record, by resampling rather than the time stretch. On until
+// switched off, from the switch under the two sliders.
+#define SGKeyPitchFollowsSpeed @"spotifyglass.speed.pitchFollows"
+BOOL SGPlayerPitchFollowsSpeed(void);
+void SGSetPlayerPitchFollowsSpeed(BOOL follows);
 // Whether the output could be reached to change its pitch.
 BOOL SGPlayerPitchAvailable(void);
