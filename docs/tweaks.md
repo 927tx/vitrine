@@ -231,9 +231,11 @@ Redesigned:
                   cover plays at 2x until the finger lifts (PlayerArtwork.x), an octave higher while Pitch follows
                   speed is on. Animated artwork (PlayerMotion.x)
                   runs the clip edge to edge from the top over its own last rows drawn on down, with a blur coming in
-                  from the seam under the controls and over the whole clip behind the lyrics; the menu switches it
-                  between Animated and Fluid without a restart. Checked in the simulator against harness/player/
-                  (`motion`)
+                  from the seam under the controls and over the whole clip behind the lyrics. The clip and the cover
+                  cross over as one comes and the other goes, the clip from its poster frame before the video has
+                  decoded one, and the Fluid field under a clip holds still and, once the clip has faded in, is hidden
+                  (SGRArtworkField's covered); the menu switches it between Animated
+                  and Fluid without a restart. Checked in the simulator against harness/player/ (`motion`)
     Lyrics/       the full screen lyrics page on glass with Apple Music style lyrics over it, always on (SGRKaraokeView,
                   which the player shows in itself too, Player/PlayerLyrics.x): lines sung over each other lit together,
                   the stack moving on once the first is sung out; an instrumental break of 7 s or more held by three dots

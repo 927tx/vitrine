@@ -690,6 +690,13 @@ static UIView *motionView(void) {
     NSLog(@"[harness] motion check %@: %@ -- %@", step, detail, ok ? @"ok" : @"WRONG");
 }
 
+// The field covered by the clip, and its Fluid copies hidden for it.
+static BOOL fieldCovered(void) {
+    SGRArtworkField *field = SGRPlayerField();
+    CALayer *fluid = [field valueForKey:@"_fluidLayer"];
+    return field.covered && fluid && fluid.hidden;
+}
+
 - (void)runMotionChecks {
     // The clip comes in before the player has laid out, as for the track restored at launch.
     after(3, ^{
@@ -712,6 +719,15 @@ static UIView *motionView(void) {
             && foot.contents && foot.contentsRect.size.height < 0.05 && CGRectGetMaxY(foot.contentsRect) > 0.999;
         [self expect:footDown step:@"the foot"
               detail:[NSString stringWithFormat:@"clip %@, foot %@ from rows %@", NSStringFromCGRect(clip.frame), NSStringFromCGRect(foot.frame), NSStringFromCGRect(foot.contentsRect)]];
+        // The poster under the video, so the clip has a picture before its first frame is decoded; and the
+        // Fluid field under it held still and, the clip being opaque, hidden.
+        CALayer *still = clip.superlayer;
+        [self expect:still.contents && CGRectEqualToRect(still.bounds, clip.frame) && still.mask && SGRPlayerField().motionHeld
+                     && fieldCovered()
+                step:@"the poster and the held field"
+              detail:[NSString stringWithFormat:@"poster %@ at %@, video %@, fade %@, field %@, %@", still.contents ? @"in" : @"missing",
+                      NSStringFromCGRect(still.frame), NSStringFromCGRect(clip.frame), still.mask ? @"on the poster" : @"missing",
+                      SGRPlayerField().motionHeld ? @"held" : @"moving", fieldCovered() ? @"its Fluid copies hidden" : @"its Fluid copies drawn"]];
         [self expect:seam.effect && !lyrics.effect step:@"the blur from the seam"
               detail:[NSString stringWithFormat:@"seam blur %@, from %@ of the height, lyrics blur %@", seam.effect ? @"on" : @"off",
                       [[seam.maskView.layer.sublayers.firstObject valueForKey:@"locations"] componentsJoinedByString:@" to "], lyrics.effect ? @"on" : @"off"]];
@@ -745,25 +761,42 @@ static UIView *motionView(void) {
         self->_units = units;
         self->_background = background;
         [self layOut];
-        [self expect:SGRPlayerField() != old && motionView() != nil step:@"a field built again" detail:motionView() ? @"the clip moved onto it" : @"the clip left behind"];
+        [self expect:SGRPlayerField() != old && motionView() != nil && fieldCovered() step:@"a field built again"
+              detail:[NSString stringWithFormat:@"%@, its Fluid copies %@", motionView() ? @"the clip moved onto it" : @"the clip left behind",
+                      fieldCovered() ? @"hidden" : @"drawn"]];
     });
+    // Switched off, the clip and the cover cross over: the clip's fade out and the cover's fade in start
+    // together, over the same time.
     after(12.5, ^{
         SGPlayerMenuSetAnimatedArtwork(NO);
+        UIView *fading = motionView();
+        CALayer *picture = ((UIView *)[fading valueForKey:@"_picture"]).layer, *mask = self->_covers.layer.mask;
+        CAAnimation *out = [picture animationForKey:@"opacity"], *in = [mask animationForKey:@"opacity"];
+        [self expect:!SGRPlayerMotionShowing() && fading && out && in && fabs(out.duration - in.duration) < 0.01 && picture.opacity == 0
+                     && mask.opacity == 1 && !SGRPlayerField().motionHeld && !fieldCovered()
+                step:@"switched off, crossing over"
+              detail:[NSString stringWithFormat:@"clip %@ to %.0f over %.2f s, cover to %.0f over %.2f s, field %@, its Fluid copies %@", fading ? @"fading" : @"gone",
+                      picture.opacity, out.duration, mask.opacity, in.duration, SGRPlayerField().motionHeld ? @"held" : @"moving",
+                      fieldCovered() ? @"hidden" : @"drawn"]];
+    });
+    after(13.2, ^{
         [self expect:!SGRPlayerMotionShowing() && !motionView() && !self->_covers.layer.mask && !SGPlayerMenuAnimatedArtwork()
                 step:@"switched off from the menu" detail:[NSString stringWithFormat:@"clip %@, cover %@", motionView() ? @"still there" : @"gone",
                                                                  self->_covers.layer.mask ? @"hidden" : @"back"]];
         SGPlayerMenuSetAnimatedArtwork(YES);
     });
-    after(14, ^{
-        [self expect:motionView() && self->_covers.layer.mask step:@"switched on again"
-              detail:[NSString stringWithFormat:@"clip %@, cover %@", motionView() ? @"back" : @"missing", self->_covers.layer.mask ? @"hidden" : @"shown"]];
+    after(14.7, ^{
+        // Faded in on screen this time, so the field is covered once the fade has finished.
+        [self expect:motionView() && self->_covers.layer.mask && fieldCovered() step:@"switched on again"
+              detail:[NSString stringWithFormat:@"clip %@, cover %@, its Fluid copies %@", motionView() ? @"back" : @"missing",
+                      self->_covers.layer.mask ? @"hidden" : @"shown", fieldCovered() ? @"hidden" : @"drawn"]];
         // The player closed: the cover list cannot be found, and switching off must still bring its cover back.
         [self->_host removeFromSuperview];
         SGPlayerMenuSetAnimatedArtwork(NO);
         [self expect:!self->_covers.layer.mask step:@"switched off with the player closed" detail:self->_covers.layer.mask ? @"cover still hidden" : @"cover back"];
         [self->_list addSubview:self->_host];
     });
-    after(15, ^{
+    after(15.7, ^{
         NSLog(@"[harness] motion checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
               self->_failures ? @"FAIL" : @"PASS");
     });

@@ -42,7 +42,9 @@ come late, out of order, or not at all.
   is served as the track's Canvas before the player's background has laid out; then the background lays
   out, the lyrics open and close, the background is built again, and the ⋯ menu's switch goes off, on, and
   off with the player out of its window. Each step is checked (the clip on the field, the cover hidden, the
-  foot and the blur, the thumbnail) and the log ends with `motion checks: n of 9 right -- PASS` or `FAIL`.
+  poster under the video and the Fluid field held under it, the foot and the blur, the thumbnail, the clip
+  and the cover crossing over half way through the switch) and the log ends with
+  `motion checks: n of 11 right -- PASS` or `FAIL`.
 
 `HARNESS_VOLUME=0` leaves out the volume row that the phone has and the tree does not.
 

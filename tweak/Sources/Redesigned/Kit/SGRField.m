@@ -121,7 +121,7 @@ static NSDictionary *noActions(void) {
         [self.layer insertSublayer:_fluidLayer above:_solid];
     }
     // The fluid field is the whole picture, as the moving one is.
-    _fluidLayer.hidden = !fluid;
+    _fluidLayer.hidden = !fluid || _covered;
     _black.hidden = fluid || _flows;
     if (fluid) _backdrop.hidden = YES;
     if (fluid && _image) [_fluidLayer setArtwork:_image animated:NO];
@@ -152,6 +152,15 @@ static NSDictionary *noActions(void) {
     if (held == _motionHeld) return;
     _motionHeld = held;
     [self updateMotion];
+}
+
+- (void)setCovered:(BOOL)covered {
+    if (covered == _covered) return;
+    _covered = covered;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    _fluidLayer.hidden = !_fluid || covered;
+    [CATransaction commit];
 }
 
 - (void)watch {

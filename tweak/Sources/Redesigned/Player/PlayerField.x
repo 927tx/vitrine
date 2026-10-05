@@ -66,8 +66,9 @@ static SGRArtworkField *fieldIn(UIView *plane) {
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
     field.flows = background == SGRPlayerBackgroundColours;
     field.fluid = background >= SGRPlayerBackgroundFluid;
-    // A paused song holds the colours still, the way it rests the cover (PlayerArtwork.x).
-    field.motionHeld = SGPlayerState().isPaused;
+    // A paused song holds the colours still, the way it rests the cover (PlayerArtwork.x), and so does an
+    // animated artwork's clip, which covers the field (PlayerMotion.x).
+    field.motionHeld = SGPlayerState().isPaused || SGRPlayerMotionShowing();
     field.bleed = kBleed;
     objc_setAssociatedObject(plane, &kFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     sg_field = field;
@@ -154,7 +155,7 @@ static void publishCover(void) {
 }
 
 - (void)playerStateDidChange:(SPTPlayerState *)state {
-    sg_field.motionHeld = state.isPaused;
+    sg_field.motionHeld = state.isPaused || SGRPlayerMotionShowing();
     NSString *track = SGURIString(state.track.URI);
     if (!track || [track isEqualToString:_track]) return;
     _track = track;

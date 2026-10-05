@@ -13,7 +13,12 @@
 // Spotify built again, gets it.
 //
 // The clip holds still when the moving field does (SGRField.m): out of a window, with the app not in front,
-// while the player opens or closes, under Reduce Motion and in Low Power Mode.
+// while the player opens or closes, under Reduce Motion and in Low Power Mode. While a clip is showing, the
+// Fluid field under it is held still too, and once the clip has faded in it is hidden (the field's covered):
+// the field's colour is what shows above the clip on the pull that dismisses.
+//
+// The clip and the cover cross over: the clip fades in from its first frame (the poster, under the video
+// until the video has decoded one) as the cover fades out, and fades out as the cover comes back.
 #import <AVFoundation/AVFoundation.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
@@ -35,7 +40,7 @@ static const CGFloat kBlurByControls = 0.6, kBlurRamp = 96;
 @interface SGRPlayerMotionView : UIView
 @property (nonatomic) CGFloat screenHeight;
 - (void)playFile:(NSURL *)file poster:(UIImage *)poster;
-- (void)appear:(BOOL)animated;
+- (void)appear:(BOOL)animated then:(void (^)(void))done;
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated;
 @end
 
@@ -43,6 +48,7 @@ static const CGFloat kBlurByControls = 0.6, kBlurRamp = 96;
     AVQueuePlayer *_player;
     AVPlayerLooper *_looper;
     UIView *_picture;   // the clip over its foot, faded in as one
+    CALayer *_still;    // the poster, with the video drawn over it
     AVPlayerLayer *_clip;
     CAGradientLayer *_clipMask, *_seamMask;
     CALayer *_foot;
@@ -65,13 +71,20 @@ static UIBlurEffect *blurEffect(void) {
     _foot = [CALayer layer];
     _foot.contentsGravity = kCAGravityResize;
     [_picture.layer addSublayer:_foot];
+    // An AVPlayerLayer draws nothing until its first frame is decoded, so the poster, the clip's first
+    // frame and where the looper starts, is the contents of the layer the video draws in: there is a
+    // picture from the first frame, and the video covers it exactly.
+    _still = [CALayer layer];
+    _still.contentsGravity = kCAGravityResizeAspectFill;
+    _still.masksToBounds = YES;
     _clip = [AVPlayerLayer layer];
     _clip.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    [_still addSublayer:_clip];
     _clipMask = [CAGradientLayer layer];
     _clipMask.colors = @[(id)UIColor.blackColor.CGColor, (id)UIColor.blackColor.CGColor, (id)UIColor.clearColor.CGColor];
     _clipMask.locations = @[@0, @(kFootFrom), @1];
-    _clip.mask = _clipMask;
-    [_picture.layer addSublayer:_clip];
+    _still.mask = _clipMask;
+    [_picture.layer addSublayer:_still];
 
     _seamBlur = [[UIVisualEffectView alloc] initWithEffect:nil];
     _seamBlur.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
@@ -118,8 +131,9 @@ static UIBlurEffect *blurEffect(void) {
     _lyricsBlur.frame = bounds;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
-    _clip.frame = CGRectMake(0, 0, width, height);
-    _clipMask.frame = _clip.bounds;
+    _still.frame = CGRectMake(0, 0, width, height);
+    _clip.frame = _still.bounds;
+    _clipMask.frame = _still.bounds;
     _foot.frame = CGRectMake(0, seam, width, MAX(0, total - seam));
     _seamMask.frame = bounds;
     _seamMask.locations = @[@(MIN(1, blurFrom / total)), @(MIN(1, (blurFrom + kBlurRamp) / total))];
@@ -131,6 +145,7 @@ static UIBlurEffect *blurEffect(void) {
     // The poster's last rows, stretched from the seam to the bottom: the clip goes on down in its own colour.
     CGFloat rows = MAX(kFootRows, 1 / MAX(1, poster.size.height * poster.scale));
     _foot.contents = (__bridge id)poster.CGImage;
+    _still.contents = (__bridge id)poster.CGImage;
     _foot.contentsRect = CGRectMake(0, 1 - rows, 1, rows);
     _player = [AVQueuePlayer new];
     _player.muted = YES;
@@ -141,14 +156,30 @@ static UIBlurEffect *blurEffect(void) {
     [self updateMotion];
 }
 
-- (void)appear:(BOOL)animated {
+// `done` runs once the clip is opaque, unless something cut the fade in short.
+- (void)appear:(BOOL)animated then:(void (^)(void))done {
     _picture.alpha = 0;
     void (^apply)(void) = ^{
         self->_picture.alpha = 1;
         self->_seamBlur.effect = blurEffect();
     };
-    if (animated) SGRAnimate(SGRMotionFade, apply, nil);
-    else apply();
+    if (animated) {
+        SGRAnimate(SGRMotionFade, apply, ^(BOOL finished) {
+            if (finished) done();
+        });
+    } else {
+        apply();
+        done();
+    }
+}
+
+// The clip and both blurs fade out; `done` runs once they have.
+- (void)disappear:(void (^)(void))done {
+    SGRAnimate(SGRMotionFade, ^{
+        self->_picture.alpha = 0;
+        self->_seamBlur.effect = nil;
+        self->_lyricsBlur.effect = nil;
+    }, ^(BOOL finished) { done(); });
 }
 
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated {
@@ -179,9 +210,11 @@ static UIBlurEffect *blurEffect(void) {
 
 static SGRPlayerMotionView *sg_motion;
 static NSString *sg_track;
-// The list the empty mask went on, so it comes off even while the player is closed and the list cannot
-// be found.
-static __weak CALayer *sg_maskedCovers;
+// The clip is in and opaque, so the field under it is covered.
+static BOOL sg_covering;
+// The list the mask went on, so it comes off even while the player is closed and the list cannot be found,
+// and the mask, told from any other.
+static __weak CALayer *sg_maskedCovers, *sg_coverMask;
 
 // The clip from the top of the field, as wide as it is, its foot down to the bottom of the field's bleed.
 static void layOut(void) {
@@ -193,48 +226,114 @@ static void layOut(void) {
     CGRect frame = CGRectMake(0, 0, size.width, MAX(size.height, screen) + field.bleed.bottom);
     if (!CGRectEqualToRect(sg_motion.frame, frame)) sg_motion.frame = frame;
     sg_motion.screenHeight = screen;
+    // A field Spotify built again, or the first one after a clip that came in before it, is covered too.
+    field.covered = sg_covering;
 }
 
-// An empty mask rather than alpha: the covers still take the swipe that changes track, and the lyrics,
-// which fade the list by its alpha as they come and go, cannot bring the cover back.
-static void setCoverShown(BOOL shown) {
+static void cover(BOOL covering) {
+    sg_covering = covering;
+    SGRPlayerField().covered = covering;
+}
+
+// The Fluid field under a clip holds still, as it does for a paused song (PlayerField.x): the clip covers it.
+static void holdField(void) {
+    SGRPlayerField().motionHeld = SGPlayerState().isPaused || sg_motion != nil;
+}
+
+// The mask's opacity to `opacity`, from where it is drawn now, over the clip's own fade. The frame reaches a
+// few covers past the list's bounds either way, which move as the list scrolls: it counts only during a fade,
+// since at 0 the mask hides everything and at 1 it comes off.
+static void fadeCoverMask(CALayer *covers, CALayer *mask, float opacity, BOOL animated, void (^done)(void)) {
+    // A list out of a window, a closed player's, has nothing to fade.
+    id list = covers.delegate;
+    animated = animated && [list isKindOfClass:UIView.class] && ((UIView *)list).window;
+    CGRect bounds = covers.bounds;
+    float from = (mask.presentationLayer ?: mask).opacity;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    mask.frame = CGRectInset(bounds, -3 * bounds.size.width, -bounds.size.height);
+    mask.opacity = opacity;
+    if (animated) {
+        CABasicAnimation *fade = [CABasicAnimation animationWithKeyPath:@"opacity"];
+        fade.fromValue = @(from);
+        fade.toValue = @(opacity);
+        fade.duration = SGRCrossfade;
+        fade.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+        [CATransaction setCompletionBlock:done];
+        [mask addAnimation:fade forKey:@"opacity"];
+    } else {
+        [mask removeAnimationForKey:@"opacity"];
+    }
+    [CATransaction commit];
+    if (!animated && done) done();
+}
+
+// A mask rather than alpha: the covers still take the swipe that changes track, and the lyrics, which fade
+// the list by its alpha as they come and go, cannot bring the cover back. Asked again for where it is going,
+// it does nothing, so the field's layout passes do not cut a fade short.
+static void setCoverShown(BOOL shown, BOOL animated) {
+    CALayer *covers = shown ? sg_maskedCovers : SGRPlayerCoverList().layer;
+    if (!covers) return;
+    CALayer *mask = covers.mask;
+    BOOL ours = mask && mask == sg_coverMask;
     if (shown) {
-        sg_maskedCovers.mask = nil;
         sg_maskedCovers = nil;
+        if (!ours) return;
+        // A newer fade ends this one early, and the mask stays for it.
+        fadeCoverMask(covers, mask, 1, animated, ^{
+            if (covers.mask == mask && sg_maskedCovers != covers) covers.mask = nil;
+        });
         return;
     }
-    CALayer *covers = SGRPlayerCoverList().layer;
-    if (!covers || covers.mask) return;
-    covers.mask = [CALayer layer];
+    if (covers == sg_maskedCovers || (mask && !ours)) return;
+    if (!mask) {
+        mask = [CALayer layer];
+        mask.backgroundColor = UIColor.blackColor.CGColor;
+        covers.mask = mask;
+        sg_coverMask = mask;
+    }
     sg_maskedCovers = covers;
+    fadeCoverMask(covers, mask, 0, animated, nil);
 }
 
 void SGRPlayerMotionFieldLaidOut(void) {
     layOut();
-    setCoverShown(sg_motion == nil);
+    setCoverShown(sg_motion == nil, NO);
 }
 
 BOOL SGRPlayerMotionShowing(void) {
     return sg_motion != nil;
 }
 
-static void clear(void) {
-    [sg_motion removeFromSuperview];
+// The clip fades out over the cover coming back where the player is on screen, and goes at once where not.
+static void clear(BOOL animated) {
+    SGRPlayerMotionView *old = sg_motion;
     sg_motion = nil;
-    setCoverShown(YES);
+    // Uncovered before the clip starts to fade, so the field is there under it.
+    cover(NO);
+    holdField();
+    animated = animated && old.window != nil;
+    setCoverShown(YES, animated);
+    if (animated) [old disappear:^{ [old removeFromSuperview]; }];
+    else [old removeFromSuperview];
 }
 
 static void show(NSString *track, NSURL *file) {
     if (!file || ![track isEqualToString:sg_track]) return;
     SGMotionPoster(file, ^(UIImage *poster) {
         if (!poster || poster.size.width <= 0 || ![track isEqualToString:sg_track]) return;
-        clear();
+        clear(YES);
         sg_motion = [[SGRPlayerMotionView alloc] initWithFrame:CGRectZero];
         [sg_motion playFile:file poster:poster];
         layOut();
+        holdField();
         [sg_motion setBlurred:SGRPlayerLyricsOpen() animated:NO];
-        [sg_motion appear:sg_motion.window != nil];
-        setCoverShown(NO);
+        BOOL animated = sg_motion.window != nil;
+        SGRPlayerMotionView *motion = sg_motion;
+        [motion appear:animated then:^{
+            if (sg_motion == motion) cover(YES);
+        }];
+        setCoverShown(NO, animated);
         SGLog(@"redesign player: animated artwork %@, %.0fx%.0f", file.lastPathComponent, poster.size.width, poster.size.height);
     });
 }
@@ -251,7 +350,7 @@ void SGRPlayerMotionLyricsChanged(void) {
     NSString *track = SGURIString(state.track.URI);
     if (!track || [track isEqualToString:sg_track]) return;
     sg_track = track;
-    clear();
+    clear(YES);
     // Read on every track, since the ⋯ menu switches it.
     if (SGRPlayerBackground() != SGRPlayerBackgroundAnimated) return;
     NSDictionary *metadata = [state.track.metadata isKindOfClass:NSDictionary.class] ? state.track.metadata : nil;
@@ -298,7 +397,7 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
     SGLog(@"redesign player: animated artwork switched %@ from the menu", on ? @"on" : @"off");
     // The playing track is let go, and looked up again when switched on.
     sg_track = nil;
-    clear();
+    clear(YES);
     [sg_watcher playerStateDidChange:SGPlayerState()];
 }
 

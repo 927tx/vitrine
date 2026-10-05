@@ -145,3 +145,21 @@ static double sg_speed = 1;
 double SGPlayerSpeed(void) { return sg_speed; }
 BOOL SGPlayerSpeedAllowed(void) { return YES; }
 void SGSetPlayerSpeed(double speed) { sg_speed = speed; NSLog(@"[harness] speed %.2f", speed); }
+
+// Sing (the mic on the lyrics, SGRSingButton.m): never available, as on a phone that cannot run it.
+#import "Shared/Sing/Sing.h"
+NSString *const SGSingChangedNotification = @"harness.singChanged";
+SGSingState SGSingCurrentState(void) { return SGSingStateUnavailable; }
+NSString *SGSingStatusText(void) { return @"Unavailable"; }
+NSString *SGSingStatusDetail(void) { return nil; }
+NSString *SGSingMissing(void) { return @"the harness"; }
+BOOL SGSingOn(void) { return NO; }
+void SGSetSingOn(BOOL on) {}
+float SGSingLevel(void) { return 0; }
+void SGSetSingLevel(float level) {}
+NSString *SGSingLevelText(double level) { return @""; }
+double SGSingModelProgress(void) { return 0; }
+NSString *SGSingModelError(void) { return nil; }
+NSString *SGSingModelSizeText(void) { return @""; }
+void SGSingDownloadModel(void) {}
+void SGSingCancelModelDownload(void) {}
