@@ -1096,6 +1096,7 @@ typedef struct {
     CFTimeInterval _stillSince;   // when the position stopped moving, 0 while it moves
     SGRKaraokeStyle *_style;   // how the lines were laid out
     BOOL _hasSpoken, _hasTranslation;   // whether the song has any line with either
+    BOOL _untranslated;   // whether a line with words has no translation, which Gemini can fill in
     NSArray<SGKaraokeLine *> *_passedOver;   // lines kept for the song that changed nothing here, not looked at again
     UIButton *_extras;
     CGFloat _builtWidth;
@@ -1350,6 +1351,14 @@ static BOOL hasTranslations(NSArray<SGKaraokeLine *> *lines) {
     return NO;
 }
 
+// A line with words to translate: not an empty one, nor a ♪ holding a break.
+static BOOL hasWords(SGKaraokeLine *line) {
+    for (SGKaraokeWord *word in line.words) {
+        if ([word.text rangeOfCharacterFromSet:NSCharacterSet.letterCharacterSet].location != NSNotFound) return YES;
+    }
+    return NO;
+}
+
 // When each line is sung and where the breaks are, worked out once per song for the frames to read.
 - (void)timeLines {
     free(_spans);
@@ -1358,7 +1367,7 @@ static BOOL hasTranslations(NSArray<SGKaraokeLine *> *lines) {
     _spans = calloc(count + 1, sizeof(SGRKaraokeSpan));
     _breaks = calloc(count + 1, sizeof(SGRKaraokeBreak));
     _breakCount = 0;
-    _hasSpoken = _hasTranslation = NO;
+    _hasSpoken = _hasTranslation = _untranslated = NO;
     _plain = SGKaraokeLinesTiming(_lines) == SGKaraokeTimingNone;
     NSInteger sungTo = 0;   // the top of the song counts as where the singing before the first line ends
     for (NSUInteger i = 0; i < count; i++) {
@@ -1368,6 +1377,7 @@ static BOOL hasTranslations(NSArray<SGKaraokeLine *> *lines) {
         sungTo = MAX(sungTo, _spans[i].end);
         _hasSpoken = _hasSpoken || line.pronunciation || line.backing.pronunciation;
         _hasTranslation = _hasTranslation || line.translation.length;
+        _untranslated = _untranslated || (!line.translation.length && hasWords(line));
     }
     [self offerExtras];
     [self askMeanings];
@@ -1488,7 +1498,8 @@ static BOOL hasTranslations(NSArray<SGKaraokeLine *> *lines) {
                                              image:[UIImage systemImageNamed:@"character.bubble"] identifier:nil
                                            handler:^(UIAction *action) { SGRSetLyricsTextShown(SGRLyricsTextTranslation, !on); }]];
     }
-    if (gemini && !_hasTranslation) {
+    // Also for a song a source translated in part, as Musixmatch's community often has: Gemini fills in the rest.
+    if (gemini && _untranslated) {
         __weak SGRKaraokeView *weakSelf = self;
         [items addObject:[UIAction actionWithTitle:@"Translate with Gemini" image:[UIImage systemImageNamed:@"sparkles"]
                                         identifier:nil handler:^(UIAction *action) { [weakSelf translateWithGemini]; }]];
@@ -1498,8 +1509,8 @@ static BOOL hasTranslations(NSArray<SGKaraokeLine *> *lines) {
     [self setNeedsLayout];
 }
 
-// The song's lines into the Lyrics page's language, or the phone's: each line takes its translation, and
-// translations are switched on so the answer shows.
+// The song's lines into the Lyrics page's language, or the phone's: each line without a translation takes
+// Gemini's, and translations are switched on so the answer shows. The whole song is sent, for the sense.
 - (void)translateWithGemini {
     NSArray<SGKaraokeLine *> *lines = _lines;
     NSString *track = _track;
@@ -1514,9 +1525,10 @@ static BOOL hasTranslations(NSArray<SGKaraokeLine *> *lines) {
         }
         if (lines != self->_lines) return;   // the song moved on meanwhile
         [lines enumerateObjectsUsingBlock:^(SGKaraokeLine *line, NSUInteger i, BOOL *stop) {
-            if (translations[i].length) line.translation = translations[i];
+            if (translations[i].length && !line.translation.length) line.translation = translations[i];
         }];
         self->_hasTranslation = YES;
+        self->_untranslated = NO;
         if (SGFlag(SGRKeyLyricsTranslation, NO)) [self restyle];
         else SGRSetLyricsTextShown(SGRLyricsTextTranslation, YES);
     });

@@ -44,7 +44,51 @@ BOOL SGGeminiKeySet(void) {
 #pragma mark - asking
 
 NSString *SGLyricsGeminiLanguage(void) {
-    return SGLyricsTranslationLanguage() ?: [NSLocale.preferredLanguages.firstObject componentsSeparatedByString:@"-"].firstObject ?: @"en";
+    return SGLyricsTranslationLanguage() ?: NSLocale.preferredLanguages.firstObject ?: @"en";
+}
+
+// Why Gemini stopped short, as finishReason or promptFeedback.blockReason name it.
+static NSString *blockedBecause(NSString *reason) {
+    if ([reason isEqualToString:@"RECITATION"]) return @"Gemini stopped because its answer repeated published lyrics.";
+    if ([@[@"SAFETY", @"PROHIBITED_CONTENT", @"BLOCKLIST", @"SPII"] containsObject:reason]) return @"Gemini's filters blocked this song's lyrics.";
+    if ([reason isEqualToString:@"MAX_TOKENS"]) return @"The song is too long for one answer from Gemini.";
+    return [NSString stringWithFormat:@"Gemini stopped before translating the song (%@).", reason];
+}
+
+NSArray<NSString *> *SGGeminiTranslationsIn(id root, NSInteger status, NSError *error, NSUInteger count, NSString **problem) {
+    NSDictionary *reply = [root isKindOfClass:NSDictionary.class] ? root : nil;
+    id candidates = reply[@"candidates"];
+    id first = [candidates isKindOfClass:NSArray.class] ? [candidates firstObject] : nil;
+    id parts = [first isKindOfClass:NSDictionary.class] && [first[@"content"] isKindOfClass:NSDictionary.class] ? first[@"content"][@"parts"] : nil;
+    id text = [parts isKindOfClass:NSArray.class] && [[parts firstObject] isKindOfClass:NSDictionary.class] ? [parts firstObject][@"text"] : nil;
+    id parsed = [text isKindOfClass:NSString.class] ? [NSJSONSerialization JSONObjectWithData:[text dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil] : nil;
+    if ([parsed isKindOfClass:NSArray.class] && [parsed count] == count) {
+        NSMutableArray<NSString *> *clean = [NSMutableArray arrayWithCapacity:count];
+        for (id line in parsed) [clean addObject:[line isKindOfClass:NSString.class] ? line : @""];
+        return clean;
+    }
+    id feedback = reply[@"promptFeedback"];
+    id blocked = [feedback isKindOfClass:NSDictionary.class] ? feedback[@"blockReason"] : nil;
+    id finished = [first isKindOfClass:NSDictionary.class] ? first[@"finishReason"] : nil;
+    if (error) {
+        *problem = @"Gemini could not be reached.";
+    } else if (status == 400 || status == 403) {
+        *problem = @"Gemini turned the key down. Check it on the Lyrics page.";
+    } else if (status == 429) {
+        *problem = @"Gemini's limit for this key is reached for now.";
+    } else if (status != 200) {
+        *problem = [NSString stringWithFormat:@"Gemini did not translate the song (%ld).", (long)status];
+    } else if ([blocked isKindOfClass:NSString.class]) {
+        *problem = blockedBecause(blocked);
+    } else if ([finished isKindOfClass:NSString.class] && ![finished isEqualToString:@"STOP"]) {
+        *problem = blockedBecause(finished);
+    } else if ([parsed isKindOfClass:NSArray.class]) {
+        *problem = [NSString stringWithFormat:@"Gemini answered %lu lines for the song's %lu. Try again.",
+                    (unsigned long)[parsed count], (unsigned long)count];
+    } else {
+        *problem = @"Gemini's answer could not be read. Try again.";
+    }
+    return nil;
 }
 
 static NSMutableDictionary<NSString *, NSArray<NSString *> *> *sg_done;   // per launch, by track and language
@@ -64,15 +108,24 @@ void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *li
     }
     NSMutableArray<NSString *> *texts = [NSMutableArray arrayWithCapacity:lines.count];
     for (SGKaraokeLine *line in lines) [texts addObject:SGKaraokeLineText(line) ?: @""];
-    NSString *language = [[NSLocale localeWithLocaleIdentifier:@"en"] localizedStringForLanguageCode:languageTag] ?: languageTag;
+    // By the whole tag, so the script stays: zh-Hant is "Chinese, Traditional" where its language alone is "Chinese".
+    NSString *language = [[NSLocale localeWithLocaleIdentifier:@"en"] localizedStringForLocaleIdentifier:languageTag] ?: languageTag;
     NSData *input = [NSJSONSerialization dataWithJSONObject:texts options:0 error:nil];
     NSString *prompt = [NSString stringWithFormat:
         @"Translate the lines of this song into %@. Answer with a JSON array of exactly %lu strings, one "
         @"per input line and in the same order. Translate the meaning naturally, keep each line short like a "
         @"lyric, and keep an empty line empty. A line already in %@ stays as it is.\n\n%@",
         language, (unsigned long)texts.count, language, [[NSString alloc] initWithData:input encoding:NSUTF8StringEncoding]];
+    // Lyrics are often explicit, and translating them is what the user asked for, so every filter that can
+    // be lowered is. Recitation cannot be switched off, and is named when it stops an answer.
+    NSMutableArray *safety = [NSMutableArray array];
+    for (NSString *category in @[@"HARM_CATEGORY_HARASSMENT", @"HARM_CATEGORY_HATE_SPEECH",
+                                 @"HARM_CATEGORY_SEXUALLY_EXPLICIT", @"HARM_CATEGORY_DANGEROUS_CONTENT"]) {
+        [safety addObject:@{@"category": category, @"threshold": @"BLOCK_NONE"}];
+    }
     NSDictionary *body = @{
         @"contents": @[@{@"parts": @[@{@"text": prompt}]}],
+        @"safetySettings": safety,
         @"generationConfig": @{
             @"responseMimeType": @"application/json",
             @"responseSchema": @{@"type": @"ARRAY", @"items": @{@"type": @"STRING"}},
@@ -87,26 +140,8 @@ void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *li
     [[NSURLSession.sharedSession dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         NSInteger status = [response isKindOfClass:NSHTTPURLResponse.class] ? ((NSHTTPURLResponse *)response).statusCode : 0;
         id root = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
-        NSArray *translations = nil;
         NSString *problem = nil;
-        id candidates = [root isKindOfClass:NSDictionary.class] ? root[@"candidates"] : nil;
-        id first = [candidates isKindOfClass:NSArray.class] ? [candidates firstObject] : nil;
-        id parts = [first isKindOfClass:NSDictionary.class] && [first[@"content"] isKindOfClass:NSDictionary.class] ? first[@"content"][@"parts"] : nil;
-        id text = [parts isKindOfClass:NSArray.class] && [[parts firstObject] isKindOfClass:NSDictionary.class] ? [parts firstObject][@"text"] : nil;
-        id parsed = [text isKindOfClass:NSString.class] ? [NSJSONSerialization JSONObjectWithData:[text dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil] : nil;
-        if ([parsed isKindOfClass:NSArray.class] && [parsed count] == texts.count) {
-            NSMutableArray<NSString *> *clean = [NSMutableArray arrayWithCapacity:texts.count];
-            for (id line in parsed) [clean addObject:[line isKindOfClass:NSString.class] ? line : @""];
-            translations = clean;
-        } else if (error) {
-            problem = @"Gemini could not be reached.";
-        } else if (status == 400 || status == 403) {
-            problem = @"Gemini turned the key down. Check it on the Lyrics page.";
-        } else if (status == 429) {
-            problem = @"Gemini's limit for this key is reached for now.";
-        } else {
-            problem = [NSString stringWithFormat:@"Gemini did not translate the song (%ld).", (long)status];
-        }
+        NSArray *translations = SGGeminiTranslationsIn(root, status, error, texts.count, &problem);
         SGLog(@"gemini: %@ lines into %@: %@", @(texts.count), languageTag, translations ? @"translated" : problem);
         dispatch_async(dispatch_get_main_queue(), ^{
             if (translations && trackID) sg_done[memo] = translations;

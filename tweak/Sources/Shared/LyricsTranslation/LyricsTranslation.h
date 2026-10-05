@@ -15,5 +15,9 @@ void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *li
 // The language a translation is asked in: the Lyrics page's, else the phone's own.
 NSString *SGLyricsGeminiLanguage(void);
 
+// Gemini's reply read: one translation per line when it has exactly `count`, else nil and in `problem`
+// why not (the key, the limit, a filter, a recitation stop, a line count that does not match).
+NSArray<NSString *> *SGGeminiTranslationsIn(id root, NSInteger status, NSError *error, NSUInteger count, NSString **problem);
+
 // The Lyrics page's row: shows whether a key is set, and sets or removes it.
 SGModRow *SGGeminiKeyRow(void);
