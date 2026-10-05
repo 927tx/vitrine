@@ -39,6 +39,7 @@ UIColor *SGRAccentColor(void) {
 
 NSString *SGRAccentLabel(void) {
     NSInteger rgb = chosen();
+    if (rgb == SGAppleMusicRed) return @"Apple Music red";
     return rgb < 0 ? @"Spotify green" : [NSString stringWithFormat:@"#%06lX", (long)rgb];
 }
 

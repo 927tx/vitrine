@@ -3,17 +3,15 @@
 #import "Settings/SGPageStyle.h"
 #import "SGRAccent.h"
 
-// Going back to Spotify's green is offered only once a colour of the mod's is set, so a stray tap
-// cannot wipe it.
+// Apple Music's red is one tap away, unless it is the colour already. Going back to Spotify's green is
+// offered only once a colour of the mod's is set, so a stray tap cannot wipe it.
 static void chooseAccent(void) {
-    if (!SGRAccentColor()) {
-        SGRPickAccent();
-        return;
-    }
     UIViewController *top = SGTopController();
     UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Accent colour" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+    if (SGInt(SGRKeyAccent, -1) != SGAppleMusicRed)
+        [sheet addAction:[UIAlertAction actionWithTitle:@"Apple Music red" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { SGSetInt(SGRKeyAccent, SGAppleMusicRed); }]];
     [sheet addAction:[UIAlertAction actionWithTitle:@"Pick a colour" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { SGRPickAccent(); }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Spotify's green" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) { SGSetInt(SGRKeyAccent, -1); }]];
+    if (SGRAccentColor()) [sheet addAction:[UIAlertAction actionWithTitle:@"Spotify green" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { SGSetInt(SGRKeyAccent, -1); }]];
     [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
     sheet.popoverPresentationController.sourceView = top.view;
     sheet.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(top.view.bounds), CGRectGetMidY(top.view.bounds), 0, 0);
