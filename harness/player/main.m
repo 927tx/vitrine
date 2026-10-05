@@ -280,6 +280,8 @@ static void loadLyrics(void) {
             w.text = word;
             w.start = cursor;
             cursor += 260 + word.length * 40;
+            // Each line's last word is held, as sung lines often end, so the held-word glow shows.
+            if (word == words.lastObject) cursor += 1600;
             w.end = cursor;
             [built addObject:w];
         }

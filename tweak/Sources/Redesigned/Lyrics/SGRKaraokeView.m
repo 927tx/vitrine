@@ -35,6 +35,10 @@ static const CGFloat kExtrasSide = 44, kExtrasBottom = 12, kExtrasGlyph = 17, kE
 static const NSTimeInterval kRestyleFade = 0.3;   // the lines crossfading to a new style
 static const NSTimeInterval kBrowseHold = 3;   // after scrolling by hand, how long until it follows the song again
 static const double kFloatMinMs = 700, kFloatLeadMs = 80;   // a short word still floats up this slowly
+// A word held this long starts to glow, and one held kGlowFullMs glows fully. The glow grows over the
+// word and fades over kGlowFadeMs after it.
+static const double kGlowFromMs = 900, kGlowFullMs = 2400, kGlowFadeMs = 450;
+static const CGFloat kGlowRadius = 9, kGlowOpacity = 0.85;
 // A line lit whole: how long its words take to come up to full white, and to float up together.
 static const NSTimeInterval kWholeFade = 0.35;
 static const double kWholeRiseMs = 900;
@@ -132,7 +136,7 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
 
 @implementation SGRKaraokeWordView {
     CAGradientLayer *_fill;
-    CGFloat _filled, _lift;
+    CGFloat _filled, _lift, _glow;
     BOOL _rightToLeft;
 }
 
@@ -183,14 +187,41 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
 - (void)floatAt:(double)ms {
     double x = MAX(0, ms - _riseStart + kFloatLeadMs) / MAX(_riseEnd - _riseStart, kFloatMinMs) * 5;
     CGFloat lift = kLift * (1 - (1 + x) * exp(-x));
+    [self glowAt:ms];
     if (lift == _lift) return;
     _lift = lift;
     self.transform = CGAffineTransformMakeTranslation(0, -lift);
 }
 
+// A held word glows, the more the longer it is held: white light around the lit part of it, since the
+// sweep's mask cuts the shadow too. Most words are too short to glow, and theirs is never drawn.
+- (void)glowAt:(double)ms {
+    double held = _word.end - _word.start;
+    CGFloat glow = 0;
+    if (held >= kGlowFromMs && !_whole) {
+        double strength = MIN(1, (held - kGlowFromMs) / (kGlowFullMs - kGlowFromMs) + 0.25);
+        double envelope = ms < _word.start ? 0
+                        : ms <= _word.end ? (ms - _word.start) / held
+                        : MAX(0, 1 - (ms - _word.end) / kGlowFadeMs);
+        glow = round(strength * envelope * 50) / 50;   // steps of 2 %, so most frames change nothing
+    }
+    if (glow == _glow) return;
+    _glow = glow;
+    CALayer *layer = _lit.layer;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    layer.shadowColor = UIColor.whiteColor.CGColor;
+    layer.shadowOffset = CGSizeZero;
+    layer.shadowRadius = kGlowRadius * (0.5 + glow / 2);
+    layer.shadowOpacity = kGlowOpacity * glow;
+    [CATransaction commit];
+}
+
 - (void)settle {
     _lift = 0;
     self.transform = CGAffineTransformIdentity;
+    _glow = 0;
+    _lit.layer.shadowOpacity = 0;
 }
 
 @end
