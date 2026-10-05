@@ -81,6 +81,7 @@ static UIViewController *lyricsPage(void) {
     if (redesigned) {
         [sections addObject:SGSection(@"Display", @[SGLyricsWordTimingRow(), SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow(),
             SGSwitchRow(@"Hide the controls", @"A few seconds after the last touch, the lyrics take the whole player", SGRKeyLyricsAutoHide),
+            SGSwitchRow(@"Landscape lyrics", @"Turn the phone with the lyrics open", SGRKeyLyricsLandscape),
             SGGeminiKeyRow()])];
     }
     [sections addObject:SGSection(nil, more)];

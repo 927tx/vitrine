@@ -121,8 +121,17 @@ void SGKaraokeSeek(NSInteger ms) {
 }
 void SGRHarnessPlayFrom(NSInteger ms) { SGKaraokeSeek(ms); }
 
-// Line meanings: Genius is not asked in the harness.
+// Line meanings: Genius is not asked in the harness. The sheet itself is the real one (MeaningSheet.m).
 #import "Shared/LyricsMeanings/Meanings.h"
+@implementation SGLyricsMeaning
+@end
 void SGLyricsMeaningsFor(NSString *trackID, NSArray<SGKaraokeLine *> *lines,
                          void (^done)(NSDictionary<NSNumber *, NSArray<SGLyricsMeaning *> *> *byLine)) {}
-void SGRShowMeanings(NSString *lineText, NSArray<SGLyricsMeaning *> *meanings) {}
+
+// Gemini translation and the settings framework's top controller: not part of the harness.
+#import "Shared/LyricsTranslation/LyricsTranslation.h"
+BOOL SGGeminiKeySet(void) { return NO; }
+NSString *SGLyricsGeminiLanguage(void) { return @"en"; }
+void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *lines, NSString *languageTag,
+                                 void (^done)(NSArray<NSString *> *translations, NSString *error)) { done(nil, @"harness"); }
+UIViewController *SGTopController(void) { return UIApplication.sharedApplication.keyWindow.rootViewController; }

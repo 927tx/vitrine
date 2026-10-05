@@ -32,6 +32,11 @@ come late, out of order, or not at all.
   Kit's last look), two skips come in a row with the older picture answering last, and one track plays
   offline. Each step checks by colour that the Kit and the field show that track's picture, and the log
   ends with `artwork checks: n of 4 right -- PASS` or `FAIL`. Before the fix it read 1 of 4.
+- `landscape` turns the lyrics sideways at 3 s, puts a line's meanings over them (the real
+  `MeaningSheet.m`) at 4 s and takes them away at 9, then pauses at 14.5 and resumes at 15.5. Each step
+  logs whether the controls are up and whether a touch on the lines lands on the lines or on the shield
+  that brings the controls back, with `ok` or `WRONG`. At 6 s it logs the sheet's frame: a card inside
+  the safe area with a grabber, where the sheet before it covered the whole screen.
 
 `HARNESS_VOLUME=0` leaves out the volume row that the phone has and the tree does not.
 

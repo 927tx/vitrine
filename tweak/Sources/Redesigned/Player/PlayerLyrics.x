@@ -84,6 +84,7 @@ static UIView *sg_shield;                   // over the player while alone: the 
     _thumb = [[UIView alloc] initWithFrame:CGRectZero];
     // A tap on the cover beside the lines brings the full player back.
     [_thumb addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(sgr_thumbTapped)]];
+    _thumb.isAccessibilityElement = YES;
     _thumb.accessibilityLabel = @"Show the player";
     _thumb.accessibilityTraits = UIAccessibilityTraitButton;
     _cover = [[UIImageView alloc] initWithFrame:CGRectZero];
@@ -106,8 +107,8 @@ static UIView *sg_shield;                   // over the player while alone: the 
 - (UIImageView *)cover { return _cover; }
 - (UIView *)stage { return _stage; }
 
-// The lines seek when they are tapped and the thumbnail takes no touches, so everywhere else the
-// overlay would only swallow them: a view that takes touches does, even with nothing on it.
+// The lines seek when they are tapped and the thumbnail brings the player back, so everywhere else the
+// overlay would only swallow touches: a view that takes them does, even with nothing on it.
 //
 // What it hands them to instead is the title row. Translated to the top of the player it is drawn well
 // outside the stack view it is arranged in, and UIKit stops looking at a view whose bounds the touch is
@@ -399,7 +400,9 @@ static void setAlone(BOOL alone, BOOL animated) {
     UIView *host = sg_host;
     if (alone == sg_alone || !host || (alone && !sg_open)) return;
     SGRLyricsLayout l = layoutIn(host);
-    if (!l.ok) return;
+    // Going alone needs somewhere to put the lines. Coming back never waits for it: the controls and the
+    // touches under the shield are given back even when the player can no longer be measured.
+    if (alone && !l.ok) return;
     sg_alone = alone;
     if (alone) {
         [sg_rest invalidate];
@@ -410,8 +413,10 @@ static void setAlone(BOOL alone, BOOL animated) {
     NSArray<UIView *> *controls = controlViews();
     void (^apply)(void) = ^{
         if (overlay.superview) {
-            place(overlay, host, l);
-            overlay.thumb.transform = thumbTransform(l);
+            if (l.ok) {
+                place(overlay, host, l);
+                overlay.thumb.transform = thumbTransform(l);
+            }
             overlay.thumb.alpha = alone ? 0 : 1;
             overlay.lyrics.extrasHidden = alone;
         }
@@ -462,7 +467,10 @@ static void setOpen(BOOL open, BOOL animated) {
         overlay.cover.image = SGRNowPlayingArtwork(NULL, NULL);
         overlay.stage.alpha = 0;
         overlay.stage.transform = CGAffineTransformMakeScale(kLyricsEnterScale, kLyricsEnterScale);
-        overlay.lyrics.browsingBegan = ^{ setAlone(YES, YES); };
+        // Not under VoiceOver, whose user could not reach the shield, nor under a sheet.
+        overlay.lyrics.browsingBegan = ^{
+            if (!UIAccessibilityIsVoiceOverRunning() && !sg_player.presentedViewController) setAlone(YES, YES);
+        };
         // Spotify's cover goes the moment the redesign's own takes its place: the same picture at the
         // same size with the same corners, so there is nothing to see in the swap. Coming back it waits
         // for the thumbnail to land on it, or the two would be on screen at once, one of them half size.
@@ -503,6 +511,8 @@ static void setOpen(BOOL open, BOOL animated) {
     else {
         [sg_rest invalidate];
         sg_rest = nil;
+        // The landscape screen shows these lines, so it goes with them (a track without lyrics came on).
+        SGRPlayerShowLandscape(NO);
     }
     SGLog(@"redesign player: lyrics %@, thumbnail %.0fx%.0f at %.0f,%.0f, title row up %.0f and right %.0f, lines %.0fx%.0f",
           open ? @"up" : @"away", l.thumb.size.width, l.thumb.size.height, l.thumb.origin.x, l.thumb.origin.y,
@@ -652,6 +662,11 @@ static SGRPlayerLyricsWatcher *sg_watcher;
         sg_rest = nil;
     }];
     [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+        restartRest();
+    }];
+    // VoiceOver keeps the controls up, and the shield is hidden from it: turned on, it brings them back.
+    [NSNotificationCenter.defaultCenter addObserverForName:UIAccessibilityVoiceOverStatusDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+        setAlone(NO, YES);
         restartRest();
     }];
     [NSNotificationCenter.defaultCenter addObserverForName:SGRNowPlayingArtworkDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *note) {

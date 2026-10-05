@@ -6,7 +6,7 @@ OUT=${OUT:-$(dirname "$0")/build}
 rm -rf "$OUT"; mkdir -p "$OUT/gen" "$OUT/PlayerHarness.app"
 
 for f in Redesigned/Player/PlayerLyrics.x Redesigned/Player/PlayerArtwork.x Redesigned/Player/PlayerFooter.x \
-         Redesigned/Player/PlayerScroll.x Redesigned/Player/PlayerField.x Redesigned/Player/PlayerMotion.x Redesigned/Kit/SGRBridges.x; do
+         Redesigned/Player/PlayerScroll.x Redesigned/Player/PlayerField.x Redesigned/Player/PlayerMotion.x Redesigned/Player/PlayerLandscape.x Redesigned/Kit/SGRBridges.x; do
     name=$(basename "$f" .x)
     "$THEOS/bin/logos.pl" -c generator=internal "$SRC/$f" > "$OUT/gen/$name.m"
 done
@@ -22,7 +22,7 @@ xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-ar
     "$SRC"/Redesigned/Kit/SGRTokens.m "$SRC"/Redesigned/Kit/SGRPalette.m "$SRC"/Redesigned/Kit/SGRField.m "$SRC"/Redesigned/Kit/SGRFlow.m "$SRC"/Redesigned/Kit/SGRFluid.m "$SRC"/Shared/AnimatedArtwork/SGMotionCatalog.m "$SRC"/Shared/AnimatedArtwork/SGMotionStore.m \
     "$SRC"/Redesigned/Kit/SGRGlass.m "$SRC"/Redesigned/Kit/SGRGlyph.m "$SRC"/Redesigned/Kit/SGRRestyle.m \
     "$SRC"/Redesigned/Kit/SGRedesign.m \
-    "$SRC"/Redesigned/Lyrics/SGRKaraokeView.m "$SRC"/Redesigned/Lyrics/LyricsText.m "$SRC"/Shared/Lyrics/KaraokeTiming.m "$SRC"/Shared/Lyrics/Protobuf.m \
+    "$SRC"/Redesigned/Lyrics/SGRKaraokeView.m "$SRC"/Redesigned/Lyrics/MeaningSheet.m "$SRC"/Redesigned/Lyrics/LyricsText.m "$SRC"/Shared/Lyrics/KaraokeTiming.m "$SRC"/Shared/Lyrics/Protobuf.m \
     -framework UIKit -framework QuartzCore -framework CoreGraphics -framework CoreImage -framework Foundation -framework Symbols -framework AVFoundation -framework CoreMedia \
     -o "$OUT/PlayerHarness.app/PlayerHarness"
 

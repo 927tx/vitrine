@@ -71,6 +71,11 @@ void SGRPlayerLyricsChanged(void);
 // whole player (PlayerLyrics.x). On until switched off; a scroll through the lines hides them either way.
 #define SGRKeyLyricsAutoHide @"spotifyglass.redesign.lyrics.autoHide"
 
+// The lyrics turn sideways with the phone onto a landscape screen of their own (PlayerLandscape.x). On
+// until switched off. Shown or put away by hand for the harness.
+#define SGRKeyLyricsLandscape @"spotifyglass.redesign.lyrics.landscape"
+void SGRPlayerShowLandscape(BOOL show);
+
 // The animated artwork follows the lyrics: blurred behind them (PlayerMotion.x).
 void SGRPlayerMotionLyricsChanged(void);
 

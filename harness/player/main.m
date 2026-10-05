@@ -9,6 +9,8 @@
 //     scroll   the list moved up and down in code; the log says whether it stayed at its top
 //     artwork  issue #58: tracks change while the covers on screen and the picture server lag behind,
 //              checked by colour at the end of each step; the log says PASS or FAIL
+//     landscape the landscape lyrics at 3 s, a line's meanings over them, a pause and a resume; each
+//              step logs whether the controls are up and what a touch on the lines lands on
 // HARNESS_VOLUME=0 leaves out the volume row the phone has (trees/clean/player/01.txt has none).
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
@@ -16,6 +18,7 @@
 #import "Redesigned/Player/Player.h"
 #import "Redesigned/Kit/SGRBridges.h"
 #import "Redesigned/Kit/SGRField.h"
+#import "Redesigned/Lyrics/MeaningSheet.h"
 
 void SGRHarnessPlayFrom(NSInteger ms);
 void SGRHarnessSetTrack(NSString *uri, NSString *imageURI, BOOL paused);
@@ -486,6 +489,7 @@ static void loadLyrics(void) {
     if ([scenario() isEqualToString:@"artwork"]) [self runArtworkChecks];
     else if ([scenario() isEqualToString:@"look"]) [self runLook];
     else if ([scenario() isEqualToString:@"scroll"]) [self runScrollChecks];
+    else if ([scenario() isEqualToString:@"landscape"]) [self runLandscape];
     // Opened, closed and opened again, so a screenshot can be taken of each state and of the move itself.
     else for (NSNumber *at in @[@2, @6, @10]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -540,6 +544,58 @@ static void after(NSTimeInterval seconds, dispatch_block_t block) {
     [self playTrack:@"spotify:track:harnessA" image:imageURI(@"aaaa")];
     // The bar lays out once as the app comes up.
     [_bar viewDidLayoutSubviews];
+}
+
+#pragma mark - landscape
+
+static UIViewController *landscapeScreen(void) {
+    for (UIWindow *window in UIApplication.sharedApplication.connectedScenes.anyObject ? ((UIWindowScene *)UIApplication.sharedApplication.connectedScenes.anyObject).windows : @[]) {
+        if (!window.hidden && [NSStringFromClass(window.rootViewController.class) isEqualToString:@"SGRLandscapeLyricsController"]) return window.rootViewController;
+    }
+    return nil;
+}
+
+// What a touch on the lines lands on, and whether the controls are up.
+static void logLandscape(NSString *step, NSString *want) {
+    UIViewController *screen = landscapeScreen();
+    UIView *view = screen.view, *shield = [screen valueForKey:@"shield"];
+    CGPoint onLine = CGPointMake(view.bounds.size.width * 0.7, view.bounds.size.height * 0.5);
+    UIView *hit = [view hitTest:onLine withEvent:nil];
+    CGFloat controls = [[screen valueForKey:@"controls"] alpha];
+    NSString *got = hit == shield ? @"shield" : @"lines";
+    NSLog(@"[harness] landscape %@: controls %.0f, a touch on the lines lands on %@ (%@) -- want %@: %@", step, controls,
+          got, NSStringFromClass(hit.class), want, [got isEqualToString:want] ? @"ok" : @"WRONG");
+}
+
+// The landscape lyrics as a turned phone shows them: a line's meanings over them as a card on the bottom
+// edge, the controls staying up behind the sheet and fading once it is gone, the shield taking the touch
+// that brings them back, and a pause and a resume from elsewhere starting the clock again.
+- (void)runLandscape {
+    after(3, ^{ SGRPlayerShowLandscape(YES); });
+    after(4, ^{
+        SGLyricsMeaning *meaning = [SGLyricsMeaning new];
+        meaning.author = SGLyricsMeaningByArtist;
+        meaning.body = @"A line of the harness's song, explained at the length Genius explains one, so the card has a body to show and to wrap.";
+        meaning.url = @"https://genius.com";
+        SGRShowMeanings(@"Harness line", @[meaning]);
+    });
+    after(6, ^{
+        UIViewController *sheet = landscapeScreen().presentedViewController;
+        UIView *window = sheet.view.window;
+        NSLog(@"[harness] landscape meanings: %@ %@ in a window %@, height class %ld, edge attached %d",
+              NSStringFromClass(sheet.class), NSStringFromCGRect([sheet.view convertRect:sheet.view.bounds toView:window]),
+              NSStringFromCGSize(window.bounds.size), (long)sheet.traitCollection.verticalSizeClass,
+              sheet.sheetPresentationController.prefersEdgeAttachedInCompactHeight);
+    });
+    after(8.5, ^{ logLandscape(@"with the sheet up past the rest", @"lines"); });
+    after(9, ^{ [landscapeScreen() dismissViewControllerAnimated:YES completion:nil]; });
+    after(14, ^{ logLandscape(@"rested after the sheet went", @"shield"); });
+    after(14.5, ^{ SGRHarnessSetTrack(@"spotify:track:harnessA", imageURI(@"aaaa"), YES); });
+    after(15, ^{ logLandscape(@"paused", @"lines"); });
+    after(15.5, ^{ SGRHarnessSetTrack(@"spotify:track:harnessA", imageURI(@"aaaa"), NO); });
+    after(17, ^{ logLandscape(@"just resumed", @"lines"); });
+    after(21, ^{ logLandscape(@"rested after the resume", @"shield"); });
+    after(22, ^{ SGRPlayerShowLandscape(NO); });
 }
 
 - (void)check:(NSString *)step want:(NSString *)want {
