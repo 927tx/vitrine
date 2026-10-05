@@ -131,7 +131,9 @@ Shared:
                   (SpeedPitchMenu.x, SpeedPitch.x, SGTimePitch.m). Pitch follows speed (on until switched off,
                   spotifyglass.speed.pitchFollows) plays the speed through Apple's Varispeed instead, faster and higher
                   together like a record; Varispeed also carries 1x while it is on, so a return to normal speed changes
-                  nothing, and the stretch is left for pitch alone at 1x, the two swapped only through a reset. Under the
+                  nothing, and the stretch is left for pitch alone at 1x, the two swapped only through a reset. A new
+                  format on either side of the output while it runs (a route to another rate, Spotify handing it
+                  another one) makes the unit again for it, and until then the sound passes as it is. Under the
                   sliders a Reverb slider sets the audio effects' reverb amount (spotifyglass.dsp.reverb.amount), turning
                   the effects and the reverb on with it. The block goes into Spotify's own context menu sheet
                   and is drawn from its own measures, not the Kit's, so it sits there under either look. Tested on the

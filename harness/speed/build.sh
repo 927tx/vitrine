@@ -9,7 +9,7 @@ rm -rf "$OUT"; mkdir -p "$OUT/gen" "$OUT/SpeedHarness.app"
 SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
 xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-arc -g -O1 \
     -I"$SRC" -I"$SRC/Shared/Player" -isysroot "$SDK" -Wno-deprecated-declarations \
-    "$(dirname "$0")/main.m" "$OUT"/gen/*.m "$SRC"/Shared/Player/SGTimePitch.m "$SRC"/Core/SGRebind.m \
+    "$(dirname "$0")/main.m" "$(dirname "$0")/../scene.m" "$OUT"/gen/*.m "$SRC"/Shared/Player/SGTimePitch.m "$SRC"/Core/SGRebind.m \
     "$SRC"/Core/SGLog.m "$SRC"/Core/SGPrefs.m "$SRC"/Core/SGUIMode.m "$SRC"/Core/SGFlagForce.m \
     -framework UIKit -framework QuartzCore -framework AudioToolbox -framework AVFoundation -framework Foundation \
     -o "$OUT/SpeedHarness.app/SpeedHarness"
@@ -23,7 +23,15 @@ cat > "$OUT/SpeedHarness.app/Info.plist" <<'PLIST'
 <key>CFBundleVersion</key><string>1</string>
 <key>CFBundleShortVersionString</key><string>1.0</string>
 <key>UILaunchScreen</key><dict/>
-<key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
+<key>UIApplicationSceneManifest</key><dict>
+  <key>UIApplicationSupportsMultipleScenes</key><false/>
+  <key>UISceneConfigurations</key><dict>
+    <key>UIWindowSceneSessionRoleApplication</key><array><dict>
+      <key>UISceneConfigurationName</key><string>Default</string>
+      <key>UISceneDelegateClassName</key><string>SGRHarnessScene</string>
+    </dict></array>
+  </dict>
+</dict>
 </dict></plist>
 PLIST
 echo "built $OUT/SpeedHarness.app"

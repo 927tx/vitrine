@@ -73,6 +73,13 @@ static BOOL tapped(void) {
     return atomic_load(&sg_source) != NULL;
 }
 
+static double rateOf(Format *format) {
+    uint64_t bits = atomic_load_explicit(&format->rateBits, memory_order_relaxed);
+    double rate;
+    memcpy(&rate, &bits, sizeof rate);
+    return rate;
+}
+
 static float loadFloat(atomic_uint *slot) {
     uint32_t bits = atomic_load(slot);
     float value;
@@ -175,7 +182,10 @@ static OSStatus feed(void *refCon, AudioUnitRenderActionFlags *flags, const Audi
     atomic_store(&sg_busy, true);
     OSStatus status = -1;
     SGTimePitch *unit = atomic_load(&sg_pull);
-    if (atomic_load(&sg_engaged) && unit && fitsUnit(data, frames, unit)) status = SGTimePitchRender(unit, frames, data);
+    // A unit made for another rate passes the sound as it is, until the main thread makes one for the new rate.
+    if (atomic_load(&sg_engaged) && unit && fitsUnit(data, frames, unit) && SGTimePitchSampleRate(unit) == rateOf(&sg_client)) {
+        status = SGTimePitchRender(unit, frames, data);
+    }
     if (status != noErr) status = pullChain(source, timestamp, frames, data);
     atomic_store(&sg_busy, false);
     return status;
@@ -250,7 +260,7 @@ static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const 
     if (tapped() || !atomic_load(&sg_engaged)) return noErr;
     atomic_store(&sg_busy, true);
     SGTimePitch *unit = atomic_load(&sg_inPlace);
-    if (atomic_load(&sg_engaged) && unit) shiftInPlace(unit, flags, frames, data);
+    if (atomic_load(&sg_engaged) && unit && SGTimePitchSampleRate(unit) == rateOf(&sg_hardware)) shiftInPlace(unit, flags, frames, data);
     atomic_store(&sg_busy, false);
     return noErr;
 }
@@ -326,15 +336,31 @@ static void readFormat(AudioUnit unit) {
 
 static void apply(void);
 
+// A speed or pitch chosen before the output started, or kept across a new format, applies now: apply()
+// makes the unit again when the rate or the channels changed.
+static void applyToFormat(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (sg_speed != 1 || sg_semitones != 0) apply();
+    });
+}
+
+// Either side of element 0 changing under a running unit: the hardware's on a route to a device at
+// another rate, Spotify's when it hands the unit another format without starting it again.
+static void formatChanged(void *refCon, AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope scope, AudioUnitElement element) {
+    if (property != kAudioUnitProperty_StreamFormat || element != 0) return;
+    if (scope != kAudioUnitScope_Input && scope != kAudioUnitScope_Output) return;
+    readFormat(unit);
+    applyToFormat();
+}
+
 static OSStatus startOutput(AudioUnit unit) {
     if (unit && isRemoteIO(unit)) {
         readFormat(unit);
         AudioUnitRemoveRenderNotify(unit, rendered, NULL);
         AudioUnitAddRenderNotify(unit, rendered, NULL);
-        // A speed or pitch chosen before the output started, or kept across a new format, applies now.
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (sg_speed != 1 || sg_semitones != 0) apply();
-        });
+        AudioUnitRemovePropertyListenerWithUserData(unit, kAudioUnitProperty_StreamFormat, formatChanged, NULL);
+        AudioUnitAddPropertyListener(unit, kAudioUnitProperty_StreamFormat, formatChanged, NULL);
+        applyToFormat();
     }
     return sg_startOutput(unit);
 }
@@ -352,9 +378,7 @@ static void disengage(void) {
 static SGTimePitch *unitForFormat(void) {
     BOOL pull = tapped();
     Format *format = pull ? &sg_client : &sg_hardware;
-    double rate;
-    uint64_t bits = atomic_load(&format->rateBits);
-    memcpy(&rate, &bits, sizeof rate);
+    double rate = rateOf(format);
     UInt32 channels = atomic_load(&format->channels);
     if (pull) {
         // In the chain the unit hands its buffers to the RemoteIO unit as they are: float, one per channel.

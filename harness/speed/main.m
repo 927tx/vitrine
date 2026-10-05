@@ -5,7 +5,10 @@
 // how fast the song is drained at each speed, and how far a mock player state's position drifts from it.
 //
 //     THEOS=$HOME/theos ./build.sh && xcrun simctl install booted build/SpeedHarness.app
-//     xcrun simctl launch --console-pty booted com.vojta.speedharness
+//     xcrun simctl launch --console-pty booted com.vojta.speedharness [rate]
+//
+// `rate` hands the running output a 48 kHz format halfway through the 1.5x step, with no new start: the
+// mod's format listener must make its unit again for 48 kHz (`a unit in the chain for 48000 Hz`).
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -61,6 +64,7 @@ static void check(OSStatus status, const char *what) {
 
 @implementation SGRHarnessDelegate {
     SPTPlayerState *_state;
+    AudioUnit _output;
     uint64_t _lastDecoded;
     NSTimeInterval _lastAt, _startedAt;
 }
@@ -87,6 +91,14 @@ static void check(OSStatus status, const char *what) {
     for (int i = 0; i < 3; i++) check(AudioUnitSetProperty(units[i], kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &slice, sizeof slice), "slice");
     for (int i = 0; i < 3; i++) check(AudioUnitInitialize(units[i]), "initialize");
     check(AudioOutputUnitStart(output), "start");
+    _output = output;
+}
+
+// Spotify's side of the output at another rate while it runs, the way a file at another rate may bring one.
+- (void)changeRate {
+    AudioStreamBasicDescription format = {48000, kAudioFormatLinearPCM, kAudioFormatFlagsNativeFloatPacked | kAudioFormatFlagIsNonInterleaved, 4, 1, 4, 2, 32, 0};
+    OSStatus status = AudioUnitSetProperty(_output, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, sizeof format);
+    NSLog(@"[harness] output's input set to 48000 Hz while running: status %d", (int)status);
 }
 
 - (void)report:(NSString *)what {
@@ -137,6 +149,7 @@ static void check(OSStatus status, const char *what) {
         // A report mid step, the way Spotify's player reports now and then.
         [self after:[step[0] doubleValue] + 1.5 do:^{ [self playerReports]; }];
     }
+    if ([NSProcessInfo.processInfo.arguments containsObject:@"rate"]) [self after:7.5 do:^{ [self changeRate]; }];
     [self after:21 do:^{
         [self report:label];
         exit(0);
