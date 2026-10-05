@@ -1,5 +1,6 @@
-// Remote videos kept as local files in Caches/Vitrine/Motion, named by a hash of their address. A video
-// asked for again while it downloads joins the download in flight. The folder keeps the newest kFiles.
+// Remote videos kept as local files in Caches/Vitrine/Motion, named by a hash of their address, and the
+// videos the mod makes, named by a hash of their key. A video asked for again while it downloads joins the
+// download in flight. The folder keeps the newest kFiles.
 #import <AVFoundation/AVFoundation.h>
 #import <CommonCrypto/CommonDigest.h>
 #import "Core/SGCore.h"
@@ -14,8 +15,8 @@ static NSURL *folder(void) {
     return url;
 }
 
-static NSURL *localFor(NSURL *remote) {
-    NSData *address = [remote.absoluteString dataUsingEncoding:NSUTF8StringEncoding];
+static NSURL *localFor(NSString *key) {
+    NSData *address = [key dataUsingEncoding:NSUTF8StringEncoding];
     unsigned char digest[CC_SHA1_DIGEST_LENGTH];
     CC_SHA1(address.bytes, (CC_LONG)address.length, digest);
     NSMutableString *name = [NSMutableString string];
@@ -41,6 +42,11 @@ CGFloat SGMotionPixels(void) {
     return round(UIScreen.mainScreen.nativeBounds.size.width * 0.75);
 }
 
+NSURL *SGMotionMadeFile(NSString *key) {
+    trim();
+    return localFor([@"made\n" stringByAppendingString:key]);
+}
+
 static NSMutableDictionary<NSURL *, NSMutableArray *> *sg_waiting;
 
 void SGMotionFile(NSURL *remote, void (^done)(NSURL *file)) {
@@ -48,7 +54,7 @@ void SGMotionFile(NSURL *remote, void (^done)(NSURL *file)) {
         done(nil);
         return;
     }
-    NSURL *local = localFor(remote);
+    NSURL *local = localFor(remote.absoluteString);
     if ([NSFileManager.defaultManager fileExistsAtPath:local.path]) {
         done(local);
         return;

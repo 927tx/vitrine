@@ -1,4 +1,5 @@
-// Moving artwork for a track: its Canvas, or Apple Music's animated album cover where the album has one.
+// Moving artwork for a track: its Canvas, or Apple Music's animated album cover where the album has one,
+// and for the lock screen, failing both, the cover over a moving blur of itself (SGFluidClip.h).
 // SGMotionCatalog.m looks covers and logos up in Apple Music's catalog. SGMotionStore.m keeps every video
 // as a local file, the form the system's lock screen takes.
 #import <UIKit/UIKit.h>
@@ -11,6 +12,7 @@ typedef NS_ENUM(NSInteger, SGLockArtwork) {
     SGLockArtworkOff = 0,
     SGLockArtworkMotion,   // the Canvas, else Apple Music's animated cover (LockScreenMotion.x)
     SGLockArtworkLyrics,   // a clip per line of lyrics (Shared/LockScreenLyrics/LyricsArtwork.x)
+    SGLockArtworkEverySong,   // Moving artwork, else the cover over a moving blur of it (LockScreenMotion.x)
 };
 // Off below iOS 26, which has no animated artwork on the lock screen.
 SGLockArtwork SGLockScreenArtwork(void);
@@ -41,6 +43,9 @@ void SGMotionSongISRC(NSString *artist, NSString *title, void (^done)(NSString *
 
 // Any remote video (a Canvas) as a local file, or nil. Main queue.
 void SGMotionFile(NSURL *remote, void (^done)(NSURL *file));
+// Where a video the mod makes itself is kept under `key`, among the downloads, which are kept to the
+// newest few. Whether it is there yet is the caller's to check. Any thread.
+NSURL *SGMotionMadeFile(NSString *key);
 
 // The first frame of a local video. Main queue.
 void SGMotionPoster(NSURL *file, void (^done)(UIImage *poster));
