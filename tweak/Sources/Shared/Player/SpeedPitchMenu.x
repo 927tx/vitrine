@@ -581,6 +581,10 @@ static BOOL isPlayerMenu(UIViewController *menu) {
     return ours;
 }
 
+BOOL SGPlayerMenuIsPlayers(UIViewController *menu) {
+    return isPlayerMenu(menu);
+}
+
 #pragma mark - Spotify's rows
 
 // The sheet keeps its spinner up until Spotify's rows are in, and they are in when every item factory

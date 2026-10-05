@@ -113,7 +113,8 @@ NSString *SGLocalFileCoverURL(NSString *path) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         NSMutableCharacterSet *set = [NSCharacterSet.URLPathAllowedCharacterSet mutableCopy];
-        [set removeCharactersInString:@":"];
+        // -[NSURL spotifyURIComponents] splits the address on ":"; "/" goes too, so the path is one plain part.
+        [set removeCharactersInString:@":/"];
         allowed = set;
     });
     NSString *escaped = [path stringByAddingPercentEncodingWithAllowedCharacters:allowed];
@@ -167,27 +168,23 @@ void SGLocalFileSaveEdit(NSString *uri, NSDictionary<NSString *, NSString *> *na
     else if (keepCover && oldCover) edit[@"cover"] = old[@"cover"];
     if (oldCover && ![edit[@"cover"] isEqual:old[@"cover"]]) [NSFileManager.defaultManager removeItemAtPath:oldCover error:nil];
 
+    // The lyrics key changes with the names only: a cover alone leaves the lyrics where they are, and the
+    // file's own names go back to the bare URI, whose lyrics may still be kept.
+    BOOL named = NO, renamed = NO;
+    for (NSString *field in @[@"title", @"artist", @"album"]) {
+        named = named || edit[field];
+        renamed = renamed || !(edit[field] == old[field] || [edit[field] isEqual:old[field]]);
+    }
+    // Milliseconds, so no two renames of a track share a lyrics key, a reset in between or not.
+    if (named) edit[@"number"] = renamed || !old[@"number"] ? @((long long)(NSDate.date.timeIntervalSince1970 * 1000)) : old[@"number"];
+
     NSMutableDictionary *edits = [allEdits() mutableCopy];
     if (edit.count) {
-        // Milliseconds, so no two edits of a track share a lyrics key, a reset in between or not.
-        edit[@"number"] = @((long long)(NSDate.date.timeIntervalSince1970 * 1000));
         edits[uri] = edit;
     } else {
         [edits removeObjectForKey:uri];
     }
     storeEdits(edits);
     SGLog(@"local files: %@ %@", uri, edit.count ? [NSString stringWithFormat:@"edited: %@", edit] : @"back to its own tags");
-    changed(uri);
-}
-
-void SGLocalFileForget(NSString *uri) {
-    NSDictionary *old = SGLocalFileEditFor(uri);
-    if (!old) return;
-    NSString *cover = SGLocalFileCoverPath(old);
-    if (cover) [NSFileManager.defaultManager removeItemAtPath:cover error:nil];
-    NSMutableDictionary *edits = [allEdits() mutableCopy];
-    [edits removeObjectForKey:uri];
-    storeEdits(edits);
-    SGLog(@"local files: %@ back to its own tags", uri);
     changed(uri);
 }

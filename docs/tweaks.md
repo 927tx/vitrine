@@ -112,6 +112,17 @@ Shared:
                   artwork (LockScreenMotion.x). With Every song, a song with neither gets its cover over copies of it
                   blurred and swaying, a seamless 8 s 3:4 loop drawn on the CPU only when the lock screen asks for it
                   and kept per picture (SGFluidClip.m). Rendered on the Mac against harness/fluid-clip/
+    LocalFiles/   local files (LocalFiles.h lists its files): Edit info in the player's ⋯ menu, the table's footer
+                  under Speed and pitch, which closes the menu and opens a form sheet (the three names, the cover
+                  with a menu to change it, Restore file's info; nothing is stored before Save, and a swipe away
+                  with changes asks first), storing a title, artist, album and cover by the file's URI and laying them
+                  over -[SPTPlayerTrack metadata] and the cover's image request (the redesign's artwork reads the
+                  stored cover itself, Redesigned/Kit/SGRBridges.x); the file is never written. Their
+                  lyrics are kept under the URI and asked of the sources by name, since Spotify never asks for them;
+                  with no source switched on, of LRCLIB alone, which then gets the file's title, artist, album and
+                  length. A rename gives a new key (a cover alone does not), asked for at once while the file plays.
+                  A miss is asked again a few times, in case it was a lost request. The model is checked on the Mac
+                  against harness/local-files/, the row and the editor in the simulator against its sim/
     Navigation/   the page transition fix (PageTransition.x) and opening a spotify: link (Links.x)
     Player/       the player's open and close announced (PlayerEvents.x), what the player is doing read through
                   one hook for every feature that wants it (PlayerState.x), the lock screen widget's flags, and in the

@@ -19,8 +19,10 @@
 
 // A local file's URI, or a lyrics key made from one.
 BOOL SGLocalFileIs(NSString *uri);
-// What the lyrics engine keeps a local file under: its URI, and once it is edited the edit's number
-// after a "#", so an edit reads as a new track and its lyrics are looked up again under the new names.
+// What the lyrics engine keeps a local file under: its URI, and once its names are edited the edit's
+// number after a "#", so a rename reads as a new track and its lyrics are looked up again under the new
+// names. A new cover alone keeps the key. Posting SGLocalFileEditsDidChangeNotification is what has the
+// lyrics engine ask for the new key while the file plays.
 // nil for anything but a local file.
 NSString *SGLocalFileLyricsKey(NSString *uri);
 // The names a local file goes by, the user's edits over its own tags: title, artist, album (each
@@ -32,9 +34,9 @@ NSDictionary<NSString *, id> *SGLocalFileTags(NSString *uri);
 // The user's edit of a local file, nil when there is none. Safe from any thread.
 NSDictionary<NSString *, id> *SGLocalFileEditFor(NSString *uri);
 // Stores the names (an empty or missing one, or one the file already has, falls back to the file's
-// own) and a new cover when `cover` is set; `keepCover` NO drops the stored one. Main thread.
+// own) and a new cover when `cover` is set; `keepCover` NO drops the stored one. The file's own names
+// with no cover remove the edit. Main thread.
 void SGLocalFileSaveEdit(NSString *uri, NSDictionary<NSString *, NSString *> *names, UIImage *cover, BOOL keepCover);
-void SGLocalFileForget(NSString *uri);
 // Where the stored covers are, and the one an edit names; nil when it names none.
 NSString *SGLocalFileCoversDirectory(void);
 NSString *SGLocalFileCoverPath(NSDictionary<NSString *, id> *edit);

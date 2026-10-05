@@ -16,6 +16,8 @@
 // a menu presented from a now playing controller is taken for the player's without it, which is how the
 // native look's player gets the block.
 void SGPlayerMenuWatchMoreButton(UIView *button);
+// Whether a context menu sheet is the player's, by the same test; decided once per menu.
+BOOL SGPlayerMenuIsPlayers(UIViewController *menu);
 // The speed Spotify's sound plays at, 1 when normal.
 double SGPlayerSpeed(void);
 // Whether speed can apply: Spotify's output was taken over when it wired it.
