@@ -296,16 +296,18 @@ static BOOL named(SGLyricsQuery *query) {
 @implementation SGLyricsWalk
 @end
 
-// A walk that ends with nothing is only an answer when every source got to search. One that passed a
-// source over for want of a name asked it nothing, and keeping that as "no lyrics" would stick to the
-// track: every later request would get the kept nil, and the lyrics card would be taken off the track
-// for the rest of the session. The same goes for a walk during which a request failed: a busy
-// server's 503 read as "no lyrics" hid a track's lyrics until Spotify was restarted.
+// Musixmatch's community translations are not waited for here: the lines take them as they are kept
+// for the lyrics view (Shared/Lyrics/KaraokeSource.x), whichever source won, Spotify included.
 static void finish(SGLyricsWalk *walk) {
     SGLyricsQuery *query = walk.query;
     SGLyricsResult *merged = walk.merged;
     NSString *trackID = query.trackID;
     SGLyricsResult *lyrics = merged.karaokeLines.count || merged.texts.count ? merged : nil;
+    // A walk that ends with nothing is only an answer when every source got to search. One that passed a
+    // source over for want of a name asked it nothing, and keeping that as "no lyrics" would stick to the
+    // track: every later request would get the kept nil, and the lyrics card would be taken off the track
+    // for the rest of the session. The same goes for a walk during which a request failed: a busy
+    // server's 503 read as "no lyrics" hid a track's lyrics until Spotify was restarted.
     BOOL everyoneAsked = !walk.passedOver.count;
     BOOL failed = atomic_load(&sg_failures) != walk.failuresAtStart;
     if (lyrics || (everyoneAsked && !failed) || merged.instrumental) {

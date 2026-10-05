@@ -10,8 +10,8 @@
 @class SGModRow, SGModSection;
 // LyricsSettings.m: the Lyrics page's parts (App/Pages.m puts the page together): where lyrics come
 // from, naming the source (read by the redesign's lyrics view only), the lock screen, which
-// language a line's translation is taken in, of those the lyrics come with (the redesign's lyrics
-// being where translations show), and whether lines timed only by the line are swept word by word.
+// language a line's translation is taken in, of those the lyrics come with, and the one Musixmatch's
+// community translations are asked in (the redesign's lyrics being where translations show), and whether lines timed only by the line are swept word by word.
 SGModSection *SGLyricsSourcesSection(BOOL namingSource);
 SGModRow *SGLockScreenLyricsRow(void);
 SGModRow *SGLyricsTranslationLanguageRow(void);
@@ -47,7 +47,9 @@ typedef NS_ENUM(NSUInteger, SGKaraokeAlign) {
 @property (nonatomic) BOOL joined;
 @end
 
-@interface SGKaraokeLine : NSObject
+// A copy shares the words, the backing and the pronunciation, which nothing changes once a line is
+// built; a translation set on the copy leaves the original as it was.
+@interface SGKaraokeLine : NSObject <NSCopying>
 @property (nonatomic, copy) NSArray<SGKaraokeWord *> *words;
 @property (nonatomic) NSInteger start, end;
 // The voice singing the line, named as the source names it ("v1", "v2"), nil when it names none.

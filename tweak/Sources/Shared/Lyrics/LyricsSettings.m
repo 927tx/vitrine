@@ -24,7 +24,8 @@ SGModRow *SGLockScreenLyricsRow(void) {
 
 SGModRow *SGLyricsTranslationLanguageRow(void) {
     SGModRow *row = SGChoiceRow(@"Translation language", nil, SGKeyLyricsTranslationLanguage, SGLyricsTranslationLanguageNames(), 0);
-    row.choiceFooter = @"Used when the lyrics come with translations. Any shows the first.";
+    row.choiceFooter = @"A language brings Musixmatch's community translations to lyrics that have none, "
+                       @"which sends Musixmatch each song's ID. Any shows the first translation the lyrics come with.";
     return row;
 }
 

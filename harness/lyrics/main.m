@@ -16,6 +16,9 @@
 //   -dump 1        prints the lines as read, with their pronunciations and translations, and quits
 //   -openMenu S    opens the pronunciation and translation menu S seconds in, as a tap on its button would
 //   -toggleAt S    switches the pronunciation and the translation over S seconds in, as the menu would
+//   -translateIn S keeps copies of the lines S seconds in with every other one translated, as
+//                  Musixmatch's community translations come in after the lines on the phone
+//   -gemini 1      a Gemini key is set, so the menu offers Translate with Gemini (stubs.m answers it)
 // and the lyrics' own settings by their keys: -spotifyglass.lyricsSimulateWords 1 (sweep line timed
 // lines on the estimate), -spotifyglass.redesign.lyricsPronunciation 1,
 // -spotifyglass.redesign.lyricsTranslation 1, -spotifyglass.redesign.lyricsTextOrder '(translation, lyrics, pronunciation)'.
@@ -236,6 +239,17 @@ static void timedTick(id self, SEL _cmd) {
                 SEL present = NSSelectorFromString(@"_presentMenuAtLocation:");
                 if ([menu respondsToSelector:present]) ((void (*)(id, SEL, CGPoint))objc_msgSend)(menu, present, CGPointMake(22, 22));
             }
+        });
+    }
+    if ([args objectForKey:@"translateIn"]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)([args doubleForKey:@"translateIn"] * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            NSMutableArray<SGKaraokeLine *> *translated = [SGKaraokeLinesForTrack(@"harness") mutableCopy];
+            for (NSUInteger i = 0; i < translated.count; i += 2) {
+                SGKaraokeLine *line = [translated[i] copy];
+                line.translation = [@"Translated: " stringByAppendingString:SGKaraokeLineText(line)];
+                translated[i] = line;
+            }
+            SGKaraokeKeepLines(@"harness", translated);
         });
     }
 #ifdef SGRKeyLyricsTextOrder

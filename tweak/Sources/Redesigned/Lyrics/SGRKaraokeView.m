@@ -1096,6 +1096,7 @@ typedef struct {
     CFTimeInterval _stillSince;   // when the position stopped moving, 0 while it moves
     SGRKaraokeStyle *_style;   // how the lines were laid out
     BOOL _hasSpoken, _hasTranslation;   // whether the song has any line with either
+    NSArray<SGKaraokeLine *> *_passedOver;   // lines kept for the song that changed nothing here, not looked at again
     UIButton *_extras;
     CGFloat _builtWidth;
     BOOL _showing;
@@ -1340,6 +1341,13 @@ typedef struct {
     _arrangement++;
     [_dots removeFromSuperview];
     _dots = nil;
+}
+
+static BOOL hasTranslations(NSArray<SGKaraokeLine *> *lines) {
+    for (SGKaraokeLine *line in lines) {
+        if (line.translation.length) return YES;
+    }
+    return NO;
 }
 
 // When each line is sung and where the breaks are, worked out once per song for the frames to read.
@@ -1719,19 +1727,40 @@ typedef struct {
         SGLog(@"karaoke: page shows track %@, lyrics %@", track, SGKaraokeLinesForTrack(track) ? @"captured" : @"not captured yet");
         _track = track;
         _lines = nil;
+        _passedOver = nil;
         _builtWidth = 0;
         [self creditTo:nil];
         [self dropLineViews];
         [self offerExtras];
     }
-    // Plain text is shown while Spotify is asked whether it has the song timed; its answer replaces it.
-    NSArray<SGKaraokeLine *> *kept = _plain && _lines && track ? SGKaraokeLinesForTrack(track) : nil;
-    if (kept && kept != _lines) {
-        SGLog(@"karaoke: timed lines of %@ came in over the plain text", track);
-        _lines = nil;
-        _builtWidth = 0;
-        [self creditTo:nil];
-        [self dropLineViews];
+    NSArray<SGKaraokeLine *> *kept = _lines && track ? SGKaraokeLinesForTrack(track) : nil;
+    if (kept && kept != _lines && kept != _passedOver) {
+        if (!_hasTranslation && kept.count == _lines.count && SGKaraokeLinesTiming(kept) == SGKaraokeLinesTiming(_lines)
+            && hasTranslations(kept)) {
+            // Musixmatch's translations come in a moment after the lines, as copies of them: the song is
+            // restyled with them where it stands.
+            SGLog(@"karaoke: translations of %@ came in", track);
+            if (_tops) {
+                _lines = kept;
+                [self timeLines];
+                [self restyle];
+            } else {
+                // Nothing placed yet, and a measure may be in flight in the old style: it is dropped, and
+                // the translated lines are built below as new ones.
+                _lines = nil;
+                _builtWidth = 0;
+                [self dropLineViews];
+            }
+        } else if (_plain) {
+            // Plain text is shown while Spotify is asked whether it has the song timed; its answer replaces it.
+            SGLog(@"karaoke: timed lines of %@ came in over the plain text", track);
+            _lines = nil;
+            _builtWidth = 0;
+            [self creditTo:nil];
+            [self dropLineViews];
+        } else {
+            _passedOver = kept;
+        }
     }
     if (!_lines && track && (_lines = SGKaraokeLinesForTrack(track))) {
         SGLog(@"karaoke: showing %lu lines of %@", (unsigned long)_lines.count, track);

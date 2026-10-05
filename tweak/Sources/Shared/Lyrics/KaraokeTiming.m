@@ -5,6 +5,19 @@
 @end
 
 @implementation SGKaraokeLine
+- (id)copyWithZone:(NSZone *)zone {
+    SGKaraokeLine *copy = [SGKaraokeLine new];
+    copy.words = _words;
+    copy.start = _start;
+    copy.end = _end;
+    copy.voice = _voice;
+    copy.align = _align;
+    copy.timing = _timing;
+    copy.backing = _backing;
+    copy.pronunciation = _pronunciation;
+    copy.translation = _translation;
+    return copy;
+}
 @end
 
 // A line is sung at about this pace and never takes longer than the gap to the next one. A slow

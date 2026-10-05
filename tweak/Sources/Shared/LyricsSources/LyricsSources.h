@@ -125,6 +125,13 @@ NSString *SGLyricsTranslationLanguage(void);
 // The sources themselves, each in its own file.
 extern SGLyricsAsk SGBiniLyricsAsk;
 extern SGLyricsAsk SGMusixmatchAsk;
+// Musixmatch's community translations of a track into `language`, by SGMusixmatchLineKey of each original
+// line, or nil when there are none. Main queue, and at once when the answer is in. Asked once per
+// track and language a launch, again only after an answer cut short.
+void SGMusixmatchTranslations(NSString *trackID, NSString *language, void (^done)(NSDictionary<NSString *, NSString *> *byLine));
+NSString *SGMusixmatchLineKey(NSString *text);
+// Copies of the lines with the translations matched in, in a new array; nil when none matched.
+NSArray<SGKaraokeLine *> *SGMusixmatchTranslatedLines(NSArray<SGKaraokeLine *> *lines, NSDictionary<NSString *, NSString *> *byLine);
 extern SGLyricsAsk SGUnisonAsk;
 extern SGLyricsAsk SGNetEaseAsk;
 extern SGLyricsAsk SGLrcLibAsk;
