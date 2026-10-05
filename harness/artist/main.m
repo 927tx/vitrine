@@ -289,7 +289,7 @@ static NSArray<NSArray *> *musicList(void) {
     wash.backgroundColor = [UIColor colorWithWhite:0 alpha:0.5];
 
     UIView *titleBox = box(header, UIView.class, CGRectMake(16, 334.67, 370, 54), nil);
-    label(titleBox, CGRectMake(0, 0, 370, 54), @"Shawn Mendes", 45, UIColor.whiteColor, @"Encore.AdaptiveTitle");
+    label(titleBox, CGRectMake(0, 0, 370, 54), NSProcessInfo.processInfo.environment[@"HARNESS_ARTIST"] ?: @"Shawn Mendes", 45, UIColor.whiteColor, @"Encore.AdaptiveTitle");
     UIView *badge = box(header, UIStackView.class, CGRectMake(16, 390.67, 114.67, 24), @"ImageHeaderView.VerifiedBadge");
     label(badge, CGRectMake(20, 4, 94, 15), @"Verified by Spotify", 11, UIColor.whiteColor, @"Encore.Label");
     UIView *meta = box(header, UIView.class, CGRectMake(16, 432.67, 370, 15.33), nil);

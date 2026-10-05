@@ -25,9 +25,19 @@
 
 @class SGRArtworkField;
 
-// The artwork's colours moving behind the player (on until switched off), or the blurred artwork held
-// still; the row is on the Now playing page (Redesigned/NowPlayingBar/NowPlayingBarSettings.m).
+// What is behind the player, chosen on the Now playing page (Redesigned/NowPlayingBar/NowPlayingBarSettings.m).
+// SGRKeyPlayerMotion is the switch the choice replaced: until a choice is stored, it picks Still or Colours.
+#define SGRKeyPlayerBackground @"spotifyglass.redesign.player.background"
 #define SGRKeyPlayerMotion @"spotifyglass.redesign.player.movingBackground"
+typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
+    SGRPlayerBackgroundStill,      // the artwork blurred and held still
+    SGRPlayerBackgroundColours,    // the artwork's colours drifting (SGRFlow.h)
+    SGRPlayerBackgroundFluid,      // the artwork itself blurred and turning (SGRFluid.h)
+    SGRPlayerBackgroundAnimated,   // the track's Canvas or Apple Music's animated cover, over Fluid (PlayerMotion.x)
+};
+SGRPlayerBackgroundKind SGRPlayerBackground(void);
+// The names of the choices, in order.
+NSArray<NSString *> *SGRPlayerBackgroundNames(void);
 
 // The field behind the player, nil until the player has laid out once (PlayerField.x).
 SGRArtworkField *SGRPlayerField(void);
@@ -57,6 +67,8 @@ void SGRPlayerToggleLyrics(void);
 // Called by PlayerLyrics.x whenever either of those two changed, so the footer's lyrics glyph follows
 // (PlayerFooter.x). It returns at once when nothing changed.
 void SGRPlayerLyricsChanged(void);
+// The animated artwork follows the lyrics: blurred behind them (PlayerMotion.x).
+void SGRPlayerMotionLyricsChanged(void);
 
 // Alpha 0, no touches, hidden from accessibility, set again on every call: for Spotify's Swift views,
 // which SGRSuppress cannot keep (PlayerControls.x).

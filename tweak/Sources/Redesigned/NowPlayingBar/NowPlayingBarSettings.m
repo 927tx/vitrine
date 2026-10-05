@@ -11,7 +11,8 @@ UIViewController *SGRNowPlayingBarSettingsPage(void) {
             SGHideRow(@"Hide the device button", nil, SGRHideBarConnect),
         ]),
         SGSection(nil, @[
-            SGSwitchRow(@"Moving background", nil, SGRKeyPlayerMotion),
+            SGChoiceRow(@"Background", @"Animated plays the Canvas or Apple Music's animated cover, over Fluid",
+                        SGRKeyPlayerBackground, SGRPlayerBackgroundNames(), SGRPlayerBackground()),
         ]),
     ] footer:nil];
 }

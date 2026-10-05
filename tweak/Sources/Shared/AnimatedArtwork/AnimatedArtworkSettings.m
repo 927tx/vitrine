@@ -7,7 +7,7 @@ NSArray *SGLockScreenMotionRows(void) {
     if (@available(iOS 26.0, *)) {
         return @[
             SGOptionRow(@"Moving artwork", @"The track's Canvas, else Apple Music's animated cover", SGKeyLockScreenMotion),
-            SGOptionRow(@"Download in Low Data Mode", @"About 2 to 6 MB a song", SGKeyMotionLowData),
+            SGOptionRow(@"Download in Low Data Mode", @"Up to about 7 MB a song", SGKeyMotionLowData),
         ];
     }
     return @[];

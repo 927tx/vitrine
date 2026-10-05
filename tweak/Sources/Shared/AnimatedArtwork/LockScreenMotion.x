@@ -67,7 +67,7 @@ static void show(NSString *uri, NSURL *file) {
         id type = metadata[@"canvas.type"], address = metadata[@"canvas.url"];
         BOOL video = [type isKindOfClass:NSString.class] && [type rangeOfString:@"video" options:NSCaseInsensitiveSearch].location != NSNotFound;
         NSURL *canvas = video && [address isKindOfClass:NSString.class] ? [NSURL URLWithString:address] : nil;
-        CGFloat pixels = UIScreen.mainScreen.nativeBounds.size.width;
+        CGFloat pixels = SGMotionPixels();
         void (^apple)(void) = ^{
             SGMotionAlbumCover(artist, album, SGMotionTall, pixels, ^(NSURL *file) { show(uri, file); });
         };

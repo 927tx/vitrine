@@ -21,6 +21,10 @@ void SGMotionAlbumCover(NSString *artist, NSString *album, SGMotionShape shape, 
 // The artist's logo from Apple Music, a transparent PNG `pixels` wide, or nil. Main queue.
 void SGMotionArtistLogo(NSString *artist, CGFloat pixels, void (^done)(UIImage *logo));
 
+// The width a full-screen clip is downloaded at: three quarters of the screen's pixels. A tall cover at the
+// screen's full width ran to 29 MB a song; at this width it was 7 MB and looks the same in motion.
+CGFloat SGMotionPixels(void);
+
 // Any remote video (a Canvas) as a local file, or nil. Main queue.
 void SGMotionFile(NSURL *remote, void (^done)(NSURL *file));
 

@@ -96,6 +96,12 @@ static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
     [self setNeedsLayout];
 }
 
+// The space under a line: a picture needs more room under it than a line of text does.
+- (CGFloat)sgr_gapAfter:(UILabel *)label {
+    if (label == _title && _logo.image) return 8;
+    return label == _creator ? 4 : 2;
+}
+
 // The title's line: the picture's fitted height where there is a picture, the label's otherwise.
 - (CGSize)sgr_sizeOf:(UILabel *)label width:(CGFloat)text {
     if (label != _title || !_logo.image) return [label sizeThatFits:CGSizeMake(text, CGFLOAT_MAX)];
@@ -179,7 +185,7 @@ static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
     UILabel *previous = nil;
     for (UILabel *label in @[_title, _creator, _length]) {
         if (label.hidden) continue;
-        if (previous) height += previous == _creator ? 4 : 2;
+        if (previous) height += [self sgr_gapAfter:previous];
         height += ceil([self sgr_sizeOf:label width:text].height);
         previous = label;
     }
@@ -197,7 +203,7 @@ static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
     UILabel *previous = nil;
     for (UILabel *label in @[_title, _creator, _length]) {
         if (label.hidden) continue;
-        if (previous) y += previous == _creator ? 4 : 2;
+        if (previous) y += [self sgr_gapAfter:previous];
         CGSize size = [self sgr_sizeOf:label width:text];
         CGFloat height = ceil(size.height);
         label.frame = CGRectMake(kSide, y, text, height);

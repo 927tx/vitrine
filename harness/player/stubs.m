@@ -61,6 +61,14 @@ void SGRHarnessSetTrack(NSString *uri, NSString *imageURI, BOOL paused) {
         metadata[@"image_url"] = [@"spotify:image:ab67616d00001e02" stringByAppendingString:hash];
         metadata[@"image_small_url"] = [@"spotify:image:ab67616d00004851" stringByAppendingString:hash];
     }
+    // HARNESS_ARTIST, HARNESS_ALBUM and HARNESS_CANVAS (a video URL) give Animated artwork something to find.
+    NSDictionary<NSString *, NSString *> *env = NSProcessInfo.processInfo.environment;
+    if (env[@"HARNESS_ARTIST"]) [track setValue:env[@"HARNESS_ARTIST"] forKey:@"artistName"];
+    if (env[@"HARNESS_ALBUM"]) metadata[@"album_title"] = env[@"HARNESS_ALBUM"];
+    if (env[@"HARNESS_CANVAS"]) {
+        metadata[@"canvas.type"] = @"VIDEO_LOOPING_RANDOM";
+        metadata[@"canvas.url"] = env[@"HARNESS_CANVAS"];
+    }
     [track setValue:metadata forKey:@"metadata"];
     SPTPlayerState *state = [SPTPlayerState new];
     [state setValue:track forKey:@"track"];
@@ -112,3 +120,9 @@ void SGKaraokeSeek(NSInteger ms) {
     sg_started = CACurrentMediaTime();
 }
 void SGRHarnessPlayFrom(NSInteger ms) { SGKaraokeSeek(ms); }
+
+// Line meanings: Genius is not asked in the harness.
+#import "Shared/LyricsMeanings/Meanings.h"
+void SGLyricsMeaningsFor(NSString *trackID, NSArray<SGKaraokeLine *> *lines,
+                         void (^done)(NSDictionary<NSNumber *, NSArray<SGLyricsMeaning *> *> *byLine)) {}
+void SGRShowMeanings(NSString *lineText, NSArray<SGLyricsMeaning *> *meanings) {}

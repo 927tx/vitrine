@@ -37,6 +37,10 @@ static void trim(void) {
     for (NSUInteger i = 0; i + kFiles < oldestFirst.count; i++) [NSFileManager.defaultManager removeItemAtURL:oldestFirst[i] error:nil];
 }
 
+CGFloat SGMotionPixels(void) {
+    return round(UIScreen.mainScreen.nativeBounds.size.width * 0.75);
+}
+
 static NSMutableDictionary<NSURL *, NSMutableArray *> *sg_waiting;
 
 void SGMotionFile(NSURL *remote, void (^done)(NSURL *file)) {
@@ -61,7 +65,12 @@ void SGMotionFile(NSURL *remote, void (^done)(NSURL *file)) {
         NSInteger status = [response isKindOfClass:NSHTTPURLResponse.class] ? ((NSHTTPURLResponse *)response).statusCode : 0;
         // The temporary file is gone once this handler returns, so it moves before the hop to main.
         BOOL kept = temporary && status == 200 && [NSFileManager.defaultManager moveItemAtURL:temporary toURL:local error:nil];
-        if (kept) trim();
+        if (kept) {
+            trim();
+            NSNumber *bytes = nil;
+            [local getResourceValue:&bytes forKey:NSURLFileSizeKey error:nil];
+            SGLog(@"motion: %@ kept, %.1f MB", local.lastPathComponent, bytes.doubleValue / 1e6);
+        }
         else SGLog(@"motion: %@ not downloaded (%ld, %@)", remote.lastPathComponent, (long)status, error.localizedDescription);
         dispatch_async(dispatch_get_main_queue(), ^{
             NSArray *waiting = sg_waiting[remote];

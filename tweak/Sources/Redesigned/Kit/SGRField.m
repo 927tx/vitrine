@@ -1,6 +1,7 @@
 #import "Core/SGCore.h"
 #import "SGRField.h"
 #import "SGRFlow.h"
+#import "SGRFluid.h"
 #import "SGRBridges.h"
 #import "SGRPalette.h"
 #import "SGRTokens.h"
@@ -35,6 +36,7 @@ static NSDictionary *noActions(void) {
     CAGradientLayer *_black;
     CALayer *_backdrop;
     SGRFlowLayer *_flow;
+    SGRFluidLayer *_fluidLayer;
     BOOL _watching;
     UIColor *_color;
     UIColor *_preferred;   // the page's own colour, made fit; wins over the artwork's
@@ -102,14 +104,36 @@ static NSDictionary *noActions(void) {
     _black.locations = @[@(MIN(1, from / total)), @(MIN(1, to / total))];
     _backdrop.frame = CGRectMake(0, 0, bounds.size.width, [self backdropHeightNow]);
     _flow.frame = CGRectMake(0, 0, bounds.size.width, [self backdropHeightNow]);
+    _fluidLayer.frame = painted;
+    // The screen's part of it, so the copies turn about it and the shade ends at the screen's foot.
+    _fluidLayer.visibleRect = CGRectMake(bleed.left, bleed.top, bounds.size.width, height);
     [CATransaction commit];
 }
 
 #pragma mark - the moving field
 
+- (void)setFluid:(BOOL)fluid {
+    if (fluid == _fluid) return;
+    _fluid = fluid;
+    if (fluid) self.flows = NO;
+    if (fluid && !_fluidLayer) {
+        _fluidLayer = [SGRFluidLayer layer];
+        [self.layer insertSublayer:_fluidLayer above:_solid];
+    }
+    // The fluid field is the whole picture, as the moving one is.
+    _fluidLayer.hidden = !fluid;
+    _black.hidden = fluid || _flows;
+    if (fluid) _backdrop.hidden = YES;
+    if (fluid && _image) [_fluidLayer setArtwork:_image animated:NO];
+    [self watch];
+    [self updateMotion];
+    [self setNeedsLayout];
+}
+
 - (void)setFlows:(BOOL)flows {
     if (flows == _flows) return;
     _flows = flows;
+    if (flows) self.fluid = NO;
     if (flows && !_flow) {
         _flow = [SGRFlowLayer layer];
         _flow.hidden = YES;
@@ -131,7 +155,7 @@ static NSDictionary *noActions(void) {
 }
 
 - (void)watch {
-    if (_watching || !_flows) return;
+    if (_watching || (!_flows && !_fluid)) return;
     _watching = YES;
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
     for (NSNotificationName name in @[UIApplicationDidBecomeActiveNotification, UIApplicationWillResignActiveNotification,
@@ -151,12 +175,14 @@ static NSDictionary *noActions(void) {
 }
 
 - (void)updateMotion {
-    if (!_flow) return;
+    if (!_flow && !_fluidLayer) return;
     // A locked phone keeps the player in its window, so being in front counts as much as being in one.
     BOOL front = UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
-    BOOL moving = _flows && !_flow.hidden && self.window && front && !SGRPlayerIsTransitioning() && !SGRReduceMotion()
-               && !NSProcessInfo.processInfo.lowPowerModeEnabled && !_motionHeld;
-    if (moving == _flow.moving) return;
+    BOOL may = self.window && front && !SGRPlayerIsTransitioning() && !SGRReduceMotion()
+            && !NSProcessInfo.processInfo.lowPowerModeEnabled && !_motionHeld;
+    _fluidLayer.moving = may && _fluid;
+    BOOL moving = may && _flows && !_flow.hidden;
+    if (!_flow || moving == _flow.moving) return;
     _flow.moving = moving;
     static NSUInteger logged;
     if (logged++ < 6) SGLog(@"redesign kit: moving field %@", moving ? @"moves" : @"holds still");
@@ -205,9 +231,10 @@ static NSDictionary *noActions(void) {
     if (!image || image == _image || (identity && [identity isEqualToString:_identity])) return;
     _image = image;
     _identity = [identity copy];
+    if (_fluid) [_fluidLayer setArtwork:image animated:animated && self.window != nil];
     NSUInteger generation = ++_generation;
     SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows};
-    if (_showsBackdrop && !_flows) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
+    if (_showsBackdrop && !_flows && !_fluid) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
     __weak SGRArtworkField *weakSelf = self;
     [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
         SGRArtworkField *field = weakSelf;
@@ -226,7 +253,7 @@ static NSDictionary *noActions(void) {
         [self applyColor:_preferred ?: _flow.baseColor animated:animated];
         return;
     }
-    if (_showsBackdrop && !_flows && palette.backdrop) {
+    if (_showsBackdrop && !_flows && !_fluid && palette.backdrop) {
         [CATransaction begin];
         [CATransaction setDisableActions:YES];
         if (animated) {
