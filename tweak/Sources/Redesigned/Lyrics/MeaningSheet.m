@@ -41,6 +41,9 @@ static NSString *authorSymbol(SGLyricsMeaningAuthor author) {
     sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent, UISheetPresentationControllerDetent.largeDetent];
     sheet.prefersGrabberVisible = YES;
     sheet.prefersScrollingExpandsWhenScrolledToEdge = YES;
+    // On the landscape lyrics (compact height) the sheet would otherwise cover the whole screen with no
+    // grabber and nothing to pull down; edge attached it is a card on the bottom edge, inside the safe area.
+    sheet.prefersEdgeAttachedInCompactHeight = YES;
     return self;
 }
 
@@ -115,17 +118,19 @@ static NSString *authorSymbol(SGLyricsMeaningAuthor author) {
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    CGFloat width = self.view.bounds.size.width - 2 * kSide;
+    // A sheet as wide as a landscape screen reaches under the sensor housing, which the safe area keeps clear.
+    UIEdgeInsets safe = self.view.safeAreaInsets;
+    CGFloat left = kSide + safe.left, width = self.view.bounds.size.width - left - kSide - safe.right;
     CGFloat y = kTop;
-    _quote.frame = CGRectMake(kSide, y, width, [_quote sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)].height);
+    _quote.frame = CGRectMake(left, y, width, [_quote sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)].height);
     y = CGRectGetMaxY(_quote.frame) + kGap;
     CGSize badge = [_author sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
-    _author.frame = CGRectMake(kSide, y, MIN(width, badge.width), badge.height);
+    _author.frame = CGRectMake(left, y, MIN(width, badge.width), badge.height);
     y = CGRectGetMaxY(_author.frame) + kGap + 4;
-    _body.frame = CGRectMake(kSide, y, width, [_body sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)].height);
+    _body.frame = CGRectMake(left, y, width, [_body sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)].height);
     y = CGRectGetMaxY(_body.frame) + kGap * 2;
-    _count.frame = CGRectMake(kSide, y, [_count sizeThatFits:CGSizeMake(width, 22)].width, 22);
-    CGFloat right = kSide + width;
+    _count.frame = CGRectMake(left, y, [_count sizeThatFits:CGSizeMake(width, 22)].width, 22);
+    CGFloat right = left + width;
     if (!_next.hidden) {
         CGSize size = [_next sizeThatFits:CGSizeZero];
         _next.frame = CGRectMake(right - size.width, y, size.width, 22);
