@@ -11,11 +11,13 @@
 #import "SGRKaraokeView.h"
 #import "LyricsText.h"
 #import "MeaningSheet.h"
+#import "SGRSingButton.h"
 #import "Shared/LyricsSources/LyricsSources.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Settings/SGPageStyle.h"
 #import "Shared/Player/PlayerEvents.h"
 #import "Shared/Haptics/Haptics.h"
+#import "Redesigned/Kit/SGRGlass.h"
 #import "Redesigned/Kit/SGRTokens.h"
 
 static const CGFloat kFontSize = 30, kMargin = 24, kLineGap = 24, kRowTighten = 2;
@@ -34,6 +36,7 @@ static const CGFloat kCreditSize = 12, kCreditAlpha = 0.4, kCreditBottom = 10;
 // The button for the pronunciation and the translation, in the bottom leading corner as Apple Music
 // has it, and the gap between it and the credit beside it.
 static const CGFloat kExtrasSide = 44, kExtrasBottom = 12, kExtrasGlyph = 17, kExtrasCreditGap = 12;
+static char kExtrasGlassKey;
 static const NSTimeInterval kRestyleFade = 0.3;   // the lines crossfading to a new style
 static const NSTimeInterval kBrowseHold = 3;   // after scrolling by hand, how long until it follows the song again
 static const double kFloatMinMs = 700, kFloatLeadMs = 80;   // a short word still floats up this slowly
@@ -133,7 +136,9 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
 @property (nonatomic) double riseStart, riseEnd;
 - (void)fillTo:(CGFloat)cursor;
 - (void)floatAt:(double)ms;
-- (void)settle;
+- (void)settle;   // land and unglow at once
+- (void)land;     // back down from its float
+- (void)unglow;   // the glow off
 @end
 
 @implementation SGRKaraokeWordView {
@@ -220,8 +225,16 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
 }
 
 - (void)settle {
+    [self land];
+    [self unglow];
+}
+
+- (void)land {
     _lift = 0;
     self.transform = CGAffineTransformIdentity;
+}
+
+- (void)unglow {
     _glow = 0;
     _lit.layer.shadowOpacity = 0;
 }
@@ -790,11 +803,12 @@ static const NSUInteger kLinesPerFrame = 4;
         return;
     }
     // A sung line fades back to dim rather than dropping its fill at once, and its words sink back
-    // on a spring slow enough to still be seen doing it.
+    // on a spring slow enough to still be seen doing it. A held word's glow is left on: the spring would
+    // drop it in the first frame, and the lit word fading out takes it out with it.
     [UIView animateWithDuration:0.9 delay:0 usingSpringWithDamping:1 initialSpringVelocity:0
                         options:UIViewAnimationOptionAllowUserInteraction
                      animations:^{
-        for (SGRKaraokeWordView *word in self->_words) [word settle];
+        for (SGRKaraokeWordView *word in self->_words) [word land];
     } completion:nil];
     [UIView animateWithDuration:0.5 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
         for (SGRKaraokeWordView *word in self->_words) word.lit.alpha = 0;
@@ -802,6 +816,7 @@ static const NSUInteger kLinesPerFrame = 4;
         if (generation != self->_generation) return;
         for (SGRKaraokeWordView *word in self->_words) {
             [word fillTo:-CGFLOAT_MAX];
+            [word unglow];
             word.lit.hidden = YES;
             word.lit.alpha = 1;
         }
@@ -1098,8 +1113,11 @@ typedef struct {
     BOOL _hasSpoken, _hasTranslation;   // whether the song has any line with either
     BOOL _untranslated;   // whether a line with words has no translation, which Gemini can fill in
     NSArray<SGKaraokeLine *> *_passedOver;   // lines kept for the song that changed nothing here, not looked at again
+    UIView *_extrasBox;   // the Kit's glass and _extras over it, which holds none, so its alpha can fade
     UIButton *_extras;
-    CGFloat _builtWidth;
+    NSArray<SGKaraokeLine *> *_translating;   // the lines Gemini is translating, nil while it is not
+    SGRSingButton *_sing;   // across from _extras
+    CGFloat _builtWidth, _placedHeight;
     BOOL _showing;
     CAGradientLayer *_fade;
     UILabel *_credit;
@@ -1146,6 +1164,8 @@ typedef struct {
     _crediting = SGFlag(SGKeyLyricsCredit, NO);
     _sweepsEstimates = SGFlag(SGKeyLyricsSimulateWords, NO);
     [self addSubview:_credit];
+    _sing = [SGRSingButton new];
+    [self addSubview:_sing];
     [self addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)]];
     [self addGestureRecognizer:[[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(held:)]];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionNotification object:nil];
@@ -1165,7 +1185,8 @@ typedef struct {
 }
 
 - (void)tapped:(UITapGestureRecognizer *)tap {
-    if (_extras && !_extras.hidden && CGRectContainsPoint(_extras.frame, [tap locationInView:self])) return;
+    if (_extrasBox && !_extrasBox.hidden && CGRectContainsPoint(_extrasBox.frame, [tap locationInView:self])) return;
+    if (_sing.userInteractionEnabled && [_sing pointInside:[tap locationInView:_sing] withEvent:nil]) return;
     CGPoint point = [tap locationInView:_scroll];
     for (SGRKaraokeLineView *view in _shown.allValues) {
         CGRect target = view.bubbleTarget;
@@ -1185,6 +1206,7 @@ typedef struct {
 
 - (void)held:(UILongPressGestureRecognizer *)hold {
     if (hold.state != UIGestureRecognizerStateBegan || !_meanings.count) return;
+    if (_sing.userInteractionEnabled && [_sing pointInside:[hold locationInView:_sing] withEvent:nil]) return;
     CGPoint point = [hold locationInView:_scroll];
     for (SGRKaraokeLineView *view in _shown.allValues) {
         if (!CGRectContainsPoint(CGRectInset(view.frame, -_margin, -_lineGap / 2), point)) continue;
@@ -1226,10 +1248,16 @@ typedef struct {
     for (SGRKaraokeLineView *view in _shown.allValues) view.blur = 0;
 }
 
+// In the caller's animation: the glass dematerialises by its effect and the glyph fades by its alpha, the
+// one view of the two with no glass in it.
 - (void)setExtrasHidden:(BOOL)hidden {
     _extrasHidden = hidden;
-    _extras.alpha = hidden ? 0 : 1;
-    _extras.userInteractionEnabled = !hidden;
+    if (_extrasBox) {
+        SGRShowGlass(SGRGlassInside(_extrasBox, &kExtrasGlassKey, kExtrasSide), !hidden);
+        _extras.alpha = hidden ? 0 : 1;
+        _extrasBox.userInteractionEnabled = !hidden;
+    }
+    _sing.tucked = hidden;
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
@@ -1318,11 +1346,22 @@ typedef struct {
     [_credit sizeToFit];
     _credit.frame = CGRectMake(_margin, self.bounds.size.height - _credit.bounds.size.height - kCreditBottom,
                                _credit.bounds.size.width, _credit.bounds.size.height);
-    if (_extras && !_extras.hidden) {
-        _extras.frame = CGRectMake(_margin, self.bounds.size.height - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
-        _credit.center = CGPointMake(CGRectGetMaxX(_extras.frame) + kExtrasCreditGap + _credit.bounds.size.width / 2, _extras.center.y);
+    if (_extrasBox && !_extrasBox.hidden) {
+        _extrasBox.frame = CGRectMake(_margin, self.bounds.size.height - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
+        SGRShowGlass(SGRGlassInside(_extrasBox, &kExtrasGlassKey, kExtrasSide), !_extrasHidden);
+        _credit.center = CGPointMake(CGRectGetMaxX(_extrasBox.frame) + kExtrasCreditGap + _credit.bounds.size.width / 2, _extrasBox.center.y);
     }
-    if (_lines && self.bounds.size.width != _builtWidth) [self rebuild];
+    _sing.frame = CGRectMake(self.bounds.size.width - _margin - kExtrasSide, self.bounds.size.height - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
+    if (_lines && self.bounds.size.width != _builtWidth) {
+        [self rebuild];
+    } else if (_tops && self.bounds.size.height != _placedHeight) {
+        // A new height moves the anchor (the player's lines going alone and back): the stack is placed for it
+        // here, inside whatever animation resized the page, so the sung line rides along with it rather than
+        // springing to the new anchor at the next line, and the band the height opens is filled in.
+        _sightOffset = -CGFLOAT_MAX;
+        [self placeLinesAnimated:NO];
+    }
+    _placedHeight = self.bounds.size.height;
 }
 
 - (void)dropLineViews {
@@ -1459,31 +1498,35 @@ static BOOL hasWords(SGKaraokeLine *line) {
     BOOL gemini = SGGeminiKeySet();
     BOOL offered = _lines && (_hasSpoken || _hasTranslation || gemini);
     if (!offered) {
-        _extras.hidden = YES;
+        _extrasBox.hidden = YES;
         return;
     }
     if (!_extras) {
-        UIImage *glyph = [UIImage systemImageNamed:@"translate" withConfiguration:
-                          [UIImageSymbolConfiguration configurationWithPointSize:kExtrasGlyph weight:UIImageSymbolWeightSemibold]];
-        // The system's glass, which turns solid under Reduce Transparency by itself; before iOS 26, the
-        // Kit's solid fill in its place.
-        UIButtonConfiguration *config;
-        if (@available(iOS 26.0, *)) {
-            config = [UIButtonConfiguration glassButtonConfiguration];
-        } else {
-            config = [UIButtonConfiguration filledButtonConfiguration];
-            config.baseBackgroundColor = SGRSolidGlassFill();
-        }
-        config.image = glyph;
-        config.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
+        // The Kit's glass, as the mic across from it has (setExtrasHidden:), which turns solid under Reduce
+        // Transparency, with a plain button over it.
+        _extrasBox = [[UIView alloc] initWithFrame:CGRectMake(0, 0, kExtrasSide, kExtrasSide)];
+        _extrasBox.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+        UIButtonConfiguration *config = [UIButtonConfiguration plainButtonConfiguration];
+        config.image = [UIImage systemImageNamed:@"translate"];
+        config.preferredSymbolConfigurationForImage = [UIImageSymbolConfiguration configurationWithPointSize:kExtrasGlyph weight:UIImageSymbolWeightSemibold];
         config.baseForegroundColor = UIColor.whiteColor;
         _extras = [UIButton buttonWithConfiguration:config primaryAction:nil];
-        _extras.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+        _extras.frame = _extrasBox.bounds;
+        _extras.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         _extras.showsMenuAsPrimaryAction = YES;
         _extras.preferredMenuElementOrder = UIContextMenuConfigurationElementOrderFixed;
         _extras.accessibilityLabel = @"Pronunciation and translation";
+        [_extrasBox addSubview:_extras];
+        [self addSubview:_extrasBox];
         self.extrasHidden = _extrasHidden;
-        [self addSubview:_extras];
+    }
+    // While Gemini works the glyph turns into a spinner, and the menu has nothing to ask it a second time.
+    BOOL translating = _translating && _translating == _lines;
+    UIButtonConfiguration *config = _extras.configuration;
+    if (config.showsActivityIndicator != translating) {
+        config.showsActivityIndicator = translating;
+        _extras.configuration = config;
+        _extras.accessibilityValue = translating ? @"Translating" : nil;
     }
     NSMutableArray<UIMenuElement *> *items = [NSMutableArray array];
     if (_hasSpoken) {
@@ -1499,13 +1542,16 @@ static BOOL hasWords(SGKaraokeLine *line) {
                                            handler:^(UIAction *action) { SGRSetLyricsTextShown(SGRLyricsTextTranslation, !on); }]];
     }
     // Also for a song a source translated in part, as Musixmatch's community often has: Gemini fills in the rest.
-    if (gemini && _untranslated) {
+    // Said in the item itself: the song's words leave the phone for Google's servers.
+    if (gemini && _untranslated && !translating) {
         __weak SGRKaraokeView *weakSelf = self;
-        [items addObject:[UIAction actionWithTitle:@"Translate with Gemini" image:[UIImage systemImageNamed:@"sparkles"]
-                                        identifier:nil handler:^(UIAction *action) { [weakSelf translateWithGemini]; }]];
+        UIAction *gemini = [UIAction actionWithTitle:@"Translate with Gemini" image:[UIImage systemImageNamed:@"sparkles"]
+                                          identifier:nil handler:^(UIAction *action) { [weakSelf translateWithGemini]; }];
+        gemini.subtitle = @"Sends the lyrics to Google";
+        [items addObject:gemini];
     }
     _extras.menu = [UIMenu menuWithChildren:items];
-    _extras.hidden = NO;
+    _extrasBox.hidden = NO;
     [self setNeedsLayout];
 }
 
@@ -1514,11 +1560,17 @@ static BOOL hasWords(SGKaraokeLine *line) {
 - (void)translateWithGemini {
     NSArray<SGKaraokeLine *> *lines = _lines;
     NSString *track = _track;
-    if (!lines.count) return;
+    if (!lines.count || _translating == lines) return;
+    _translating = lines;
+    [self offerExtras];
     SGLyricsTranslateWithGemini(track, lines, SGLyricsGeminiLanguage(), ^(NSArray<NSString *> *translations, NSString *error) {
+        if (self->_translating == lines) self->_translating = nil;
+        [self offerExtras];
         if (!translations) {
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"No translation" message:error
                                                                     preferredStyle:UIAlertControllerStyleAlert];
+            // Over the player, which is dark whatever the system's appearance.
+            alert.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
             [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
             [SGTopController() presentViewController:alert animated:YES completion:nil];
             return;
@@ -1566,15 +1618,18 @@ static BOOL hasWords(SGKaraokeLine *line) {
 
 // The view of a line, made the first time it is asked for and placed where the stack has it.
 - (SGRKaraokeLineView *)viewForLine:(NSInteger)index {
-    SGRKaraokeLineView *view = _shown[@(index)];
+    __block SGRKaraokeLineView *view = _shown[@(index)];
     if (view || !_tops || index < 0 || index >= (NSInteger)_tops.count) return view;
-    view = [[SGRKaraokeLineView alloc] initWithLine:_lines[index] width:_builtWidth - 2 * _margin style:_style under:nil
-                                            blurred:_maxBlur > 0 && !_plain sweepsEstimates:_sweepsEstimates];
-    if (_plain) [view showPlain];
-    [view markMeaning:_meanings[@(index)]];
-    [_scroll addSubview:view];
-    _shown[@(index)] = view;
-    [self placeLine:view at:index animated:NO];
+    // Made where it belongs even inside an animation of the page's (a new height), not flown in from the corner.
+    [UIView performWithoutAnimation:^{
+        view = [[SGRKaraokeLineView alloc] initWithLine:self->_lines[index] width:self->_builtWidth - 2 * self->_margin style:self->_style under:nil
+                                                blurred:self->_maxBlur > 0 && !self->_plain sweepsEstimates:self->_sweepsEstimates];
+        if (self->_plain) [view showPlain];
+        [view markMeaning:self->_meanings[@(index)]];
+        [self->_scroll addSubview:view];
+        self->_shown[@(index)] = view;
+        [self placeLine:view at:index animated:NO];
+    }];
     return view;
 }
 

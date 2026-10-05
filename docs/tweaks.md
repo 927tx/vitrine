@@ -153,6 +153,15 @@ Shared:
                   master switch on.
                   Tested on the Mac against harness/audio-effects/ and harness/autoeq/, the hook in the simulator
                   against its sim/, the page against harness/audio-effects-page/
+    Sing/         Sing, a song's vocals turned down while it plays (Sing.h lists its files): the voice model (Mel-Band
+                  RoFormer, MIT, from Hugging Face) downloaded and checked file by file, a stop keeping what came in for the
+                  next download to carry on from, the STFT around it on Accelerate,
+                  and an engine that stands in Speed and pitch's chain between Spotify's mixer and its output
+                  (SGPlayerSetStage), pulls the mixer a few seconds ahead of what plays, separates two-second windows
+                  there on a worker thread and mixes the vocals down on the render thread. Spotify's clock has the lead
+                  taken off (SPTPlayerState's positionAsOfTimestamp), and a seek, a skip or a stop drops it. The mic is
+                  on the redesign's lyrics (Redesigned/Lyrics/SGRSingButton.m). Tested on the Mac against harness/sing/,
+                  the download against its download/
     Haptics/      Vibrations (Haptics.h lists its files): a tap of UIKit's feedback generators for the player's and the now
                   playing bar's controls, the scrubber's tenths and ends, cover swipes, gestures and the lyrics page's tap to
                   seek, at the strength set for them (ControlHaptics.x, SGFeedback.m); and Music Haptics, Core Haptics
@@ -312,10 +321,15 @@ is set. Last comes the Font, under either look and on any iOS, below 26 too. Red
 (Settings/SGGlowSwitch), its ⓘ says what it changes, and flipping it offers to restart Spotify.
 The pages show only what the stored look has: a page opened after flipping the switch already shows
 what the restart will bring. Then a card of parts. Navbar: the tab editor of the stored look, each with
-its own list of tabs. Player: Gestures, Lyrics (the ordered list of lyrics sources, lyrics for every track,
-naming the source in the redesign, the lock screen, and glass lyrics in the native look; in the redesign also
-which of the lyrics, their pronunciation and their translation is set largest, and the translation's language), Blocked artists (with the count on the row) and Lock screen widget (on iOS 26 its full-screen artwork: Off,
-Moving artwork, Lyrics or Every song, and the lyrics' style, Still or Animated), which work with either look;
+its own list of tabs. Lyrics, on the main page of its own: Sing first, then the ordered list of lyrics sources,
+lyrics for every track, naming the source in the redesign, the lock screen, and glass lyrics in the native look; in
+the redesign also which of the lyrics, their pronunciation and their translation is set largest, and the
+translation's language. Sing, under either look, on the main page and as Lyrics' first row, the row reading out On,
+Off or how far the voice model's download has come, kept up to date while the page shows: Sing's switch, which turns
+the mic on and off at once, its Status (a tap says more), the Vocals slider (gone, as sung, the vocals alone), the voice model's download, Runs on (GPU, GPU
+and Neural Engine, Neural Engine) and Ignore heat warnings, all applying straight away. Player: Gestures, AirPods gestures, Blocked
+artists (with the count on the row) and Lock screen widget (Moving artwork, Lyrics or Every song, and the
+lyrics' style, Still or Animated), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player

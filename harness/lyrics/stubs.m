@@ -23,7 +23,13 @@ void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *li
                                  void (^done)(NSArray<NSString *> *translations, NSString *error)) {
     NSMutableArray<NSString *> *translations = [NSMutableArray array];
     for (SGKaraokeLine *line in lines) [translations addObject:[@"Gemini: " stringByAppendingString:SGKaraokeLineText(line)]];
-    done(translations, nil);
+    // -geminiDelay S: as late as a whole song through the real API can be.
+    double delay = [NSUserDefaults.standardUserDefaults doubleForKey:@"geminiDelay"];
+    if (delay <= 0) {
+        done(translations, nil);
+        return;
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ done(translations, nil); });
 }
 
 // Line meanings: -title and -artist name the track Genius is searched for, and the setting's key

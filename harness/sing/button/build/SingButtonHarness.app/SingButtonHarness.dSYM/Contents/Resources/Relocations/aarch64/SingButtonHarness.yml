@@ -1,0 +1,137 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/r/GitRepositories/spotifyglass-gpl-wt-sing/harness/sing/button/build/SingButtonHarness.app/SingButtonHarness'
+relocations:
+  - { offset: 0x27, size: 0x8, addend: 0x0, symName: _SGRAccentColor, symObjAddr: 0x0, symBinAddr: 0x100000ED0, symSize: 0x8 }
+  - { offset: 0x209C, size: 0x8, addend: 0x0, symName: _SGRAccentColor, symObjAddr: 0x0, symBinAddr: 0x100000ED0, symSize: 0x8 }
+  - { offset: 0x20B5, size: 0x8, addend: 0x0, symName: _SGTopController, symObjAddr: 0x8, symBinAddr: 0x100000ED8, symSize: 0x184 }
+  - { offset: 0x2108, size: 0x8, addend: 0x0, symName: '-[SGHarnessDelegate application:didFinishLaunchingWithOptions:]', symObjAddr: 0x18C, symBinAddr: 0x10000105C, symSize: 0x5B8 }
+  - { offset: 0x21AA, size: 0x8, addend: 0x0, symName: _CGRectMake, symObjAddr: 0x744, symBinAddr: 0x100001614, symSize: 0x4C }
+  - { offset: 0x2210, size: 0x8, addend: 0x0, symName: '___63-[SGHarnessDelegate application:didFinishLaunchingWithOptions:]_block_invoke', symObjAddr: 0x790, symBinAddr: 0x100001660, symSize: 0x38 }
+  - { offset: 0x2249, size: 0x8, addend: 0x0, symName: ___copy_helper_block_e8_32s, symObjAddr: 0x7C8, symBinAddr: 0x100001698, symSize: 0x38 }
+  - { offset: 0x226D, size: 0x8, addend: 0x0, symName: ___destroy_helper_block_e8_32s, symObjAddr: 0x800, symBinAddr: 0x1000016D0, symSize: 0x2C }
+  - { offset: 0x2289, size: 0x8, addend: 0x0, symName: '-[SGHarnessDelegate window]', symObjAddr: 0x82C, symBinAddr: 0x1000016FC, symSize: 0x24 }
+  - { offset: 0x22BF, size: 0x8, addend: 0x0, symName: '-[SGHarnessDelegate setWindow:]', symObjAddr: 0x850, symBinAddr: 0x100001720, symSize: 0x3C }
+  - { offset: 0x22FD, size: 0x8, addend: 0x0, symName: '-[SGHarnessDelegate .cxx_destruct]', symObjAddr: 0x88C, symBinAddr: 0x10000175C, symSize: 0x38 }
+  - { offset: 0x232F, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x8C4, symBinAddr: 0x100001794, symSize: 0x90 }
+  - { offset: 0x2B4C, size: 0x8, addend: 0x0, symName: _SGSingCurrentState, symObjAddr: 0x0, symBinAddr: 0x100001824, symSize: 0xF0 }
+  - { offset: 0x2B65, size: 0x8, addend: 0x0, symName: _SGSingChangedNotification, symObjAddr: 0xAB8, symBinAddr: 0x100010030, symSize: 0x0 }
+  - { offset: 0x2C33, size: 0x8, addend: 0x0, symName: _SGSingCurrentState, symObjAddr: 0x0, symBinAddr: 0x100001824, symSize: 0xF0 }
+  - { offset: 0x2C4C, size: 0x8, addend: 0x0, symName: _defaults, symObjAddr: 0xF0, symBinAddr: 0x100001914, symSize: 0x1C }
+  - { offset: 0x2C65, size: 0x8, addend: 0x0, symName: _SGSingStatusText, symObjAddr: 0x10C, symBinAddr: 0x100001930, symSize: 0x180 }
+  - { offset: 0x2C8D, size: 0x8, addend: 0x0, symName: _names, symObjAddr: 0x28C, symBinAddr: 0x100001AB0, symSize: 0xC }
+  - { offset: 0x2CA6, size: 0x8, addend: 0x0, symName: _SGSingStatusDetail, symObjAddr: 0x298, symBinAddr: 0x100001ABC, symSize: 0x14 }
+  - { offset: 0x2CBF, size: 0x8, addend: 0x0, symName: _SGSingMissing, symObjAddr: 0x2AC, symBinAddr: 0x100001AD0, symSize: 0xC }
+  - { offset: 0x2CD8, size: 0x8, addend: 0x0, symName: _SGSingOn, symObjAddr: 0x2B8, symBinAddr: 0x100001ADC, symSize: 0x1C }
+  - { offset: 0x2CF1, size: 0x8, addend: 0x0, symName: _SGSetSingOn, symObjAddr: 0x2D4, symBinAddr: 0x100001AF8, symSize: 0xA4 }
+  - { offset: 0x2D15, size: 0x8, addend: 0x0, symName: _SGSingLevel, symObjAddr: 0x378, symBinAddr: 0x100001B9C, symSize: 0xF8 }
+  - { offset: 0x2D2E, size: 0x8, addend: 0x0, symName: _SGSetSingLevel, symObjAddr: 0x470, symBinAddr: 0x100001C94, symSize: 0x50 }
+  - { offset: 0x2D52, size: 0x8, addend: 0x0, symName: _SGSingLevelText, symObjAddr: 0x4C0, symBinAddr: 0x100001CE4, symSize: 0x18C }
+  - { offset: 0x2D7A, size: 0x8, addend: 0x0, symName: _SGSingModelProgress, symObjAddr: 0x64C, symBinAddr: 0x100001E70, symSize: 0x50 }
+  - { offset: 0x2D93, size: 0x8, addend: 0x0, symName: _SGSingModelSizeText, symObjAddr: 0x69C, symBinAddr: 0x100001EC0, symSize: 0xC }
+  - { offset: 0x2DAC, size: 0x8, addend: 0x0, symName: _SGSingModelError, symObjAddr: 0x6A8, symBinAddr: 0x100001ECC, symSize: 0x8 }
+  - { offset: 0x2DC5, size: 0x8, addend: 0x0, symName: _SGSingDownloadModel, symObjAddr: 0x6B0, symBinAddr: 0x100001ED4, symSize: 0x4 }
+  - { offset: 0x2DDA, size: 0x8, addend: 0x0, symName: _SGSingCancelModelDownload, symObjAddr: 0x6B4, symBinAddr: 0x100001ED8, symSize: 0x4 }
+  - { offset: 0x2EF4, size: 0x8, addend: 0x0, symName: '-[SGRHarnessScene scene:willConnectToSession:options:]', symObjAddr: 0x0, symBinAddr: 0x100001EDC, symSize: 0x13C }
+  - { offset: 0x4DAA, size: 0x8, addend: 0x0, symName: '-[SGRHarnessScene scene:willConnectToSession:options:]', symObjAddr: 0x0, symBinAddr: 0x100001EDC, symSize: 0x13C }
+  - { offset: 0x4E14, size: 0x8, addend: 0x0, symName: '-[SGRHarnessScene window]', symObjAddr: 0x13C, symBinAddr: 0x100002018, symSize: 0x24 }
+  - { offset: 0x4E4A, size: 0x8, addend: 0x0, symName: '-[SGRHarnessScene setWindow:]', symObjAddr: 0x160, symBinAddr: 0x10000203C, symSize: 0x3C }
+  - { offset: 0x4E88, size: 0x8, addend: 0x0, symName: '-[SGRHarnessScene .cxx_destruct]', symObjAddr: 0x19C, symBinAddr: 0x100002078, symSize: 0x38 }
+  - { offset: 0x5032, size: 0x8, addend: 0x0, symName: '-[SGRSingButton initWithFrame:]', symObjAddr: 0x0, symBinAddr: 0x1000020B0, symSize: 0x530 }
+  - { offset: 0x5142, size: 0x8, addend: 0x0, symName: _kPanelGlassKey, symObjAddr: 0x123F5, symBinAddr: 0x100015660, symSize: 0x0 }
+  - { offset: 0x8663, size: 0x8, addend: 0x0, symName: '-[SGRSingButton initWithFrame:]', symObjAddr: 0x0, symBinAddr: 0x1000020B0, symSize: 0x530 }
+  - { offset: 0x86B6, size: 0x8, addend: 0x0, symName: '-[SGRSingButton dealloc]', symObjAddr: 0x530, symBinAddr: 0x1000025E0, symSize: 0x94 }
+  - { offset: 0x86E8, size: 0x8, addend: 0x0, symName: '-[SGRSingButton layoutSubviews]', symObjAddr: 0x5C4, symBinAddr: 0x100002674, symSize: 0x260 }
+  - { offset: 0x8764, size: 0x8, addend: 0x0, symName: _CGPointMake, symObjAddr: 0x824, symBinAddr: 0x1000028D4, symSize: 0x2C }
+  - { offset: 0x87AC, size: 0x8, addend: 0x0, symName: '-[SGRSingButton refresh]', symObjAddr: 0x850, symBinAddr: 0x100002900, symSize: 0x648 }
+  - { offset: 0x8884, size: 0x8, addend: 0x0, symName: '-[SGRSingButton tapped]', symObjAddr: 0xEC4, symBinAddr: 0x100002F74, symSize: 0x2AC }
+  - { offset: 0x88B6, size: 0x8, addend: 0x0, symName: _tell, symObjAddr: 0x1170, symBinAddr: 0x100003220, symSize: 0x23C }
+  - { offset: 0x8904, size: 0x8, addend: 0x0, symName: '___23-[SGRSingButton tapped]_block_invoke', symObjAddr: 0x13AC, symBinAddr: 0x10000345C, symSize: 0x34 }
+  - { offset: 0x892C, size: 0x8, addend: 0x0, symName: '___23-[SGRSingButton tapped]_block_invoke_2', symObjAddr: 0x13E0, symBinAddr: 0x100003490, symSize: 0x28 }
+  - { offset: 0x8954, size: 0x8, addend: 0x0, symName: '___23-[SGRSingButton tapped]_block_invoke_3', symObjAddr: 0x1408, symBinAddr: 0x1000034B8, symSize: 0x30 }
+  - { offset: 0x897C, size: 0x8, addend: 0x0, symName: '-[SGRSingButton held:]', symObjAddr: 0x1438, symBinAddr: 0x1000034E8, symSize: 0x78 }
+  - { offset: 0x89BC, size: 0x8, addend: 0x0, symName: '-[SGRSingButton showPanel]', symObjAddr: 0x14B0, symBinAddr: 0x100003560, symSize: 0x548 }
+  - { offset: 0x89EE, size: 0x8, addend: 0x0, symName: '___26-[SGRSingButton showPanel]_block_invoke', symObjAddr: 0x19F8, symBinAddr: 0x100003AA8, symSize: 0x68 }
+  - { offset: 0x8A2B, size: 0x8, addend: 0x0, symName: '-[SGRSingButton placePanel]', symObjAddr: 0x1AC4, symBinAddr: 0x100003B10, symSize: 0x290 }
+  - { offset: 0x8A6B, size: 0x8, addend: 0x0, symName: _CGRectMake, symObjAddr: 0x1D54, symBinAddr: 0x100003DA0, symSize: 0x4C }
+  - { offset: 0x8AD1, size: 0x8, addend: 0x0, symName: '-[SGRSingButton showLevel]', symObjAddr: 0x1DA0, symBinAddr: 0x100003DEC, symSize: 0xD0 }
+  - { offset: 0x8B03, size: 0x8, addend: 0x0, symName: '-[SGRSingButton slid]', symObjAddr: 0x1E70, symBinAddr: 0x100003EBC, symSize: 0x68 }
+  - { offset: 0x8B43, size: 0x8, addend: 0x0, symName: '-[SGRSingButton holdPanel]', symObjAddr: 0x1ED8, symBinAddr: 0x100003F24, symSize: 0x54 }
+  - { offset: 0x8B75, size: 0x8, addend: 0x0, symName: '-[SGRSingButton letPanelGo]', symObjAddr: 0x1F2C, symBinAddr: 0x100003F78, symSize: 0x138 }
+  - { offset: 0x8BB5, size: 0x8, addend: 0x0, symName: '___27-[SGRSingButton letPanelGo]_block_invoke', symObjAddr: 0x2064, symBinAddr: 0x1000040B0, symSize: 0x70 }
+  - { offset: 0x8BFC, size: 0x8, addend: 0x0, symName: ___copy_helper_block_e8_32w, symObjAddr: 0x20D4, symBinAddr: 0x100004120, symSize: 0x34 }
+  - { offset: 0x8C20, size: 0x8, addend: 0x0, symName: ___destroy_helper_block_e8_32w, symObjAddr: 0x2108, symBinAddr: 0x100004154, symSize: 0x28 }
+  - { offset: 0x8C3C, size: 0x8, addend: 0x0, symName: '-[SGRSingButton hidePanel]', symObjAddr: 0x2130, symBinAddr: 0x10000417C, symSize: 0xB0 }
+  - { offset: 0x8C6E, size: 0x8, addend: 0x0, symName: '___26-[SGRSingButton hidePanel]_block_invoke', symObjAddr: 0x21E0, symBinAddr: 0x10000422C, symSize: 0x68 }
+  - { offset: 0x8CAB, size: 0x8, addend: 0x0, symName: '-[SGRSingButton pointInside:withEvent:]', symObjAddr: 0x2248, symBinAddr: 0x100004294, symSize: 0x11C }
+  - { offset: 0x8CFD, size: 0x8, addend: 0x0, symName: '-[SGRSingButton .cxx_destruct]', symObjAddr: 0x2364, symBinAddr: 0x1000043B0, symSize: 0xB8 }
+  - { offset: 0x8D2F, size: 0x8, addend: 0x0, symName: ___tell_block_invoke, symObjAddr: 0x241C, symBinAddr: 0x100004468, symSize: 0x5C }
+  - { offset: 0x8D76, size: 0x8, addend: 0x0, symName: ___copy_helper_block_e8_32b, symObjAddr: 0x2478, symBinAddr: 0x1000044C4, symSize: 0x38 }
+  - { offset: 0x99BD, size: 0x8, addend: 0x0, symName: _SGRGlassInside, symObjAddr: 0x0, symBinAddr: 0x1000044FC, symSize: 0xBC }
+  - { offset: 0x99D6, size: 0x8, addend: 0x0, symName: _kInsideModeKey, symObjAddr: 0x4838, symBinAddr: 0x100015661, symSize: 0x0 }
+  - { offset: 0x99F2, size: 0x8, addend: 0x0, symName: _kFilmKey, symObjAddr: 0x4839, symBinAddr: 0x100015662, symSize: 0x0 }
+  - { offset: 0xA38B, size: 0x8, addend: 0x0, symName: _SGRGlassInside, symObjAddr: 0x0, symBinAddr: 0x1000044FC, symSize: 0xBC }
+  - { offset: 0xA3CF, size: 0x8, addend: 0x0, symName: _glassInside, symObjAddr: 0xBC, symBinAddr: 0x1000045B8, symSize: 0x58C }
+  - { offset: 0xA497, size: 0x8, addend: 0x0, symName: _CGSizeMake, symObjAddr: 0x648, symBinAddr: 0x100004B44, symSize: 0x2C }
+  - { offset: 0xA4DF, size: 0x8, addend: 0x0, symName: _SGRGlassCapsuleInside, symObjAddr: 0x674, symBinAddr: 0x100004B70, symSize: 0xA0 }
+  - { offset: 0xA531, size: 0x8, addend: 0x0, symName: _glassMode, symObjAddr: 0x714, symBinAddr: 0x100004C10, symSize: 0x64 }
+  - { offset: 0xA54A, size: 0x8, addend: 0x0, symName: _newShape, symObjAddr: 0x778, symBinAddr: 0x100004C74, symSize: 0x1C4 }
+  - { offset: 0xA580, size: 0x8, addend: 0x0, symName: _CGRectMake, symObjAddr: 0x93C, symBinAddr: 0x100004E38, symSize: 0x4C }
+  - { offset: 0xA5E6, size: 0x8, addend: 0x0, symName: _keepFilm, symObjAddr: 0x988, symBinAddr: 0x100004E84, symSize: 0x5B4 }
+  - { offset: 0xA670, size: 0x8, addend: 0x0, symName: _CGPointMake, symObjAddr: 0xF3C, symBinAddr: 0x100005438, symSize: 0x2C }
+  - { offset: 0xA6B8, size: 0x8, addend: 0x0, symName: ___CGPointEqualToPoint, symObjAddr: 0xF68, symBinAddr: 0x100005464, symSize: 0x58 }
+  - { offset: 0xA729, size: 0x8, addend: 0x0, symName: _SGRPrimary, symObjAddr: 0x0, symBinAddr: 0x1000054BC, symSize: 0x1C }
+  - { offset: 0xA742, size: 0x8, addend: 0x0, symName: _SGRSideMargin, symObjAddr: 0x9E8, symBinAddr: 0x10000C818, symSize: 0x0 }
+  - { offset: 0xA76E, size: 0x8, addend: 0x0, symName: _SGRGrid, symObjAddr: 0x9F0, symBinAddr: 0x10000C820, symSize: 0x0 }
+  - { offset: 0xA783, size: 0x8, addend: 0x0, symName: _SGRRadiusArtwork, symObjAddr: 0x9F8, symBinAddr: 0x10000C828, symSize: 0x0 }
+  - { offset: 0xA798, size: 0x8, addend: 0x0, symName: _SGRRadiusCard, symObjAddr: 0xA00, symBinAddr: 0x10000C830, symSize: 0x0 }
+  - { offset: 0xA7AD, size: 0x8, addend: 0x0, symName: _SGRRadiusCover, symObjAddr: 0xA08, symBinAddr: 0x10000C838, symSize: 0x0 }
+  - { offset: 0xA7C2, size: 0x8, addend: 0x0, symName: _SGRRadiusThumb, symObjAddr: 0xA10, symBinAddr: 0x10000C840, symSize: 0x0 }
+  - { offset: 0xA7D7, size: 0x8, addend: 0x0, symName: _SGRGlassCircleSize, symObjAddr: 0xA18, symBinAddr: 0x10000C848, symSize: 0x0 }
+  - { offset: 0xA7EC, size: 0x8, addend: 0x0, symName: _SGRActionHeight, symObjAddr: 0xA20, symBinAddr: 0x10000C850, symSize: 0x0 }
+  - { offset: 0xA801, size: 0x8, addend: 0x0, symName: _SGRActionSpacing, symObjAddr: 0xA28, symBinAddr: 0x10000C858, symSize: 0x0 }
+  - { offset: 0xA816, size: 0x8, addend: 0x0, symName: _SGRGlassSpacing, symObjAddr: 0xA30, symBinAddr: 0x10000C860, symSize: 0x0 }
+  - { offset: 0xA82B, size: 0x8, addend: 0x0, symName: _SGRCrossfade, symObjAddr: 0xA38, symBinAddr: 0x10000C868, symSize: 0x0 }
+  - { offset: 0xACC8, size: 0x8, addend: 0x0, symName: _SGRPrimary, symObjAddr: 0x0, symBinAddr: 0x1000054BC, symSize: 0x1C }
+  - { offset: 0xACE1, size: 0x8, addend: 0x0, symName: _SGRSecondary, symObjAddr: 0x1C, symBinAddr: 0x1000054D8, symSize: 0x64 }
+  - { offset: 0xACFA, size: 0x8, addend: 0x0, symName: _SGRIncreaseContrast, symObjAddr: 0x80, symBinAddr: 0x10000553C, symSize: 0x14 }
+  - { offset: 0xAD13, size: 0x8, addend: 0x0, symName: _SGRTertiary, symObjAddr: 0x94, symBinAddr: 0x100005550, symSize: 0x60 }
+  - { offset: 0xAD2C, size: 0x8, addend: 0x0, symName: _SGRAccent, symObjAddr: 0xF4, symBinAddr: 0x1000055B0, symSize: 0xFC }
+  - { offset: 0xAD45, size: 0x8, addend: 0x0, symName: _SGRNeutralField, symObjAddr: 0x1F0, symBinAddr: 0x1000056AC, symSize: 0x3C }
+  - { offset: 0xAD5E, size: 0x8, addend: 0x0, symName: _SGRSolidGlassFill, symObjAddr: 0x22C, symBinAddr: 0x1000056E8, symSize: 0x34 }
+  - { offset: 0xAD77, size: 0x8, addend: 0x0, symName: _SGRHairline, symObjAddr: 0x260, symBinAddr: 0x10000571C, symSize: 0x68 }
+  - { offset: 0xAD90, size: 0x8, addend: 0x0, symName: _SGRElevated, symObjAddr: 0x2C8, symBinAddr: 0x100005784, symSize: 0x134 }
+  - { offset: 0xADFE, size: 0x8, addend: 0x0, symName: _SGRFont, symObjAddr: 0x3FC, symBinAddr: 0x1000058B8, symSize: 0x1AC }
+  - { offset: 0xAE6C, size: 0x8, addend: 0x0, symName: _SGRMonospacedDigitsFont, symObjAddr: 0x5A8, symBinAddr: 0x100005A64, symSize: 0x240 }
+  - { offset: 0xAEB3, size: 0x8, addend: 0x0, symName: _SGRReduceMotion, symObjAddr: 0x7E8, symBinAddr: 0x100005CA4, symSize: 0x14 }
+  - { offset: 0xAECC, size: 0x8, addend: 0x0, symName: _SGRReduceTransparency, symObjAddr: 0x7FC, symBinAddr: 0x100005CB8, symSize: 0x14 }
+  - { offset: 0xAEE5, size: 0x8, addend: 0x0, symName: _SGRAnimate, symObjAddr: 0x810, symBinAddr: 0x100005CCC, symSize: 0x1D4 }
+  - { offset: 0xB6BA, size: 0x8, addend: 0x0, symName: _SGGlassEffect, symObjAddr: 0x0, symBinAddr: 0x100005EA0, symSize: 0x88 }
+  - { offset: 0xB6D3, size: 0x8, addend: 0x0, symName: _kPanesKey, symObjAddr: 0x39D3, symBinAddr: 0x100015663, symSize: 0x0 }
+  - { offset: 0xB7F2, size: 0x8, addend: 0x0, symName: _SGGlassEffect, symObjAddr: 0x0, symBinAddr: 0x100005EA0, symSize: 0x88 }
+  - { offset: 0xB81A, size: 0x8, addend: 0x0, symName: _SGGlassFor, symObjAddr: 0x88, symBinAddr: 0x100005F28, symSize: 0x134 }
+  - { offset: 0xB85E, size: 0x8, addend: 0x0, symName: _newPane, symObjAddr: 0x1BC, symBinAddr: 0x10000605C, symSize: 0xD8 }
+  - { offset: 0xB886, size: 0x8, addend: 0x0, symName: _SGGlassAt, symObjAddr: 0x294, symBinAddr: 0x100006134, symSize: 0x1E0 }
+  - { offset: 0xB8D8, size: 0x8, addend: 0x0, symName: _SGHideGlassFrom, symObjAddr: 0x474, symBinAddr: 0x100006314, symSize: 0xF4 }
+  - { offset: 0xB934, size: 0x8, addend: 0x0, symName: _SGShapeGlass, symObjAddr: 0x568, symBinAddr: 0x100006408, symSize: 0x2B4 }
+  - { offset: 0xC286, size: 0x8, addend: 0x0, symName: _SGLogLong, symObjAddr: 0x0, symBinAddr: 0x1000066BC, symSize: 0x3AC }
+  - { offset: 0xC293, size: 0x8, addend: 0x0, symName: ___SGLogLong_block_invoke, symObjAddr: 0x3AC, symBinAddr: 0x100006A68, symSize: 0x174 }
+  - { offset: 0xC37C, size: 0x8, addend: 0x0, symName: _SGRequireClasses, symObjAddr: 0x5FC, symBinAddr: 0x100006CB8, symSize: 0x268 }
+  - { offset: 0xC465, size: 0x8, addend: 0x0, symName: _SGLogLong, symObjAddr: 0x0, symBinAddr: 0x1000066BC, symSize: 0x3AC }
+  - { offset: 0xC4CC, size: 0x8, addend: 0x0, symName: ___os_log_helper_16_2_1_8_34, symObjAddr: 0x520, symBinAddr: 0x100006BDC, symSize: 0x40 }
+  - { offset: 0xC4F8, size: 0x8, addend: 0x0, symName: ___copy_helper_block_e8_32s40s, symObjAddr: 0x560, symBinAddr: 0x100006C1C, symSize: 0x58 }
+  - { offset: 0xC51C, size: 0x8, addend: 0x0, symName: ___destroy_helper_block_e8_32s40s, symObjAddr: 0x5B8, symBinAddr: 0x100006C74, symSize: 0x44 }
+  - { offset: 0xC704, size: 0x8, addend: 0x0, symName: _SGFlag, symObjAddr: 0x0, symBinAddr: 0x100006F20, symSize: 0x120 }
+  - { offset: 0xC71D, size: 0x8, addend: 0x0, symName: _SGFlagOverridePrefix, symObjAddr: 0x868, symBinAddr: 0x100010148, symSize: 0x0 }
+  - { offset: 0xC790, size: 0x8, addend: 0x0, symName: _SGFlag, symObjAddr: 0x0, symBinAddr: 0x100006F20, symSize: 0x120 }
+  - { offset: 0xC7E2, size: 0x8, addend: 0x0, symName: _SGEnabled, symObjAddr: 0x120, symBinAddr: 0x100007040, symSize: 0x5C }
+  - { offset: 0xC80A, size: 0x8, addend: 0x0, symName: _SGHidden, symObjAddr: 0x17C, symBinAddr: 0x10000709C, symSize: 0x5C }
+  - { offset: 0xC832, size: 0x8, addend: 0x0, symName: _SGSetEnabled, symObjAddr: 0x1D8, symBinAddr: 0x1000070F8, symSize: 0x94 }
+  - { offset: 0xC864, size: 0x8, addend: 0x0, symName: _SGInt, symObjAddr: 0x26C, symBinAddr: 0x10000718C, symSize: 0xD8 }
+  - { offset: 0xC8A8, size: 0x8, addend: 0x0, symName: _SGSetInt, symObjAddr: 0x344, symBinAddr: 0x100007264, symSize: 0x90 }
+  - { offset: 0xC8DA, size: 0x8, addend: 0x0, symName: _SGFlagOverride, symObjAddr: 0x3D4, symBinAddr: 0x1000072F4, symSize: 0xC0 }
+  - { offset: 0xC902, size: 0x8, addend: 0x0, symName: _SGSetFlagOverride, symObjAddr: 0x494, symBinAddr: 0x1000073B4, symSize: 0x11C }
+  - { offset: 0xC934, size: 0x8, addend: 0x0, symName: _SGMigrateKey, symObjAddr: 0x5B0, symBinAddr: 0x1000074D0, symSize: 0x180 }
+  - { offset: 0xC99F, size: 0x8, addend: 0x0, symName: _SGRestartSpotify, symObjAddr: 0x730, symBinAddr: 0x100007650, symSize: 0xA0 }
+  - { offset: 0xC9C9, size: 0x8, addend: 0x0, symName: ___SGRestartSpotify_block_invoke, symObjAddr: 0x7D0, symBinAddr: 0x1000076F0, symSize: 0x20 }
+...

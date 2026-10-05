@@ -23,7 +23,8 @@ xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-ar
     "$SRC"/Shared/LyricsSources/SGTTML.m "$SRC"/Redesigned/Kit/SGRTokens.m \
     $( [ -f "$SRC"/Shared/LyricsMeanings/Meanings.m ] && echo "$SRC"/Shared/LyricsMeanings/Meanings.m "$SRC"/Redesigned/Lyrics/MeaningSheet.m ) \
     "$SRC"/Core/SGLog.m "$SRC"/Core/SGPrefs.m "$SRC"/Core/SGGlass.m \
-    -framework UIKit -framework QuartzCore -framework CoreGraphics -framework CoreText -framework Foundation \
+    $( [ -f "$SRC"/Redesigned/Lyrics/SGRSingButton.m ] && echo "$SRC"/Redesigned/Lyrics/SGRSingButton.m "$SRC"/Redesigned/Kit/SGRGlass.m "$HERE"/../sing/button/sing-stubs.m ) \
+    -framework UIKit -framework QuartzCore -framework CoreGraphics -framework CoreText -framework Foundation -framework Symbols \
     -o "$APP/LyricsHarness"
 
 cp "$HERE"/fixtures/*.ttml "$HERE"/fixtures/*.lrc "$HERE"/fixtures/*.json "$HERE"/fixtures/*.txt "$APP/"

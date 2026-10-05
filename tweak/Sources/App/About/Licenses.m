@@ -35,11 +35,19 @@ UIViewController *SGLicensesPage(void) {
     SGModRow *wdl = SGLinkRow(@"WDL", @"Liveprog's EEL2 · zlib License", @"https://github.com/justinfrankel/WDL");
     // Not shipped: the Headphones page downloads its results when asked, but they are AutoEq's work all the same.
     SGModRow *autoEq = SGLinkRow(@"AutoEq", @"Headphone corrections · MIT License", @"https://github.com/jaakkopasanen/AutoEq");
+    // Sing's voice model is downloaded rather than built in, and its NOTICE travels with it here all the same.
+    SGModRow *voice = SGLinkRow(@"Sing's voice model", @"Mel-Band RoFormer · MIT License", @"https://huggingface.co/My-Name-Is-Jeff/vitrine-sing");
     return [[SGModPage alloc] initWithTitle:@"Licenses" intro:@"The mod's own license, and the code from others it includes." sections:@[
         SGSection(nil, @[mod]),
         SGNotedSection(nil, @[bs2b], [@"Copyright (c) 2005 Boris Mikhaylov\n\n" stringByAppendingString:kMIT]),
         SGNotedSection(nil, @[wdl], [@"Copyright (C) 2004-2013 Cockos Incorporated\nCopyright (C) 1999-2003 Nullsoft, Inc.\n\n"
                                      stringByAppendingString:kZlib]),
         SGNotedSection(nil, @[autoEq], [@"Copyright (c) 2018-2022 Jaakko Pasanen\n\n" stringByAppendingString:kMIT]),
+        SGNotedSection(nil, @[voice], [@"Mel-Band RoFormer vocal separation, by Ju-Chiang Wang, Wei-Tsung Lu and Minz Won.\n"
+                                       @"Checkpoint: KimberleyJensen, https://huggingface.co/KimberleyJSN/melbandroformer (MIT).\n"
+                                       @"Core ML conversion: john-rocky / mlboydaisuke, https://huggingface.co/mlboydaisuke/MelBandRoformer-Vocal-CoreAI (MIT).\n"
+                                       @"Core ML export: Darkkos, https://huggingface.co/Darkkos/spoti-sing (MIT), mirrored unchanged.\n"
+                                       @"Reference architecture: lucidrains/BS-RoFormer. Training code: ZFTurbo.\n\n"
+                                       @"Copyright (c) 2023 Phil Wang\n\n" stringByAppendingString:kMIT]),
     ] footer:nil];
 }

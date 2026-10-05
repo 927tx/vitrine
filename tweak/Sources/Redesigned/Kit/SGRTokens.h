@@ -50,7 +50,10 @@ typedef NS_ENUM(NSInteger, SGRMotion) {
     SGRMotionLayout,   // a spring with no overshoot, for anything moving or resizing
     SGRMotionPress,    // a spring with a little bounce, for press feedback
     SGRMotionFade,     // an ease in and out over SGRCrossfade, kept under Reduce Motion
+    // A strong ease out over 0.2 s, for what comes back or opens at a touch: the eye is on it from the
+    // first frame. Kept under Reduce Motion like a fade, so only alpha, colour and a glass effect go in it.
+    SGRMotionRespond,
 };
-// Runs `animations` with the motion's timing, or at once under Reduce Motion (except a fade), and
+// Runs `animations` with the motion's timing, or at once under Reduce Motion (except a fade or a response), and
 // always calls `completion`. Only transform, alpha and colour belong in it while a page scrolls.
 void SGRAnimate(SGRMotion motion, void (^animations)(void), void (^completion)(BOOL finished));

@@ -18,6 +18,8 @@ const NSTimeInterval SGRCrossfade = 0.35;
 // A layout spring settles in about this long without overshooting; a press gives a little back.
 static const NSTimeInterval kLayoutDuration = 0.45, kPressDuration = 0.32;
 static const CGFloat kPressDamping = 0.62;
+// A response lands within the press feedback's budget, on a curve that is most of the way there at once.
+static const NSTimeInterval kRespondDuration = 0.2;
 
 UIColor *SGRPrimary(void) {
     return UIColor.whiteColor;
@@ -85,7 +87,7 @@ BOOL SGRIncreaseContrast(void) {
 
 void SGRAnimate(SGRMotion motion, void (^animations)(void), void (^completion)(BOOL finished)) {
     if (!animations) return;
-    if (motion != SGRMotionFade && SGRReduceMotion()) {
+    if (motion != SGRMotionFade && motion != SGRMotionRespond && SGRReduceMotion()) {
         [UIView performWithoutAnimation:animations];
         if (completion) completion(YES);
         return;
@@ -101,5 +103,16 @@ void SGRAnimate(SGRMotion motion, void (^animations)(void), void (^completion)(B
         case SGRMotionFade:
             [UIView animateWithDuration:SGRCrossfade delay:0 options:options | UIViewAnimationOptionCurveEaseInOut animations:animations completion:completion];
             break;
+        case SGRMotionRespond: {
+            // UIView's own curves are too soft for this; a property animator takes any curve, and like the
+            // others it starts from what is on screen, so it can take over a fade halfway out.
+            UICubicTimingParameters *curve = [[UICubicTimingParameters alloc] initWithControlPoint1:CGPointMake(0.23, 1)
+                                                                                     controlPoint2:CGPointMake(0.32, 1)];
+            UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc] initWithDuration:kRespondDuration timingParameters:curve];
+            [animator addAnimations:animations];
+            if (completion) [animator addCompletion:^(UIViewAnimatingPosition position) { completion(position == UIViewAnimatingPositionEnd); }];
+            [animator startAnimation];
+            break;
+        }
     }
 }

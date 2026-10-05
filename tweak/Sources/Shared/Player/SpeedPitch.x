@@ -122,13 +122,37 @@ static OSStatus pullSource(AudioUnit source, const AudioTimeStamp *outputTime, U
     return noErr;
 }
 
+static _Atomic(SGPlayerStage) sg_stage;
+
+void SGPlayerSetStage(SGPlayerStage stage) {
+    atomic_store(&sg_stage, stage);
+}
+
+typedef struct {
+    AudioUnit source;
+    const AudioTimeStamp *time;
+} MixerPull;
+
+static OSStatus pullMixer(void *context, UInt32 frames, AudioBufferList *data) {
+    MixerPull *mixer = context;
+    return pullSource(mixer->source, mixer->time, frames, data);
+}
+
+// The mixer's sound, through the stage when one is set.
+static OSStatus pullChain(AudioUnit source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *data) {
+    SGPlayerStage stage = atomic_load_explicit(&sg_stage, memory_order_acquire);
+    if (!stage) return pullSource(source, time, frames, data);
+    MixerPull mixer = {source, time};
+    return stage(frames, data, pullMixer, &mixer);
+}
+
 static OSStatus pullForUnit(void *context, UInt32 frames, AudioBufferList *data) {
     AudioUnit source = atomic_load(&sg_source);
     if (!source) {
         for (UInt32 b = 0; b < data->mNumberBuffers; b++) if (data->mBuffers[b].mData) memset(data->mBuffers[b].mData, 0, data->mBuffers[b].mDataByteSize);
         return noErr;
     }
-    return pullSource(source, NULL, frames, data);
+    return pullChain(source, NULL, frames, data);
 }
 
 static BOOL fitsUnit(const AudioBufferList *data, UInt32 frames, SGTimePitch *unit) {
@@ -152,7 +176,7 @@ static OSStatus feed(void *refCon, AudioUnitRenderActionFlags *flags, const Audi
     OSStatus status = -1;
     SGTimePitch *unit = atomic_load(&sg_pull);
     if (atomic_load(&sg_engaged) && unit && fitsUnit(data, frames, unit)) status = SGTimePitchRender(unit, frames, data);
-    if (status != noErr) status = pullSource(source, timestamp, frames, data);
+    if (status != noErr) status = pullChain(source, timestamp, frames, data);
     atomic_store(&sg_busy, false);
     return status;
 }

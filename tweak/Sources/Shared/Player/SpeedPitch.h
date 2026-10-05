@@ -10,6 +10,7 @@
 // Speed and pitch last until Spotify quits; neither is stored.
 // Threading: main thread only, except what SGTimePitch.h says runs on the render thread.
 #import <UIKit/UIKit.h>
+#import <AudioToolbox/AudioToolbox.h>
 
 // Marks a menu opened soon after a tap on `button`, the player's more button, as the player's, so it gets
 // Speed and pitch (watching it twice does nothing). The redesign's PlayerHeader.x hands its button over;
@@ -41,3 +42,9 @@ BOOL SGPlayerPitchAvailable(void);
 BOOL SGPlayerMenuOffersAnimatedArtwork(void);
 BOOL SGPlayerMenuAnimatedArtwork(void);
 void SGPlayerMenuSetAnimatedArtwork(BOOL on);
+// A stage between Spotify's mixer and the rest of the chain (Sing's look-ahead, Shared/Sing): it fills the
+// chain's buffers, pulling the mixer through `pull` as much as it likes. NULL passes the mixer straight on.
+// Called on the render thread, and only while Spotify's connection is taken over (SGPlayerSpeedAllowed).
+typedef OSStatus (*SGPlayerPull)(void *context, UInt32 frames, AudioBufferList *data);
+typedef OSStatus (*SGPlayerStage)(UInt32 frames, AudioBufferList *data, SGPlayerPull pull, void *context);
+void SGPlayerSetStage(SGPlayerStage stage);

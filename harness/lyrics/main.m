@@ -19,6 +19,9 @@
 //   -translateIn S keeps copies of the lines S seconds in with every other one translated, as
 //                  Musixmatch's community translations come in after the lines on the phone
 //   -gemini 1      a Gemini key is set, so the menu offers Translate with Gemini (stubs.m answers it)
+//   -geminiDelay S stubs.m's Gemini answers S seconds later instead of at once
+//   -check 1       asserts the view's fixes (see runChecks), prints PASS and FAIL lines and quits with the
+//                  number of failures; run it with -song duet -at 20000 -gemini 1 -geminiDelay 1
 // and the lyrics' own settings by their keys: -spotifyglass.lyricsSimulateWords 1 (sweep line timed
 // lines on the estimate), -spotifyglass.redesign.lyricsPronunciation 1,
 // -spotifyglass.redesign.lyricsTranslation 1, -spotifyglass.redesign.lyricsTextOrder '(translation, lyrics, pronunciation)'.
@@ -27,6 +30,8 @@
 #import <objc/message.h>
 #import <mach/mach_time.h>
 #import "Redesigned/Lyrics/SGRKaraokeView.h"
+#import "Redesigned/Lyrics/SGRSingButton.h"
+#import "Shared/Sing/Sing.h"
 // HEAD's sources (build.sh old) may be from before the lyrics had anything but their words.
 #if __has_include("Redesigned/Lyrics/LyricsText.h")
 #import "Redesigned/Lyrics/LyricsText.h"
@@ -178,6 +183,110 @@ static void timedTick(id self, SEL _cmd) {
     sg_sampleCount = 0;
 }
 
+#pragma mark - the checks
+
+static int sg_failures;
+
+static void expect(BOOL ok, NSString *what) {
+    printf("%s %s\n", ok ? "PASS" : "FAIL", what.UTF8String);
+    fflush(stdout);
+    if (!ok) sg_failures++;
+}
+
+static id findView(UIView *root, Class cls) {
+    if ([root isKindOfClass:cls]) return root;
+    for (UIView *view in root.subviews) {
+        id found = findView(view, cls);
+        if (found) return found;
+    }
+    return nil;
+}
+
+static void after(double seconds, dispatch_block_t block) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)), dispatch_get_main_queue(), block);
+}
+
+// Where the line the stack is arranged around starts, against where the anchor puts it for the page's height.
+static CGFloat anchorMiss(SGRKaraokeView *karaoke) {
+    NSInteger focus = [[karaoke valueForKey:@"focus"] integerValue];
+    UIView *view = [karaoke valueForKey:@"shown"][@(focus)];
+    if (!view) return CGFLOAT_MAX;
+    return fabs(view.center.y - view.bounds.size.height / 2 - karaoke.bounds.size.height * 0.28);
+}
+
+static void runChecks(SGRKaraokeView *karaoke, UIView *host) {
+    // A held last word keeps its glow as its line goes dim, and loses it once the line has.
+    SGKaraokeLine *line = timed(0, @"hold this", @"v1");
+    line.words.lastObject.end = line.words.lastObject.start + 3000;
+    line.end = line.words.lastObject.end;
+    id style = ((id (*)(id, SEL, CGFloat, NSArray *, BOOL, BOOL))objc_msgSend)([NSClassFromString(@"SGRKaraokeStyle") alloc],
+        NSSelectorFromString(@"initWithSize:order:pronunciation:translation:"), 30, SGRLyricsTextOrder(), NO, NO);
+    UIView *lineView = ((id (*)(id, SEL, id, CGFloat, id, id, BOOL, BOOL))objc_msgSend)([NSClassFromString(@"SGRKaraokeLineView") alloc],
+        NSSelectorFromString(@"initWithLine:width:style:under:blurred:sweepsEstimates:"), line, 300, style, nil, NO, NO);
+    [karaoke.window addSubview:lineView];
+    [lineView setValue:@YES forKey:@"active"];
+    ((void (*)(id, SEL, double))objc_msgSend)(lineView, NSSelectorFromString(@"showTime:"), line.words.lastObject.start + 2500.0);
+    UILabel *lit = [[[lineView valueForKey:@"words"] lastObject] valueForKey:@"lit"];
+    float glow = lit.layer.shadowOpacity;
+    expect(glow > 0.3, [NSString stringWithFormat:@"a word held 3 s glows (%.2f)", glow]);
+    [lineView setValue:@NO forKey:@"active"];
+    expect(lit.layer.shadowOpacity == glow, @"the glow stays on as its line goes out, for the fade to carry it");
+    after(0.8, ^{
+        expect(lit.layer.shadowOpacity == 0 && lit.hidden, @"the glow is off once the line is dim");
+        [lineView removeFromSuperview];
+    });
+
+    // The sung line stays on the anchor through a change of height, and is placed for the new one at once.
+    expect(anchorMiss(karaoke) < 2, [NSString stringWithFormat:@"the sung line is at the anchor (off by %.1f)", anchorMiss(karaoke)]);
+    CGRect frame = host.frame;
+    host.frame = CGRectMake(frame.origin.x, frame.origin.y - 75, frame.size.width, frame.size.height + 300);
+    [karaoke layoutIfNeeded];
+    expect(anchorMiss(karaoke) < 2, [NSString stringWithFormat:@"after 300 pt more height it is at the new anchor (off by %.1f)", anchorMiss(karaoke)]);
+    host.frame = frame;
+    [karaoke layoutIfNeeded];
+    expect(anchorMiss(karaoke) < 2, [NSString stringWithFormat:@"and back (off by %.1f)", anchorMiss(karaoke)]);
+
+    // The mic to VoiceOver: one adjustable button, two of the slider's steps a swipe.
+    SGRSingButton *mic = findView(karaoke, SGRSingButton.class);
+    expect(mic.isAccessibilityElement && (mic.accessibilityTraits & UIAccessibilityTraitAdjustable), @"the mic is adjustable");
+    float level = SGSingLevel();
+    [mic accessibilityIncrement];
+    expect(fabsf(SGSingLevel() - (level + 0.1f)) < 0.001f, [NSString stringWithFormat:@"a swipe up takes the level from %.2f to %.2f", level, SGSingLevel()]);
+    expect([mic.accessibilityValue containsString:SGSingLevelText(SGSingLevel())], [NSString stringWithFormat:@"its value reads the level: %@", mic.accessibilityValue]);
+    [mic accessibilityDecrement];
+    expect(fabsf(SGSingLevel() - level) < 0.001f, @"a swipe down takes it back");
+
+    // The corner buttons go by their glass's effect, never an alpha over the glass.
+    UIView *box = [karaoke valueForKey:@"extrasBox"];
+    UIButton *extras = [karaoke valueForKey:@"extras"];
+    UIVisualEffectView *micGlass = mic.subviews.firstObject, *extrasGlass = box.subviews.firstObject;
+    expect([micGlass isKindOfClass:UIVisualEffectView.class] && [extrasGlass isKindOfClass:UIVisualEffectView.class], @"both have the Kit's glass behind them");
+    karaoke.extrasHidden = YES;
+    expect(!micGlass.effect && !extrasGlass.effect && mic.alpha == 1 && box.alpha == 1, @"hidden, their glass has no effect and nothing over it fades");
+    expect(extras.alpha == 0 && !mic.userInteractionEnabled && !box.userInteractionEnabled, @"hidden, the glyphs are gone and take no touches");
+    karaoke.extrasHidden = NO;
+    expect(micGlass.effect && extrasGlass.effect && extras.alpha == 1 && mic.userInteractionEnabled, @"shown again, all of it is back");
+
+    // Gemini: the item says where the lyrics go, a spinner while it works and no second request.
+    UIAction *gemini = nil;
+    for (UIMenuElement *item in extras.menu.children) {
+        if ([item.title isEqualToString:@"Translate with Gemini"]) gemini = (UIAction *)item;
+    }
+    expect(gemini.subtitle.length > 0, [NSString stringWithFormat:@"the Gemini item says: %@", gemini.subtitle]);
+    ((void (*)(id, SEL))objc_msgSend)(karaoke, NSSelectorFromString(@"translateWithGemini"));
+    BOOL offered = NO;
+    for (UIMenuElement *item in extras.menu.children) offered |= [item.title isEqualToString:@"Translate with Gemini"];
+    expect(extras.configuration.showsActivityIndicator && !offered, @"while Gemini works the button spins and the item is gone");
+    after([NSUserDefaults.standardUserDefaults doubleForKey:@"geminiDelay"] + 0.5, ^{
+        expect(!extras.configuration.showsActivityIndicator, @"once it answers the spinner is gone");
+        after(0.5, ^{
+            printf("%d failed\n", sg_failures);
+            fflush(stdout);
+            exit(sg_failures);
+        });
+    });
+}
+
 #pragma mark - the app
 
 @interface SGHarnessDelegate : UIResponder <UIApplicationDelegate>
@@ -231,9 +340,11 @@ static void timedTick(id self, SEL _cmd) {
     }];
     self.window.rootViewController = root;
     [self.window makeKeyAndVisible];
+    if ([args boolForKey:@"check"]) after(2, ^{ runChecks(karaoke, host); });
     if ([args objectForKey:@"openMenu"]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)([args doubleForKey:@"openMenu"] * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            for (UIView *view in karaoke.subviews) {
+            // The button sits in a box with its glass, as the mic does.
+            for (UIView *view in [karaoke.subviews valueForKeyPath:@"@unionOfArrays.subviews"]) {
                 if (![view isKindOfClass:UIButton.class]) continue;
                 UIContextMenuInteraction *menu = ((UIButton *)view).contextMenuInteraction;
                 SEL present = NSSelectorFromString(@"_presentMenuAtLocation:");

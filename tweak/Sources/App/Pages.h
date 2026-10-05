@@ -11,4 +11,5 @@ extern NSString *const SGRedesignedUIInfo;
 
 SGModSection *SGAppearanceSection(void);   // the Appearance card at the top of Mod Settings
 UIViewController *SGPlayerSettingsPage(void);
+UIViewController *SGLyricsSettingsPage(void);   // with Sing (Shared/Sing) on it
 UIViewController *SGNavbarPage(void);       // the tab editor of whichever look is stored

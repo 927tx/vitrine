@@ -22,6 +22,7 @@
 #import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/LiveActivity/LiveActivity.h"
 #import "Shared/ListeningStats/ListeningStats.h"
+#import "Shared/Sing/Sing.h"
 #import "App/About/About.h"
 #import "Redesigned/Album/Album.h"
 #import "Pages.h"
@@ -46,11 +47,17 @@ static UIViewController *modSettingsPage(void) {
     // The audio effects work on the sound, so both looks have them, with what they are doing beside the chevron.
     SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", ^UIViewController *{ return SGDSPSettingsPage(); });
     audioEffects.value = ^NSString *{ return SGDSPSummary(); };
+    // Sing works on the sound, so both looks have it, saying beside the chevron whether it is on or how far its
+    // voice model has come.
+    SGModRow *sing = pageRow(@"Sing", @"music.mic", ^UIViewController *{ return SGSingSettingsPage(); });
+    sing.value = ^NSString *{ return SGSingSummary(); };
     // Home & Library holds only the native look's switches, so the redesign has no such page; the
     // Live Activity works under both, and only where ActivityKit's card does.
     NSMutableArray<SGModRow *> *parts = [NSMutableArray arrayWithArray:@[
         pageRow(@"Navbar", @"dock.rectangle", ^UIViewController *{ return SGNavbarPage(); }),
         pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
+        pageRow(@"Lyrics", @"quote.bubble", ^UIViewController *{ return SGLyricsSettingsPage(); }),
+        sing,
         audioEffects,
     ]];
     if (@available(iOS 17.0, *)) {

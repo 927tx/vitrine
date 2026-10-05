@@ -424,9 +424,9 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
     _shown = [self rowsToShow];
     _intro = intro ? SGNote(intro) : nil;
     _footer = footer ? SGNote(footer) : nil;
-    // A page row reads its value out when the page appears rather than on the ticker, so only the
-    // rows whose numbers climb on their own keep one running.
-    for (SGModSection *s in sections) for (SGModRow *row in s.rows) _live |= row.value && !row.page;
+    // Any row with a value keeps a ticker running: a page row's can move while the page shows (a download's
+    // percentage beside the chevron).
+    for (SGModSection *s in sections) for (SGModRow *row in s.rows) _live |= row.value != nil;
     return self;
 }
 
@@ -522,6 +522,14 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
 - (void)readValues {
     for (UITableViewCell *cell in self.tableView.visibleCells) {
         SGModRow *row = [self rowAt:[self.tableView indexPathForCell:cell]];
+        if (row.page && row.value) {
+            // valueAndChevron is sized to its text, so a new text gets a new one.
+            NSString *text = row.value();
+            UILabel *shown = (UILabel *)cell.accessoryView.subviews.firstObject;
+            if (![shown isKindOfClass:UILabel.class] || [shown.text isEqualToString:text]) continue;
+            cell.accessoryView = valueAndChevron(text);
+            continue;
+        }
         UILabel *label = (UILabel *)cell.accessoryView;
         if (!row.value || row.page || ![label isKindOfClass:UILabel.class]) continue;
         label.text = row.value();
