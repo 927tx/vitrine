@@ -10,5 +10,7 @@
 	<true/>
 	<key>MusicHapticsSupported</key>
 	<true/>
+	<key>NSMotionUsageDescription</key>
+	<string>AirPods gestures read how your head moves, so a double nod can like a song and a shake can skip it.</string>
 </dict>
 </plist>

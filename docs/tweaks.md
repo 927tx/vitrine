@@ -140,6 +140,13 @@ Shared:
                   catalog (SystemMusicHaptics.x), and for a song Apple has a haptic track for the mod's stands down
                   until the next song. The analyzer is scored on the Mac against harness/haptics/, the hook in the simulator against its
                   sim/, the settings against harness/haptics-page/
+    HeadGestures/ AirPods gestures (HeadGestures.h lists its files): CMHeadphoneMotionManager's attitudes, while the
+                  switch is on and Spotify plays, read for a double nod, which adds the track to Liked Songs through
+                  Spotify's collection platform (addURL:showUIConfirmation:completion:), and a shake, which skips; a
+                  tone played through Spotify's playback session confirms each, whatever the Ring/Silent switch says.
+                  Learning one's own nod and shake sets the thresholds, each kept only if the detector, set to it,
+                  finds the gesture in what was recorded. The detector is
+                  tested on the Mac against harness/head-gestures/, the hook and the page in the simulator against its sim/
     LiveActivity/ a Live Activity on the lock screen and in the Dynamic Island in one of three views, the line being
                   sung with the next one under it, the tracks up next (a tap on one skipping ahead to it), or a control
                   menu of tabs, Controls (previous, play and pause, next, shuffle, repeat), Queue and a sleep Timer of
