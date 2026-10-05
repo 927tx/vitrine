@@ -1,4 +1,5 @@
 #import "Core/SGCore.h"
+#import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Redesigned/Player/Player.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
@@ -79,7 +80,8 @@ static UIViewController *lyricsPage(void) {
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGLyricsSourcesSection(redesigned)];
     if (redesigned) {
         [sections addObject:SGSection(@"Display", @[SGLyricsWordTimingRow(), SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow(),
-            SGSwitchRow(@"Hide the controls", @"A few seconds after the last touch, the lyrics take the whole player", SGRKeyLyricsAutoHide)])];
+            SGSwitchRow(@"Hide the controls", @"A few seconds after the last touch, the lyrics take the whole player", SGRKeyLyricsAutoHide),
+            SGGeminiKeyRow()])];
     }
     [sections addObject:SGSection(nil, more)];
     return [[SGModPage alloc] initWithTitle:@"Lyrics" intro:SGRestartNote sections:sections footer:nil];

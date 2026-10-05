@@ -16,6 +16,16 @@ NSString *SGLyricsCreditFor(NSString *trackID) { return @"the harness"; }
 // -translateTo es: the language the Lyrics page would ask translations for.
 NSString *SGLyricsTranslationLanguage(void) { return [NSUserDefaults.standardUserDefaults stringForKey:@"translateTo"]; }
 
+// -gemini 1: a Gemini key is set, and Translate with Gemini answers each line with itself, marked.
+BOOL SGGeminiKeySet(void) { return [NSUserDefaults.standardUserDefaults boolForKey:@"gemini"]; }
+NSString *SGLyricsGeminiLanguage(void) { return SGLyricsTranslationLanguage() ?: @"en"; }
+void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *lines, NSString *languageTag,
+                                 void (^done)(NSArray<NSString *> *translations, NSString *error)) {
+    NSMutableArray<NSString *> *translations = [NSMutableArray array];
+    for (SGKaraokeLine *line in lines) [translations addObject:[@"Gemini: " stringByAppendingString:SGKaraokeLineText(line)]];
+    done(translations, nil);
+}
+
 // Line meanings: -title and -artist name the track Genius is searched for, and the setting's key
 // (-spotifyglass.lyricsMeanings 3) turns them on.
 @interface SGHarnessTrack : NSObject

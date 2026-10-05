@@ -18,7 +18,7 @@ fi
 SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
 xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-arc -g ${OPT:--O0} \
     -I"$SRC" -I"$SRC/Redesigned/Lyrics" -isysroot "$SDK" -Wall -Wno-deprecated-declarations \
-    "$HERE/main.m" "$HERE/stubs.m" \
+    "$HERE/main.m" "$HERE/../scene.m" "$HERE/stubs.m" \
     "$SRC"/Redesigned/Lyrics/SGRKaraokeView.m $( [ -f "$SRC"/Redesigned/Lyrics/LyricsText.m ] && echo "$SRC"/Redesigned/Lyrics/LyricsText.m ) "$SRC"/Shared/Lyrics/KaraokeTiming.m "$SRC"/Shared/Lyrics/Protobuf.m \
     "$SRC"/Shared/LyricsSources/SGTTML.m "$SRC"/Redesigned/Kit/SGRTokens.m \
     $( [ -f "$SRC"/Shared/LyricsMeanings/Meanings.m ] && echo "$SRC"/Shared/LyricsMeanings/Meanings.m "$SRC"/Redesigned/Lyrics/MeaningSheet.m ) \
@@ -40,6 +40,12 @@ cat > "$APP/Info.plist" <<PLIST
 <key>UILaunchScreen</key><dict/>
 <key>UIApplicationSceneManifest</key><dict>
   <key>UIApplicationSupportsMultipleScenes</key><false/>
+  <key>UISceneConfigurations</key><dict>
+    <key>UIWindowSceneSessionRoleApplication</key><array><dict>
+      <key>UISceneConfigurationName</key><string>Default</string>
+      <key>UISceneDelegateClassName</key><string>SGRHarnessScene</string>
+    </dict></array>
+  </dict>
 </dict>
 </dict></plist>
 PLIST

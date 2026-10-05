@@ -12,6 +12,8 @@
 #import "LyricsText.h"
 #import "MeaningSheet.h"
 #import "Shared/LyricsSources/LyricsSources.h"
+#import "Shared/LyricsTranslation/LyricsTranslation.h"
+#import "Settings/SGPageStyle.h"
 #import "Shared/Player/PlayerEvents.h"
 #import "Shared/Haptics/Haptics.h"
 #import "Redesigned/Kit/SGRTokens.h"
@@ -1436,7 +1438,8 @@ typedef struct {
 // The button shows only for a song with a pronunciation or a translation to show, and its menu only
 // what the song has: a switch for each, reading what tapping it will do.
 - (void)offerExtras {
-    BOOL offered = _lines && (_hasSpoken || _hasTranslation);
+    BOOL gemini = SGGeminiKeySet();
+    BOOL offered = _lines && (_hasSpoken || _hasTranslation || gemini);
     if (!offered) {
         _extras.hidden = YES;
         return;
@@ -1477,9 +1480,38 @@ typedef struct {
                                              image:[UIImage systemImageNamed:@"character.bubble"] identifier:nil
                                            handler:^(UIAction *action) { SGRSetLyricsTextShown(SGRLyricsTextTranslation, !on); }]];
     }
+    if (gemini && !_hasTranslation) {
+        __weak SGRKaraokeView *weakSelf = self;
+        [items addObject:[UIAction actionWithTitle:@"Translate with Gemini" image:[UIImage systemImageNamed:@"sparkles"]
+                                        identifier:nil handler:^(UIAction *action) { [weakSelf translateWithGemini]; }]];
+    }
     _extras.menu = [UIMenu menuWithChildren:items];
     _extras.hidden = NO;
     [self setNeedsLayout];
+}
+
+// The song's lines into the Lyrics page's language, or the phone's: each line takes its translation, and
+// translations are switched on so the answer shows.
+- (void)translateWithGemini {
+    NSArray<SGKaraokeLine *> *lines = _lines;
+    NSString *track = _track;
+    if (!lines.count) return;
+    SGLyricsTranslateWithGemini(track, lines, SGLyricsGeminiLanguage(), ^(NSArray<NSString *> *translations, NSString *error) {
+        if (!translations) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"No translation" message:error
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
+            [SGTopController() presentViewController:alert animated:YES completion:nil];
+            return;
+        }
+        if (lines != self->_lines) return;   // the song moved on meanwhile
+        [lines enumerateObjectsUsingBlock:^(SGKaraokeLine *line, NSUInteger i, BOOL *stop) {
+            if (translations[i].length) line.translation = translations[i];
+        }];
+        self->_hasTranslation = YES;
+        if (SGFlag(SGRKeyLyricsTranslation, NO)) [self restyle];
+        else SGRSetLyricsTextShown(SGRLyricsTextTranslation, YES);
+    });
 }
 
 // Where a line starts on the page, for the stack as it is arranged now: an open break holds the room
