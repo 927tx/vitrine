@@ -1,4 +1,5 @@
-// Checks what is new in the lyrics sources without the phone or the network: KuGou's KRC unpacked
+// Checks what is new in the lyrics sources and their words without the phone or the network: lines in
+// Thai and the scripts like it split at the dictionary's words (KaraokeTiming.m), KuGou's KRC unpacked
 // and read (KuGou.m, through NetEase.m's parser), and the QQ Music and KuGou asks matching a track
 // against made-up search replies. The requests are answered here, by host. Any file named on the
 // command line is a real KuGou download or QQ lyrics reply, saved as JSON, and only its line count is
@@ -44,6 +45,18 @@ static NSString *param(NSURL *url, NSString *name) {
     return nil;
 }
 
+static NSArray<SGKaraokeWord *> *piecesOf(NSString *text) {
+    return SGKaraokeStaticLines(@[text]).firstObject.words;
+}
+
+// The words of an unspaced token come back flush, so the line reads as it was written.
+static void checkSplit(NSString *text, BOOL split) {
+    NSArray<SGKaraokeWord *> *words = piecesOf(text);
+    printf("%lu pieces: %s\n", (unsigned long)words.count, [[words valueForKey:@"text"] componentsJoinedByString:@"|"].UTF8String);
+    CHECK([SGKaraokeLineText(SGKaraokeStaticLines(@[text]).firstObject) isEqualToString:text]);
+    CHECK(!split || words.count > 1);
+}
+
 // KRC as KuGou packs it: "krc1", then the zlib of the text XORed with the key, all in base64.
 static NSString *packed(NSString *krc, NSString *magic) {
     NSData *text = [krc dataUsingEncoding:NSUTF8StringEncoding];
@@ -82,6 +95,21 @@ static void checkLive(NSString *path) {
 
 int main(int argc, char **argv) {
     @autoreleasepool {
+        // Thai, Lao, Khmer and Burmese, long lines with no space, and Thai among Latin and brackets.
+        checkSplit(@"ฉันรักเธอมากกว่าสิ่งใดในโลกนี้และจะอยู่เคียงข้างเธอตลอดไป", YES);
+        checkSplit(@"วันนี้อากาศดีมากเราไปเดินเล่นที่สวนสาธารณะด้วยกันไหมนะที่รัก", YES);
+        checkSplit(@"Baby(ที่รัก)ฉันคิดถึงเธอทุกวันทุกคืนไม่เคยลืมเลย,ok?", YES);
+        checkSplit(@"ฉันรักเธอ, เธอรักฉัน... (ด้วยหัวใจ)", YES);
+        CHECK([piecesOf(@"(ด้วยหัวใจ)").firstObject.text isEqualToString:@"(ด้วย"]);   // what comes before the first word stays with it
+        checkSplit(@"ຂ້ອຍຮັກເຈົ້າຫຼາຍທີ່ສຸດໃນໂລກນີ້ແລະຈະຢູ່ນຳເຈົ້າຕະຫຼອດໄປ", NO);
+        checkSplit(@"ខ្ញុំស្រលាញ់អ្នកខ្លាំងណាស់ហើយនឹងនៅជាមួយអ្នកជារៀងរហូត", NO);
+        checkSplit(@"ကျွန်တော်မင်းကိုအရမ်းချစ်တယ်ထာဝရမင်းနဲ့အတူရှိနေမယ်", NO);
+        CHECK(piecesOf(@"๏๚").count == 1);   // Thai punctuation alone: no word, one piece
+        CHECK(piecesOf(@"hello world").count == 2 && !piecesOf(@"hello world")[1].joined);
+        CHECK(piecesOf(@"日本語の歌").count == 5 && piecesOf(@"日本語の歌")[4].joined);
+        NSArray<SGKaraokeWord *> *thai = piecesOf(@"ฉันรักเธอมากกว่าสิ่งใดในโลกนี้");
+        CHECK(!thai[0].joined && thai[1].joined);
+
         // The keys the two catalogues are matched by.
         CHECK([SGLyricsMatchKey(@"晴天（Live版）") isEqualToString:SGLyricsMatchKey(@"晴天 (Live版)")]);
         CHECK([SGLyricsMatchKey(@"Hello,　World!") isEqualToString:@"helloworld"]);

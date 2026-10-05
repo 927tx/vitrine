@@ -78,6 +78,22 @@ BOOL SGKaraokeUnspacedScript(NSString *text) {
     return text.length && [text rangeOfCharacterFromSet:unspacedScript()].location != NSNotFound;
 }
 
+// Thai, Lao, Burmese and Khmer, which leave no space between words either, but whose syllables are a
+// letter with marks around it: they are split where the system's dictionary finds a word, not a
+// character at a time.
+static BOOL dictionaryScript(NSString *text) {
+    static NSCharacterSet *set;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSMutableCharacterSet *building = [NSMutableCharacterSet new];
+        [building addCharactersInRange:NSMakeRange(0x0E00, 0x100)];   // Thai and Lao
+        [building addCharactersInRange:NSMakeRange(0x1000, 0xA0)];    // Myanmar
+        [building addCharactersInRange:NSMakeRange(0x1780, 0x80)];    // Khmer
+        set = [building copy];
+    });
+    return [text rangeOfCharacterFromSet:set].location != NSNotFound;
+}
+
 void SGKaraokeAlignVoices(NSArray<SGKaraokeLine *> *lines) {
     NSMutableArray<NSString *> *heard = [NSMutableArray array];
     for (SGKaraokeLine *line in lines) {
@@ -113,8 +129,28 @@ static void appendPiece(NSMutableArray<SGKaraokeWord *> *pieces, NSString *text)
     [pieces addObject:word];
 }
 
+// A token cut at the start of every word the system finds in it, so the pieces still make up the
+// whole token: whatever comes between two words stays with the first, whatever comes before the
+// first word with it.
+static void appendWords(NSMutableArray<SGKaraokeWord *> *pieces, NSString *token) {
+    NSMutableArray<NSNumber *> *cuts = [NSMutableArray arrayWithObject:@0];
+    __block BOOL first = YES;
+    [token enumerateSubstringsInRange:NSMakeRange(0, token.length)
+                              options:NSStringEnumerationByWords | NSStringEnumerationSubstringNotRequired
+                           usingBlock:^(NSString *word, NSRange range, NSRange enclosing, BOOL *stop) {
+        if (!first && range.location > cuts.lastObject.unsignedIntegerValue) [cuts addObject:@(range.location)];
+        first = NO;
+    }];
+    [cuts addObject:@(token.length)];
+    for (NSUInteger i = 0; i + 1 < cuts.count; i++) {
+        NSUInteger from = cuts[i].unsignedIntegerValue;
+        appendPiece(pieces, [token substringWithRange:NSMakeRange(from, cuts[i + 1].unsignedIntegerValue - from)]);
+    }
+}
+
 // The line split into what the sweep lights one at a time: words where the script spaces them, a
-// syllable at a time where it does not, so a Japanese line sweeps instead of lighting up whole.
+// syllable at a time where it does not, so a Japanese line sweeps instead of lighting up whole, and
+// the dictionary's words in Thai and its neighbours, so a long line wraps between them.
 // Everything a token holds past its first piece is joined to the one before it.
 static NSArray<SGKaraokeWord *> *piecesOf(NSString *line) {
     NSMutableArray<SGKaraokeWord *> *pieces = [NSMutableArray array];
@@ -122,7 +158,8 @@ static NSArray<SGKaraokeWord *> *piecesOf(NSString *line) {
         if (!token.length) continue;
         NSUInteger first = pieces.count;
         if (!SGKaraokeUnspacedScript(token)) {
-            appendPiece(pieces, token);
+            if (dictionaryScript(token)) appendWords(pieces, token);
+            else appendPiece(pieces, token);
         } else {
             // Latin letters or digits caught between two syllables stay together as one piece.
             NSMutableString *run = [NSMutableString string];

@@ -2,6 +2,9 @@
 
 `./build.sh` checks, on the Mac as a Mac Catalyst binary, with no simulator and no network:
 
+- the word splitting in `Shared/Lyrics/KaraokeTiming.m`: long Thai, Lao, Khmer and Burmese lines with no
+  spaces come apart at the dictionary's words, the pieces make up the line exactly, and Latin, Chinese and
+  Japanese lines split as before. The pieces are printed, so a script the system does not split shows;
 - KuGou's KRC (`KuGou.m`, read by `SGLyricsPieceLines` in `NetEase.m`): packed here the way KuGou packs
   it, then unpacked and read, with the word times, the joining and the line ends checked;
 - the QQ Music and KuGou asks against made-up search replies: titles, singers and lengths that do not
