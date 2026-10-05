@@ -29,6 +29,7 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
+#import "Redesigned/Album/Album.h"
 #import "Artist.h"
 
 // How much of the photo's height the dissolve into the field covers, and the scrim over the top of it that
@@ -68,7 +69,7 @@ static char kLogoNameKey;
 // Apple Music's logo for the artist in place of the name, where Apple Music has one. Asked once per name;
 // the catalog remembers the answer for the launch.
 static void showLogo(SGRHeaderInfo *info, NSString *name) {
-    if (!name.length || [objc_getAssociatedObject(info, &kLogoNameKey) isEqualToString:name]) return;
+    if (!name.length || !SGEnabled(SGRKeyArtistLogo) || [objc_getAssociatedObject(info, &kLogoNameKey) isEqualToString:name]) return;
     objc_setAssociatedObject(info, &kLogoNameKey, name, OBJC_ASSOCIATION_COPY_NONATOMIC);
     __weak SGRHeaderInfo *weakInfo = info;
     CGFloat pixels = UIScreen.mainScreen.bounds.size.width * UIScreen.mainScreen.scale;

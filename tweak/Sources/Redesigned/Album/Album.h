@@ -20,6 +20,12 @@
 // Threading: main thread only.
 #import <UIKit/UIKit.h>
 
+// Apple Music's animated cover at the top of an album, and its logo in place of an artist's name; both on
+// until switched off (AlbumSettings.m).
+#define SGRKeyAlbumMotion @"spotifyglass.redesign.album.motion"
+#define SGRKeyArtistLogo @"spotifyglass.redesign.artist.logo"
+UIViewController *SGRAlbumSettingsPage(void);
+
 // The album page `view` is on, or nil: the CreativeWorkTemplateView that carries the header, the list and
 // the two floating controls (trees/clean/album/01.txt:22).
 UIView *SGRAlbumPageOf(UIView *view);
