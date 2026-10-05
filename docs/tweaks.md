@@ -239,7 +239,7 @@ setting by the part of Spotify it changes, so a part's glass, its hide switches 
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
 they change. It opens on the Appearance card: Redesigned UI, then the stored look's accent colour, and in the native
 look AMOLED (the redesign is always black); Spotify's green is offered from the colour row once a colour
-is set. Redesigned UI is the one switch between the two looks (see Layers): it glows
+is set. Last comes the Font, under either look and on any iOS, below 26 too. Redesigned UI is the one switch between the two looks (see Layers): it glows
 (Settings/SGGlowSwitch), its ⓘ says what it changes, and flipping it offers to restart Spotify.
 The pages show only what the stored look has: a page opened after flipping the switch already shows
 what the restart will bring. Then a card of parts. Navbar: the tab editor of the stored look, each with

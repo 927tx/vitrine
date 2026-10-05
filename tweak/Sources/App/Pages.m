@@ -1,4 +1,5 @@
 #import "Core/SGCore.h"
+#import "Shared/Fonts/Fonts.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Redesigned/Player/Player.h"
 #import "Settings/SGModPage.h"
@@ -51,9 +52,12 @@ static SGModRow *unavailableRow(void) {
 }
 
 SGModSection *SGAppearanceSection(void) {
+    // Fonts.x works under either look on any iOS, so the row is on the card either way.
+    SGModRow *font = SGWithSymbol(SGChoiceRow(@"Font", nil, SGKeyAppFont, SGAppFontNames(), SGAppFontSpotify), @"textformat");
     if (!SGRedesignAvailable()) {
         NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:unavailableRow()];
         [rows addObjectsFromArray:SGNativeAppearanceRows()];
+        [rows addObject:font];
         return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
     }
     SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
@@ -65,6 +69,7 @@ SGModSection *SGAppearanceSection(void) {
     };
     NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:SGWithSymbol(redesign, @"sparkles")];
     [rows addObjectsFromArray:SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()];
+    [rows addObject:font];
     return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
 }
 
