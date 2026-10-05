@@ -265,7 +265,9 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
         _shield.frame = self.view.bounds;
         [self.view addSubview:_shield];
     }
-    SGRAnimate(SGRMotionFade, ^{
+    // Back at a tap with the Kit's response, from where a fade out is; they go with the slow fade, as the
+    // portrait player's do (PlayerLyrics.x).
+    SGRAnimate(shown ? SGRMotionRespond : SGRMotionFade, ^{
         for (UIView *view in @[self->_controls, self->_close, self->_title, self->_artist]) view.alpha = shown ? 1 : 0;
         self->_lyrics.extrasHidden = !shown;
     }, nil);

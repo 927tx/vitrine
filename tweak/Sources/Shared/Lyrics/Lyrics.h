@@ -97,6 +97,14 @@ SGKaraokeTiming SGKaraokeLinesTiming(NSArray<SGKaraokeLine *> *lines);
 
 NSArray<SGKaraokeLine *> *SGKaraokeLinesForTrack(NSString *trackID);   // nil until the lyrics came
 void SGKaraokeKeepLines(NSString *trackID, NSArray<SGKaraokeLine *> *lines);
+// Posted on the main queue, object the track's id as SGKaraokePlayingTrack names it, when lines are kept
+// for it, and when a look for its lyrics (SGKaraokeLooking) ends with none, so a reader waiting on one
+// learns the look is over.
+extern NSNotificationName const SGKaraokeLinesKeptNotification;
+// Whether the track's lyrics are being asked for at this moment, of the sources or of spclient after
+// them: the ask in flight, not the pause before a lost one is asked again. A local file's walk can take
+// tens of seconds. A walk LyricsSources runs for Spotify's own request is not seen here. Main queue.
+BOOL SGKaraokeLooking(NSString *trackID);
 // Asks spclient for a track's lyrics once, with the headers of Spotify's own requests, for when no
 // page of Spotify's has asked for them, e.g. with the app in the background.
 void SGKaraokeRequestLyrics(NSString *trackID);

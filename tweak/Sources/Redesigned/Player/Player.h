@@ -69,8 +69,9 @@ void SGRPlayerToggleLyrics(void);
 // Called by PlayerLyrics.x whenever either of those two changed, so the footer's lyrics glyph follows
 // (PlayerFooter.x). It returns at once when nothing changed.
 void SGRPlayerLyricsChanged(void);
-// The controls fade a few seconds after the last touch while the lyrics play, and the lines take the
-// whole player (PlayerLyrics.x). On until switched off; a scroll through the lines hides them either way.
+// The controls under the lines fade a few seconds after the last touch while the lyrics play, and the
+// lines grow down into their room (PlayerLyrics.x). On until switched off; a scroll through the lines
+// hides them either way.
 #define SGRKeyLyricsAutoHide @"spotifyglass.redesign.lyrics.autoHide"
 
 // The lyrics turn sideways with the phone onto a landscape screen of their own (PlayerLandscape.x). On
