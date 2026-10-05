@@ -107,6 +107,11 @@ Shared:
                   next one dimmed over the blurred cover, SGLyricsClip.m) written only when the lock screen asks for it,
                   Still (one frame) or Animated. Rendered on the Mac against harness/lyrics-clip/. What reaches the
                   system's now playing through this hook and Player/NowPlayingExtras.x is checked by harness/now-playing/
+    AnimatedArtwork/ moving artwork (AnimatedArtwork.h): the track's Canvas, else Apple Music's animated album cover
+                  (SGMotionCatalog.m), kept as local files (SGMotionStore.m), on iOS 26 the lock screen's full-screen
+                  artwork (LockScreenMotion.x). With Every song, a song with neither gets its cover over copies of it
+                  blurred and swaying, a seamless 8 s 3:4 loop drawn on the CPU only when the lock screen asks for it
+                  and kept per picture (SGFluidClip.m). Rendered on the Mac against harness/fluid-clip/
     Navigation/   the page transition fix (PageTransition.x) and opening a spotify: link (Links.x)
     Player/       the player's open and close announced (PlayerEvents.x), what the player is doing read through
                   one hook for every feature that wants it (PlayerState.x), the lock screen widget's flags, and in the
@@ -119,7 +124,9 @@ Shared:
                   sliders a Reverb slider sets the audio effects' reverb amount (spotifyglass.dsp.reverb.amount), turning
                   the effects and the reverb on with it. The block goes into Spotify's own context menu sheet
                   and is drawn from its own measures, not the Kit's, so it sits there under either look. Tested on the
-                  Mac against harness/pitch/ and in the simulator against harness/speed/ and harness/menu/
+                  Mac against harness/pitch/ and in the simulator against harness/speed/ and harness/menu/. Under the
+                  redesign, with the player's background Fluid or Animated, a row under the block switches Animated
+                  artwork at once, through functions the redesign's PlayerMotion.x defines
     AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): Spotify's
                   import of AudioOutputUnitStart is rebound, as Music Haptics does, and a render notify on its RemoteIO
                   unit runs each finished buffer through the mod's own engine, re-blocked to 1024 frames one block late,
@@ -198,7 +205,11 @@ Redesigned:
     Player/       the redesigned full screen player (Player.h lists its files); its more button is handed to
                   Shared/Player's Speed and pitch, which draws in the menu it opens, and a hold on either side of the
                   cover plays at 2x until the finger lifts (PlayerArtwork.x), an octave higher while Pitch follows
-                  speed is on
+                  speed is on. Animated artwork (PlayerMotion.x)
+                  runs the clip edge to edge from the top over its own last rows drawn on down, with a blur coming in
+                  from the seam under the controls and over the whole clip behind the lyrics; the menu switches it
+                  between Animated and Fluid without a restart. Checked in the simulator against harness/player/
+                  (`motion`)
     Lyrics/       the full screen lyrics page on glass with Apple Music style lyrics over it, always on (SGRKaraokeView,
                   which the player shows in itself too, Player/PlayerLyrics.x): lines sung over each other lit together,
                   the stack moving on once the first is sung out; an instrumental break of 7 s or more held by three dots
@@ -289,7 +300,7 @@ what the restart will bring. Then a card of parts. Navbar: the tab editor of the
 its own list of tabs. Player: Gestures, Lyrics (the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, the lock screen, and glass lyrics in the native look; in the redesign also
 which of the lyrics, their pronunciation and their translation is set largest, and the translation's language), Blocked artists (with the count on the row) and Lock screen widget (on iOS 26 its full-screen artwork: Off,
-Moving artwork or Lyrics, and the lyrics' style, Still or Animated), which work with either look;
+Moving artwork, Lyrics or Every song, and the lyrics' style, Still or Animated), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
