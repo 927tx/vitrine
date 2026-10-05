@@ -153,19 +153,29 @@ void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *li
 #pragma mark - the row
 
 static void askForKey(void) {
+    // Says what leaves the phone, not only where the key stays: each song translated goes to Google whole.
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Gemini API key"
-        message:@"Lyrics translate into any language with your own key, from Google AI Studio. It stays on this iPhone."
+        message:@"Translate with Gemini sends the song's lyrics to Google, on your own key from Google AI Studio. The key stays on this iPhone."
         preferredStyle:UIAlertControllerStyleAlert];
+    // An empty field would store nothing and take the key away, which only Remove is for: Save waits for text.
+    __weak UIAlertController *weakAlert = alert;
+    UIAlertAction *save = [UIAlertAction actionWithTitle:@"Save" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        NSString *key = [weakAlert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (key.length) storeKey(key);
+    }];
+    save.enabled = NO;
+    __weak UIAlertAction *weakSave = save;
     [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
         field.placeholder = @"API key";
         field.secureTextEntry = YES;
         field.autocorrectionType = UITextAutocorrectionTypeNo;
         field.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        __weak UITextField *weakField = field;   // the field keeps its actions, and the alert both
+        [field addAction:[UIAction actionWithHandler:^(UIAction *action) {
+            weakSave.enabled = [weakField.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].length > 0;
+        }] forControlEvents:UIControlEventEditingChanged];
     }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Save" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        NSString *key = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-        storeKey(key);
-    }]];
+    [alert addAction:save];
     if (SGGeminiKeySet()) {
         [alert addAction:[UIAlertAction actionWithTitle:@"Remove" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
             storeKey(nil);

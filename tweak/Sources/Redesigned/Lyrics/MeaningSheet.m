@@ -4,6 +4,8 @@
 #import "Redesigned/Kit/SGRTokens.h"
 
 static const CGFloat kSide = 24, kTop = 28, kGap = 12;
+// The footer's row is drawn 22pt tall; its buttons take touches over 44, centred on it.
+static const CGFloat kRow = 22, kTouch = 44;
 
 static NSString *authorName(SGLyricsMeaningAuthor author) {
     switch (author) {
@@ -75,7 +77,12 @@ static NSString *authorSymbol(SGLyricsMeaningAuthor author) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = UIColor.systemBackgroundColor;
+    // From iOS 26 a sheet short of full height is Liquid Glass, which the system draws and turns opaque
+    // itself at the large detent and under Reduce Transparency; a fill here would cover it.
+    if (@available(iOS 26.0, *)) {
+    } else {
+        self.view.backgroundColor = UIColor.systemBackgroundColor;
+    }
     _scroll = [[UIScrollView alloc] initWithFrame:self.view.bounds];
     _scroll.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     _scroll.alwaysBounceVertical = YES;
@@ -129,18 +136,18 @@ static NSString *authorSymbol(SGLyricsMeaningAuthor author) {
     y = CGRectGetMaxY(_author.frame) + kGap + 4;
     _body.frame = CGRectMake(left, y, width, [_body sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)].height);
     y = CGRectGetMaxY(_body.frame) + kGap * 2;
-    _count.frame = CGRectMake(left, y, [_count sizeThatFits:CGSizeMake(width, 22)].width, 22);
-    CGFloat right = left + width;
+    _count.frame = CGRectMake(left, y, [_count sizeThatFits:CGSizeMake(width, kRow)].width, kRow);
+    CGFloat right = left + width, touchTop = y - (kTouch - kRow) / 2;
     if (!_next.hidden) {
-        CGSize size = [_next sizeThatFits:CGSizeZero];
-        _next.frame = CGRectMake(right - size.width, y, size.width, 22);
+        CGFloat side = MAX(kTouch, [_next sizeThatFits:CGSizeZero].width);
+        _next.frame = CGRectMake(right - side, touchTop, side, kTouch);
         right = CGRectGetMinX(_next.frame) - 20;
     }
     if (!_open.hidden) {
-        CGSize size = [_open sizeThatFits:CGSizeZero];
-        _open.frame = CGRectMake(right - size.width, y, size.width, 22);
+        CGFloat side = MAX(kTouch, [_open sizeThatFits:CGSizeZero].width);
+        _open.frame = CGRectMake(right - side, touchTop, side, kTouch);
     }
-    _scroll.contentSize = CGSizeMake(self.view.bounds.size.width, y + 22 + kTop + self.view.safeAreaInsets.bottom);
+    _scroll.contentSize = CGSizeMake(self.view.bounds.size.width, touchTop + kTouch + kTop + self.view.safeAreaInsets.bottom);
 }
 
 - (void)showNext {
