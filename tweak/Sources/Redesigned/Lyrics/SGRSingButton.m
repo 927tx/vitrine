@@ -20,15 +20,6 @@ static const float kAsSungCatch = 0.08f;
 static const CGFloat kMarkWidth = 14;
 static char kButtonGlassKey, kPanelGlassKey;
 
-void SGRShowGlass(UIView *shape, BOOL shown) {
-    if ([shape isKindOfClass:UIVisualEffectView.class]) {
-        UIVisualEffectView *glass = (UIVisualEffectView *)shape;
-        if ((glass.effect != nil) != shown) glass.effect = shown ? SGGlassEffect() : nil;
-    } else {
-        shape.alpha = shown ? 1 : 0;
-    }
-}
-
 @implementation SGRSingButton {
     UIButton *_button;   // holds no glass, so its alpha is free to fade
     CAShapeLayer *_ring;

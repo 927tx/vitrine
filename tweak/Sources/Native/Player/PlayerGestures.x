@@ -21,7 +21,8 @@ static const double kHoldSpeed = 2;
 // The now playing bar's cover has a tilt view of its own, 40pt; the player's is about 354.
 static const CGFloat kCoverMinWidth = 200;
 static char kHoldKey;
-// The badge comes in quickly and goes quicker: the finger is already off the cover.
+// The badge comes in quickly and goes quicker: the finger is already off the cover. The way out is the
+// redesign's SGRMotionExit (Redesigned/Kit/SGRTokens.h), copied since the native look cannot import the Kit.
 static const NSTimeInterval kBadgeEnter = 0.2, kBadgeExit = 0.15;
 
 @interface SGCoverHold : UILongPressGestureRecognizer

@@ -12,12 +12,6 @@
 // Threading: main thread only.
 #import <UIKit/UIKit.h>
 
-// Shows or hides a Kit glass shape (Redesigned/Kit/SGRGlass.h) by its effect, never by an alpha on it or on
-// a view above it (PlayerMotion.x): UIKit draws the material wrongly or not at all under a fading alpha. The
-// solid shape Reduce Transparency puts in its place has no effect and fades by its own alpha. For the mic and
-// the pronunciation and translation button across from it; animates in the caller's animation.
-void SGRShowGlass(UIView *shape, BOOL shown);
-
 @interface SGRSingButton : UIView
 // Goes with the host's controls when they are hidden, in the host's animation: its glass dematerialises
 // rather than fading under an alpha, and it takes no touches while tucked.

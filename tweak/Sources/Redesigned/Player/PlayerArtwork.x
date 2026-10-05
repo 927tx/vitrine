@@ -140,8 +140,6 @@ static void scaleEveryCover(BOOL animated) {
 // It is a speed like the menu's, so with Pitch follows speed on (until switched off) it also plays an
 // octave higher, the way a record does. The native look's copy is in Native/Player/PlayerGestures.x.
 static const double kHoldSpeed = 2;
-// The badge's way out, quicker than its way in: the finger is already off the cover.
-static const NSTimeInterval kBadgeExit = 0.15;
 static char kHoldKey, kBadgeGlassKey;
 
 @interface SGRCoverHold : UILongPressGestureRecognizer
@@ -177,8 +175,8 @@ static char kHoldKey, kBadgeGlassKey;
 }
 
 // "2×" and a forward glyph on the Kit's glass capsule at the top of the cover while it is held. What fades
-// is the glass's effect, never an alpha over it, which UIKit draws a blur under wrongly or not at all
-// (PlayerMotion.x); the capsule grows in from 0.9 with the Kit's press spring.
+// is the glass's effect (SGRShowGlass), never an alpha over it; the capsule grows in from 0.9 with the Kit's
+// press spring and goes with its exit, quicker than it came: the finger is already off the cover.
 - (void)showBadge:(BOOL)shown on:(UIView *)cover {
     if (shown && !_badge) {
         _badgeLabel = [UILabel new];
@@ -202,10 +200,8 @@ static char kHoldKey, kBadgeGlassKey;
     UIView *badge = _badge, *label = _badgeLabel;
     // Made again by the Kit if Reduce Transparency changed: then it is a solid fill, which fades by alpha.
     UIView *shape = SGRGlassCapsuleInside(badge, &kBadgeGlassKey, badge.bounds.size, NO);
-    UIVisualEffectView *glass = [shape isKindOfClass:UIVisualEffectView.class] ? (UIVisualEffectView *)shape : nil;
     void (^state)(BOOL) = ^(BOOL on) {
-        if (glass) glass.effect = on ? SGGlassEffect() : nil;
-        else shape.alpha = on ? 1 : 0;
+        SGRShowGlass(shape, on);
         label.alpha = on ? 1 : 0;
     };
     if (shown) {
@@ -221,10 +217,9 @@ static char kHoldKey, kBadgeGlassKey;
             badge.transform = CGAffineTransformIdentity;
         }, nil);
     } else {
-        [UIView animateWithDuration:kBadgeExit delay:0 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
-                         animations:^{ state(NO); } completion:^(BOOL finished) {
+        SGRAnimate(SGRMotionExit, ^{ state(NO); }, ^(BOOL finished) {
             if (finished && !self->_badgeShown) [badge removeFromSuperview];
-        }];
+        });
     }
 }
 

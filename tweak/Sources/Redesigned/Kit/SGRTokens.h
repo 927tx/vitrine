@@ -5,7 +5,7 @@
 // SGRPrimary and SGRSecondary both pass WCAG AA on it. Type is the system font (SF Pro) sized by the
 // text style and capped, since Spotify's pages lay out for a fixed header height. Motion is springs,
 // critically damped for layout and a little bounce for press feedback; under Reduce Motion both
-// become instant, while crossfades stay, a fade not being motion.
+// become instant, while crossfades, responses and exits stay, a fade not being motion.
 //
 // Threading: the constants and the colours are safe anywhere; fonts, SGRAnimate and the
 // accessibility reads are main thread only.
@@ -53,7 +53,10 @@ typedef NS_ENUM(NSInteger, SGRMotion) {
     // A strong ease out over 0.2 s, for what comes back or opens at a touch: the eye is on it from the
     // first frame. Kept under Reduce Motion like a fade, so only alpha, colour and a glass effect go in it.
     SGRMotionRespond,
+    // An ease out over 0.15 s, for what goes once the finger has let it go (the hold's 2x badge): nothing is
+    // watched on its way out. Kept under Reduce Motion like a fade.
+    SGRMotionExit,
 };
-// Runs `animations` with the motion's timing, or at once under Reduce Motion (except a fade or a response), and
+// Runs `animations` with the motion's timing, or at once under Reduce Motion (except a fade, a response or an exit), and
 // always calls `completion`. Only transform, alpha and colour belong in it while a page scrolls.
 void SGRAnimate(SGRMotion motion, void (^animations)(void), void (^completion)(BOOL finished));
