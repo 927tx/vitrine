@@ -18,38 +18,30 @@ static void say(NSString *title, NSString *message) {
     [SGTopController() presentViewController:alert animated:YES completion:nil];
 }
 
-// Set while learning listens, a cancelled try too: SGHeadGesturesLearn runs its seconds out either way.
-static BOOL sg_listening;
+static BOOL anythingLearned(void) {
+    return SGInt(SGKeyHeadNod, 0) > 0 || SGInt(SGKeyHeadShake, 0) > 0;
+}
 
-static void learn(SGHeadAxis axis) {
+// `done` runs once something may be stored, before the alert that says what: the page shows Forget then.
+static void learn(SGHeadAxis axis, void (^done)(void)) {
     if (!SGHeadGesturesAvailable()) {
         say(@"No head tracking", @"This iPhone cannot read the motion of headphones.");
         return;
     }
-    if (sg_listening) {
-        say(@"Still listening", @"The last try is finishing. Try again in a few seconds.");
-        return;
-    }
     BOOL nod = axis == SGHeadAxisPitch;
-    NSString *key = nod ? SGKeyHeadNod : SGKeyHeadShake;
-    // SGHeadGesturesLearn stores what it found itself, so a cancelled try puts the old size back.
-    NSInteger before = SGInt(key, 0);
+    // Cancel tapped while the alert was still coming in: learning never starts.
     __block BOOL cancelled = NO;
     UIAlertController *asking = [UIAlertController alertControllerWithTitle:nod ? @"Nod twice" : @"Shake your head"
         message:nod ? @"Now, the way you would to like a song." : @"Now, the way you would to skip a song."
         preferredStyle:UIAlertControllerStyleAlert];
-    [asking addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(UIAlertAction *action) { cancelled = YES; }]];
+    [asking addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(UIAlertAction *action) {
+        cancelled = YES;
+        SGHeadGesturesCancelLearn();
+    }]];
     [SGTopController() presentViewController:asking animated:YES completion:^{
-        sg_listening = YES;
+        if (cancelled) return;
         SGHeadGesturesLearn(axis, kLearnSeconds, ^(double threshold, NSInteger samples) {
-            sg_listening = NO;
-            if (cancelled) {
-                if (SGInt(key, 0) != before) {
-                    SGSetInt(key, before);
-                    SGHeadGesturesSettingsChanged();
-                }
-                return;
-            }
+            done();
             [asking dismissViewControllerAnimated:YES completion:^{
                 if (samples == 0)
                     say(@"No motion came", @"Put in AirPods that track head motion (AirPods Pro, AirPods 3 or later, "
@@ -64,18 +56,15 @@ static void learn(SGHeadAxis axis) {
     }];
 }
 
-// Both learned sizes back to the defaults, asked first. With nothing learned there is nothing to ask.
-static void forget(void) {
-    if (SGInt(SGKeyHeadNod, 0) <= 0 && SGInt(SGKeyHeadShake, 0) <= 0) {
-        say(@"Nothing learned yet", @"Your nod and your shake use the default sizes.");
-        return;
-    }
+// Both learned sizes back to the defaults, asked first; `done` runs once they are.
+static void forget(void (^done)(void)) {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Forget your nod and shake?"
         message:@"Both go back to the default sizes. You can learn them again." preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Forget" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
         SGSetInt(SGKeyHeadNod, 0);
         SGSetInt(SGKeyHeadShake, 0);
         SGHeadGesturesSettingsChanged();
+        done();
     }]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
     [SGTopController() presentViewController:alert animated:YES completion:nil];
@@ -96,19 +85,23 @@ UIViewController *SGHeadGesturesSettingsPage(void) {
         ^NSString *(double value) { return [NSString stringWithFormat:@"%ld%%", lround(value)]; });
     sensitivity.visible = on;
 
-    SGModRow *nod = SGStatActionRow(@"Learn your nod", nil, ^NSString *{ return learnedValue(SGKeyHeadNod); }, ^{ learn(SGHeadAxisPitch); });
-    SGModRow *shake = SGStatActionRow(@"Learn your shake", nil, ^NSString *{ return learnedValue(SGKeyHeadShake); }, ^{ learn(SGHeadAxisYaw); });
-    // Shown whenever the switch is on: SGModPage asks `visible` again only when a switch flips or the page
-    // comes back, not after an alert, so a row hidden until something is learned would stay hidden.
-    SGModRow *forgetRow = SGActionRow(@"Forget what it learned", nil, ^{ forget(); });
+    // Learning and forgetting change what Forget's row reads, which no switch on the page tells it.
+    __block __weak SGModPage *page;
+    void (^refresh)(void) = ^{ [page refreshVisibility]; };
+    SGModRow *nod = SGStatActionRow(@"Learn your nod", nil, ^NSString *{ return learnedValue(SGKeyHeadNod); }, ^{ learn(SGHeadAxisPitch, refresh); });
+    SGModRow *shake = SGStatActionRow(@"Learn your shake", nil, ^NSString *{ return learnedValue(SGKeyHeadShake); }, ^{ learn(SGHeadAxisYaw, refresh); });
+    nod.visible = shake.visible = on;
+    SGModRow *forgetRow = SGActionRow(@"Forget what it learned", nil, ^{ forget(refresh); });
     forgetRow.color = SGRed();
-    for (SGModRow *row in @[nod, shake, forgetRow]) row.visible = on;
+    forgetRow.visible = ^BOOL { return on() && anythingLearned(); };
 
-    return [[SGModPage alloc] initWithTitle:@"AirPods gestures" intro:nil sections:@[
+    SGModPage *shown = [[SGModPage alloc] initWithTitle:@"AirPods gestures" intro:nil sections:@[
         SGSection(nil, @[SGWithSymbol(toggle, @"airpods.pro"), sensitivity]),
         SGNotedSection(@"Learn", @[nod, shake, forgetRow],
             @"Learning listens for a few seconds and sets how big a move counts, from yours. The gestures work while "
             "Spotify plays through headphones that track head motion. A tone in the music confirms each one, a rising pair when "
             "it worked and a low one when it did not, with the iPhone on silent too."),
     ] footer:nil];
+    page = shown;
+    return shown;
 }

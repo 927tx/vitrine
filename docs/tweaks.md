@@ -187,7 +187,8 @@ Shared:
                   Spotify's collection platform (addURL:showUIConfirmation:completion:), and a shake, which skips; a
                   tone played through Spotify's playback session confirms each, whatever the Ring/Silent switch says.
                   Learning one's own nod and shake sets the thresholds, each kept only if the detector, set to it,
-                  finds the gesture in what was recorded. The one CMHeadphoneMotionManager is lent to other features
+                  finds the gesture in what was recorded; its Cancel stops listening at once, and Forget shows only
+                  while something is learned. The one CMHeadphoneMotionManager is lent to other features
                   (SGHeadMotionListen: Sing's spatial voice), and runs for them with the switch off, the detector then
                   unfed. The detector is
                   tested on the Mac against harness/head-gestures/, the hook and the page in the simulator against its sim/

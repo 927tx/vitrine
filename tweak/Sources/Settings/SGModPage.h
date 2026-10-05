@@ -26,8 +26,9 @@
 @property (nonatomic) BOOL glows;
 // An ⓘ button beside the row's switch, whose tap reads this out under the row's title.
 @property (nonatomic, copy) NSString *info;
-// The row shows only while this answers YES, asked again whenever a switch on the page is flipped or the
-// page comes back from a choice's list: the row fades in or out where it sits. Nil shows it always.
+// The row shows only while this answers YES, asked again whenever a switch on the page is flipped, the
+// page comes back from a choice's list or it is told to (-refreshVisibility): the row fades in or out where
+// it sits. Nil shows it always.
 @property (nonatomic, copy) BOOL (^visible)(void);
 // A choice row's: a line under each name in its list, in the same order, and what runs once one is stored.
 @property (nonatomic, copy) NSArray<NSString *> *choiceNotes;
@@ -49,6 +50,8 @@
 
 @interface SGModPage : SGPage
 - (instancetype)initWithTitle:(NSString *)title intro:(NSString *)intro sections:(NSArray<SGModSection *> *)sections footer:(NSString *)footer;
+// Asks every row's `visible` again, after something other than a switch on the page changed what it reads.
+- (void)refreshVisibility;
 @end
 
 // The intro of every page whose switches the hooks read at launch.

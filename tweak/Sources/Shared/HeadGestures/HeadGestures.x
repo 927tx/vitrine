@@ -40,6 +40,7 @@ static NSOperationQueue *sg_queue;   // serial: the detector, the learning buffe
 static SGHeadDetector sg_detector;
 static NSMutableData *sg_learned;    // learning's samples, three doubles each
 static BOOL sg_learning;
+static NSUInteger sg_learnTry;       // which learning is current: a cancelled one's timer finds it moved on
 static BOOL sg_listening;            // started with the handler, by updateListening
 static BOOL sg_detecting;            // the gestures want the motion: learning, or the switch on and Spotify playing
 static BOOL sg_queueDetecting;       // sg_detecting, on sg_queue
@@ -313,12 +314,14 @@ void SGHeadGesturesLearn(SGHeadAxis axis, double seconds, void (^done)(double th
         return;
     }
     sg_learning = YES;
+    NSUInteger ticket = ++sg_learnTry;
     manager();
     // The check after learning runs with the other gesture as it is set now, at a sensitivity of 100%.
     double other = axis == SGHeadAxisPitch ? learnedOr(SGKeyHeadShake, SGHeadDefaultShake) : learnedOr(SGKeyHeadNod, SGHeadDefaultNod);
     [sg_queue addOperationWithBlock:^{ sg_learned = [NSMutableData data]; }];
     SGHeadGesturesSettingsChanged();
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (ticket != sg_learnTry) return;
         [sg_queue addOperationWithBlock:^{
             NSData *data = sg_learned;
             sg_learned = nil;
@@ -335,6 +338,7 @@ void SGHeadGesturesLearn(SGHeadAxis axis, double seconds, void (^done)(double th
             free(pitch);
             free(yaw);
             dispatch_async(dispatch_get_main_queue(), ^{
+                if (ticket != sg_learnTry) return;
                 SGLog(@"head gestures: learned %.2f rad/s for %@ from %d samples", learned, axis == SGHeadAxisPitch ? @"nod" : @"shake", count);
                 if (learned > 0) SGSetInt(axis == SGHeadAxisPitch ? SGKeyHeadNod : SGKeyHeadShake, lround(learned * kMilli));
                 sg_learning = NO;
@@ -343,6 +347,15 @@ void SGHeadGesturesLearn(SGHeadAxis axis, double seconds, void (^done)(double th
             });
         }];
     });
+}
+
+void SGHeadGesturesCancelLearn(void) {
+    if (!sg_learning) return;
+    sg_learning = NO;
+    sg_learnTry++;
+    [sg_queue addOperationWithBlock:^{ sg_learned = nil; }];
+    SGLog(@"head gestures: learning cancelled");
+    SGHeadGesturesSettingsChanged();
 }
 
 // Playing or not, from the one player hook every feature shares.

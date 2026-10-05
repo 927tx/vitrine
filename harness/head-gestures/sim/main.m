@@ -200,6 +200,7 @@ static NSInteger sg_nodBefore;
         },
         ^{
             check(sg_active, @"switch on, playing: listening");
+            check([self.table numberOfRowsInSection:1] == 2, @"nothing learned: no Forget row");
             doubleNod(0.35, 0.4);
         },
         ^{
@@ -239,6 +240,7 @@ static NSInteger sg_nodBefore;
             check([[self alertTitle] isEqualToString:@"Learned"], [NSString stringWithFormat:@"after 4 s it says %@", [self alertTitle]]);
             check(SGInt(SGKeyHeadNod, 0) > 0, [NSString stringWithFormat:@"stored nod %ld", (long)SGInt(SGKeyHeadNod, 0)]);
             check(!sg_active, @"learning over, paused: stopped");
+            check([self.table numberOfRowsInSection:1] == 3, @"a nod learned: the Forget row shows");
             [self dismissAlert];
             [self.table reloadData];
             [self setPlaying:YES];
@@ -260,8 +262,9 @@ static NSInteger sg_nodBefore;
             [self.table reloadData];
         },
         ^{
-            // Learning the nod again, cancelled while a nod comes in.
+            // Learning the nod again, cancelled while a nod comes in, with another feature listening to the motion.
             sg_nodBefore = SGInt(SGKeyHeadNod, 0);
+            SGHeadMotionListen(@"harness", ^(CMDeviceMotion *motion) {});
             [self.table.delegate tableView:self.table didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:1]];
         },
         ^{
@@ -271,16 +274,21 @@ static NSInteger sg_nodBefore;
         },
         ^{
             check([self alertTitle] == nil, [NSString stringWithFormat:@"Cancel takes the alert away: %@", [self alertTitle]]);
+            check(SGInt(SGKeyHeadNod, 0) == sg_nodBefore, [NSString stringWithFormat:@"a cancelled try keeps the nod %ld, stored %ld", (long)sg_nodBefore, (long)SGInt(SGKeyHeadNod, 0)]);
+            check(sg_active, @"cancelled, paused, another feature listening: the motion runs on for it");
+            SGHeadMotionListen(@"harness", nil);
+            check(!sg_active, @"that feature gone too: stopped");
             [self.table.delegate tableView:self.table didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:1]];
         },
         ^{
-            check([[self alertTitle] isEqualToString:@"Still listening"], [NSString stringWithFormat:@"learning again before the cancelled one ends says %@", [self alertTitle]]);
-            [self dismissAlert];
+            check([[self alertTitle] isEqualToString:@"Nod twice"], [NSString stringWithFormat:@"learning again straight after Cancel asks: %@", [self alertTitle]]);
+            check(sg_active, @"learning again: listening");
+            [self press:UIAlertActionStyleCancel];
         },
-        ^{}, ^{},
+        ^{}, ^{}, ^{}, ^{},
         ^{
-            check([self alertTitle] == nil, [NSString stringWithFormat:@"a cancelled try says nothing when it ends: %@", [self alertTitle]]);
-            check(SGInt(SGKeyHeadNod, 0) == sg_nodBefore, [NSString stringWithFormat:@"a cancelled try keeps the nod %ld, stored %ld", (long)sg_nodBefore, (long)SGInt(SGKeyHeadNod, 0)]);
+            check([self alertTitle] == nil, [NSString stringWithFormat:@"the cancelled tries say nothing when their 4 s end: %@", [self alertTitle]]);
+            check(SGInt(SGKeyHeadNod, 0) == sg_nodBefore, [NSString stringWithFormat:@"and store nothing: nod %ld", (long)SGInt(SGKeyHeadNod, 0)]);
             check(!sg_active, @"cancelled learning over, paused: stopped");
             [self.table.delegate tableView:self.table didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:1]];
         },
@@ -290,11 +298,7 @@ static NSInteger sg_nodBefore;
         },
         ^{
             check(SGInt(SGKeyHeadNod, 0) == 0 && SGInt(SGKeyHeadShake, 0) == 0, @"Forget clears both");
-            [self.table.delegate tableView:self.table didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:1]];
-        },
-        ^{
-            check([[self alertTitle] isEqualToString:@"Nothing learned yet"], [NSString stringWithFormat:@"Forget with nothing learned says %@", [self alertTitle]]);
-            [self dismissAlert];
+            check([self.table numberOfRowsInSection:1] == 2, @"nothing learned again: the Forget row goes");
         },
         ^{
             NSLog(@"[harness] %@", failures ? [NSString stringWithFormat:@"%d failed", failures] : @"all passed");

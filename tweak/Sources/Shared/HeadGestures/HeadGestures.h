@@ -32,6 +32,9 @@ BOOL SGHeadGesturesAvailable(void);
 // Listens for `seconds` whatever plays and answers the threshold learned for `axis` (0 when the motion held
 // no gesture) and how many samples came (0 when no headphones sent any, or motion is not allowed).
 void SGHeadGesturesLearn(SGHeadAxis axis, double seconds, void (^done)(double threshold, NSInteger samples));
+// Ends the learning that listens now, at once: nothing is stored, its done is never called, and the motion stops
+// unless the gestures or another feature want it. A new learning can start straight after.
+void SGHeadGesturesCancelLearn(void);
 
 UIViewController *SGHeadGesturesSettingsPage(void);
 

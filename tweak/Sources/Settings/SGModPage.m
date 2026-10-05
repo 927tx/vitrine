@@ -474,6 +474,10 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
     return YES;
 }
 
+- (void)refreshVisibility {
+    [self showRowsThen:nil];
+}
+
 // The row a switch or an ⓘ belongs to, by the cell it sits in: rows coming and going move the rows under
 // them, so a position remembered when the cell was made may be stale.
 - (NSIndexPath *)pathOf:(UIView *)control {

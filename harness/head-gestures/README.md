@@ -21,9 +21,10 @@ The real `HeadGestures.x` (through Logos), its settings page and the detector, w
 platform stood in for and `CMHeadphoneMotionManager`'s start and stop taken over, so made-up motion reaches the
 handler on the manager's own queue. It checks that nothing listens until the switch is on, a double nod adds the
 playing track with Spotify's toast, a shake skips, an episode is not saved, pausing stops, learning listens while
-paused and stores what it learned, learning with no motion says so, a learning alert's Cancel keeps the nod
-that was stored (and a second Learn meanwhile says it is still listening), and Forget asks before it clears
-both, and says nothing is learned when nothing is.
+paused and stores what it learned, learning with no motion says so, a learning alert's Cancel ends the
+listening at once (but for another feature's, through SGHeadMotionListen) and keeps the nod that was stored, a
+second Learn straight after starts at once, Forget shows only while something is learned, and asks before it
+clears both.
 
     THEOS=$HOME/theos sim/build.sh && xcrun simctl install <udid> build/sim/HeadGesturesSim.app
     xcrun simctl launch <udid> com.vitrine.headgesturessim    # then read the [harness] lines from the log
@@ -31,3 +32,5 @@ both, and says nothing is learned when nothing is.
 2026-10-05, iPhone 17 Pro on iOS 27.0: all 15 checks pass, three runs in a row, with the cue's tones played
 through AVAudioPlayer (the harness checks the calls, not the sound). With Cancel and Forget, all 24 pass; a simulator
 slow enough to hold the alert's presentation for seconds makes the timed steps fail.
+Since Cancel ends learning at once and Forget shows only while something is learned: all 30 pass, three runs in a
+row, on the same simulator.
