@@ -4,6 +4,7 @@
 #import "Settings/SGModPage.h"
 #import "NowPlayingBar.h"
 #import "Redesigned/Player/Player.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 
 UIViewController *SGRNowPlayingBarSettingsPage(void) {
     return [[SGModPage alloc] initWithTitle:@"Now playing" intro:SGRestartNote sections:@[
@@ -13,6 +14,7 @@ UIViewController *SGRNowPlayingBarSettingsPage(void) {
         SGSection(nil, @[
             SGChoiceRow(@"Background", @"Animated plays the Canvas or Apple Music's animated cover, over Fluid",
                         SGRKeyPlayerBackground, SGRPlayerBackgroundNames(), SGRPlayerBackground()),
+            SGOptionRow(@"Download in Low Data Mode", @"Animated artwork, up to about 7 MB a song", SGKeyMotionLowData),
         ]),
     ] footer:nil];
 }
