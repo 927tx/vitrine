@@ -309,6 +309,11 @@ static void loadLyrics(void) {
 
 #pragma mark - the harness
 
+// PlayerArtwork.x's hold on the cover, whose badge the badge scenario shows and hides by hand.
+@interface NSObject (SGRHarnessHold)
+- (void)showBadge:(BOOL)shown on:(UIView *)cover;
+@end
+
 @interface SGRHarnessDelegate : UIResponder <UIApplicationDelegate>
 @property (nonatomic, strong) UIWindow *window;
 @end
@@ -321,6 +326,7 @@ static void loadLyrics(void) {
     UIScrollView *_list;
     UIView *_plane, *_host;
     UIViewController *_background;
+    UIView *_tilt;
     NSUInteger _failures, _checks;
 }
 
@@ -377,6 +383,7 @@ static void loadLyrics(void) {
     UIView *tilt = box(inner, _TtC35CreativeWorkCommons_CoverArtTiltKit16CoverArtTiltView.class,
                        CGRectMake(0, round((inner.bounds.size.height - coverSide) / 2), coverSide, coverSide), nil);
     tilt.accessibilityLabel = @"Inspect cover art";
+    _tilt = tilt;
     // The Encore.ImageView holding the picture (01.txt:40), which PlayerField.x reads the cover from.
     UIView *coverElement = box(tilt, UIView.class, tilt.bounds, @"Encore.ImageView");
     UIImage *picture = artwork();
@@ -510,6 +517,7 @@ static void loadLyrics(void) {
     else if ([scenario() isEqualToString:@"scroll"]) [self runScrollChecks];
     else if ([scenario() isEqualToString:@"landscape"]) [self runLandscape];
     else if ([scenario() isEqualToString:@"motion"]) [self runMotionChecks];
+    else if ([scenario() isEqualToString:@"badge"]) [self runBadgeChecks];
     // Opened, closed and opened again, so a screenshot can be taken of each state and of the move itself.
     else for (NSNumber *at in @[@2, @6, @10]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -592,6 +600,30 @@ static void logLandscape(NSString *step, NSString *want) {
 // that brings them back, and a pause and a resume from elsewhere starting the clock again.
 - (void)runLandscape {
     after(3, ^{ SGRPlayerShowLandscape(YES); });
+    // The window comes up clear and fades in with the turn; it and what it presents are dark; the
+    // controls say what they do and are 44pt.
+    after(3.05, ^{
+        UIWindow *window = landscapeScreen().view.window;
+        NSLog(@"[harness] landscape window as it comes up: alpha %.2f -- want under 1: %@", window.alpha, window.alpha < 1 ? @"ok" : @"WRONG");
+    });
+    after(3.9, ^{
+        UIViewController *screen = landscapeScreen();
+        UIWindow *window = screen.view.window;
+        NSLog(@"[harness] landscape window: alpha %.2f, %@ -- want 1, dark: %@", window.alpha,
+              window.overrideUserInterfaceStyle == UIUserInterfaceStyleDark ? @"dark" : @"not dark",
+              window.alpha == 1 && window.overrideUserInterfaceStyle == UIUserInterfaceStyleDark ? @"ok" : @"WRONG");
+        NSMutableArray<UIButton *> *buttons = [[[screen valueForKey:@"controls"] arrangedSubviews] mutableCopy];
+        [buttons addObject:[screen valueForKey:@"_close"]];
+        for (UIButton *button in buttons) {
+            BOOL ok = button.accessibilityLabel.length && button.bounds.size.width >= 44 && button.bounds.size.height >= 44;
+            NSLog(@"[harness] landscape button \"%@\" %@ -- want a label, 44pt: %@", button.accessibilityLabel,
+                  NSStringFromCGSize(button.bounds.size), ok ? @"ok" : @"WRONG");
+        }
+        UILabel *title = [screen valueForKey:@"_title"], *artist = [screen valueForKey:@"_artist"];
+        NSLog(@"[harness] landscape text: title %.0fpt in %@, artist %.0fpt in %@, close %@", title.font.pointSize,
+              NSStringFromCGRect(title.frame), artist.font.pointSize, NSStringFromCGRect(artist.frame),
+              NSStringFromCGRect([[screen valueForKey:@"_close"] frame]));
+    });
     after(4, ^{
         SGLyricsMeaning *meaning = [SGLyricsMeaning new];
         meaning.author = SGLyricsMeaningByArtist;
@@ -615,7 +647,55 @@ static void logLandscape(NSString *step, NSString *want) {
     after(15.5, ^{ SGRHarnessSetTrack(@"spotify:track:harnessA", imageURI(@"aaaa"), NO); });
     after(17, ^{ logLandscape(@"just resumed", @"lines"); });
     after(21, ^{ logLandscape(@"rested after the resume", @"shield"); });
-    after(22, ^{ SGRPlayerShowLandscape(NO); });
+    // VoiceOver's escape turns the screen back, and the player is key once it has faded.
+    after(22, ^{ NSLog(@"[harness] landscape escape answered %d", [landscapeScreen() accessibilityPerformEscape]); });
+    after(23, ^{
+        BOOL gone = !landscapeScreen(), key = self.window.isKeyWindow;
+        NSLog(@"[harness] landscape after the escape: gone %d, the player key %d -- %@", gone, key, gone && key ? @"ok" : @"WRONG");
+    });
+}
+
+#pragma mark - badge
+
+// The hold's 2x badge: the Kit's glass capsule first in it with its effect on, the label over it, the
+// glyph an attachment; a hold again while it fades out keeps it; let go, it goes.
+- (void)runBadgeChecks {
+    __block NSObject *hold = nil;
+    for (UIGestureRecognizer *recognizer in _tilt.gestureRecognizers) {
+        if ([NSStringFromClass(recognizer.class) isEqualToString:@"SGRCoverHold"]) hold = recognizer;
+    }
+    __block NSUInteger right = 0, checks = 0;
+    void (^check)(NSString *, BOOL) = ^(NSString *step, BOOL ok) {
+        checks++;
+        if (ok) right++;
+        NSLog(@"[harness] badge %@: %@", step, ok ? @"ok" : @"WRONG");
+    };
+    UIView *tilt = _tilt;
+    UIView *(^badge)(void) = ^UIView *{ return [hold valueForKey:@"badge"]; };
+    after(2, ^{ [hold showBadge:YES on:tilt]; });
+    after(2.8, ^{
+        UIView *shape = badge().subviews.firstObject;
+        UILabel *label = [hold valueForKey:@"badgeLabel"];
+        __block BOOL glyph = NO;
+        [label.attributedText enumerateAttribute:NSAttachmentAttributeName inRange:NSMakeRange(0, label.attributedText.length) options:0
+                                      usingBlock:^(id value, NSRange range, BOOL *stop) { if (value) glyph = YES; }];
+        check(@"up", badge().superview == tilt && [shape isKindOfClass:UIVisualEffectView.class]
+              && ((UIVisualEffectView *)shape).effect && label.superview == badge() && label.alpha == 1
+              && CGAffineTransformIsIdentity(badge().transform) && glyph);
+        NSLog(@"[harness] badge %@ with %@ (%@), label %@ fits %d", NSStringFromCGRect(badge().frame), NSStringFromClass(shape.class),
+              NSStringFromClass([(UIVisualEffectView *)shape effect].class), label.attributedText.string,
+              label.intrinsicContentSize.width <= badge().bounds.size.width);
+        [hold showBadge:NO on:tilt];
+    });
+    after(2.85, ^{ [hold showBadge:YES on:tilt]; });
+    after(3.5, ^{
+        check(@"held again while it faded", badge().superview == tilt && [(UIVisualEffectView *)badge().subviews.firstObject effect]);
+        [hold showBadge:NO on:tilt];
+    });
+    after(4, ^{
+        check(@"let go", !badge().superview);
+        NSLog(@"[harness] badge checks: %lu of %lu right -- %@", (unsigned long)right, (unsigned long)checks, right == checks ? @"PASS" : @"FAIL");
+    });
 }
 
 - (void)check:(NSString *)step want:(NSString *)want {

@@ -16,9 +16,9 @@ sources, for example an older commit, to see a bug before its fix.
 `build.sh` runs `logos.pl -c generator=internal` over `PlayerLyrics.x`, `PlayerArtwork.x`,
 `PlayerFooter.x`, `PlayerScroll.x`, `PlayerField.x` and the Kit's `SGRBridges.x`, and links them with
 the real `Core/`, `Redesigned/Kit/` and `SGRKaraokeView`. `stubs.m` stands in for the hooks the harness
-does not compile (the Kit's accent and repaint, the rest of the player, the lyrics store, the haptics)
-and plays a mock player: `SGRHarnessSetTrack` reports a track, with the image ids Spotify's metadata
-carries, to every state observer. A song of ten timed lines plays on from launch. `main.m` also answers
+does not compile (the Kit's accent and repaint, the rest of the player, the lyrics store, the haptics,
+Sing's mic) and plays a mock player: `SGRHarnessSetTrack` reports a track, with the image ids Spotify's
+metadata carries, to every state observer. A song of ten timed lines plays on from launch. `main.m` also answers
 for i.scdn.co through an `NSURLProtocol` handed to every session, so each picture the Kit fetches can
 come late, out of order, or not at all.
 
@@ -36,7 +36,11 @@ come late, out of order, or not at all.
   `MeaningSheet.m`) at 4 s and takes them away at 9, then pauses at 14.5 and resumes at 15.5. Each step
   logs whether the controls are up and whether a touch on the lines lands on the lines or on the shield
   that brings the controls back, with `ok` or `WRONG`. At 6 s it logs the sheet's frame: a card inside
-  the safe area with a grabber, where the sheet before it covered the whole screen.
+  the safe area with a grabber, where the sheet before it covered the whole screen. It also logs that the
+  window comes up clear and fades in, dark, that every button has a label and 44pt, and at 22 s that
+  VoiceOver's escape takes the screen away and gives the key back to the player.
+- `badge` shows the hold's 2× badge on the cover by hand, holds again while it fades out and lets go.
+  The log ends with `badge checks: n of 3 right -- PASS` or `FAIL`.
 
 - `motion` is Animated artwork. The clip, `HARNESS_CANVAS_FILE` (any mp4, `harness/fluid-clip` writes one),
   is served as the track's Canvas before the player's background has laid out; then the background lays
