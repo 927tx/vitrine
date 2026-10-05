@@ -5,9 +5,10 @@
 // render asks for, until the sound it holds (the lead) is a window plus the model's time. A worker thread
 // takes the held sound two seconds at a time, every 1.5 s, runs the separator and writes the vocals into a
 // second ring beside it, the half second the windows share crossfaded. Each render plays the held sound
-// from the oldest frame on, the vocals turned down by the level wherever they are in, and dry wherever
-// they are not yet (as the lead fills, or when the model falls behind). Switched off, it pulls half of
-// what plays until the lead is given back, and is a straight pull again.
+// from the oldest frame on, the vocals turned down by the level once a hop of them is in ahead, and dry once fewer
+// than the reserve are (as the lead fills, or when the model falls behind), with a budget for falling behind. Not
+// separating (switched off, held, given up, without a model), it plays the lead it holds on as it is, dry, and lets it
+// go only with a flush, where nothing heard is lost; once off and let go, it is a straight pull again.
 //
 // Spatial voice: the vocals' middle (left plus right, halved) can be put at an angle off straight ahead,
 // where Sing.x holds it as the head turns. The ear facing it hears it louder and the other quieter at the same
@@ -17,8 +18,10 @@
 // exactly as separated.
 //
 // What plays is the lead behind what Spotify's decoder has handed over, which is what Spotify's clock
-// counts: Sing.x takes the lead off the player's position, and asks for a flush when Spotify seeks or
-// skips, which drops the sound held from before it.
+// counts when the player reports. Its clock then runs on by the time alone, so a position reported at a moment
+// (Sing.x: when that line of the clock began) has the lead held at that moment taken off, less what was dropped since (SGSingEngineLeadAt): a lead filling
+// after a report does not move what is heard, and one let go moves it on. Sing.x asks for a flush when Spotify
+// seeks or skips, which drops the sound held from before it.
 //
 // Threading: SGSingEngineRender on the render thread only, allocation and lock free; the worker is the
 // engine's own; everything else from any thread.
@@ -43,6 +46,8 @@ void SGSingEngineDestroy(SGSingEngine *engine);
 void SGSingEngineSetSeparator(SGSingEngine *engine, SGSingSeparator *separator);
 void SGSingEngineSetOn(SGSingEngine *engine, bool on);
 bool SGSingEngineOn(SGSingEngine *engine);
+// On, not held, with a separator and not given up: the lead is kept up for the vocals.
+bool SGSingEngineSeparating(SGSingEngine *engine);
 // The vocals' level from 0 (gone) through 1 (as the song has them) to 2 (the vocals alone, the rest gone).
 void SGSingEngineSetLevel(SGSingEngine *engine, float level);
 // Where the separated voice sounds, in radians to the listener's right of straight ahead (left is negative,
@@ -72,12 +77,18 @@ static inline double SGSpatialVoiceAngle(SGSpatialFront *f, double yaw, double t
     f->last = time;
     return yawToRight * remainder(yaw - f->front, 2 * M_PI);
 }
-// Holds the worker (a hot phone): what plays is dry, and the lead is given back.
+// The vocals fell short for longer than the engine's budget: it plays the song as it is, the lead kept as it is,
+// until switched off and on again.
+bool SGSingEngineGaveUp(SGSingEngine *engine);
+// Holds the worker (a hot phone, or Sing resting at As sung): what plays is dry, the lead kept as it is.
 void SGSingEngineSetPaused(SGSingEngine *engine, bool paused);
-// Drops the sound held ahead, at the next render.
+// Drops the sound held ahead, at the next render; the lead reads as dropped from now.
 void SGSingEngineFlush(SGSingEngine *engine);
-// Seconds of Spotify's sound held ahead of what plays.
+// Seconds of Spotify's sound held ahead of what plays, as the render thread left it.
 double SGSingEngineLead(SGSingEngine *engine);
+// The seconds to take off a position Spotify's player counted at `when` (CFAbsoluteTime) and has run on by the
+// time since: the lead held then, less what was dropped since; negative when more was dropped than was held.
+double SGSingEngineLeadAt(SGSingEngine *engine, CFAbsoluteTime when);
 
 OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, float *right, SGSingPull pull, void *context);
 
@@ -86,8 +97,16 @@ typedef struct {
     double ready;              // seconds of the held sound separated, ahead of what plays (negative when behind)
     double averageMS;          // a window's separation, a running average
     double voiceAngle;         // radians, as last set
-    unsigned long long windows, failures, dryFrames;   // dry: frames played unseparated while on
+    unsigned long long windows, failures, dryFrames;   // dry: frames played unseparated while separating
+    double dropped;            // seconds of held sound never played (flushes), since the engine was made
+    unsigned long long written, played;   // frames pulled from Spotify's mixer and played, since the engine was made
+    bool mixing;               // the vocals are turned down now (the hysteresis in SGSingEngine.m)
+    double budgetSpent;        // seconds short of vocals since they were last in, of the 8 s it gives up after
 } SGSingEngineStats;
 SGSingEngineStats SGSingEngineReadStats(SGSingEngine *engine);
+// The loudness (RMS) of the separated vocals and of the rest of the song, per tenth of a second, for the `count`
+// tenths up to what plays now, oldest first; 0 where none was separated. For the Sing page to draw: a few atomic
+// reads, the measuring done on the worker.
+void SGSingEngineReadLevels(SGSingEngine *engine, float *vocals, float *rest, int count);
 // The model's last error, nil when its last window went through.
 NSString *SGSingEngineError(SGSingEngine *engine);

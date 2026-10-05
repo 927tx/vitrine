@@ -6,8 +6,9 @@
 // sways slowly to show the same thing.
 //
 // It is drawn once into layers and moved by Core Animation alone: the turn is the disc layer's rotation and the
-// voice's position, each motion animated from where it is on screen to the next over a little more than the
-// motion's interval, so nothing runs per frame on the main thread. It listens to the head only while it is in
+// voice's position, each motion animated from where it is on screen over the motions' own interval to where the
+// head will be by the next one, at the speed it is turning, so the disc keeps up with the head rather than a
+// motion behind it, and nothing runs per frame on the main thread. It listens to the head only while it is in
 // a window, Spotify is in front and Motion & Fitness is allowed (the page never asks; the switch does). Under
 // Reduce Motion the disc holds still and a turn of the head past a step fades it to the new angle.
 //
@@ -32,9 +33,11 @@ static const CGFloat kVoiceHeight = 12;         // over the floor, as the listen
 // The sway while there is no head to follow: far enough to see the voice come round, slow enough to be calm,
 // starting and turning back with no velocity.
 static const double kSwayAngle = 38 * M_PI / 180, kSwaySeconds = 12;
-// Each motion is animated to over this long, a little more than AirPods' interval, so the turn never stops
-// between two of them.
-static const CFTimeInterval kFollowSeconds = 0.12;
+// A turn this long or shorter follows a motion: straight, not eased. Each motion is animated to over the
+// motions' interval as heard (AirPods send about 25 a second), held within kFollowShortest and kFollowLongest,
+// and leads by no more than kFollowLead.
+static const CFTimeInterval kFollowSeconds = 0.12, kFollowShortest = 1.0 / 120, kFollowLongest = 0.08;
+static const double kFollowLead = 12 * M_PI / 180;
 // Under Reduce Motion, the turn the voice must move by before the still picture fades to it.
 static const double kStillStep = 15 * M_PI / 180;
 
@@ -44,6 +47,8 @@ static const double kStillStep = 15 * M_PI / 180;
     UILabel *_caption;
     CGFloat _radius;
     double _angle;           // the disc's turn as last set, unwrapped
+    double _heard;           // the voice's angle in the last motion, and when that motion was (its timestamp)
+    NSTimeInterval _heardAt, _interval;   // the interval between motions, smoothed
     BOOL _listening, _live, _swaying;
     CMAuthorizationStatus _allowed;
 }
@@ -219,7 +224,11 @@ static CAGradientLayer *floorLight(CGPoint at, CGFloat size, UIColor *color, CGF
     position.values = positions;
     for (CAKeyframeAnimation *animation in @[rotation, position]) {
         animation.duration = seconds;
-        if (begin <= 0) continue;
+        // A turn after the head asks for the display's full rate, so it keeps up with a quick turn.
+        if (begin <= 0) {
+            if (seconds <= kFollowSeconds) animation.preferredFrameRateRange = CAFrameRateRangeMake(60, 120, 120);
+            continue;
+        }
         animation.repeatCount = HUGE_VALF;
         animation.beginTime = begin;
         // A slow turn is smooth at 60 frames a second, so it asks for no more. Its maximum stays at 120: a cap at 60
@@ -329,7 +338,7 @@ static CAGradientLayer *floorLight(CGPoint at, CGFloat size, UIColor *color, CGF
     _listening = listen;
     if (!listen) {
         SGHeadMotionListen(kListener, nil);
-        [self followed:NAN];
+        [self followed:NAN at:0];
         return;
     }
     __weak typeof(self) weakSelf = self;
@@ -339,23 +348,35 @@ static CAGradientLayer *floorLight(CGPoint at, CGFloat size, UIColor *color, CGF
     SGHeadMotionListen(kListener, ^(CMDeviceMotion *motion) {
         double angle = motion ? SGSpatialVoiceAngle(&front, motion.attitude.yaw, motion.timestamp) : NAN;
         if (!motion) front.hasFront = false;
-        dispatch_async(dispatch_get_main_queue(), ^{ [weakSelf followed:angle]; });
+        NSTimeInterval at = motion.timestamp;
+        dispatch_async(dispatch_get_main_queue(), ^{ [weakSelf followed:angle at:at]; });
     });
 }
 
-// The voice's angle from the head's motion, NAN when the motion stopped.
-- (void)followed:(double)angle {
+// The voice's angle from the head's motion at its timestamp, NAN when the motion stopped.
+- (void)followed:(double)angle at:(NSTimeInterval)at {
     BOOL live = _listening && !isnan(angle);
+    double since = at - _heardAt, turned = remainder(angle - _heard, 2 * M_PI);
+    _heard = angle;
+    _heardAt = at;
     if (live != _live) {
         _live = live;
+        _interval = 0;
         [self updateCaption];
         [self moveOn];
-        if (live) {
-            [self turnTo:angle seconds:0.5];
-            return;
-        }
+        if (live) [self turnTo:angle seconds:0.5];
+        return;
     }
-    if (live) [self turnTo:angle seconds:kFollowSeconds];
+    if (!live) return;
+    // A gap (the headphones out a moment, Spotify busy) is no interval, and no speed to lead by.
+    if (since <= 0 || since > 4 * kFollowLongest) {
+        [self turnTo:angle seconds:kFollowLongest];
+        return;
+    }
+    _interval = _interval > 0 ? 0.8 * _interval + 0.2 * since : since;
+    CFTimeInterval seconds = fmin(kFollowLongest, fmax(kFollowShortest, _interval));
+    double lead = fmax(-kFollowLead, fmin(kFollowLead, turned / since * seconds));
+    [self turnTo:angle + lead seconds:seconds];
 }
 
 - (void)refresh {

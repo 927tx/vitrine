@@ -3,12 +3,21 @@
 //
 // - the STFT: a sine's peak bin at the size torch.stft gives it (amplitude times the window's sum over two), and
 //   noise through the STFT and back unchanged;
-// - the model: loaded from a separator.mlmodelc folder at the compute units asked for, the time a window takes,
-//   and a voice mixed over chords taken apart: the vocals it finds against the voice, beside the mix's own score;
+// - the loader (SGSingLoader.m): the CPU copy loaded and warmed first, then the faster copy on the compute units
+//   asked for; a second want joining the load in flight; a load past its deadline abandoned, Sing Failed, and a
+//   fresh load working while the abandoned one still runs, which is let go when it comes back; a purge during a
+//   load dropping its result; the copies kept over a quick off and on, and dropped after the time kept; each
+//   window on the faster copy only in the foreground; a window the faster copy fails done again on the CPU's;
+// - the model: its shapes, the time a window takes, and a voice mixed over chords taken apart: the vocals it finds
+//   against the voice, beside the mix's own score;
 // - the engine: Spotify's mixer stood in for by the mix, pulled through SGSingEngineRender in IO buffers on a
 //   thread that keeps real time, while the engine's worker separates ahead: the lead it builds, every frame
-//   out in order, the vocals level applied, a flush, the lead given back when Sing is switched off, and
+//   out in order, the vocals level applied, a flush, the lead kept and played on when Sing is switched off, and
 //   no allocation on the render thread.
+// - the lead, without the model: the lead reported is the frames pulled and not played, to the frame; held (the
+//   heat, resting), given up or switched off, it is kept and played on as it is, nothing skipped and none built; a
+//   flush (a pause, a seek) drops it at once; and the lead to take off a position Spotify counted at a moment is the
+//   lead held then, less what was dropped since.
 // - spatial voice, without the model: a separator that hands the whole window back as vocals, so what plays is
 //   the vocals placed. A tone straight ahead plays exactly as it came; at 90 degrees right the right ear has it
 //   louder by the pan's 7.7 dB at the same power and the left ear late by the delay around the head; at 90
@@ -16,14 +25,15 @@
 //   is held off: a turned head has it off to the side, the front catching up over 20 s, across +-180 degrees
 //   without a jump, and ahead again after a gap in the motion.
 //
-//     ./build.sh && build/sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]
-//     ./build.sh && build/sing spatial
+//     ./build.sh && build/sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]   (the faster copy's units)
+//     ./build.sh && build/sing spatial        (the checks without the model: the lead, spatial voice, falling behind)
 #import <Foundation/Foundation.h>
 #import <Accelerate/Accelerate.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <CoreML/CoreML.h>
 #import <pthread.h>
 #import <stdatomic.h>
+#import "Shared/Sing/SGSingLoader.h"
 #import "Shared/Sing/SGSingSeparator.h"
 #import "Shared/Sing/SGSingEngine.h"
 
@@ -193,20 +203,119 @@ static Audio separateOffline(SGSingSeparator *separator, Audio mix, double *slow
     return vocals;
 }
 
-static MLModel *loadModel(NSString *path, NSString *units) {
-    MLModelConfiguration *configuration = [MLModelConfiguration new];
-    configuration.computeUnits = unitsNamed(units);
+// The main run loop turned until `done` holds or `seconds` pass; the loader hands back on the main queue.
+static bool waitFor(double seconds, bool (^done)(void)) {
+    double until = now() + seconds;
+    while (!done() && now() < until) CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, true);
+    return done();
+}
+
+// An MLModel whose every prediction fails, standing in for a GPU copy that iOS stops.
+@interface SGFailingModel : MLModel
+@end
+
+@implementation SGFailingModel
+- (id<MLFeatureProvider>)predictionFromFeatures:(id<MLFeatureProvider>)input error:(NSError **)error {
+    if (error) *error = [NSError errorWithDomain:@"harness" code:1 userInfo:@{NSLocalizedDescriptionKey: @"refused, as iOS refuses the GPU in the background"}];
+    return nil;
+}
+@end
+
+// The loader through its cases; hands back the separator it leaves Ready, both copies in it.
+static SGSingSeparator *checkLoader(NSString *path, NSString *units) {
+    NSURL *url = [NSURL fileURLWithPath:path];
+    MLComputeUnits fast = unitsNamed(units);
+    SGSingLoaderSetForeground(YES);
+
+    // A load past its deadline is abandoned and Sing is Failed; the mic off and on starts a fresh one at once,
+    // which works while the first is still out, and the first is let go when it comes back.
+    SGSingLoaderCPUDeadline = 0.2;
+    SGSingLoaderWant(url, MLComputeUnitsCPUOnly);
+    waitFor(5, ^bool { return SGSingLoaderCurrentState() != SGSingLoaderLoading; });
+    CHECK(SGSingLoaderCurrentState() == SGSingLoaderFailed && [SGSingLoaderError() containsString:@"did not load in"],
+          "a load past its deadline is abandoned, and Sing is Failed: %s", SGSingLoaderError().UTF8String ?: "(no reason)");
+    SGSingLoaderCPUDeadline = 120;
+    SGSingLoaderWant(url, MLComputeUnitsCPUOnly);
+    CHECK(SGSingLoaderCurrentState() == SGSingLoaderFailed && SGSingLoaderAttempts() == 1, "Failed stays Failed until the mic is switched off and on");
+    SGSingLoaderRelease();
     double began = now();
+    SGSingLoaderWant(url, fast);
+    SGSingLoaderWant(url, fast);
+    CHECK(SGSingLoaderAttempts() == 2 && SGSingLoaderOutstanding() == 2, "off and on starts a fresh load beside the abandoned one, and a second want joins it (%u loads, %u out)",
+          SGSingLoaderAttempts(), SGSingLoaderOutstanding());
+    waitFor(300, ^bool { return SGSingLoaderCurrentState() != SGSingLoaderLoading; });
+    double ready = now() - began;
+    SGSingSeparator *separator = SGSingLoaderSeparator();
+    CHECK(SGSingLoaderCurrentState() == SGSingLoaderReady && separator, "the CPU copy loads and warms in %.1f s, and Sing is Ready", ready);
+    waitFor(300, ^bool { return SGSingLoaderOutstanding() == 0 && SGSingLoaderFastState() != SGSingFastLoading; });
+    CHECK(SGSingLoaderSeparator() == separator, "the abandoned load came back and was let go: the separator is still the fresh load's");
+    if (fast != MLComputeUnitsCPUOnly) {
+        CHECK(SGSingLoaderFastState() == SGSingFastReady, "then the %s copy loads and warms beside it, %.1f s after the want (state %ld)",
+              SGSingUnitsName(fast).UTF8String, now() - began, (long)SGSingLoaderFastState());
+    }
+
+    // Kept over a quick off and on, dropped once the time kept has passed.
+    SGSingLoaderKeepSeconds = 1.5;
+    SGSingLoaderRelease();
+    waitFor(0.5, ^bool { return false; });
+    SGSingLoaderWant(url, fast);
+    waitFor(2, ^bool { return false; });
+    CHECK(SGSingLoaderSeparator() == separator && SGSingLoaderAttempts() == 2 + (fast != MLComputeUnitsCPUOnly),
+          "switched off and on within the time kept, the copies are still there and nothing loads (%u loads)", SGSingLoaderAttempts());
+    SGSingLoaderRelease();
+    waitFor(3, ^bool { return SGSingLoaderCurrentState() == SGSingLoaderIdle; });
+    CHECK(SGSingLoaderCurrentState() == SGSingLoaderIdle && !SGSingLoaderSeparator(), "left off past the time kept, the copies are dropped");
+
+    // A purge during a load: what the load brings back is let go.
+    SGSingLoaderWant(url, MLComputeUnitsCPUOnly);
+    SGSingLoaderPurge(@"the harness purges during the load");
+    waitFor(300, ^bool { return SGSingLoaderOutstanding() == 0; });
+    waitFor(0.5, ^bool { return false; });
+    CHECK(SGSingLoaderCurrentState() == SGSingLoaderIdle && !SGSingLoaderSeparator(), "a load purged on its way is let go when it comes back");
+
+    // The separator for the rest of the run, both copies in it, as Sing.x has it.
+    SGSingLoaderKeepSeconds = 60;
+    SGSingLoaderWant(url, fast);
+    waitFor(300, ^bool { return SGSingLoaderCurrentState() != SGSingLoaderLoading
+                                && (fast == MLComputeUnitsCPUOnly || SGSingLoaderFastState() != SGSingFastLoading); });
+    separator = SGSingLoaderSeparator();
+    CHECK(separator != nil, "loaded again for the rest of the run");
+    return separator;
+}
+
+// Each window on the copy that fits: the faster only in the foreground, a failed one done again on the CPU's, which
+// keeps it until the app has been in the background.
+static void checkCopies(SGSingSeparator *separator, Audio mix, bool hasFast) {
+    float *vl = calloc(kSGSingWindowFrames, sizeof(float)), *vr = calloc(kSGSingWindowFrames, sizeof(float));
     NSError *error;
-    MLModel *model = [MLModel modelWithContentsOfURL:[NSURL fileURLWithPath:path] configuration:configuration error:&error];
-    CHECK(model != nil, "the model loads (%s compute units) in %.1f s%s%s", units.UTF8String, now() - began, error ? ": " : "",
-          error.localizedDescription.UTF8String ?: "");
-    if (!model) exit(1);
-    MLFeatureDescription *input = model.modelDescription.inputDescriptionsByName[@"spectrum"];
-    MLFeatureDescription *output = model.modelDescription.outputDescriptionsByName[@"vocals_spectrum"];
-    CHECK([input.multiArrayConstraint.shape isEqualToArray:(@[@1, @2050, @201, @2])] && [output.multiArrayConstraint.shape isEqualToArray:(@[@1, @2050, @201, @2])],
-          "its spectrum and vocals_spectrum are [1, 2050, 201, 2]");
-    return model;
+    SGSingSeparatorStats before = [separator stats];
+    if (hasFast) {
+        [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
+        SGSingSeparatorStats stats = [separator stats];
+        CHECK(stats.fast && stats.windows[1] == before.windows[1] + 1, "in the foreground a window goes to the faster copy");
+        SGSingSeparatorSetForeground(false);
+        [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
+        stats = [separator stats];
+        CHECK(!stats.fast && stats.windows[0] == before.windows[0] + 1, "in the background it goes to the CPU's");
+        SGSingSeparatorSetForeground(true);
+        before = stats;
+    }
+    // The fast copy swapped for one that fails, then put back.
+    SGFailingModel *failing = [SGFailingModel alloc];
+    [separator setFastModel:failing named:@"failing"];
+    BOOL ok = [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
+    SGSingSeparatorStats stats = [separator stats];
+    CHECK(ok && stats.fallbacks == before.fallbacks + 1 && stats.windows[0] == before.windows[0] + 1 && !stats.fast,
+          "a window the faster copy fails is done again on the CPU's (%s)", ok ? "separated" : error.localizedDescription.UTF8String);
+    [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
+    stats = [separator stats];
+    CHECK(stats.fallbacks == before.fallbacks + 1 && stats.windows[0] == before.windows[0] + 2, "and the faster copy rests for the next window");
+    SGSingSeparatorSetForeground(false);
+    SGSingSeparatorSetForeground(true);
+    [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
+    CHECK([separator stats].fallbacks == before.fallbacks + 2, "until the app has been in the background, when it is tried again");
+    free(vl);
+    free(vr);
 }
 
 // Which device Core ML means to run each operation on, counted, where the OS can tell.
@@ -303,7 +412,8 @@ static void checkEngine(SGSingSeparator *separator, Audio mix, Audio voice, Audi
     printf("  info  lead at 12 s %.2f s (at most %.2f s, target %.2f s), %llu windows at %.0f ms average, %llu frames played dry while on\n",
            leadAtOn, leadMax, stats.targetLead, stats.windows, stats.averageMS, stats.dryFrames);
     CHECK(leadAtOn > 2 && leadAtOn < 7, "with Sing on the engine pulls ahead of what plays (%.2f s)", leadAtOn);
-    CHECK(leadAtOff < 0.05, "switched off it gives the lead back (%.3f s left)", leadAtOff);
+    CHECK(leadAtOff > 2, "switched off it keeps the lead and plays it on (%.2f s)", leadAtOff);
+    size_t skipped = (size_t)llround(stats.dropped * kSGSingRate);
     // What plays is the mixer's frames in order, from 6 s to 16 s the mix less the vocals the offline pass finds,
     // with the vocals at 0.
     size_t from = 6 * kSGSingRate, to = 16 * kSGSingRate;
@@ -322,13 +432,13 @@ static void checkEngine(SGSingSeparator *separator, Audio mix, Audio voice, Audi
     printf("  info  the karaoke against the true instrumental: %.1f dB; the mix's own: %.1f dB\n", snr(instrumental, out, from, to), snr(instrumental, mix, from, to));
     double after = 0;
     size_t firstOff = 0;
-    for (size_t i = 26 * kSGSingRate; i < out.frames / 1024 * 1024; i++) {
-        double d = fabs(out.left[i] - mix.left[i]) + fabs(out.right[i] - mix.right[i]);
+    for (size_t i = 26 * kSGSingRate; i < out.frames / 1024 * 1024 && i + skipped < mix.frames; i++) {
+        double d = fabs(out.left[i] - mix.left[i + skipped]) + fabs(out.right[i] - mix.right[i + skipped]);
         if (d > 1e-6 && !firstOff) firstOff = i;
         after = fmax(after, d);
     }
     if (firstOff) printf("  info  first difference at %.4f s: out %g, mix %g, mix a frame on %g\n", firstOff / (double)kSGSingRate, out.left[firstOff], mix.left[firstOff], mix.left[firstOff + 1]);
-    CHECK(after < 1e-6, "off again, the mix plays on where it was (%.2g)", after);
+    CHECK(after < 1e-6 && skipped == 0, "off again, the mix plays on where it was, nothing skipped (%.2g, %.2f s dropped)", after, stats.dropped);
     writeWAV(@"engine.wav", out);
 
     // The level: at 2 only the vocals play.
@@ -337,7 +447,16 @@ static void checkEngine(SGSingSeparator *separator, Audio mix, Audio voice, Audi
     SGSingEngineSetLevel(loud, 2);
     SGSingEngineSetOn(loud, true);
     Source third = {mix, 0};
-    Audio alone = play(loud, mix, &third, 1024, 10, ^(double played) {});
+    __block double inAt = -1;
+    __block int switches = 0;
+    __block bool was = false;
+    Audio alone = play(loud, mix, &third, 1024, 10, ^(double played) {
+        bool mixing = SGSingEngineReadStats(loud).mixing;
+        if (mixing && inAt < 0) inAt = played;
+        switches += mixing != was;
+        was = mixing;
+    });
+    printf("  info  at the top of the slider the vocals came in at %.2f s and switched %d times\n", inAt, switches);
     double vocalsOnly = snr(offlineVocals, alone, 6 * kSGSingRate, 9 * kSGSingRate);
     CHECK(vocalsOnly > 30, "at the top of the slider the vocals play alone (%.1f dB against the offline vocals)", vocalsOnly);
     SGSingEngineDestroy(loud);
@@ -377,6 +496,177 @@ static void checkEngine(SGSingSeparator *separator, Audio mix, Audio voice, Audi
 }
 @end
 
+// Whole windows back as vocals, as fast as asked: the first `fastWindows` at once, then `slow` seconds each; with a
+// NaN in every window when `poison` is set.
+@interface SGPacedSeparator : SGWholeSeparator
+@property (nonatomic) int fastWindows;
+@property double slow;   // atomic: changed while the worker runs a window
+@property (nonatomic) bool poison;
+@end
+
+@implementation SGPacedSeparator {
+    int _done;
+}
+- (BOOL)separateLeft:(const float *)left right:(const float *)right vocalsLeft:(float *)vocalsLeft vocalsRight:(float *)vocalsRight error:(NSError **)error {
+    [super separateLeft:left right:right vocalsLeft:vocalsLeft vocalsRight:vocalsRight error:error];
+    if (_poison) vocalsLeft[1000] = vocalsRight[2000] = NAN;
+    if (_done++ >= _fastWindows) usleep((useconds_t)(self.slow * 1e6));
+    return YES;
+}
+@end
+
+// The lead without the model: what is reported against what was pulled and played, kept and played on when not
+// separating, dropped by a flush, and the lead to take off a position counted at a moment.
+static void checkHold(void) {
+    size_t frames = 40 * kSGSingRate;
+    Audio tone = makeAudio(frames);
+    for (size_t i = 0; i < frames; i++) tone.left[i] = tone.right[i] = (float)(0.5 * sin(2 * M_PI * 440 * i / kSGSingRate));
+    SGSingEngine *engine = SGSingEngineCreate();
+    SGPacedSeparator *steady = [[SGPacedSeparator alloc] initWithModel:nil];
+    steady.fastWindows = INT_MAX;
+    SGSingEngineSetSeparator(engine, steady);
+    SGSingEngineSetLevel(engine, 1);
+    SGSingEngineSetOn(engine, true);
+    Source source = {tone, 0}, *pulled = &source;
+    __block double worst = 0, at1 = 0, leadAt1 = 0, leadAt8 = 0, heldLeast = 100, heldMost = 0, takeOffHeld = -1, leadAt12 = 0;
+    __block double afterFlush = -1, takeOffFlushed = 0, leadAt19 = 0, leadAt21 = 0, droppedAt12 = -1;
+    malloc_logger = countAllocation;
+    Audio out = play(engine, tone, &source, 1024, 22, ^(double played) {
+        // Between renders: what was pulled less what was played out, less what was dropped.
+        double held = ((double)pulled->pulled - played * kSGSingRate) / kSGSingRate - SGSingEngineReadStats(engine).dropped;
+        if (!SGSingEngineReadStats(engine).dropped || played > 12.1) worst = fmax(worst, fabs(SGSingEngineLead(engine) - held));
+        // While the lead fills.
+        if (played >= 1 && !at1) {
+            at1 = CFAbsoluteTimeGetCurrent();
+            leadAt1 = SGSingEngineLead(engine);
+        }
+        if (played >= 8 && !leadAt8) leadAt8 = SGSingEngineLead(engine);
+        // Held (the heat, resting) from 8 s to 12 s, then separating again; off at 20 s.
+        SGSingEngineSetPaused(engine, played >= 8 && played < 12);
+        if (played >= 8.5 && played < 12) {
+            heldLeast = fmin(heldLeast, SGSingEngineLead(engine));
+            heldMost = fmax(heldMost, SGSingEngineLead(engine));
+        }
+        if (played >= 11 && takeOffHeld < 0) takeOffHeld = SGSingEngineLeadAt(engine, at1);
+        // A pause or a seek: the flush drops the lead, read as dropped at once.
+        if (played >= 12 && droppedAt12 < 0) {
+            leadAt12 = SGSingEngineLead(engine);
+            SGSingEngineFlush(engine);
+            afterFlush = SGSingEngineLead(engine);
+            takeOffFlushed = SGSingEngineLeadAt(engine, at1);
+            droppedAt12 = SGSingEngineReadStats(engine).dropped;
+        }
+        if (played >= 19 && !leadAt19) leadAt19 = SGSingEngineLead(engine);
+        if (played >= 20 && SGSingEngineOn(engine)) SGSingEngineSetOn(engine, false);
+        if (played >= 21 && !leadAt21) leadAt21 = SGSingEngineLead(engine);
+    });
+    malloc_logger = NULL;
+    double dropped = SGSingEngineReadStats(engine).dropped;
+    CHECK(atomic_load(&sg_renderAllocations) == 0, "the lead: no allocation on the render thread (%u)", atomic_load(&sg_renderAllocations));
+    CHECK(worst < 0.5 / kSGSingRate, "the lead reported is the frames pulled and not yet played, to the frame (off by %.0f at most)", worst * kSGSingRate);
+    CHECK(heldLeast == leadAt8 && heldMost == leadAt8 && leadAt8 > leadAt1 + 1,
+          "held at 8 s (the heat, resting), the %.2f s held are kept as they are (%.2f to %.2f s), none dropped or built", leadAt8, heldLeast, heldMost);
+    CHECK(fabs(takeOffHeld - leadAt1) < 1100.0 / kSGSingRate,
+          "a position counted at 1 s, as the lead filled, has the %.2f s held then taken off (%.2f s), not the %.2f s held later", leadAt1, takeOffHeld, leadAt8);
+    double skippedBefore = 0;
+    for (size_t i = 0; i < 12 * kSGSingRate; i++) skippedBefore = fmax(skippedBefore, fabsf(out.left[i] - tone.left[i]));
+    CHECK(skippedBefore < 1e-6, "until the flush every frame plays in order, held or not: nothing skipped (%.2g)", skippedBefore);
+    CHECK(afterFlush == 0 && droppedAt12 >= 0 && fabs(takeOffFlushed - (leadAt1 - leadAt12)) < 1100.0 / kSGSingRate,
+          "a flush (a pause, a seek) drops the %.2f s at once: the lead reads %.2f s, and a position counted at 1 s has %.2f s taken off (%.2f less %.2f)",
+          leadAt12, afterFlush, takeOffFlushed, leadAt1, leadAt12);
+    size_t skipped = (size_t)llround(dropped * kSGSingRate);
+    double after = 0;
+    for (size_t i = 12.1 * kSGSingRate; i < 13 * kSGSingRate; i++) after = fmax(after, fabsf(out.left[i] - tone.left[i + skipped]));
+    CHECK(after < 1e-6, "after it, the tone plays on from the mixer's next frame, %.2f s on (%.2g)", dropped, after);
+    CHECK(leadAt19 > 2, "separating again from 12 s, the lead is built again (%.2f s at 19 s)", leadAt19);
+    CHECK(fabs(leadAt21 - leadAt19) < 0.6, "switched off at 20 s, the lead is kept and plays on (%.2f s at 21 s)", leadAt21);
+    SGSingEngineDestroy(engine);
+}
+
+// A model that keeps up for a while and then falls behind: the vocals fade out once, not at every window, and
+// after 8 s short of them the engine gives up and gives the lead back. And a NaN from the model never plays.
+static void checkFallingBehind(void) {
+    size_t frames = 40 * kSGSingRate;
+    Audio tone = makeAudio(frames);
+    for (size_t i = 0; i < frames; i++) tone.left[i] = tone.right[i] = (float)(0.5 * sin(2 * M_PI * 440 * i / kSGSingRate));
+    SGSingEngine *engine = SGSingEngineCreate();
+    SGPacedSeparator *separator = [[SGPacedSeparator alloc] initWithModel:nil];
+    separator.fastWindows = 6;
+    separator.slow = 2.2;
+    SGSingEngineSetSeparator(engine, separator);
+    SGSingEngineSetLevel(engine, 0);
+    SGSingEngineSetOn(engine, true);
+    Source source = {tone, 0};
+    __block int switches = 0;
+    __block bool was = false, everIn = false;
+    __block double gaveUpAt = 0;
+    Audio out = play(engine, tone, &source, 1024, 40, ^(double played) {
+        bool mixing = SGSingEngineReadStats(engine).mixing;
+        if (mixing != was) switches++;
+        was = mixing;
+        everIn |= mixing;
+        if (!gaveUpAt && SGSingEngineGaveUp(engine)) gaveUpAt = played;
+    });
+    CHECK(everIn && switches <= 2, "a model falling behind: the vocals came in and went out %d times (at most once each)", switches);
+    CHECK(gaveUpAt > 0 && SGSingEngineLead(engine) > 1, "and after 8 s short of them the engine gave up (at %.1f s) and kept the lead (%.2f s)",
+          gaveUpAt, SGSingEngineLead(engine));
+    size_t skipped = (size_t)llround(SGSingEngineReadStats(engine).dropped * kSGSingRate);
+    double last = 0;
+    // Past the tone's end the source hands over silence.
+    for (size_t i = 38 * kSGSingRate; i < 40 * kSGSingRate - 1024; i++) last = fmax(last, fabsf(out.left[i] - (i + skipped < frames ? tone.left[i + skipped] : 0)));
+    CHECK(last == 0, "then the song plays as it is (%.2g)", last);
+    // Sing.x tries again at the next track by switching the engine off and on: a fresh budget, and the vocals back.
+    separator.slow = 0;
+    SGSingEngineSetOn(engine, false);
+    SGSingEngineSetOn(engine, true);
+    Source next = {tone, 0};
+    __block bool again = false;
+    play(engine, tone, &next, 1024, 12, ^(double played) { again |= SGSingEngineReadStats(engine).mixing; });
+    CHECK(again && !SGSingEngineGaveUp(engine), "switched off and on after giving up, it tries again and the vocals come back");
+    SGSingEngineDestroy(engine);
+
+    // Held for the heat for 10 s and let go: a start again, which the budget does not count.
+    SGSingEngine *held = SGSingEngineCreate();
+    SGPacedSeparator *steady = [[SGPacedSeparator alloc] initWithModel:nil];
+    steady.fastWindows = INT_MAX;
+    SGSingEngineSetSeparator(held, steady);
+    SGSingEngineSetOn(held, true);
+    Source third = {tone, 0};
+    __block bool backIn = false;
+    __block double spentAfter = -1;
+    __block unsigned long long windowsAt8 = 0, windowsAt15 = 0;
+    Audio heldOut = play(held, tone, &third, 1024, 30, ^(double played) {
+        SGSingEngineSetPaused(held, played >= 6 && played < 16);
+        if (played >= 17 && spentAfter < 0) spentAfter = SGSingEngineReadStats(held).budgetSpent;
+        if (played >= 20) backIn |= SGSingEngineReadStats(held).mixing;
+        if (played < 8) windowsAt8 = SGSingEngineReadStats(held).windows;
+        if (played < 15) windowsAt15 = SGSingEngineReadStats(held).windows;
+    });
+    CHECK(spentAfter == 0 && !SGSingEngineGaveUp(held) && backIn,
+          "held for 10 s and let go, the wait for the vocals is a start (%.1f s of the budget spent 1 s on), they come back, and the engine does not give up", spentAfter);
+    // Sing.x rests the same way at the vocals as sung: no window runs, and the song plays exactly as it is.
+    double heldDiff = 0;
+    skipped = (size_t)llround(SGSingEngineReadStats(held).dropped * kSGSingRate);
+    for (size_t i = 8 * kSGSingRate; i < 15 * kSGSingRate; i++) heldDiff = fmax(heldDiff, fabsf(heldOut.left[i] - tone.left[i + skipped]));
+    CHECK(windowsAt15 == windowsAt8 && heldDiff == 0, "held, the model runs no window (%llu then %llu) and the song plays exactly as it is (%.2g)",
+          windowsAt8, windowsAt15, heldDiff);
+    SGSingEngineDestroy(held);
+
+    SGSingEngine *poisoned = SGSingEngineCreate();
+    SGPacedSeparator *bad = [[SGPacedSeparator alloc] initWithModel:nil];
+    bad.poison = true;
+    bad.fastWindows = INT_MAX;
+    SGSingEngineSetSeparator(poisoned, bad);
+    SGSingEngineSetLevel(poisoned, 2);
+    SGSingEngineSetOn(poisoned, true);
+    Source second = {tone, 0};
+    Audio sung = play(poisoned, tone, &second, 1024, 8, ^(double played) {});
+    bool finite = true;
+    for (size_t i = 0; i < sung.frames; i++) finite &= isfinite(sung.left[i]) && isfinite(sung.right[i]);
+    CHECK(finite && SGSingEngineReadStats(poisoned).mixing, "a NaN from the model plays as silence, never as a NaN");
+    SGSingEngineDestroy(poisoned);
+}
+
 static double energy(const float *samples, size_t from, size_t to) {
     double sum = 0;
     for (size_t i = from; i < to; i++) sum += (double)samples[i] * samples[i];
@@ -413,6 +703,11 @@ static void checkSpatial(void) {
     });
     malloc_logger = NULL;
     CHECK(atomic_load(&sg_renderAllocations) == 0, "spatial voice: no allocation on the render thread (%u)", atomic_load(&sg_renderAllocations));
+    // The loudness the Sing page draws: all of the tone is vocals here, a sine of 0.5 at an RMS of 0.354.
+    float vocalsLevel[5], restLevel[5];
+    SGSingEngineReadLevels(engine, vocalsLevel, restLevel, 5);
+    CHECK(fabsf(vocalsLevel[0] - 0.3536f) < 0.01f && fabsf(vocalsLevel[4] - 0.3536f) < 0.01f && restLevel[0] < 0.001f,
+          "the loudness of what plays now: vocals %.3f (a 0.5 sine's 0.354), the rest %.3f", vocalsLevel[4], restLevel[4]);
     SGSingEngineStats stats = SGSingEngineReadStats(engine);
     CHECK(stats.ready > 0 && stats.dryFrames < 4 * kSGSingRate, "spatial voice: the vocals are in (%.2f s separated ahead, %.2f s played dry)",
           stats.ready, stats.dryFrames / (double)kSGSingRate);
@@ -482,13 +777,15 @@ int main(int argc, char **argv) {
     @autoreleasepool {
         if (argc == 2 && !strcmp(argv[1], "spatial")) {
             sg_outDir = NSTemporaryDirectory();
+            checkHold();
             checkSpatial();
             checkFront();
+            checkFallingBehind();
             printf("%s\n", sg_failures ? "FAILED" : "all passed");
             return sg_failures ? 1 : 0;
         }
         if (argc < 4) {
-            printf("usage: sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]\n       sing spatial\n");
+            printf("usage: sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]   (the faster copy's units; cpu for none)\n       sing spatial\n");
             return 2;
         }
         NSString *modelPath = @(argv[1]), *units = argc > 4 ? @(argv[4]) : @"all";
@@ -496,9 +793,15 @@ int main(int argc, char **argv) {
         [NSFileManager.defaultManager createDirectoryAtPath:sg_outDir withIntermediateDirectories:YES attributes:nil error:nil];
         checkSTFT();
 
-        MLModel *model = loadModel(modelPath, units);
+        SGSingSeparator *separator = checkLoader(modelPath, units);
+        if (!separator) return 1;
+        MLModel *shapes = [MLModel modelWithContentsOfURL:[NSURL fileURLWithPath:modelPath] configuration:[MLModelConfiguration new] error:nil];
+        MLFeatureDescription *input = shapes.modelDescription.inputDescriptionsByName[@"spectrum"];
+        MLFeatureDescription *output = shapes.modelDescription.outputDescriptionsByName[@"vocals_spectrum"];
+        CHECK([input.multiArrayConstraint.shape isEqualToArray:(@[@1, @2050, @201, @2])] && [output.multiArrayConstraint.shape isEqualToArray:(@[@1, @2050, @201, @2])],
+              "its spectrum and vocals_spectrum are [1, 2050, 201, 2]");
+        shapes = nil;
         describePlan(modelPath, units);
-        SGSingSeparator *separator = [[SGSingSeparator alloc] initWithModel:model];
 
         Audio voice = readAudio(@(argv[2]));
         size_t frames = (size_t)kSGSingRate * 30;
@@ -513,7 +816,7 @@ int main(int argc, char **argv) {
         }
         double slowest, average;
         Audio vocals = separateOffline(separator, mix, &slowest, &average);
-        printf("  info  a two second window takes %.0f ms on average, %.0f ms at most (the first one warms the model up)\n", average * 1000, slowest * 1000);
+        printf("  info  a two second window takes %.0f ms on average, %.0f ms at most (the copies were warmed with silence)\n", average * 1000, slowest * 1000);
         size_t to = frames - kSGSingWindowFrames / 2;
         double found = snr(padded, vocals, kSGSingRate, to), baseline = snr(padded, mix, kSGSingRate, to);
         CHECK(found > baseline + 10, "the vocals it finds score %.1f dB against the voice, the mix itself %.1f dB", found, baseline);
@@ -529,8 +832,12 @@ int main(int argc, char **argv) {
         writeWAV(@"accompaniment.wav", accompaniment);
 
         checkEngine(separator, mix, padded, vocals);
+        // Last, as it swaps the faster copy out.
+        checkCopies(separator, mix, unitsNamed(units) != MLComputeUnitsCPUOnly);
+        checkHold();
         checkSpatial();
         checkFront();
+        checkFallingBehind();
         printf("%s\n", sg_failures ? "FAILED" : "all passed");
         return sg_failures ? 1 : 0;
     }

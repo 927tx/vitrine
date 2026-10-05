@@ -27,9 +27,12 @@
 @property (nonatomic, readonly) BOOL isPaused;
 @property (nonatomic, readonly) BOOL isPlaying;
 @property (nonatomic, readonly) BOOL isLoading;
-// Seconds. position runs on from positionAsOfTimestamp by the time elapsed since the state was made.
+// Seconds. position runs on from positionAsOfTimestamp by the time elapsed since timestamp, when the player reported.
 @property (nonatomic, readonly) double position;
 @property (nonatomic, readonly) double positionAsOfTimestamp;
+@property (nonatomic, readonly) NSDate *timestamp;
+// What position runs on at: 1, or Speed and pitch's speed (Shared/Player/SpeedPitch.x hooks it).
+@property (nonatomic, readonly) double playbackSpeed;
 // The track's length, in the same unit as position.
 @property (nonatomic, readonly) double duration;
 // The tracks to come and the ones played, nearest first; SPTPlayerTrack each, read with a type check.

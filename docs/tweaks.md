@@ -224,12 +224,23 @@ Shared:
                   Tested on the Mac against harness/audio-effects/ and harness/autoeq/, the hook in the simulator
                   against its sim/, the page against harness/audio-effects-page/
     Sing/         Sing, a song's vocals turned down while it plays (Sing.h lists its files): the voice model (Mel-Band
-                  RoFormer, MIT, from Hugging Face) downloaded and checked file by file, a stop keeping what came in for the
-                  next download to carry on from, the STFT around it on Accelerate,
+                  RoFormer, MIT, from Hugging Face) downloaded and checked file by file over Wi-Fi unless cellular is allowed,
+                  a stop keeping what came in for the next download to carry on from; loaded only while Spotify is active
+                  (SGSingLoader.m), a CPU copy first and warmed, then a faster one beside it for the foreground, each load
+                  with a deadline and kept a minute after the mic goes off; the STFT around it on Accelerate,
                   and an engine that stands in Speed and pitch's chain between Spotify's mixer and its output
                   (SGPlayerSetStage), pulls the mixer a few seconds ahead of what plays, separates two-second windows
                   there on a worker thread and mixes the vocals down on the render thread. Spotify's clock has the lead
-                  taken off (SPTPlayerState's positionAsOfTimestamp), and a seek, a skip or a stop drops it. Spatial
+                  taken off (SPTPlayerState's positionAsOfTimestamp): the lead held when that line of the clock began
+                  (the same position run on at the same speed, however often a state is stamped again), less what was
+                  dropped since, as the player reports on a change and not as it plays (SGSingLeadOf, read by every
+                  correction; every 5 s a "sing: clock:" log line sets Spotify's clock against what the engine pulled
+                  and played, and every lyrics seek logs where it was sent and where it landed), and a seek, a skip or a stop drops it. Not separating (stopped, held, resting at As sung,
+                  standing aside), the engine plays the lead it holds on as it is, dry, the clock still corrected, so no
+                  part of the song is skipped; it lets it go at a pause, where Sing.x seeks Spotify back to what was
+                  heard, or with a seek, a skip or the output stopping, and builds one only when it separates. From the
+                  thermal state Serious up Sing is held and lets the model go,
+                  unless Ignore heat warnings is on, and runs again at Fair. Spatial
                   voice holds the separated vocals in front as the head turns: HeadGestures' motion gives the yaw off a
                   front that follows the head over 20 s, and the render thread pans the vocals' middle at equal power,
                   narrowed, with the far ear up to 0.65 ms late and low-passed; it stands down for iOS's own spatial
@@ -514,11 +525,14 @@ lyrics for every track, naming the source in the redesign, the lock screen, and 
 the redesign also which of the lyrics, their pronunciation and their translation is set largest, Romanised lyrics
 (applied at once), and the translation's language. Sing, under either look, on the main page and as Lyrics' first row, the row reading out On,
 Off or how far the voice model's download has come, kept up to date while the page shows: Sing's switch, which turns
-the mic on and off at once, its Status (a tap says more), the Vocals slider (gone, as sung, the vocals alone), Spatial voice
+the mic on and off at once, a card at its top (SGSingCard.m: the song, what Sing is doing, a tap saying more, the vocals
+and the rest traced live from the engine's loudness, still under Reduce Motion, play and pause, and a tall Vocals slider
+from gone through as sung to the vocals alone, with Sing along, Original and Vocals only under it), Spatial voice
 (where the iPhone reads headphone motion; a page of its own, reading out On or Off, with a live preview at its top that
 follows the head through AirPods, or sways gently without them and holds still under Reduce Motion, a line under it
-saying which, then the switch; its row is on the main page too, under Sing's), the voice model's download, Runs on (GPU, GPU
-and Neural Engine, Neural Engine) and Ignore heat warnings, all applying straight away. Lock screen, on the main
+saying which, then the switch; its row is on the main page too, under Sing's), the voice model's download (Paused and
+Checking among its states) and its removal, Ignore heat warnings, and under Advanced Runs on (Automatic, CPU only, GPU,
+Neural Engine, GPU and Neural Engine: the faster copy's), all applying straight away. Lock screen, on the main
 page under either look, opens the lock screen widget's page, titled Lock screen (Moving artwork, Lyrics or Every song, and the lyrics' style,
 Still or Animated, and Spotify's like and dislike buttons' flag; its podcast, audiobook and artwork flags stay in
 All flags). Player: Gestures and Blocked artists (with the count on the row), which work with either look;

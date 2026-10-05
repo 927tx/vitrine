@@ -199,6 +199,7 @@ float SGSingLevel(void) { return 0; }
 void SGSetSingLevel(float level) {}
 NSString *SGSingLevelText(double level) { return @""; }
 double SGSingModelProgress(void) { return 0; }
+BOOL SGSingModelWaitingForNetwork(void) { return NO; }
 NSString *SGSingModelError(void) { return nil; }
 NSString *SGSingModelSizeText(void) { return @""; }
 void SGSingDownloadModel(void) {}

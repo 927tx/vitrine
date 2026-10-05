@@ -11,6 +11,7 @@
 #import "Shared/LockScreenLyrics/LockScreenLyrics.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/LyricsSources/LyricsSources.h"
+#import "Shared/Sing/Sing.h"
 #import "Headers/SPTPlayer.h"
 #import <mach-o/dyld.h>
 #import <objc/runtime.h>
@@ -400,8 +401,22 @@ NSInteger SGKaraokePositionMs(void) {
 
 void SGKaraokeSeek(NSInteger ms) {
     id player = sg_player;
-    if (![player respondsToSelector:@selector(seekTo:)]) return;
+    if (![player respondsToSelector:@selector(seekTo:)]) {
+        SGLog(@"seek: to %ld ms, but no player to seek", (long)ms);
+        return;
+    }
+    // Where it was and where it is half a second on, with Karaoke's lead and the correction it takes off, so the log
+    // says whether a seek lands where it was sent.
+    SPTPlayerState *state = playerState();
+    NSInteger before = SGKaraokePositionMs();
+    NSString *lead = [NSString stringWithFormat:@"Karaoke holds %.2f s, takes %.2f s off", SGSingHeldLead(), state ? SGSingLeadOf(state) : 0];
     [(id<SPTPlayer>)player seekTo:ms / 1000.0];
+    SGLog(@"seek: to %ld ms (sent %.3f s to %@) from %ld ms; %@", (long)ms, ms / 1000.0, [player class], (long)before, lead);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        SPTPlayerState *now = playerState();
+        SGLog(@"seek: half a second after the seek to %ld ms the position reads %ld ms (%ld ms off); Karaoke holds %.2f s, takes %.2f s off", (long)ms,
+              (long)SGKaraokePositionMs(), (long)(SGKaraokePositionMs() - ms - 500), SGSingHeldLead(), now ? SGSingLeadOf(now) : 0);
+    });
 }
 
 // A Spotify track by its base62 id, a local file by its URI (Shared/LocalFiles/LocalFiles.h).

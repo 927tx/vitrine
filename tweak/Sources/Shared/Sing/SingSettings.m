@@ -1,10 +1,14 @@
-// The Sing page (Sing on Mod Settings' main page, and Lyrics > Karaoke), under either look: Sing's switch, which
-// turns the mic on and off at once, what Sing is doing, the vocals' level, spatial voice's page (its preview,
-// SGSpatialPreview.m, and its switch), and the voice model.
+// The Sing page (Sing on Mod Settings' main page, and Lyrics > Karaoke), under either look: the card at its top
+// (SGSingCard.m: the song, what Sing is doing, the vocals and the rest traced live, play and pause, the vocals'
+// level and its three stops), Sing's switch, which turns the mic on and off at once, Ignore heat warnings, the voice
+// model and its removal, spatial voice's page (its preview, SGSpatialPreview.m, and its switch), and Runs on under
+// Advanced.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
 #import "Sing.h"
+
+UIView *SGSingCardView(void);   // SGSingCard.m
 
 static void tell(NSString *title, NSString *message) {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:message preferredStyle:UIAlertControllerStyleAlert];
@@ -28,13 +32,22 @@ NSString *SGSingLevelText(double level) {
     return [NSString stringWithFormat:@"Backing %.0f%%", (2 - level) * 100];
 }
 
+static NSString *bytes(long long count) {
+    return [NSByteCountFormatter stringFromByteCount:count countStyle:NSByteCountFormatterCountStyleFile];
+}
+
 static NSString *modelValue(void) {
     if (!SGSingOSSupported() || !SGSingDeviceSupported()) return @"Unavailable";
     switch (SGSingModelCurrentState()) {
         case SGSingModelDownloading:
-            return SGSingModelWaitingForNetwork() ? @"Waiting for the network" : [NSString stringWithFormat:@"%.0f%%", SGSingModelProgress() * 100];
-        case SGSingModelReady: return @"On the iPhone";
-        case SGSingModelMissing: return SGSingModelError() ? @"Failed, try again" : [NSString stringWithFormat:@"Download, %@", SGSingModelSizeText()];
+            if (SGSingModelChecking()) return @"Checking…";
+            if (SGSingModelWaitingForNetwork()) return SGSingModelOverCellular() ? @"Waiting for the network" : @"Waiting for Wi-Fi";
+            return [NSString stringWithFormat:@"%.0f%%", SGSingModelProgress() * 100];
+        case SGSingModelReady: return [NSString stringWithFormat:@"Downloaded · %@", SGSingModelSizeText()];
+        case SGSingModelMissing:
+            if (SGSingModelError()) return @"Failed, try again";
+            if (SGSingModelPausedBytes()) return [NSString stringWithFormat:@"Paused · %@ of %@", bytes(SGSingModelPausedBytes()), SGSingModelSizeText()];
+            return [NSString stringWithFormat:@"Download, %@", SGSingModelSizeText()];
     }
     return @"";
 }
@@ -46,12 +59,17 @@ static void modelTapped(UITableViewController *page) {
     }
     switch (SGSingModelCurrentState()) {
         case SGSingModelMissing: {
-            NSString *message = [NSString stringWithFormat:@"%@%@ from Hugging Face, best over Wi-Fi. It stays on this iPhone, and no audio leaves it.",
+            NSString *message = [NSString stringWithFormat:@"%@%@ from Hugging Face. It waits for Wi-Fi unless you let it use cellular. It stays on this iPhone, and no audio leaves it.",
                                  SGSingModelError() ? [NSString stringWithFormat:@"The last try failed: %@\n\n", SGSingModelError()] : @"", SGSingModelSizeText()];
-            ask(@"Download the voice model?", message, @"Download", NO, ^{ SGSingDownloadModel(); });
+            ask(SGSingModelPausedBytes() ? @"Carry on with the download?" : @"Download the voice model?", message, @"Download", NO, ^{ SGSingDownloadModel(); });
             break;
         }
         case SGSingModelDownloading:
+            if (SGSingModelWaitingForNetwork() && !SGSingModelOverCellular()) {
+                ask(@"Download over cellular?", [NSString stringWithFormat:@"The download waits for Wi-Fi. Over cellular or a Low Data Mode network it uses up to %@ of your plan.",
+                                                 SGSingModelSizeText()], @"Use cellular", NO, ^{ SGSingDownloadModelOverCellular(); });
+                break;
+            }
             ask(@"Stop the download?", @"What has come in is kept, so the next download carries on from it.", @"Stop", YES, ^{ SGSingCancelModelDownload(); });
             break;
         case SGSingModelReady:
@@ -110,31 +128,70 @@ UIViewController *SGSpatialVoiceSettingsPage(void) {
     return made;
 }
 
+// The Sing page: the card (SGSingCard.m) as the table's header, sized to Dynamic Type, then its rows.
+@interface SGSingPage : SGModPage
+@end
+
+@implementation SGSingPage {
+    UIView *_card;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    _card = SGSingCardView();
+    self.tableView.tableHeaderView = _card;
+}
+
+// Handed back only when its size changes (SGFitNote's way: the table lays out again on every handing back).
+- (void)viewWillLayoutSubviews {
+    [super viewWillLayoutSubviews];
+    UITableView *table = self.tableView;
+    CGSize size = [_card sizeThatFits:CGSizeMake(table.bounds.size.width, 0)];
+    if (CGSizeEqualToSize(_card.bounds.size, size)) return;
+    _card.frame = (CGRect){_card.frame.origin, size};
+    table.tableHeaderView = _card;
+}
+
+@end
+
 UIViewController *SGSingSettingsPage(void) {
-    SGModRow *sing = SGOptionRow(@"Sing", @"Turns the vocals down as the song plays, like the mic on the lyrics", SGKeySing);
+    SGModRow *sing = SGOptionRow(@"Sing", nil, SGKeySing);
     sing.changed = ^(BOOL on) { SGSetSingOn(on); };
-    SGModRow *status = SGStatActionRow(@"Status", nil, ^NSString *{ return SGSingStatusText(); }, ^{
-        NSString *detail = SGSingStatusDetail();
-        if (detail) tell(@"Sing", detail);
+    SGModRow *heat = SGOptionRow(@"Ignore heat warnings", @"Keeps Sing going on a hot iPhone, which then gets hotter", SGKeySingIgnoreHeat);
+    heat.changed = ^(BOOL on) { SGSetSingIgnoresHeat(on); };
+    __block __weak SGModPage *page;
+    SGModRow *model = SGStatActionRow(@"Voice model", nil, ^NSString *{ return modelValue(); }, ^{ modelTapped(page); });
+    SGModRow *remove = SGActionRow(@"Remove voice model", nil, ^{
+        BOOL partial = SGSingModelCurrentState() != SGSingModelReady;
+        ask(partial ? @"Remove the paused download?" : @"Remove the voice model?",
+            partial ? [NSString stringWithFormat:@"It frees %@. A new download starts from the beginning.", bytes(SGSingModelPausedBytes())]
+                    : [NSString stringWithFormat:@"It frees %@. Sing needs it again to turn the vocals down.", SGSingModelSizeText()],
+            @"Remove", YES, ^{
+                SGSetSingOn(NO);
+                SGSingDeleteModel();
+                [page.tableView reloadData];
+            });
     });
-    SGModRow *level = SGSliderRow(@"Vocals", @"From gone, through the song as sung, to the vocals alone", 0, 2, 0.05,
-        ^double { return SGSingLevel(); }, ^(double value) { SGSetSingLevel((float)value); }, ^NSString *(double value) { return SGSingLevelText(value); });
+    remove.color = SGRed();
+    remove.visible = ^BOOL { return SGSingModelCurrentState() == SGSingModelReady || SGSingModelPausedBytes() > 0; };
     SGModRow *spatial = SGPageRow(@"Spatial voice", ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
     spatial.subtitle = @"With AirPods, the voice stays in front of you as you turn your head";
     spatial.value = ^NSString *{ return SGSingSpatial() ? @"On" : @"Off"; };
     // Facts about the iPhone, which do not change while the page shows.
     spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
-    __block __weak SGModPage *page;
-    SGModRow *model = SGStatActionRow(@"Voice model", @"Mel-Band RoFormer, run on the iPhone", ^NSString *{ return modelValue(); }, ^{ modelTapped(page); });
-    SGModRow *units = SGChoiceRow(@"Runs on", @"Read as the model loads", SGKeySingComputeUnits, SGSingComputeUnitNames(), 2);
+    SGModRow *units = SGChoiceRow(@"Runs on", nil, SGKeySingComputeUnits, SGSingComputeUnitNames(), 0);
+    units.choiceNotes = @[@"The GPU, unless it did not load on this iOS before", @"Slower, and the least memory", @"Tried every time, even after it did not load",
+                          @"Experimental: slower than the CPU on a Mac", @"Experimental"];
+    units.choiceFooter = @"Sing loads the voice model on the CPU first and starts with it. A second copy then loads for the windows "
+                         @"played while Spotify is open; in the background they run on the CPU.";
     units.chosen = ^(NSInteger index) { SGSingComputeUnitsChanged(); };
-    SGModRow *heat = SGOptionRow(@"Ignore heat warnings", @"Keeps Sing going on a hot iPhone, which then gets hotter", SGKeySingIgnoreHeat);
-    heat.changed = ^(BOOL on) { SGSetSingIgnoresHeat(on); };
-    SGModPage *made = [[SGModPage alloc] initWithTitle:@"Sing" intro:nil sections:@[
-        SGSection(nil, @[SGWithSymbol(sing, @"music.mic"), status, level, spatial]),
-        SGNotedSection(@"Voice model", @[model, units, heat],
-                       @"Sing listens a few seconds ahead of what plays and separates the vocals there, so a song takes a few seconds to "
-                       @"turn its vocals down after it starts or after a seek. Everything runs on the iPhone; no audio leaves it."),
+    SGSingPage *made = [[SGSingPage alloc] initWithTitle:@"Sing" intro:nil sections:@[
+        SGSection(nil, @[sing, heat, model, remove]),
+        SGSection(nil, @[spatial]),
+        SGNotedSection(@"Advanced", @[units],
+                       @"Sing turns a song's vocals down to sing over, or the rest down to hear the vocals alone, with a voice model that "
+                       @"runs only on this iPhone: no audio leaves it. It listens a few seconds ahead of what plays, so the vocals change a "
+                       @"few seconds after a song starts or after a seek."),
     ] footer:nil];
     page = made;
     return made;

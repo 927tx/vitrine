@@ -1384,6 +1384,7 @@ typedef struct {
     if (_plain) return;   // a line with no time has nowhere to seek to
     for (SGRKaraokeLineView *view in _shown.allValues) {
         if (!CGRectContainsPoint(CGRectInset(view.frame, -_margin, -_lineGap / 2), point)) continue;
+        SGLog(@"lyrics: tapped the line at %ld-%ld ms, the clock at %.0f ms", (long)view.line.start, (long)view.line.end, _clock);
         SGKaraokeSeek(view.line.start);
         SGPlayFeedback(SGFeedbackSkip);
         [self glideTo:view.line.start];

@@ -3,6 +3,7 @@
 //
 //     ./build.sh && xcrun simctl install <udid> build/SingButtonHarness.app
 //     xcrun simctl launch <udid> com.vojta.singbuttonharness -state 7 -panel 1 -level 0.4
+//     xcrun simctl launch <udid> com.vojta.singbuttonharness -state 2 -progress 0.4 -waiting 1
 //     xcrun simctl io <udid> screenshot shot.png
 #import <UIKit/UIKit.h>
 #import "Redesigned/Lyrics/SGRSingButton.h"

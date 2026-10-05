@@ -9,10 +9,25 @@ enum {
     kLongestLead = kSGSingRate * 6,
     kShortestLead = kSGSingRate * 5 / 2,
 };
-// The lead asked for over a window: this many times the model's average time, and this much more.
-static const double kLeadPerModelTime = 1.5, kLeadSpare = 0.25;
+// The lead asked for over a window: this many times the model's average time, and this much more. Just before each
+// window lands, the vocals separated ahead of what plays are down to half the model's time and the spare, which must
+// stay above the reserve with room for a window that comes in late.
+static const double kLeadPerModelTime = 1.5, kLeadSpare = 0.75;
 // The vocals come in and go out over this long, so the switch and the lead filling do not click.
 static const float kFadeSeconds = 0.1f;
+// Changes in what Spotify's clock runs ahead of what plays, kept for SGSingEngineLeadAt: a fill or two's worth, as
+// it is read soon after each report; and the moments last asked about, kept for as long as their report stands.
+enum { kHistory = 1024, kAsked = 8 };
+// Hysteresis, so a model about as fast as the song fades the vocals out once rather than at every window: the mix
+// goes back to the song as it is when the vocals separated ahead of what plays fall under the reserve (more than
+// the fade), and comes back to them only with a full hop separated ahead, which the lead (a window, 1.5 times the
+// model's time and the spare) reaches just as each window lands. Time spent so after the vocals were first in comes
+// out of a budget, renewed by that long with the vocals in throughout; spent, the engine gives up (SGSingEngineGaveUp).
+static const uint64_t kReserve = kSGSingRate * 12 / 100;
+static const uint64_t kReturn = kSGSingEngineHop;
+static const uint64_t kBudget = kSGSingRate * 8;
+// The loudness the Sing page draws: per tenth of a second of the song, kept for the last kLevelSlots of them.
+enum { kLevelBlock = kSGSingRate / 10, kLevelSlots = 128 };
 // How often the worker looks for a new window.
 static const useconds_t kPoll = 10000;
 // Spatial voice: at 90 degrees the pan goes this far of the way to one ear, the far ear hears the voice this
@@ -32,23 +47,42 @@ struct SGSingEngine {
     _Atomic uint64_t base;        // where the worker starts over, at the latest flush
     atomic_uint generation;       // counts the flushes
     atomic_bool flushAsked, on, paused, hasSeparator;
+    atomic_bool mixing, gaveUp;   // the render's, for the stats and Sing.x
+    atomic_bool freshBudget;      // switched on again: the render starts the budget over
+    _Atomic uint64_t spent;       // the render's `recovering`, for the stats
+    _Atomic uint64_t dropped;     // frames of held sound never played: flushes
+    // What Spotify's clock had counted past what plays, at each render that changed it (written less played,
+    // plus dropped: a flush leaves it as it was), with when; `historyCount` counts the entries made.
+    struct { _Atomic double at; _Atomic uint64_t ahead; } history[kHistory];
+    _Atomic uint64_t historyCount;
+    struct { double when; uint64_t ahead; } asked[kAsked];
+    unsigned askedNext;
     atomic_uint levelBits, targetLead, voiceAngleBits;
 
     // The render thread's own.
     bool running;                 // the rings are in use: Sing is on, or the lead is not given back yet
     float amount, vocalsGain, otherGain;
+    bool established;             // the vocals have been in since the rings last started over or the work resumed
+    bool wasWorking;              // the last render's: working resumed (after a heat hold, a new model) starts over
+    uint64_t recovering, steady;  // frames short of vocals since they were in, and frames in with them since
     float voiceAngle;             // where the voice is now, gliding to voiceAngleBits
     float shadowLeft, shadowRight;   // the low-passes' last outputs, an ear each
+    uint64_t ahead;               // the last entry made in `history`
 
     // The worker's.
     pthread_t worker;
     atomic_bool alive;
-    os_unfair_lock lock;          // the separator and the error
+    os_unfair_lock lock;          // the separator, the error and `asked`
     void *separator;              // retained
     NSString *error;
     float *window[2], *vocals[2];
 
     _Atomic uint64_t windows, failures, dryFrames, averageMicroseconds;
+
+    // The worker's loudness of the vocals and the rest per block, the block's number written last; and the next
+    // block it measures.
+    struct { _Atomic uint64_t block; atomic_uint vocals, rest; } levels[kLevelSlots];
+    uint64_t nextLevel;
 };
 
 static float loadFloat(atomic_uint *slot) {
@@ -69,10 +103,13 @@ static void storeFloat(atomic_uint *slot, float value) {
 // Starts the rings over where the mixer is now.
 static void startOver(SGSingEngine *engine) {
     uint64_t written = atomic_load_explicit(&engine->written, memory_order_relaxed);
+    atomic_fetch_add(&engine->dropped, written - atomic_load_explicit(&engine->played, memory_order_relaxed));
     atomic_store(&engine->played, written);
     atomic_store(&engine->base, written);
     atomic_fetch_add(&engine->generation, 1);
     engine->amount = 0;
+    engine->established = false;
+    atomic_store(&engine->mixing, false);
 }
 
 // `count` frames from the mixer into the rings at `at`, in up to two runs where the ring wraps.
@@ -137,15 +174,19 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
         atomic_store(&engine->flushAsked, false);
     }
     if (atomic_exchange_explicit(&engine->flushAsked, false, memory_order_relaxed)) startOver(engine);
+    if (atomic_exchange_explicit(&engine->freshBudget, false, memory_order_relaxed)) engine->recovering = engine->steady = 0;
 
     uint64_t written = atomic_load_explicit(&engine->written, memory_order_relaxed);
     uint64_t played = atomic_load_explicit(&engine->played, memory_order_relaxed);
     uint64_t held = written - played;
     bool working = on && !atomic_load_explicit(&engine->paused, memory_order_relaxed)
-                   && atomic_load_explicit(&engine->hasSeparator, memory_order_relaxed);
-    int64_t want = (working ? (int64_t)atomic_load_explicit(&engine->targetLead, memory_order_relaxed) : 0) - (int64_t)held;
-    // Up to twice what plays while the lead fills, half while it is given back.
-    int64_t count = (int64_t)frames + MAX(-(int64_t)frames / 2, MIN(want, (int64_t)frames));
+                   && atomic_load_explicit(&engine->hasSeparator, memory_order_relaxed)
+                   && !atomic_load_explicit(&engine->gaveUp, memory_order_relaxed);
+    // Separating: up to twice what plays while the lead fills, half while a shorter target is reached. Not separating
+    // (off, held, given up, no model), what plays: the lead held plays on as it is, nothing skipped, until a flush
+    // (Spotify seeks, skips, stops, or Sing.x seeks it back to what is heard at a pause), and none is built.
+    int64_t want = (int64_t)atomic_load_explicit(&engine->targetLead, memory_order_relaxed) - (int64_t)held;
+    int64_t count = (int64_t)frames + (working ? MAX(-(int64_t)frames / 2, MIN(want, (int64_t)frames)) : 0);
     count = MAX(count, (int64_t)frames - (int64_t)held);
     count = MIN(count, (int64_t)(kRing - kSGSingWindowFrames) - (int64_t)held);
     if (count > 0) {
@@ -160,10 +201,33 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
     }
 
     uint64_t ready = atomic_load_explicit(&engine->ready, memory_order_acquire);
+    int64_t ahead = (int64_t)ready - (int64_t)played;
+    // Work that resumes (cooled down, a model loaded again) has no vocals ahead yet: that is a start, not falling behind.
+    if (working && !engine->wasWorking) {
+        engine->established = false;
+        engine->recovering = engine->steady = 0;
+    }
+    engine->wasWorking = working;
+    bool mixing = atomic_load_explicit(&engine->mixing, memory_order_relaxed);
+    if (mixing && (!working || ahead < (int64_t)(kReserve + frames))) {
+        mixing = false;
+        engine->steady = 0;
+    } else if (!mixing && working && ahead >= (int64_t)kReturn) {
+        mixing = engine->established = true;
+    }
+    if (mixing) {
+        engine->steady += frames;
+        if (engine->steady >= kBudget) engine->recovering = 0;
+    } else if (working && engine->established) {
+        engine->recovering += frames;
+        if (engine->recovering >= kBudget) atomic_store_explicit(&engine->gaveUp, true, memory_order_relaxed);
+    }
+    atomic_store_explicit(&engine->mixing, mixing, memory_order_relaxed);
+    atomic_store_explicit(&engine->spent, engine->recovering, memory_order_relaxed);
     float vocalsTo, otherTo;
     gainsFor(loadFloat(&engine->levelBits), &vocalsTo, &otherTo);
     float vocalsStep = (vocalsTo - engine->vocalsGain) / frames, otherStep = (otherTo - engine->otherGain) / frames;
-    float fade = 1.0f / (kFadeSeconds * kSGSingRate), amountTo = on ? 1 : 0;
+    float fade = 1.0f / (kFadeSeconds * kSGSingRate), amountTo = on && mixing ? 1 : 0;
 
     // The voice's angle glides the short way round towards the one set, and lands on it; within the buffer
     // each ear's gain, delay and low-pass move in a straight line from where the angle was to where it is.
@@ -198,13 +262,13 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
             } else {
                 engine->shadowLeft = engine->shadowRight = (v + w) * 0.5f;
             }
-            left[i] = x + a * (engine->vocalsGain * placedLeft - v + otherGain * (x - v));
-            right[i] = y + a * (engine->vocalsGain * placedRight - w + otherGain * (y - w));
+            left[i] = fmaxf(-1, fminf(x + a * (engine->vocalsGain * placedLeft - v + otherGain * (x - v)), 1));
+            right[i] = fmaxf(-1, fminf(y + a * (engine->vocalsGain * placedRight - w + otherGain * (y - w)), 1));
         } else {
             engine->amount = 0;
             left[i] = x;
             right[i] = y;
-            dry += on;
+            dry += working;
         }
     }
     engine->vocalsGain = vocalsTo;
@@ -212,6 +276,14 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
     played += frames;
     atomic_store_explicit(&engine->played, played, memory_order_release);
     if (dry) atomic_fetch_add_explicit(&engine->dryFrames, dry, memory_order_relaxed);
+    uint64_t counted = written - played + atomic_load_explicit(&engine->dropped, memory_order_relaxed);
+    if (counted != engine->ahead) {
+        engine->ahead = counted;
+        uint64_t n = atomic_load_explicit(&engine->historyCount, memory_order_relaxed);
+        atomic_store_explicit(&engine->history[n % kHistory].at, CFAbsoluteTimeGetCurrent(), memory_order_relaxed);
+        atomic_store_explicit(&engine->history[n % kHistory].ahead, counted, memory_order_relaxed);
+        atomic_store_explicit(&engine->historyCount, n + 1, memory_order_release);
+    }
     // The lead given back and the vocals faded out: a straight pull from the next render on.
     if (!on && played == written) engine->running = false;
     return noErr;
@@ -238,6 +310,26 @@ static void updateTarget(SGSingEngine *engine, double modelSeconds) {
     atomic_store(&engine->targetLead, (unsigned)fmax(kShortestLead, fmin(lead, kLongestLead)));
 }
 
+// The loudness (RMS of both channels) of the vocals and of the rest, per block not measured yet from `start`, where
+// the window just separated begins, to `ready`; read from the worker's own copy of the window and its vocals, as the
+// render may have pulled new sound over the rings there while the model ran.
+static void measureLevels(SGSingEngine *engine, uint64_t start, uint64_t ready) {
+    engine->nextLevel = MAX(engine->nextLevel, (start + kLevelBlock - 1) / kLevelBlock);
+    for (; (engine->nextLevel + 1) * kLevelBlock <= ready; engine->nextLevel++) {
+        double vocals = 0, rest = 0;
+        for (uint64_t p = engine->nextLevel * kLevelBlock; p < (engine->nextLevel + 1) * kLevelBlock; p++) {
+            uint64_t i = p - start;
+            float v = engine->vocals[0][i], w = engine->vocals[1][i], x = engine->window[0][i] - v, y = engine->window[1][i] - w;
+            vocals += v * v + w * w;
+            rest += x * x + y * y;
+        }
+        __typeof__(engine->levels[0]) *slot = &engine->levels[engine->nextLevel % kLevelSlots];
+        storeFloat(&slot->vocals, (float)sqrt(vocals / (2 * kLevelBlock)));
+        storeFloat(&slot->rest, (float)sqrt(rest / (2 * kLevelBlock)));
+        atomic_store_explicit(&slot->block, engine->nextLevel + 1, memory_order_release);   // + 1: 0 is never written
+    }
+}
+
 static void *work(void *argument) {
     SGSingEngine *engine = argument;
     pthread_setname_np("spotifyglass.sing");
@@ -248,6 +340,7 @@ static void *work(void *argument) {
         if (now != generation) {
             generation = now;
             start = previousEnd = atomic_load(&engine->base);
+            engine->nextLevel = (start + kLevelBlock - 1) / kLevelBlock;
             atomic_store_explicit(&engine->ready, start, memory_order_release);
         }
         SGSingSeparator *separator = currentSeparator(engine);
@@ -281,6 +374,12 @@ static void *work(void *argument) {
             continue;
         }
         setError(engine, nil);
+        // A value the model got wrong is silence, not a click or a channel gone quiet.
+        for (int c = 0; c < 2; c++) {
+            for (int i = 0; i < kSGSingWindowFrames; i++) {
+                if (!isfinite(engine->vocals[c][i])) engine->vocals[c][i] = 0;
+            }
+        }
         uint64_t windows = atomic_fetch_add(&engine->windows, 1);
         uint64_t average = atomic_load(&engine->averageMicroseconds);
         average = windows ? (uint64_t)(average * 0.8 + took * 1e6 * 0.2) : (uint64_t)(took * 1e6);
@@ -295,6 +394,7 @@ static void *work(void *argument) {
             engine->vocalsRight[index] = engine->vocalsRight[index] * (1 - a) + engine->vocals[1][i] * a;
         }
         if (atomic_load(&engine->generation) == generation) atomic_store_explicit(&engine->ready, start + kSGSingEngineHop, memory_order_release);
+        measureLevels(engine, start, start + kSGSingEngineHop);
         previousEnd = start + kSGSingWindowFrames;
         start += kSGSingEngineHop;
     }
@@ -358,11 +458,24 @@ void SGSingEngineSetSeparator(SGSingEngine *engine, SGSingSeparator *separator) 
 }
 
 void SGSingEngineSetOn(SGSingEngine *engine, bool on) {
+    // Switched on again, it tries again with a full budget.
+    if (on && !atomic_exchange(&engine->on, true)) {
+        atomic_store(&engine->freshBudget, true);
+        atomic_store(&engine->gaveUp, false);
+    }
     atomic_store(&engine->on, on);
+}
+
+bool SGSingEngineGaveUp(SGSingEngine *engine) {
+    return atomic_load(&engine->gaveUp);
 }
 
 bool SGSingEngineOn(SGSingEngine *engine) {
     return atomic_load(&engine->on);
+}
+
+bool SGSingEngineSeparating(SGSingEngine *engine) {
+    return engine && atomic_load(&engine->on) && !atomic_load(&engine->paused) && atomic_load(&engine->hasSeparator) && !atomic_load(&engine->gaveUp);
 }
 
 void SGSingEngineSetLevel(SGSingEngine *engine, float level) {
@@ -381,11 +494,48 @@ void SGSingEngineFlush(SGSingEngine *engine) {
     atomic_store(&engine->flushAsked, true);
 }
 
+// The frames a flush asked for and not yet done will drop: the render may not run before it is read (Spotify paused).
+static uint64_t pendingDrop(SGSingEngine *engine) {
+    if (!atomic_load_explicit(&engine->flushAsked, memory_order_acquire)) return 0;
+    uint64_t played = atomic_load_explicit(&engine->played, memory_order_acquire);
+    uint64_t written = atomic_load_explicit(&engine->written, memory_order_acquire);
+    return written > played ? written - played : 0;
+}
+
 double SGSingEngineLead(SGSingEngine *engine) {
-    if (!engine) return 0;
-    uint64_t played = atomic_load_explicit(&engine->played, memory_order_relaxed);
-    uint64_t written = atomic_load_explicit(&engine->written, memory_order_relaxed);
+    if (!engine || atomic_load_explicit(&engine->flushAsked, memory_order_acquire)) return 0;
+    uint64_t played = atomic_load_explicit(&engine->played, memory_order_acquire);
+    uint64_t written = atomic_load_explicit(&engine->written, memory_order_acquire);
     return written > played ? (double)(written - played) / kSGSingRate : 0;
+}
+
+double SGSingEngineLeadAt(SGSingEngine *engine, CFAbsoluteTime when) {
+    if (!engine) return 0;
+    os_unfair_lock_lock(&engine->lock);
+    uint64_t ahead = 0;
+    bool known = false;
+    for (unsigned i = 0; i < kAsked && !known; i++) {
+        if (engine->asked[i].when == when) ahead = engine->asked[i].ahead, known = true;
+    }
+    if (!known) {
+        // What the clock had counted past what played at `when`: the last entry made by then, none before the first;
+        // kept for the next time the same report is read.
+        // ponytail: a `when` first asked about more than kHistory changes on reads the oldest kept; Sing.x reads the
+        // player's state twice a second while on. The render would have to make kHistory entries while this reads
+        // for one to tear.
+        uint64_t n = atomic_load_explicit(&engine->historyCount, memory_order_acquire);
+        for (uint64_t k = n; k > 0 && n - k < kHistory; k--) {
+            __typeof__(engine->history[0]) *entry = &engine->history[(k - 1) % kHistory];
+            ahead = atomic_load_explicit(&entry->ahead, memory_order_relaxed);
+            if (atomic_load_explicit(&entry->at, memory_order_relaxed) <= when) break;
+            if (k == 1) ahead = 0;
+        }
+        engine->asked[engine->askedNext++ % kAsked] = (__typeof__(engine->asked[0])){when, ahead};
+    }
+    os_unfair_lock_unlock(&engine->lock);
+    // Less what was dropped since, which what plays skipped, a flush asked for with it.
+    double dropped = (double)atomic_load_explicit(&engine->dropped, memory_order_relaxed) + (double)pendingDrop(engine);
+    return ((double)ahead - dropped) / kSGSingRate;
 }
 
 SGSingEngineStats SGSingEngineReadStats(SGSingEngine *engine) {
@@ -399,6 +549,11 @@ SGSingEngineStats SGSingEngineReadStats(SGSingEngine *engine) {
         .windows = atomic_load(&engine->windows),
         .failures = atomic_load(&engine->failures),
         .dryFrames = atomic_load(&engine->dryFrames),
+        .dropped = atomic_load(&engine->dropped) / (double)kSGSingRate,
+        .written = atomic_load(&engine->written),
+        .played = played,
+        .mixing = atomic_load(&engine->mixing),
+        .budgetSpent = atomic_load(&engine->spent) / (double)kSGSingRate,
     };
 }
 
@@ -407,4 +562,15 @@ NSString *SGSingEngineError(SGSingEngine *engine) {
     NSString *error = engine->error;
     os_unfair_lock_unlock(&engine->lock);
     return error;
+}
+
+void SGSingEngineReadLevels(SGSingEngine *engine, float *vocals, float *rest, int count) {
+    uint64_t now = atomic_load_explicit(&engine->played, memory_order_relaxed) / kLevelBlock;
+    for (int k = 0; k < count; k++) {
+        uint64_t block = now + k + 1 - (uint64_t)count;
+        __typeof__(engine->levels[0]) *slot = &engine->levels[block % kLevelSlots];
+        bool known = now + 1 >= (uint64_t)count - k && atomic_load_explicit(&slot->block, memory_order_acquire) == block + 1;
+        vocals[k] = known ? loadFloat(&slot->vocals) : 0;
+        rest[k] = known ? loadFloat(&slot->rest) : 0;
+    }
 }

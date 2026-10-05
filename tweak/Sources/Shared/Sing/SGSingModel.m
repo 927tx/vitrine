@@ -12,6 +12,10 @@
 
 static NSString *const kRepo = @"https://huggingface.co/My-Name-Is-Jeff/vitrine-sing/resolve/main/";
 static const int kRetries = 3;
+// Bytes a stopped download has kept, for the row that offers to carry on with it or remove it.
+static NSString *const kPausedKey = @"spotifyglass.sing.downloadPaused";
+// Room the download leaves on the disk besides itself.
+static const long long kSpareSpace = 64ll * 1000 * 1000;
 
 typedef struct {
     NSString *__unsafe_unretained path;
@@ -108,7 +112,9 @@ static void announce(void) {
 static SGSingDownloader *sg_downloader;   // while a download runs
 static NSString *sg_lastError;
 static double sg_progress;
-static BOOL sg_waitingForNetwork;   // offline: the session holds the request until the iPhone is online
+static BOOL sg_waitingForNetwork;   // offline, or on cellular unless allowed: the session holds the request
+static BOOL sg_cellular;            // the download may use cellular and Low Data Mode networks
+static BOOL sg_checking;            // the weights' checksum is being read
 
 @implementation SGSingDownloader {
     NSURLSession *_session;
@@ -121,8 +127,11 @@ static BOOL sg_waitingForNetwork;   // offline: the session holds the request un
 - (void)start {
     NSURLSessionConfiguration *configuration = NSURLSessionConfiguration.defaultSessionConfiguration;
     configuration.timeoutIntervalForRequest = 60;
-    // Offline, a request (a retry too) waits for the network rather than failing at once.
+    // Offline, a request (a retry too) waits for the network rather than failing at once; and so it does on cellular
+    // or a Low Data Mode network, 489 MB being a lot of a plan, until the user says it may use them.
     configuration.waitsForConnectivity = YES;
+    configuration.allowsExpensiveNetworkAccess = sg_cellular;
+    configuration.allowsConstrainedNetworkAccess = sg_cellular;
     NSOperationQueue *queue = [NSOperationQueue new];
     queue.maxConcurrentOperationCount = 1;
     _session = [NSURLSession sessionWithConfiguration:configuration delegate:self delegateQueue:queue];
@@ -198,6 +207,7 @@ static BOOL sg_waitingForNetwork;   // offline: the session holds the request un
         sg_downloader = nil;
         sg_waitingForNetwork = NO;
         sg_lastError = error;
+        if (!error) [NSUserDefaults.standardUserDefaults removeObjectForKey:kPausedKey];
         sg_modelGeneration++;
         announce();
     });
@@ -247,7 +257,10 @@ static BOOL sg_waitingForNetwork;   // offline: the session holds the request un
         return;
     }
     long long size = sizeOf(location);
+    BOOL big = file.size > 1000 * 1000;
+    if (big) dispatch_async(dispatch_get_main_queue(), ^{ sg_checking = YES; announce(); });
     NSString *hash = size == file.size ? sha256Of(location) : nil;
+    if (big) dispatch_async(dispatch_get_main_queue(), ^{ sg_checking = NO; announce(); });
     SGLog(@"sing: %@ came in, %ld, %lld bytes", file.path, (long)status, size);
     if (!answered || size != file.size || ![hash isEqualToString:@(file.sha256)]) {
         self.error = !answered ? [NSString stringWithFormat:@"The server answered %ld for %@", (long)status, file.path]
@@ -326,8 +339,30 @@ NSString *SGSingModelSizeText(void) {
     return [NSByteCountFormatter stringFromByteCount:totalBytes() countStyle:NSByteCountFormatterCountStyleFile];
 }
 
+// What is still to come: the files not in the staging folder yet.
+static long long bytesToCome(void) {
+    long long left = 0;
+    for (int i = 0; i < kFileCount; i++) {
+        if (sizeOf([stagingFolder() URLByAppendingPathComponent:kFiles[i].path]) != kFiles[i].size) left += kFiles[i].size;
+    }
+    return left;
+}
+
 void SGSingDownloadModel(void) {
     if (sg_downloader || SGSingModelURL()) return;
+    // The volume Application Support is on, which the staging folder's parent may not exist on yet.
+    NSURL *support = singFolder().URLByDeletingLastPathComponent.URLByDeletingLastPathComponent;
+    NSNumber *free = [support resourceValuesForKeys:@[NSURLVolumeAvailableCapacityForImportantUsageKey] error:nil][NSURLVolumeAvailableCapacityForImportantUsageKey];
+    long long wanted = bytesToCome() + kSpareSpace;
+    if (free && free.longLongValue < wanted) {
+        NSByteCountFormatterCountStyle style = NSByteCountFormatterCountStyleFile;
+        sg_lastError = [NSString stringWithFormat:@"The iPhone has %@ free, and the voice model needs %@ more.",
+                        [NSByteCountFormatter stringFromByteCount:free.longLongValue countStyle:style],
+                        [NSByteCountFormatter stringFromByteCount:wanted - free.longLongValue countStyle:style]];
+        SGLog(@"sing: the download does not start: %@", sg_lastError);
+        announce();
+        return;
+    }
     sg_lastError = nil;
     sg_progress = 0;
     sg_waitingForNetwork = NO;
@@ -336,7 +371,33 @@ void SGSingDownloadModel(void) {
     announce();
 }
 
+void SGSingDownloadModelOverCellular(void) {
+    if (!sg_downloader) {
+        sg_cellular = YES;
+        SGSingDownloadModel();
+        return;
+    }
+    if (sg_cellular) return;
+    // The running download's session forbids cellular: it stops keeping what it has, and starts again allowed.
+    SGSingCancelModelDownload();
+    sg_cellular = YES;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{ SGSingDownloadModel(); });
+}
+
+BOOL SGSingModelOverCellular(void) {
+    return sg_cellular;
+}
+
+BOOL SGSingModelChecking(void) {
+    return sg_downloader && sg_checking;
+}
+
+long long SGSingModelPausedBytes(void) {
+    return sg_downloader || SGSingModelURL() ? 0 : [NSUserDefaults.standardUserDefaults integerForKey:kPausedKey];
+}
+
 void SGSingCancelModelDownload(void) {
+    if (sg_downloader) [NSUserDefaults.standardUserDefaults setInteger:(NSInteger)(sg_progress * totalBytes()) forKey:kPausedKey];
     [sg_downloader cancel];
     sg_downloader = nil;
     sg_modelGeneration++;
@@ -346,12 +407,13 @@ void SGSingCancelModelDownload(void) {
 void SGSingDeleteModel(void) {
     SGSingCancelModelDownload();
     [NSFileManager.defaultManager removeItemAtURL:singFolder() error:nil];
+    [NSUserDefaults.standardUserDefaults removeObjectForKey:kPausedKey];
     sg_modelGeneration++;
     announce();
 }
 
 NSArray<NSString *> *SGSingComputeUnitNames(void) {
-    return @[@"GPU", @"GPU and Neural Engine", @"Neural Engine"];
+    return @[@"Automatic", @"CPU only", @"GPU", @"Neural Engine", @"GPU and Neural Engine"];
 }
 
 BOOL SGSingOSSupported(void) {

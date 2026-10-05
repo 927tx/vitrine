@@ -1,5 +1,6 @@
 // Shared/Sing's calls as the mic button makes them, answering from the launch line instead of the model and the
-// audio: -state is an SGSingState (Sing.h), -progress the download's fraction. The lyrics harness links it too,
+// audio: -state is an SGSingState (Sing.h), -progress the download's fraction, -waiting 1 a download held for the
+// network. The lyrics harness links it too,
 // since SGRKaraokeView puts the mic on the lyrics.
 #import <UIKit/UIKit.h>
 #import "Shared/Sing/Sing.h"
@@ -45,6 +46,7 @@ NSString *SGSingLevelText(double level) {
 }
 
 double SGSingModelProgress(void) { return [defaults() doubleForKey:@"progress"]; }
+BOOL SGSingModelWaitingForNetwork(void) { return [defaults() boolForKey:@"waiting"]; }
 NSString *SGSingModelSizeText(void) { return @"489 MB"; }
 NSString *SGSingModelError(void) { return nil; }
 void SGSingDownloadModel(void) {}

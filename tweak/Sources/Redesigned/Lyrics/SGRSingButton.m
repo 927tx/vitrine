@@ -110,7 +110,17 @@ static char kButtonGlassKey, kPanelGlassKey;
     switch (state) {
         case SGSingStateUnavailable: glyph = @"mic.slash"; alpha = 0.5; break;
         case SGSingStateNoModel: glyph = @"mic"; alpha = 0.7; break;
-        case SGSingStateDownloading: glyph = @"arrow.down"; progress = SGSingModelProgress(); break;
+        case SGSingStateDownloading:
+            // Offline, the ring stays where the download stopped and the glyph says why, dimmed like the other
+            // states that wait.
+            if (SGSingModelWaitingForNetwork()) {
+                glyph = @"wifi.slash";
+                alpha = 0.7;
+            } else {
+                glyph = @"arrow.down";
+            }
+            progress = SGSingModelProgress();
+            break;
         case SGSingStateOff: glyph = @"mic"; break;
         case SGSingStatePreparing:
         case SGSingStateBuffering: progress = 2; break;

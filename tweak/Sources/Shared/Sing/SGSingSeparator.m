@@ -1,5 +1,8 @@
 #import <Accelerate/Accelerate.h>
 #import <CoreML/CoreML.h>
+#import <os/lock.h>
+#import <stdatomic.h>
+#import "Core/SGLog.h"
 #import "SGSingSeparator.h"
 
 enum {
@@ -9,6 +12,26 @@ enum {
 };
 
 static NSString *const kInput = @"spectrum", *const kOutput = @"vocals_spectrum";
+// This many windows on each copy are logged with their time.
+static const unsigned long long kLoggedWindows = 5;
+
+static atomic_bool sg_foreground;
+static atomic_uint sg_backgrounds;   // counts the times the app left the foreground
+
+void SGSingSeparatorSetForeground(bool foreground) {
+    if (!foreground && atomic_exchange(&sg_foreground, false)) atomic_fetch_add(&sg_backgrounds, 1);
+    atomic_store(&sg_foreground, foreground);
+}
+
+const char *SGSingThermalName(void) {
+    switch (NSProcessInfo.processInfo.thermalState) {
+        case NSProcessInfoThermalStateNominal: return "nominal";
+        case NSProcessInfoThermalStateFair: return "fair";
+        case NSProcessInfoThermalStateSerious: return "serious";
+        case NSProcessInfoThermalStateCritical: return "critical";
+    }
+    return "?";
+}
 
 // Where bin `bin` of channel `channel` at STFT frame `frame` starts in the model's layout (its real part;
 // the imaginary part follows it).
@@ -18,6 +41,12 @@ static inline size_t at(int bin, int channel, int frame) {
 
 @implementation SGSingSeparator {
     MLModel *_model;
+    os_unfair_lock _lock;        // the faster copy and its name
+    MLModel *_fast;
+    NSString *_fastName;
+    bool _fastResting;           // failed a window: rests until the app has left the foreground
+    unsigned _restingFrom;       // sg_backgrounds when it failed
+    SGSingSeparatorStats _stats; // the worker's; read whole under the lock
     MLMultiArray *_input;
     vDSP_DFT_Setup _forward, _inverse;
     float _window[kSGSingFFT];
@@ -32,6 +61,7 @@ static inline size_t at(int bin, int channel, int frame) {
 - (instancetype)initWithModel:(MLModel *)model {
     if (!(self = [super init])) return nil;
     _model = model;
+    _lock = OS_UNFAIR_LOCK_INIT;
     _forward = vDSP_DFT_zrop_CreateSetup(NULL, kSGSingFFT, vDSP_DFT_FORWARD);
     _inverse = vDSP_DFT_zrop_CreateSetup(_forward, kSGSingFFT, vDSP_DFT_INVERSE);
     _spectrum = calloc(kSGSingSpectrumFloats, sizeof(float));
@@ -157,18 +187,104 @@ static BOOL readOutput(MLMultiArray *array, float *into) {
     return ok;
 }
 
+- (void)setFastModel:(MLModel *)model named:(NSString *)name {
+    os_unfair_lock_lock(&_lock);
+    _fast = model;
+    _fastName = name;
+    _fastResting = false;
+    _stats.windows[1] = 0;
+    _stats.averageMS[1] = 0;
+    os_unfair_lock_unlock(&_lock);
+}
+
+- (SGSingSeparatorStats)stats {
+    os_unfair_lock_lock(&_lock);
+    SGSingSeparatorStats stats = _stats;
+    os_unfair_lock_unlock(&_lock);
+    return stats;
+}
+
+// The vocals' spectrum of `features` from `model` into `into`, NO and `error` when it failed.
+static BOOL predict(MLModel *model, MLDictionaryFeatureProvider *features, float *into, NSError **error) {
+    id<MLFeatureProvider> result = [model predictionFromFeatures:features error:error];
+    MLMultiArray *output = [result featureValueForName:kOutput].multiArrayValue;
+    if (output && readOutput(output, into)) return YES;
+    if (error && !*error) *error = [NSError errorWithDomain:@"SGSing" code:1 userInfo:@{NSLocalizedDescriptionKey: @"The model answered in a shape Sing does not read"}];
+    return NO;
+}
+
++ (double)warmUp:(MLModel *)model error:(NSError **)error {
+    float *silence = calloc(kSGSingSpectrumFloats, sizeof(float)), *out = malloc(kSGSingSpectrumFloats * sizeof(float));
+    double took = -1;
+    MLMultiArray *input = silence && out ? [[MLMultiArray alloc] initWithDataPointer:silence shape:@[@1, @(2 * kSGSingBins), @(kSGSingSTFTFrames), @2]
+                                                                           dataType:MLMultiArrayDataTypeFloat32
+                                                                            strides:@[@(2 * kSGSingBins * kSGSingSTFTFrames * 2), @(kSGSingSTFTFrames * 2), @2, @1]
+                                                                        deallocator:nil error:error] : nil;
+    MLDictionaryFeatureProvider *features = input ? [[MLDictionaryFeatureProvider alloc] initWithDictionary:@{kInput: input} error:error] : nil;
+    if (features) {
+        CFAbsoluteTime began = CFAbsoluteTimeGetCurrent();
+        @autoreleasepool {
+            if (predict(model, features, out, error)) took = CFAbsoluteTimeGetCurrent() - began;
+        }
+        // Silence must come back as silence, not as the non-finite numbers a half-precision floor makes of it.
+        for (int i = 0; took >= 0 && i < kSGSingSpectrumFloats; i++) {
+            if (!isfinite(out[i])) {
+                took = -1;
+                if (error) *error = [NSError errorWithDomain:@"SGSing" code:2 userInfo:@{NSLocalizedDescriptionKey: @"The model turned silence into numbers that are not finite"}];
+            }
+        }
+    }
+    input = nil;   // before the memory it points into
+    free(silence);
+    free(out);
+    return took;
+}
+
+// The window's time into the copy's running average, the first windows logged.
+- (void)count:(int)copy took:(double)took named:(NSString *)name {
+    os_unfair_lock_lock(&_lock);
+    unsigned long long n = ++_stats.windows[copy];
+    double ms = took * 1000;
+    _stats.averageMS[copy] = n == 1 ? ms : _stats.averageMS[copy] * 0.8 + ms * 0.2;
+    _stats.fast = copy == 1;
+    os_unfair_lock_unlock(&_lock);
+    if (n <= kLoggedWindows) SGLog(@"sing: window %llu on the %@ copy took %.0f ms (1500 ms keeps up), thermal state %s", n, name, ms, SGSingThermalName());
+}
+
 - (BOOL)separateLeft:(const float *)left right:(const float *)right vocalsLeft:(float *)vocalsLeft
          vocalsRight:(float *)vocalsRight error:(NSError **)error {
     if (!_model) return NO;
     [self analyzeLeft:left right:right into:_spectrum];
     MLDictionaryFeatureProvider *features = [[MLDictionaryFeatureProvider alloc] initWithDictionary:@{kInput: _input} error:error];
     if (!features) return NO;
-    id<MLFeatureProvider> result = [_model predictionFromFeatures:features error:error];
-    MLMultiArray *output = [result featureValueForName:kOutput].multiArrayValue;
-    if (!output || !readOutput(output, _vocals)) {
-        if (error && !*error) *error = [NSError errorWithDomain:@"SGSing" code:1 userInfo:@{NSLocalizedDescriptionKey: @"The model answered in a shape Sing does not read"}];
-        return NO;
+    bool foreground = atomic_load(&sg_foreground);
+    unsigned backgrounds = atomic_load(&sg_backgrounds);
+    os_unfair_lock_lock(&_lock);
+    if (_fastResting && backgrounds != _restingFrom) _fastResting = false;
+    MLModel *fast = foreground && !_fastResting ? _fast : nil;
+    NSString *fastName = _fastName;
+    os_unfair_lock_unlock(&_lock);
+    if (fast) {
+        CFAbsoluteTime began = CFAbsoluteTimeGetCurrent();
+        NSError *fastError;
+        if (predict(fast, features, _vocals, &fastError)) {
+            [self count:1 took:CFAbsoluteTimeGetCurrent() - began named:fastName];
+            [self synthesize:_vocals left:vocalsLeft right:vocalsRight];
+            return YES;
+        }
+        os_unfair_lock_lock(&_lock);
+        if (_fast == fast) {
+            _fastResting = true;
+            _restingFrom = backgrounds;
+        }
+        _stats.fallbacks++;
+        os_unfair_lock_unlock(&_lock);
+        SGLog(@"sing: the %@ copy failed a window (%@), so it is done on the CPU's, and the %@ copy rests until Spotify has been in the background",
+              fastName, fastError.localizedDescription, fastName);
     }
+    CFAbsoluteTime began = CFAbsoluteTimeGetCurrent();
+    if (!predict(_model, features, _vocals, error)) return NO;
+    [self count:0 took:CFAbsoluteTimeGetCurrent() - began named:@"CPU"];
     [self synthesize:_vocals left:vocalsLeft right:vocalsRight];
     return YES;
 }

@@ -12,7 +12,14 @@
 // The vocals come back from the model's complex mask times the spectrum, through the inverse STFT
 // (torch.istft: overlap-add of the windowed frames divided by the window's squared sum).
 //
-// Threading: one separator is used by one thread at a time (its buffers are its own).
+// Two copies of the model can stand behind one separator: the CPU's, which it is made with, and a faster one
+// (the GPU's or the Neural Engine's) handed over once it is loaded and warm. A window goes to the faster copy only
+// while Spotify is in the foreground (SGSingSeparatorSetForeground), since iOS refuses GPU work from the
+// background; a window the faster copy fails is done again on the CPU's, and the faster copy rests until the app
+// has left the foreground. The first windows on each copy are logged with their time.
+//
+// Threading: one separator is used by one thread at a time (its buffers are its own); the faster copy and the
+// foreground can be set from any thread.
 #import <Foundation/Foundation.h>
 
 @class MLModel;
@@ -27,9 +34,27 @@ enum {
     kSGSingSpectrumFloats = kSGSingBins * 2 * kSGSingSTFTFrames * 2,
 };
 
+// The thermal state in a word, for the log.
+const char *SGSingThermalName(void);
+// Whether Spotify is in the foreground, process-wide; the faster copy is used only then.
+void SGSingSeparatorSetForeground(bool foreground);
+
+typedef struct {
+    unsigned long long windows[2], fallbacks;   // [0] the CPU's copy, [1] the faster one
+    double averageMS[2];
+    bool fast;                                  // the last window went to the faster copy
+} SGSingSeparatorStats;
+
 @interface SGSingSeparator : NSObject
 // Nil `model` makes one that only does the STFT, for the harness.
 - (instancetype)initWithModel:(MLModel *)model;
+// The faster copy, already warm, and the name the log gives it; nil takes it away.
+- (void)setFastModel:(MLModel *)model named:(NSString *)name;
+- (SGSingSeparatorStats)stats;
+// One prediction of silence on `model`, which Core ML spends allocating and specialising, so the first real window
+// does not; its time in seconds, or a negative number and `error` when the model failed or answered in a shape the
+// separator does not read.
++ (double)warmUp:(MLModel *)model error:(NSError **)error;
 // The window's spectrum in the model's layout, `spectrum` holding kSGSingSpectrumFloats.
 - (void)analyzeLeft:(const float *)left right:(const float *)right into:(float *)spectrum;
 // The inverse: kSGSingWindowFrames frames per channel out of a spectrum in the model's layout.
