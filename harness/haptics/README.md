@@ -43,7 +43,8 @@ generator), the analyzer and the Vibrations settings compiled into an app whose 
 so its `AudioOutputUnitStart` goes through the rebound import slot as Spotify's does. `sim/fakehaptics.m`
 stands in for Core Haptics and counts what it is asked to play. A beat of a kick and a snare a second plays
 through a 44.1 kHz client into the simulator's 48 kHz hardware while a script checks each Follows choice, the
-strength at 50% and 200%, the switch off and on, then a 16-bit interleaved client.
+strength at 50% and 200%, the switch off and on, standing down while iOS's own Music Haptics plays the song and
+back at the next, then a 16-bit interleaved client. The app has harness/scene.m's scene, which iOS 27 needs.
 
     THEOS=$HOME/theos ./build-sim.sh
     xcrun simctl install <udid> build/sim/HapticsHarness.app
@@ -52,6 +53,8 @@ strength at 50% and 200%, the switch off and on, then a 16-bit interleaved clien
 
 `./build-sim.sh before <dir>` builds the same against an older `MusicHaptics.x`, `Haptics.h` and analyzer put in
 `<dir>`, running only the format steps. Use a device of your own (`xcrun simctl create`), by UDID.
+
+2026-10-05, iPhone 17 Pro on iOS 27.0: every step passes, the stand-down and its return too.
 
 2026-09-19: every step passes. Beat sends no rumble, Bass no snare, 50% halves the taps (0.44 from 0.88) and the
 rumble's loudest (0.162 from 0.322), 200% doubles the rumble (0.64). The hook now listens at the hardware's

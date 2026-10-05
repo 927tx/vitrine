@@ -5,6 +5,7 @@
 //     ControlHaptics.x     the player's and the now playing bar's controls, the scrubber, the cover swipes, the gestures
 //     MusicHaptics.x       Spotify's audio output listened to, and Core Haptics played along with it
 //     SGMusicAnalyzer.m    the listening: taps and a rumble out of the samples
+//     SystemMusicHaptics.x iOS's own Music Haptics given the song's ISRC; the mod's stands down for its songs
 //     HapticsSettings.m    the Vibrations cards, with each switch's strength and what Music Haptics follows
 //
 // Everything on them applies at once, without a restart. Everything hooked is Spotify's own (its controls
@@ -63,6 +64,9 @@ void SGPrepareFeedback(SGFeedback feedback);
 void SGSetMusicHapticsEnabled(BOOL on);
 // From its strength and its choice of what to follow: reads them again, for the next tap.
 void SGMusicHapticsSettingsChanged(void);
+// From SystemMusicHaptics.x: iOS's own Music Haptics has a haptic track for the song playing, so the mod's
+// stands down (YES), or the song changed and it may play again (NO).
+void SGMusicHapticsSetSystemPlaying(BOOL playing);
 
 // A strength key's percentage as a factor, 1 for 100%, kept within its range.
 double SGHapticsStrength(NSString *key);

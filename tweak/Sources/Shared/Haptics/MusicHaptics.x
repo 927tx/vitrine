@@ -21,6 +21,8 @@
 // with the switch off the notify returns straight away. Nothing listens while Spotify is not the active
 // app, since iOS plays no haptics for an app in the background. Sound that is not Spotify's own
 // output (Connect, AirPlay to another device, video) never passes the unit, and plays no haptics.
+// Nothing listens either while iOS's own Music Haptics plays a haptic track of the song
+// (SystemMusicHaptics.x), so the two never play at once; the mod's fills in for songs Apple has none for.
 //
 // Threading: the notify runs on the render thread and only touches atomics, the analyzer and the
 // ring; the Core Haptics objects belong to the player thread; the switch, its settings and the app's
@@ -60,7 +62,7 @@ enum { kRingSize = 1024, kMonoFrames = 4096 };
 
 #pragma mark - shared between the threads
 
-static atomic_bool sg_enabled, sg_active, sg_listening;
+static atomic_bool sg_enabled, sg_active, sg_systemPlaying, sg_listening;
 static atomic_uint sg_generation;
 static atomic_uint_fast64_t sg_latencyBits;
 static atomic_uint sg_lastFrames;
@@ -496,7 +498,7 @@ static void readLatency(void) {
 }
 
 static void updateListening(void) {
-    BOOL listening = atomic_load(&sg_enabled) && atomic_load(&sg_active);
+    BOOL listening = atomic_load(&sg_enabled) && atomic_load(&sg_active) && !atomic_load(&sg_systemPlaying);
     if (atomic_exchange(&sg_listening, listening) == listening) return;
     if (listening) {
         atomic_fetch_add(&sg_generation, 1);
@@ -517,6 +519,12 @@ static void updateListening(void) {
 void SGSetMusicHapticsEnabled(BOOL on) {
     if (!sg_wake) return;
     atomic_store(&sg_enabled, on);
+    updateListening();
+}
+
+void SGMusicHapticsSetSystemPlaying(BOOL playing) {
+    if (atomic_exchange(&sg_systemPlaying, playing) == playing || !sg_wake) return;
+    if (atomic_load(&sg_enabled)) SGLog(@"music haptics: %@", playing ? @"iOS's own plays this song, standing down" : @"playing along again");
     updateListening();
 }
 

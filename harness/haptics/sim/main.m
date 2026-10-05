@@ -217,6 +217,13 @@ static int sg_failures;
         }, ^(double s) {
             [self report:@"on again, Everything, 100%" seconds:s kicks:1 snares:1 rumble:YES intensity:tap100 level:level100];
         }],
+        // What SystemMusicHaptics.x says when Apple has a haptic track for the song, and at the next song.
+        @[@"iOS's own Music Haptics plays", ^{ SGMusicHapticsSetSystemPlaying(YES); }, ^(double s) {
+            [self report:@"iOS's own Music Haptics plays" seconds:s kicks:0 snares:0 rumble:NO intensity:NAN level:NAN];
+        }],
+        @[@"a song iOS has none for", ^{ SGMusicHapticsSetSystemPlaying(NO); }, ^(double s) {
+            [self report:@"a song iOS has none for" seconds:s kicks:1 snares:1 rumble:YES intensity:tap100 level:level100];
+        }],
     ]];
 #endif
     [steps addObject:@[@"16-bit interleaved client at 48 kHz", ^{ [self startInt16ChainAt:48000]; }, ^(double s) {

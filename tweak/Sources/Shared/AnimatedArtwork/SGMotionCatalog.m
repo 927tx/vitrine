@@ -395,3 +395,37 @@ void SGMotionArtistLogo(NSString *artist, CGFloat pixels, void (^done)(UIImage *
         });
     });
 }
+
+#pragma mark - recordings
+
+// The song's ISRC, for iOS's Music Haptics, which plays haptics for a recording it knows by that code.
+void SGMotionSongISRC(NSString *artist, NSString *title, void (^done)(NSString *isrc)) {
+    if (!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(), ^{ SGMotionSongISRC(artist, title, done); });
+        return;
+    }
+    NSString *artistKey = SGMotionNameKey(artist), *titleKey = SGMotionNameKey(title);
+    if (!artistKey.length || !titleKey.length) {
+        done(nil);
+        return;
+    }
+    NSString *key = [NSString stringWithFormat:@"isrc\n%@\n%@", artistKey, titleKey];
+    lookUp(key, ^(NSString *isrc) { done(isrc); }, ^(void (^answer)(id, BOOL)) {
+        search(@"songs", [NSString stringWithFormat:@"%@ %@", artist, title], @"", YES, ^(NSArray *found, BOOL answered) {
+            if (!answered) {
+                answer(nil, NO);
+                return;
+            }
+            NSString *isrc = nil;
+            for (id result in found) {
+                id attributes = dig(result, @"attributes");
+                if (!sameArtist(artistKey, SGMotionNameKey(dig(attributes, @"artistName")))) continue;
+                if (![SGMotionNameKey(dig(attributes, @"name")) isEqualToString:titleKey]) continue;
+                id code = dig(attributes, @"isrc");
+                if ([code isKindOfClass:NSString.class] && [code length]) isrc = code;
+                break;
+            }
+            answer(isrc, YES);
+        });
+    });
+}

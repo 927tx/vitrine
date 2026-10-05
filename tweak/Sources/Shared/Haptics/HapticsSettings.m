@@ -7,7 +7,7 @@
 #import "Settings/SGModPage.h"
 #import "Haptics.h"
 
-static NSString *const kMusicHapticsInfo = @"The iPhone taps along with the drums and rumbles under the bass of whatever Spotify is playing, worked out from the sound as it plays, much like Music Haptics in Apple Music.\n\nIt follows the sound this iPhone plays, through its speaker or headphones, while Spotify is open: iOS plays no haptics for an app in the background, and a song playing on another device through Connect has no sound here to follow.";
+static NSString *const kMusicHapticsInfo = @"The iPhone taps along with the drums and rumbles under the bass of whatever Spotify is playing, worked out from the sound as it plays, much like Music Haptics in Apple Music.\n\nIt follows the sound this iPhone plays, through its speaker or headphones, while Spotify is open: iOS plays no haptics for an app in the background, and a song playing on another device through Connect has no sound here to follow.\n\nWith Music Haptics on in Settings > Accessibility, iOS plays its own haptics for songs Apple Music has them for, in the background and on the lock screen too, and this one steps aside for those songs.";
 
 static NSArray<NSString *> *followsNames(void) {
     return @[@"Everything", @"Beat", @"Bass"];

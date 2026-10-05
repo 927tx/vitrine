@@ -120,7 +120,9 @@ Shared:
                   and bass analyzer on the render thread (SGMusicAnalyzer.m, plain C), and a thread of its own schedules
                   the taps and the rumble for when the sound is heard, at their strength and leaving out what Follows
                   leaves out (MusicHaptics.x). Everything applies at once; nothing plays while Spotify is not the active
-                  app. The analyzer is scored on the Mac against harness/haptics/, the hook in the simulator against its
+                  app. iOS's own Music Haptics, when on in Accessibility, is handed the song's ISRC from Apple Music's
+                  catalog (SystemMusicHaptics.x), and for a song Apple has a haptic track for the mod's stands down
+                  until the next song. The analyzer is scored on the Mac against harness/haptics/, the hook in the simulator against its
                   sim/, the settings against harness/haptics-page/
     LiveActivity/ a Live Activity on the lock screen and in the Dynamic Island in one of three views, the line being
                   sung with the next one under it, the tracks up next (a tap on one skipping ahead to it), or a control
