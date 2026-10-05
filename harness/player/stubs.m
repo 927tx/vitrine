@@ -135,3 +135,9 @@ NSString *SGLyricsGeminiLanguage(void) { return @"en"; }
 void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *lines, NSString *languageTag,
                                  void (^done)(NSArray<NSString *> *translations, NSString *error)) { done(nil, @"harness"); }
 UIViewController *SGTopController(void) { return UIApplication.sharedApplication.keyWindow.rootViewController; }
+
+// Speed and pitch: a number the harness keeps, with no audio behind it.
+static double sg_speed = 1;
+double SGPlayerSpeed(void) { return sg_speed; }
+BOOL SGPlayerSpeedAllowed(void) { return YES; }
+void SGSetPlayerSpeed(double speed) { sg_speed = speed; NSLog(@"[harness] speed %.2f", speed); }
