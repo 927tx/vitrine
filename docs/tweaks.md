@@ -190,7 +190,9 @@ Redesigned:
                   Laid out on the Mac against harness/playlist/
     Album/        the album page laid out the same way, on the page the Creative Work Platform builds rather than the
                   playlist's, so it shares nothing with Playlist/ but the Kit: the cover full bleed dissolving into the
-                  field, the title, the artist and the kind and date centred under it, and the same row of glass
+                  field (Apple Music's animated cover over it where the album has one, fading in once its first frame
+                  is decoded and moving only in front of the app with Reduce Motion and Low Power Mode off and Auto-Play
+                  Video Previews on), the title, the artist and the kind and date centred under it, and the same row of glass
                   controls -- play and shuffle float over the album page outside its header, so they are concealed
                   there and the row carries the Kit's stand-ins, which draw their glyph and fire them. Under the tracks
                   everything the server sends is dropped -- more by the artist, videos, concerts, merch, you might also

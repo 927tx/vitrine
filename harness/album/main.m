@@ -2,6 +2,7 @@
 // trees/clean/album/03.txt, so Redesigned/Album can be laid out and looked at on the Mac.
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <AVFoundation/AVFoundation.h>
 #import "../download-mock.h"
 
 #pragma mark - Spotify's classes, by name
@@ -441,6 +442,47 @@ static NSString *trailingLabel(UIView *root) {
         }
         at(3, ^{ setAddTo(1); NSLog(@"[harness] add-to: saved from elsewhere"); });
         at(7, ^{ [trailingButton(rootView) sendActionsForControlEvents:UIControlEventTouchUpInside]; });
+    }
+
+    // `motion`: Apple Music's animated cover, HARNESS_CANVAS_FILE (any mp4), handed to the hero at 2 s as the
+    // catalog would hand it. The clip stays transparent until its first frame is decoded and then fades in;
+    // it plays in a window and stops out of one.
+    if ([NSProcessInfo.processInfo.arguments containsObject:@"motion"]) {
+        UIView *rootView = root.view;
+        __block UIView *hero = nil;
+        at(2, ^{
+            NSMutableArray<UIView *> *queue = [NSMutableArray arrayWithObject:rootView];
+            while (queue.count && !hero) {
+                UIView *v = queue.firstObject;
+                [queue removeObjectAtIndex:0];
+                if ([NSStringFromClass(v.class) isEqualToString:@"SGRAlbumHero"]) hero = v;
+                [queue addObjectsFromArray:v.subviews];
+            }
+            const char *path = getenv("HARNESS_CANVAS_FILE");
+            NSLog(@"[harness] motion: hero %@, clip %s", hero ? @"found" : @"missing", path ?: "not given");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            if (hero && path) [hero performSelector:NSSelectorFromString(@"showMotion:") withObject:[NSURL fileURLWithPath:@(path)]];
+#pragma clang diagnostic pop
+            AVPlayerLayer *clip = [hero valueForKey:@"_motion"];
+            NSLog(@"[harness] motion: added, ready %d, opacity %.0f, fading %@", clip.readyForDisplay, clip.opacity,
+                  [clip animationForKey:@"fade"] ? @"yes" : @"no");
+        });
+        for (NSNumber *when in @[@2.5, @4]) {
+            at(when.doubleValue, ^{
+                AVPlayerLayer *clip = [hero valueForKey:@"_motion"];
+                NSLog(@"[harness] motion at %@s: ready %d, opacity %.0f, rate %.0f", when, clip.readyForDisplay, clip.opacity, clip.player.rate);
+            });
+        }
+        at(4.5, ^{
+            UIView *parent = hero.superview;
+            NSUInteger index = [parent.subviews indexOfObject:hero];
+            [hero removeFromSuperview];
+            AVPlayerLayer *clip = [hero valueForKey:@"_motion"];
+            NSLog(@"[harness] motion out of the window: rate %.0f", clip.player.rate);
+            [parent insertSubview:hero atIndex:index];
+            NSLog(@"[harness] motion back in it: rate %.0f", clip.player.rate);
+        });
     }
 
     // In `late`, add arrives at 2.5 s, after every pass of the header's and the metadata's re-reads: an arranged

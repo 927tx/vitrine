@@ -38,6 +38,11 @@ At 3.5 s it puts Spotify's own frames back on the title block, its stack and the
 both groups for a layout pass, which is what the redesign's `SGRObserveLayout` watches have to survive.
 The log says what the redesign answered with.
 
+`motion` on the launch line, with `SIMCTL_CHILD_HARNESS_CANVAS_FILE` set to any mp4, hands the hero that clip at
+2 s the way Apple Music's catalog would. The log says the clip was added at opacity 0 and not yet fading, that by
+2.5 s its first frame was ready and it had faded in and was playing, and that taken out of the window at 4.5 s it
+stopped and put back it played again.
+
 `SGLog` goes to the unified log rather than stdout, so the redesign's own lines are read with
 
     xcrun simctl spawn booted log stream --predicate 'eventMessage CONTAINS "spotifyglass"' --style compact
