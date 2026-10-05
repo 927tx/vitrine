@@ -16,11 +16,15 @@
 // there), swipe=<section>.<row>:<n> and band=<band>:<n> (VoiceOver's swipe on a slider or an equalizer band,
 // n times), string=<key after spotifyglass.dsp.>:<text> (stored behind the page's back, as the engine's
 // errors turn up), pop, delete=<row> (the library's swipe to delete on that file), hit (which band a finger
-// takes around each handle, to the log), confirm (the alert's destructive button), dump (the stored dsp keys and the first sections' frames to the log).
+// takes around each handle, to the log), confirm (the alert's destructive button), dump (the stored dsp keys and the first sections' frames to the log),
+// save=<name> (the settings saved as a preset of the user's, behind the page's back), rows (each visible row's
+// title, whether it is ticked and what VoiceOver reads as its value, to the log).
+// Without keep, the user's presets are cleared too.
 #import <UIKit/UIKit.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import "Shared/AudioEffects/AudioEffects.h"
 #import "Shared/AudioEffects/AudioEffectsPage.h"
+#import "Shared/AudioEffects/AudioEffectsPresets.h"
 #import "Shared/AudioEffects/SGDSPCurveView.h"
 #import "Settings/SGModPage.h"
 
@@ -61,6 +65,7 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
         for (NSString *key in store.dictionaryRepresentation.allKeys) {
             if ([key hasPrefix:@"spotifyglass.dsp"]) [store removeObjectForKey:key];
         }
+        [store removeObjectForKey:SGKeyDSPUserPresets];
     }
     if ([args containsObject:@"master"]) SGDSPSetSwitch(SGKeyDSP, YES);
     if ([args containsObject:@"allon"]) for (NSString *key in effectKeys()) SGDSPSetSwitch(key, YES);
@@ -224,11 +229,23 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
                   (long)band, (long)[curve bandAt:CGPointMake(x, y)], (long)[curve bandAt:CGPointMake(x, y - 20)],
                   (long)[curve bandAt:CGPointMake(x, y - 40)], (long)[curve bandAt:CGPointMake(x + 9, y)]);
         }
+    } else if ([verb isEqualToString:@"save"]) {
+        SGDSPSaveUserPreset(value);
+    } else if ([verb isEqualToString:@"rows"]) {
+        for (NSIndexPath *path in table.indexPathsForVisibleRows) {
+            UITableViewCell *cell = [table cellForRowAtIndexPath:path];
+            id content = cell.contentConfiguration;
+            NSString *text = [content isKindOfClass:UIListContentConfiguration.class] ? [content text] : cell.textLabel.text;
+            NSLog(@"[harness] row %ld.%ld %@%@%@", (long)path.section, (long)path.row, text,
+                  cell.accessibilityTraits & UIAccessibilityTraitSelected ? @" (ticked)" : @"",
+                  cell.accessibilityValue ? [@" value " stringByAppendingString:cell.accessibilityValue] : @"");
+        }
     } else if ([verb isEqualToString:@"dump"]) {
         NSDictionary *all = NSUserDefaults.standardUserDefaults.dictionaryRepresentation;
         for (NSString *key in [all.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
             if ([key hasPrefix:@"spotifyglass.dsp"]) NSLog(@"[harness] %@ = %@", key, all[key]);
         }
+        NSLog(@"[harness] user presets: %@", [SGDSPUserPresetNames() componentsJoinedByString:@", "]);
         NSLog(@"[harness] summary: %@; on top %@ with %ld sections", SGDSPSummary(), self.nav.topViewController.class,
               (long)table.numberOfSections);
         for (NSInteger section = 0; section < MIN(3, table.numberOfSections); section++) {

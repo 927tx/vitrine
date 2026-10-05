@@ -502,7 +502,7 @@ static UIView *valueAndChevron(NSString *text) {
 
 #pragma mark - rows
 
-// Section 0 is the effects' switch, then a card per effect, then the reset.
+// Section 0 is the effects' switch, Presets and Headphones, then a card per effect, then the reset.
 - (SGDSPEffect *)effectIn:(NSInteger)section {
     return section >= 1 && section <= (NSInteger)_effects.count ? _effects[(NSUInteger)section - 1] : nil;
 }
@@ -522,7 +522,7 @@ static UIView *valueAndChevron(NSString *text) {
 
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
     SGDSPEffect *e = [self effectIn:section];
-    return e ? [self rowCountOf:e] : 1;
+    return e ? [self rowCountOf:e] : section == 0 ? 3 : 1;
 }
 
 // No views, but asked for all the same: without them the table keeps its own spacing, not the heights below.
@@ -577,6 +577,8 @@ static UIView *valueAndChevron(NSString *text) {
 }
 
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
+    if (path.section == 0 && path.row == 1) return [self valueCell:table title:@"Presets" value:@""];
+    if (path.section == 0 && path.row == 2) return [self valueCell:table title:@"Headphones" value:SGDSPHeadphoneSummary()];
     if (path.section == 0) {
         UITableViewCell *cell = SGDequeueCell(table, @"master");
         [self fillHead:cell title:@"Effects" subtitle:SGDSPStatus() symbol:@"waveform"];
@@ -665,6 +667,10 @@ static UIView *valueAndChevron(NSString *text) {
         [self confirmReset];
         return;
     }
+    if (path.section == 0 && path.row > 0) {
+        [self.navigationController pushViewController:path.row == 1 ? SGDSPPresetsPage() : SGDSPHeadphonesPage() animated:YES];
+        return;
+    }
     SGDSPRow *row = [self rowAt:path];
     if (!row) return;
     if (row.kind == SGDSPRowChoice) [self.navigationController pushViewController:[[SGDSPChoicePage alloc] initWithRow:row] animated:YES];
@@ -672,7 +678,7 @@ static UIView *valueAndChevron(NSString *text) {
 }
 
 - (BOOL)tableView:(UITableView *)table shouldHighlightRowAtIndexPath:(NSIndexPath *)path {
-    if (path.section == (NSInteger)_effects.count + 1) return YES;
+    if (path.section == (NSInteger)_effects.count + 1 || (path.section == 0 && path.row > 0)) return YES;
     SGDSPRow *row = [self rowAt:path];
     return row && (row.kind == SGDSPRowChoice || row.kind == SGDSPRowPage);
 }

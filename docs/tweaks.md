@@ -102,7 +102,12 @@ Shared:
                   one hook for every feature that wants it (PlayerState.x), the lock screen widget's flags, and in the
                   more button's menu Speed and pitch: both done to Spotify's audio by Apple's time and pitch unit, put
                   between its mixer and its RemoteIO unit by taking over the connection Spotify makes between them
-                  (SpeedPitchMenu.x, SpeedPitch.x, SGTimePitch.m). The block goes into Spotify's own context menu sheet
+                  (SpeedPitchMenu.x, SpeedPitch.x, SGTimePitch.m). Pitch follows speed (on until switched off,
+                  spotifyglass.speed.pitchFollows) plays the speed through Apple's Varispeed instead, faster and higher
+                  together like a record; Varispeed also carries 1x while it is on, so a return to normal speed changes
+                  nothing, and the stretch is left for pitch alone at 1x, the two swapped only through a reset. Under the
+                  sliders a Reverb slider sets the audio effects' reverb amount (spotifyglass.dsp.reverb.amount), turning
+                  the effects and the reverb on with it. The block goes into Spotify's own context menu sheet
                   and is drawn from its own measures, not the Kit's, so it sits there under either look. Tested on the
                   Mac against harness/pitch/ and in the simulator against harness/speed/ and harness/menu/
     AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): Spotify's
@@ -112,8 +117,14 @@ Shared:
                   hardware's, not the client format Spotify sets. The effects are the SGDSP*.m files, on Accelerate,
                   Apple's Reverb2 unit, libbs2b and EEL2 (vendor/audio). Settings apply as they change, on a queue of
                   its own; the file effects read their files from Documents/Vitrine/Audio effects
-                  (AudioEffectsFiles.m). Tested on the Mac against harness/audio-effects/, the hook in the simulator
-                  against its sim/
+                  (AudioEffectsFiles.m). Presets and Headphones (AudioEffectsPresets.h lists their files): seven
+                  built-in presets over a reset that keep the Graphic EQ, the user's own as a copy of every dsp key, the
+                  settings from before the page's first pick saved as one of them, Before presets, and AutoEq's
+                  corrections, its INDEX.md fetched from GitHub and cached a month in Caches/Vitrine/AutoEq, a
+                  headphone's GraphicEQ file put into the Graphic EQ (AutoEq.m), None taking it off; a pick turns the
+                  master switch on.
+                  Tested on the Mac against harness/audio-effects/ and harness/autoeq/, the hook in the simulator
+                  against its sim/, the page against harness/audio-effects-page/
     Haptics/      Vibrations (Haptics.h lists its files): a tap of UIKit's feedback generators for the player's and the now
                   playing bar's controls, the scrubber's tenths and ends, cover swipes, gestures and the lyrics page's tap to
                   seek, at the strength set for them (ControlHaptics.x, SGFeedback.m); and Music Haptics, Core Haptics
@@ -142,7 +153,8 @@ Native:
     Navbar/       Spotify's tab bar composed (Navbar.x, NavbarLayout.m, hooked from TabBarHooks.x), the Navbar and Add a tab pages
     NowPlayingBar/ the device button hidden, the bar's flags
     Player/       the full screen player (Player.x), its cards and buttons hidden (PlayerDeclutter.x), the glass lyrics card
-                  (LyricsCard.x), the gestures' hookup, the Queue & devices flags
+                  (LyricsCard.x), the gestures' hookup and the hold on either side of the cover that plays at 2x until
+                  the finger lifts (PlayerGestures.x), the Queue & devices flags
     Lyrics/       the full screen lyrics page on glass (LyricsPage.x)
     Home/         the Home gradient, Home's sections and pills hidden (HomeDeclutter.x), the Home & Library page
     Playlist/     the playlist header and pills, hidden one switch each
@@ -160,7 +172,9 @@ Redesigned:
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
                   (BarConnect.x, its own key and its own Now playing page, apart from the native look's)
     Player/       the redesigned full screen player (Player.h lists its files); its more button is handed to
-                  Shared/Player's Speed and pitch, which draws in the menu it opens
+                  Shared/Player's Speed and pitch, which draws in the menu it opens, and a hold on either side of the
+                  cover plays at 2x until the finger lifts (PlayerArtwork.x), an octave higher while Pitch follows
+                  speed is on
     Lyrics/       the full screen lyrics page on glass with Apple Music style lyrics over it, always on (SGRKaraokeView,
                   which the player shows in itself too, Player/PlayerLyrics.x): lines sung over each other lit together,
                   the stack moving on once the first is sung out; an instrumental break of 7 s or more held by three dots
@@ -262,9 +276,11 @@ snare and a rumble under the bass), Beat (the taps without the rumble) or Bass (
 rumble), all applying straight away. Live Activity, on iOS 17 and up under either look: its switch and which view it
 shows, Lyrics, Queue or Control menu, both
 applying straight away, the row reading out the view or Off. Audio effects, in either look (Shared/AudioEffects/AudioEffectsPage.m):
-the effects' switch with what the engine is doing under it, then a card per effect, each opening out into its
-sliders, choices, curve or file library while its switch is on, everything applying as it changes; the row reads
-out Off, On or how many effects are on. Home & Library, in the native look only:
+the effects' switch with what the engine is doing under it, Presets (built-in ones and your own, saved, loaded
+and deleted there) and Headphones (AutoEq's corrections, searched and applied to the Graphic EQ), either of which
+turns the effects on, then a card per effect, each opening out into its sliders, choices, curve or file library
+while its switch is on (Reverb has its Room and its Amount, the amount the player's ⋯ menu also sets), everything
+applying as it changes; the row reads out Off, On or how many effects are on. Home & Library, in the native look only:
 the Gradient page (the wash behind the top of Home in one of eight colours, at three strengths and
 four heights) and the Home flags, the parts of Home to hide including the DJ button and badge, the
 playlist header, buttons and pills to hide, and the Library flags. Then Privacy & clutter

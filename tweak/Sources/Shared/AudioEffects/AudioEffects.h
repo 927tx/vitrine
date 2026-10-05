@@ -40,6 +40,9 @@
 // The Graphic EQ, in AutoEq's GraphicEQ format: "GraphicEQ: 20 -1.2; 21 -1.1; ...".
 #define SGKeyDSPGraphicEq               @"spotifyglass.dsp.geq"
 #define SGKeyDSPGraphicEqNodes          @"spotifyglass.dsp.geq.nodes"
+// The AutoEq headphone the nodes came from, as its folder in AutoEq's results (SGAutoEqHeadphone.path);
+// empty once the text is edited by hand.
+#define SGKeyDSPGraphicEqHeadphone      @"spotifyglass.dsp.geq.headphone"
 
 // File effects name a file in their library (SGDSPLibraryFiles), by its name alone: the app's container
 // moves on every reinstall, the name does not.

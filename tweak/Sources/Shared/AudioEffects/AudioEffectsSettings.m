@@ -38,6 +38,7 @@ static NSDictionary<NSString *, NSString *> *stringDefaults(void) {
             SGKeyDSPCompanderGains: @"0;0;0;0;0;0;0",
             SGKeyDSPEqualizerGains: @"0;0;0;0;0;0;0;0;0;0;0;0;0;0;0",
             SGKeyDSPGraphicEqNodes: @"GraphicEQ: 0.0 0.0;",
+            SGKeyDSPGraphicEqHeadphone: @"",
             SGKeyDSPConvolverFile: @"",
             SGKeyDSPDDCFile: @"",
             SGKeyDSPLiveprogFile: @"",

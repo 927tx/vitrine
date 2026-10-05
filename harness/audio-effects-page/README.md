@@ -25,6 +25,12 @@ equalizer's curve the cascade's own response through its handles, the width show
 the stored 60), long choice names moving under the title at 375pt, an error row in the engine's wording, the
 credits under the reset; the values stored under the right keys, snapped to their steps.
 
+`save=<name>` stores a preset of the user's behind the page's back and `rows` logs each visible row with its tick
+and VoiceOver value. 2026-10-05, iPhone 17 Pro on iOS 27.0: the Presets page's first pick saves Before presets at
+the top of Yours and a tap on it puts the settings back; a swipe delete above the ticked preset keeps the tick on
+it, and the last one leaves the placeholder. Headphones' None turns the Graphic EQ off and clears the headphone,
+and a headphone being applied reads "Applying" to VoiceOver.
+
 What it does not cover: a real finger. The drag is played through the curve's own methods, so whether its
 pan wins over the table's scroll when a finger starts on a handle (and loses anywhere else) is untested
 here; `hit` logs which band a finger going down at and around each handle would take. Nor the document
