@@ -5,6 +5,7 @@
 // The activity is started only while the app is in front, the one place ActivityKit allows it.
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
 #import "Headers/SPTPlayer.h"
 #import "Shared/Lyrics/Lyrics.h"
@@ -16,7 +17,9 @@ API_AVAILABLE(ios(17.0))
 + (void)showWithView:(NSInteger)view paused:(BOOL)paused line:(NSString *)line nextLine:(NSString *)nextLine
               titles:(NSArray<NSString *> *)titles artists:(NSArray<NSString *> *)artists uris:(NSArray<NSString *> *)uris
                  tab:(NSInteger)tab title:(NSString *)title artist:(NSString *)artist shuffle:(BOOL)shuffle repeatMode:(NSInteger)repeatMode
-            timerEnd:(NSDate *)timerEnd timerEndOfTrack:(BOOL)timerEndOfTrack;
+            timerEnd:(NSDate *)timerEnd timerEndOfTrack:(BOOL)timerEndOfTrack
+                tint:(NSString *)tint trackStart:(NSDate *)trackStart trackEnd:(NSDate *)trackEnd pausedAt:(NSNumber *)pausedAt
+         translation:(NSString *)translation;
 + (void)end;
 @end
 
@@ -103,7 +106,7 @@ static NSInteger repeatModeOf(SPTPlayerOptions *options) {
 
 // The line being sung and the one after it; before the first line, between lines and without lyrics
 // at all, a note holds the place.
-static NSString *lyricsLine(NSString *trackID, NSString **next) {
+static NSString *lyricsLine(NSString *trackID, NSString **next, NSString **translation) {
     NSArray<SGKaraokeLine *> *lines = SGKaraokeLinesForTrack(trackID);
     if (!lines) {
         SGKaraokeRequestLyrics(trackID);
@@ -120,8 +123,32 @@ static NSString *lyricsLine(NSString *trackID, NSString **next) {
     *next = index + 1 < (NSInteger)lines.count ? SGKaraokeLineText(lines[index + 1]) : @"";
     if (index < 0) return @"♪";
     SGKaraokeLine *current = lines[index];
+    *translation = current.translation;
     BOOL nextFarOff = index + 1 == (NSInteger)lines.count || lines[index + 1].start - position > kBreakMs;
     return position > current.end + kBreakMs && nextFarOff ? @"♪" : SGKaraokeLineText(current);
+}
+
+// The cover's colour for the card: Spotify's now playing artwork drawn into one pixel, darkened so white
+// text keeps its contrast. Read once a track.
+static NSString *sg_tintTrack, *sg_tint;
+
+static NSString *tintFor(NSString *trackID) {
+    if (!trackID || [trackID isEqualToString:sg_tintTrack]) return sg_tint;
+    MPMediaItemArtwork *artwork = MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo[MPMediaItemPropertyArtwork];
+    UIImage *image = [artwork isKindOfClass:MPMediaItemArtwork.class] ? [artwork imageWithSize:CGSizeMake(32, 32)] : nil;
+    if (!image.CGImage) return sg_tint;
+    unsigned char pixel[4] = {0};
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGContextRef context = CGBitmapContextCreate(pixel, 1, 1, 8, 4, space, (CGBitmapInfo)kCGImageAlphaPremultipliedLast);
+    CGColorSpaceRelease(space);
+    if (!context) return sg_tint;
+    CGContextSetInterpolationQuality(context, kCGInterpolationMedium);
+    CGContextDrawImage(context, CGRectMake(0, 0, 1, 1), image.CGImage);
+    CGContextRelease(context);
+    const double keep = 0.55;   // of the colour, the rest black
+    sg_tintTrack = trackID;
+    sg_tint = [NSString stringWithFormat:@"%02X%02X%02X", (int)(pixel[0] * keep), (int)(pixel[1] * keep), (int)(pixel[2] * keep)];
+    return sg_tint;
 }
 
 static void clearSleepTimer(void) {
@@ -159,8 +186,23 @@ static void tick(void) API_AVAILABLE(ios(17.0)) {
     BOOL paused = state.isPaused;
     NSTimeInterval every = paused ? kPausedTick : kTick;
     if (sg_timer && sg_tickEvery != every) startTimer(every);
-    NSString *line = @"", *next = @"";
-    if (view == SGLiveActivityLyrics) line = lyricsLine(trackID, &next);
+    NSString *line = @"", *next = @"", *translation = nil;
+    if (view == SGLiveActivityLyrics) line = lyricsLine(trackID, &next, &translation);
+    // The redesign's switch for translations (SGRKeyLyricsTranslation, Redesigned/Lyrics/LyricsText.h).
+    if (!SGFlag(@"spotifyglass.redesign.lyricsTranslation", NO)) translation = nil;
+    NSString *tint = tintFor(trackID);
+    // The bar runs by itself from where the track started; paused, it holds at the share played.
+    double duration = [state respondsToSelector:@selector(duration)] ? state.duration : 0;
+    NSInteger position = SGKaraokePositionMs();
+    NSDate *trackStart = nil, *trackEnd = nil;
+    NSNumber *pausedAt = nil;
+    if (duration > 0 && position >= 0) {
+        double played = position / 1000.0;
+        trackStart = [NSDate dateWithTimeIntervalSinceNow:-played];
+        trackStart = [NSDate dateWithTimeIntervalSince1970:round(trackStart.timeIntervalSince1970)];
+        trackEnd = [trackStart dateByAddingTimeInterval:duration];
+        if (paused) pausedAt = @(MIN(1, played / duration));
+    }
 
     NSMutableArray<NSString *> *titles = [NSMutableArray array], *artists = [NSMutableArray array], *uris = [NSMutableArray array];
     if (view != SGLiveActivityLyrics) {
@@ -183,12 +225,14 @@ static void tick(void) API_AVAILABLE(ios(17.0)) {
 
     NSMutableArray<NSString *> *parts = [NSMutableArray arrayWithObjects:@(view).stringValue, paused ? @"1" : @"0", line, next,
         @(tab).stringValue, title, artist, shuffle ? @"1" : @"0", @(repeatMode).stringValue,
-        @((long long)sleepEnd.timeIntervalSince1970).stringValue, endOfTrack ? @"1" : @"0", nil];
+        @((long long)sleepEnd.timeIntervalSince1970).stringValue, endOfTrack ? @"1" : @"0", tint ?: @"", translation ?: @"",
+        @((long long)trackStart.timeIntervalSince1970).stringValue, paused ? @(round(pausedAt.doubleValue * 100)).stringValue : @"", nil];
     for (NSUInteger i = 0; i < titles.count; i++) [parts addObject:[NSString stringWithFormat:@"%@\t%@\t%@", titles[i], artists[i], uris[i]]];
     send([parts componentsJoinedByString:@"\n"], ^{
         [SGLiveActivityBridge showWithView:view paused:paused line:line nextLine:next titles:titles artists:artists uris:uris
                                         tab:tab title:title artist:artist shuffle:shuffle repeatMode:repeatMode
-                                   timerEnd:sleepEnd timerEndOfTrack:endOfTrack];
+                                   timerEnd:sleepEnd timerEndOfTrack:endOfTrack
+                                       tint:tint trackStart:trackStart trackEnd:trackEnd pausedAt:pausedAt translation:translation];
     });
 }
 

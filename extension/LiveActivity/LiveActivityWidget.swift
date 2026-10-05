@@ -22,6 +22,13 @@ struct SGLiveActivityBundle: WidgetBundle {
     }
 }
 
+// The cover's colour, RRGGBB, as the card's background; the old translucent black without one.
+private func tint(_ state: State) -> Color {
+    guard let hex = state.tint, hex.count == 6, let value = Int(hex, radix: 16) else { return Color.black.opacity(0.75) }
+    return Color(red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255,
+                 blue: Double(value & 0xFF) / 255)
+}
+
 extension SGLyricsAttributes.Tab {
     var symbol: String {
         switch self {
@@ -43,12 +50,9 @@ extension SGLyricsAttributes.Tab {
 struct SGLyricsLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: SGLyricsAttributes.self) { context in
-            ContentView(state: context.state, upNext: 4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, context.state.view == .panel ? 12 : 16)
-                .padding(.vertical, 12)
+            FamilyView(state: context.state)
                 .foregroundStyle(.white)
-                .activityBackgroundTint(Color.black.opacity(0.75))
+                .activityBackgroundTint(tint(context.state))
                 .activitySystemActionForegroundColor(.white)
                 .widgetURL(URL(string: "spotify:"))
         } dynamicIsland: { context in
@@ -74,14 +78,71 @@ struct SGLyricsLiveActivity: Widget {
                         .foregroundStyle(green)
                         .frame(maxWidth: 44)
                 } else {
-                    Image(systemName: context.state.paused ? "pause.fill" : "waveform")
-                        .foregroundStyle(green)
+                    ProgressRing(state: context.state)
                 }
             } minimal: {
                 Image(systemName: "music.note")
                     .foregroundStyle(green)
             }
             .widgetURL(URL(string: "spotify:"))
+        }
+    }
+}
+
+// The lock screen's card, and StandBy's: what the view shows, and the bar under it.
+private struct FamilyView: View {
+    let state: State
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ContentView(state: state, upNext: 4)
+            ProgressBar(state: state)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, state.view == .panel ? 12 : 16)
+        .padding(.vertical, 12)
+    }
+}
+
+// The track's progress as a ring, for the compact Dynamic Island, which Apple Watch and CarPlay show too.
+private struct ProgressRing: View {
+    let state: State
+
+    var body: some View {
+        if let start = state.trackStart, let end = state.trackEnd, end > start {
+            Group {
+                if state.paused, let at = state.pausedAt {
+                    ProgressView(value: at)
+                } else {
+                    ProgressView(timerInterval: start...end, countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+                }
+            }
+            .progressViewStyle(.circular)
+            .tint(green)
+            .frame(width: 18, height: 18)
+        } else {
+            Image(systemName: state.paused ? "pause.fill" : "waveform")
+                .foregroundStyle(green)
+        }
+    }
+}
+
+// The track's progress, running by itself between two dates while it plays and held while it is paused.
+private struct ProgressBar: View {
+    let state: State
+
+    var body: some View {
+        if let start = state.trackStart, let end = state.trackEnd, end > start {
+            Group {
+                if state.paused, let at = state.pausedAt {
+                    ProgressView(value: at)
+                } else {
+                    ProgressView(timerInterval: start...end, countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+                }
+            }
+            .progressViewStyle(.linear)
+            .tint(.white)
+            .frame(height: 4)
         }
     }
 }
@@ -105,12 +166,23 @@ private struct LyricsView: View {
     let state: State
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .center, spacing: 4) {
             Text(state.line)
                 .font(.title3.weight(.bold))
                 .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.7)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
                 .direction(of: state.line)
+            if let translation = state.translation, !translation.isEmpty {
+                Text(translation)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .direction(of: translation)
+            }
             if !state.nextLine.isEmpty {
                 Text(state.nextLine)
                     .font(.subheadline.weight(.semibold))

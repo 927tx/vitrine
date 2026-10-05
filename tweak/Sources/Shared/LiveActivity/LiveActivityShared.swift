@@ -39,6 +39,15 @@ struct SGLyricsAttributes: ActivityAttributes {
         var repeatMode: Int   // 0 off, 1 the playlist or album, 2 the track
         var timerEnd: Date?   // the sleep timer's end, nil when none is set
         var timerEndOfTrack: Bool
+        // The cover's colour as RRGGBB, darkened for white text; nil before it is read.
+        var tint: String?
+        // When the track started and ends at the speed it plays, for a progress bar that runs by itself;
+        // nil when the length is not known. Paused, the bar holds at `pausedAt`.
+        var trackStart: Date?
+        var trackEnd: Date?
+        var pausedAt: Double?
+        // The line's translation, when the lyrics have one and translations are shown.
+        var translation: String?
     }
 }
 

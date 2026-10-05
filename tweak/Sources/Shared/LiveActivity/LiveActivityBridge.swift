@@ -67,7 +67,8 @@ public final class SGLiveActivityBridge: NSObject {
     @objc public static func show(view: Int, paused: Bool, line: String, nextLine: String,
                                   titles: [String], artists: [String], uris: [String],
                                   tab: Int, title: String, artist: String, shuffle: Bool, repeatMode: Int,
-                                  timerEnd: Date?, timerEndOfTrack: Bool) {
+                                  timerEnd: Date?, timerEndOfTrack: Bool,
+                                  tint: String?, trackStart: Date?, trackEnd: Date?, pausedAt: NSNumber?, translation: String?) {
         let tracks = titles.indices.map {
             SGLyricsAttributes.Track(title: titles[$0], artist: artists[$0], uri: uris[$0])
         }
@@ -75,7 +76,9 @@ public final class SGLiveActivityBridge: NSObject {
             view: SGLyricsAttributes.View(rawValue: view) ?? .lyrics, paused: paused,
             line: line, nextLine: nextLine, tracks: tracks,
             tab: SGLyricsAttributes.Tab(rawValue: tab) ?? .controls, title: title, artist: artist,
-            shuffle: shuffle, repeatMode: repeatMode, timerEnd: timerEnd, timerEndOfTrack: timerEndOfTrack)
+            shuffle: shuffle, repeatMode: repeatMode, timerEnd: timerEnd, timerEndOfTrack: timerEndOfTrack,
+            tint: tint, trackStart: trackStart, trackEnd: trackEnd, pausedAt: pausedAt?.doubleValue,
+            translation: translation)
         let content = ActivityContent(state: state, staleDate: nil)
         if let activity = current {
             queue(.update(activity.id, content))
