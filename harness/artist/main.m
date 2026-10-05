@@ -356,6 +356,46 @@ static NSArray<NSArray *> *musicList(void) {
 
     [self.window makeKeyAndVisible];
 
+    // `logo`: an artist's logo arriving with the page on screen, at 2.5 s, and taken away again at 4.5 s (run
+    // with `-spotifyglass.redesign.artist.logo NO` so Apple Music's own does not arrive too). The logo and the
+    // name cross over while the block makes room, the logo starting from the name's place.
+    if ([NSProcessInfo.processInfo.arguments containsObject:@"logo"]) {
+        UIView *rootView = root.view;
+        __block UIView *info = nil;
+        UIImage *logo = [[[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(600, 200)] imageWithActions:^(UIGraphicsImageRendererContext *context) {
+            [UIColor.whiteColor setFill];
+            [[UIBezierPath bezierPathWithRoundedRect:CGRectMake(0, 0, 600, 200) cornerRadius:40] fill];
+        }];
+        void (^report)(NSString *) = ^(NSString *when) {
+            UIView *picture = [info valueForKey:@"_logo"], *title = [info valueForKey:@"_title"];
+            NSLog(@"[harness] logo %@: logo %@ alpha %.2f hidden %d at %@ (fading %@, moving %@), name alpha %.2f at %@", when,
+                  [(UIImageView *)picture image] ? @"drawn" : @"empty", picture.alpha, picture.hidden, NSStringFromCGRect(picture.frame),
+                  [picture.layer animationForKey:@"opacity"] ? @"yes" : @"no", [picture.layer animationForKey:@"position"] ? @"yes" : @"no",
+                  title.alpha, NSStringFromCGRect(title.frame));
+        };
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            NSMutableArray<UIView *> *queue = [NSMutableArray arrayWithObject:rootView];
+            while (queue.count && !info) {
+                UIView *v = queue.firstObject;
+                [queue removeObjectAtIndex:0];
+                if ([NSStringFromClass(v.class) isEqualToString:@"SGRHeaderInfo"]) info = v;
+                [queue addObjectsFromArray:v.subviews];
+            }
+            report(@"before");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            [info performSelector:NSSelectorFromString(@"showTitleImage:") withObject:logo];
+            report(@"arriving");
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ report(@"arrived"); });
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [info performSelector:NSSelectorFromString(@"showTitleImage:") withObject:nil];
+                report(@"leaving");
+            });
+#pragma clang diagnostic pop
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ report(@"gone"); });
+        });
+    }
+
     // What the redesign's Follow draws: nothing before the state, then the glyph for it. A tap on it at
     // 2.5 s, which Spotify answers with Following.
     for (NSNumber *when in @[@0.5, @1.5, @2.5, @3.0]) {
