@@ -11,4 +11,8 @@
 @interface SGRKaraokeView : UIView
 // Hides Spotify's own lyrics next to this view while it has lyrics to show, and brings them back when not.
 - (void)syncSiblings;
+// Called as a finger starts to scroll the lines, for a host that hides its controls then.
+@property (nonatomic, copy) void (^browsingBegan)(void);
+// The pronunciation and translation button goes with the host's controls when they are hidden.
+@property (nonatomic) BOOL extrasHidden;
 @end

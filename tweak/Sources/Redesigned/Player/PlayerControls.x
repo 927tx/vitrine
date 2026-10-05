@@ -18,6 +18,7 @@
 // inside the unit's view never reaches.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Shared/Lyrics/Lyrics.h"
 #import "Player.h"
 
 static const CGFloat kSkipGlyphSize = 32, kPlayGlyphSize = 44;
@@ -228,11 +229,42 @@ static UILabel *monospaced(UIView *host, NSString *identifier, const void *findK
 }
 %end
 
+#pragma mark - tap to seek
+
+static char kSliderKey, kSeekTapKey;
+
+// Spotify's slider only drags. A tap on it seeks to where it landed; the tap cancels the slider's own
+// tracking, so the two never both seek.
+@interface SGRSeekTap : UITapGestureRecognizer
+@end
+
+@implementation SGRSeekTap
+- (void)sgr_seek {
+    UIView *slider = self.view;
+    SPTPlayerState *state = SGPlayerState();
+    CGFloat width = slider.bounds.size.width;
+    if (!state || width < 1 || state.duration <= 0) return;
+    CGFloat share = MIN(1, MAX(0, [self locationInView:slider].x / width));
+    SGKaraokeSeek((NSInteger)(share * state.duration * 1000));
+}
+@end
+
+static void watchSlider(UIView *host) {
+    UIView *slider = SGRFindByIdentifier(host, @"SPTNowPlayingSliderV2", &kSliderKey);
+    if (!slider || objc_getAssociatedObject(slider, &kSeekTapKey)) return;
+    SGRSeekTap *tap = [[SGRSeekTap alloc] init];
+    [tap addTarget:tap action:@selector(sgr_seek)];
+    [slider addGestureRecognizer:tap];
+    objc_setAssociatedObject(slider, &kSeekTapKey, tap, OBJC_ASSOCIATION_ASSIGN);
+    SGLog(@"redesign player: a tap on the progress bar seeks");
+}
+
 %hook _TtC20NowPlaying_ModesImpl19DurationElementUnit
 - (void)viewDidLayoutSubviews {
     %orig;
     UIView *host = ((UIViewController *)self).viewIfLoaded;
     if (!host) return;
+    watchSlider(host);
     UILabel *taken = monospaced(host, @"now-playing-time-take-label-internal", &kTakeKey);
     monospaced(host, @"now-playing-time-remaning-label-internal", &kRemainingKey);
     // Whether Spotify's font has digits of one width shows in the descriptor's feature settings.

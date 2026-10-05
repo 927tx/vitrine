@@ -1187,7 +1187,14 @@ typedef struct {
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(followSong) object:nil];
     _browsing = YES;
+    if (self.browsingBegan) self.browsingBegan();
     for (SGRKaraokeLineView *view in _shown.allValues) view.blur = 0;
+}
+
+- (void)setExtrasHidden:(BOOL)hidden {
+    _extrasHidden = hidden;
+    _extras.alpha = hidden ? 0 : 1;
+    _extras.userInteractionEnabled = !hidden;
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
@@ -1423,6 +1430,7 @@ typedef struct {
         _extras.showsMenuAsPrimaryAction = YES;
         _extras.preferredMenuElementOrder = UIContextMenuConfigurationElementOrderFixed;
         _extras.accessibilityLabel = @"Pronunciation and translation";
+        self.extrasHidden = _extrasHidden;
         [self addSubview:_extras];
     }
     NSMutableArray<UIMenuElement *> *items = [NSMutableArray array];
