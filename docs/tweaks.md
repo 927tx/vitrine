@@ -149,6 +149,13 @@ Shared:
                   by the attributes' type in LiveActivityShared.swift, compiled into both. It starts only with Spotify
                   in front; its switch and its view apply at once
 
+    ListeningStats/ listening stats kept on the phone (ListeningStats.h lists its files): each music track timed while
+                  it plays through PlayerState's observer and written to a text log in Application Support once it ran 30 s
+                  or half the track (ListeningStats.x), Spotify's data export read in, either shape, loose or zipped, plays
+                  already there skipped (SGPlayLog.m), and a page of the top tracks, artists and albums of a week, a month,
+                  a year and all time. Tested on the Mac against harness/listening-stats/, the page and the recorder in the
+                  simulator against its sim/
+
 Native:
 
     Appearance/   AMOLED (Amoled.x), the accent colour (Accent.x), the soft top edge (EdgeEffect.x), and Repaint.x, which

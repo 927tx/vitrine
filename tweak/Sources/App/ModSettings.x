@@ -21,6 +21,7 @@
 #import "Shared/Flags/Flags.h"
 #import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/LiveActivity/LiveActivity.h"
+#import "Shared/ListeningStats/ListeningStats.h"
 #import "App/About/About.h"
 #import "Redesigned/Album/Album.h"
 #import "Pages.h"
@@ -57,6 +58,7 @@ static UIViewController *modSettingsPage(void) {
         liveActivity.value = ^NSString *{ return SGLiveActivitySummary(); };
         [parts addObject:liveActivity];
     }
+    [parts addObject:pageRow(@"Listening stats", @"chart.bar", ^UIViewController *{ return SGListeningStatsPage(); })];
     if (!SGRedesignedUIStored()) [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
     else [parts addObject:pageRow(@"Albums & artists", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
     [sections addObjectsFromArray:@[
