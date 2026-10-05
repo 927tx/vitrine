@@ -20,6 +20,9 @@ private typealias Tab = SGLyricsAttributes.Tab
 struct SGLiveActivityBundle: WidgetBundle {
     var body: some Widget {
         SGLyricsLiveActivity()
+        if #available(iOS 18.0, *) {
+            SGLyricsWatchLiveActivity()
+        }
     }
 }
 
@@ -83,41 +86,125 @@ extension SGLyricsAttributes.Tab {
 
 struct SGLyricsLiveActivity: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: SGLyricsAttributes.self) { context in
-            FamilyView(state: context.state)
-                .foregroundStyle(.white)
-                .activityBackgroundTint(tint(context.state))
-                .activitySystemActionForegroundColor(.white)
-                .widgetURL(URL(string: "spotify:"))
-        } dynamicIsland: { context in
-            DynamicIsland {
-                DynamicIslandExpandedRegion(.bottom) {
-                    Group {
-                        if context.state.view == .panel {
-                            Summary(state: context.state)
-                        } else {
-                            ContentView(state: context.state, upNext: 3)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 4)
-                }
-            } compactLeading: {
-                Badge(state: context.state)
-            } compactTrailing: {
-                if let end = context.state.timerEnd, end > Date() {
-                    Text(timerInterval: Date()...end, countsDown: true)
-                        .monospacedDigit()
-                        .foregroundStyle(green)
-                        .frame(maxWidth: 44)
-                } else {
-                    ProgressRing(state: context.state)
-                }
-            } minimal: {
-                Badge(state: context.state)
-            }
+        lyricsActivity(SGLyricsAttributes.self) { FamilyView(state: $0) }
+    }
+}
+
+// The same activity from iOS 18, with its own small layout on Apple Watch and in CarPlay.
+@available(iOS 18.0, *)
+struct SGLyricsWatchLiveActivity: Widget {
+    var body: some WidgetConfiguration {
+        lyricsActivity(SGLyricsWatchAttributes.self) { FamilyAwareView(state: $0) }
+            .supplementalActivityFamilies([.small])
+    }
+}
+
+private func lyricsActivity<A: ActivityAttributes, Card: View>(
+    _: A.Type, @ViewBuilder card: @escaping (State) -> Card
+) -> ActivityConfiguration<A> where A.ContentState == State {
+    ActivityConfiguration(for: A.self) { context in
+        card(context.state)
+            .foregroundStyle(.white)
+            .activityBackgroundTint(tint(context.state))
+            .activitySystemActionForegroundColor(.white)
             .widgetURL(URL(string: "spotify:"))
+    } dynamicIsland: { context in
+        DynamicIsland {
+            // The row beside the camera: a note, and the sleep timer or whether it plays.
+            DynamicIslandExpandedRegion(.leading) {
+                Image(systemName: "music.note")
+                    .foregroundStyle(green)
+                    .padding(.leading, 6)
+            }
+            DynamicIslandExpandedRegion(.trailing) {
+                Group {
+                    if let end = runningTimer(context.state) {
+                        Countdown(end: end)
+                    } else {
+                        PlayingSymbol(state: context.state)
+                    }
+                }
+                .padding(.trailing, 6)
+            }
+            DynamicIslandExpandedRegion(.bottom) {
+                Group {
+                    if context.state.view == .panel {
+                        Summary(state: context.state)
+                    } else {
+                        ContentView(state: context.state, upNext: 3)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
+                // The island is always black, whatever the card's tint.
+                .foregroundStyle(.white)
+            }
+        } compactLeading: {
+            Badge(state: context.state)
+        } compactTrailing: {
+            if let end = runningTimer(context.state) {
+                Countdown(end: end)
+                    .frame(maxWidth: 44)
+            } else {
+                ProgressRing(state: context.state)
+            }
+        } minimal: {
+            Badge(state: context.state)
         }
+        .widgetURL(URL(string: "spotify:"))
+    }
+}
+
+@available(iOS 18.0, *)
+private struct FamilyAwareView: View {
+    let state: State
+    @Environment(\.activityFamily) private var family
+
+    var body: some View {
+        switch family {
+        case .small: SmallView(state: state)
+        default: FamilyView(state: state)
+        }
+    }
+}
+
+// Apple Watch's Smart Stack and CarPlay: the cover and the line, or the track while the view is not
+// the lyrics, and the bar under them. Nothing to tap, since a tap there opens Spotify on the iPhone.
+private struct SmallView: View {
+    let state: State
+
+    private var lines: (String, String) {
+        if state.view == .lyrics, !state.line.isEmpty {
+            return (state.line, state.translation.flatMap { $0.isEmpty ? nil : $0 } ?? state.nextLine)
+        }
+        return (state.title, state.artist)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 8) {
+                if let image = coverImage(state) {
+                    Cover(image: image, side: 32)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(lines.0)
+                        .font(.headline)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+                        .direction(of: lines.0)
+                    if !lines.1.isEmpty {
+                        Text(lines.1)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.6))
+                            .lineLimit(1)
+                            .direction(of: lines.1)
+                    }
+                }
+            }
+            ProgressBar(state: state)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
     }
 }
 
@@ -142,6 +229,32 @@ private struct FamilyView: View {
     }
 }
 
+// The sleep timer's end while it is still ahead; nil once it is up or when none is set, so no countdown
+// is drawn from a range that runs backwards.
+private func runningTimer(_ state: State) -> Date? {
+    state.timerEnd.flatMap { $0 > Date() ? $0 : nil }
+}
+
+private struct Countdown: View {
+    let end: Date
+
+    var body: some View {
+        Text(timerInterval: Date()...end, countsDown: true)
+            .monospacedDigit()
+            .foregroundStyle(green)
+    }
+}
+
+// Paused or playing, where there is no progress or sleep timer to show.
+private struct PlayingSymbol: View {
+    let state: State
+
+    var body: some View {
+        Image(systemName: state.paused ? "pause.fill" : "waveform")
+            .foregroundStyle(green)
+    }
+}
+
 // The track's progress as a ring, for the compact Dynamic Island, which Apple Watch and CarPlay show too.
 private struct ProgressRing: View {
     let state: State
@@ -159,8 +272,7 @@ private struct ProgressRing: View {
             .tint(green)
             .frame(width: 18, height: 18)
         } else {
-            Image(systemName: state.paused ? "pause.fill" : "waveform")
-                .foregroundStyle(green)
+            PlayingSymbol(state: state)
         }
     }
 }
@@ -213,6 +325,29 @@ private struct LyricsView: View {
     }
 
     var body: some View {
+        // No line being sung (before the first, in a break, without lyrics): the track holds the place.
+        if state.line.isEmpty || state.line == "♪" {
+            VStack(alignment: .center, spacing: 2) {
+                Text(state.title.isEmpty ? "♪" : state.title)
+                    .font(lineFont.weight(.bold))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+                    .direction(of: state.title)
+                if !state.title.isEmpty, !state.artist.isEmpty {
+                    Text(state.artist)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .direction(of: state.artist)
+                }
+            }
+        } else {
+            line
+        }
+    }
+
+    private var line: some View {
         VStack(alignment: .center, spacing: 4) {
             Text(state.line)
                 .font(lineFont.weight(.bold))

@@ -10,16 +10,23 @@ public final class SGLiveActivityBridge: NSObject {
     // Under ActivityKit's 4096, with room for its own wrapping.
     private static let maxStateBytes = 3800
 
-    private static var current: Activity<SGLyricsAttributes>? {
-        Activity<SGLyricsAttributes>.activities.first { $0.activityState == .active || $0.activityState == .stale }
+    private typealias State = SGLyricsAttributes.ContentState
+
+    // Either type's activities: one left from before an update to iOS 18 carries on under its own.
+    private static func live<A>(_ activities: [Activity<A>]) -> [String] {
+        activities.filter { $0.activityState == .active || $0.activityState == .stale }.map(\.id)
     }
 
-    @objc public static var isShowing: Bool { current != nil }
+    private static var showing: [String] {
+        live(Activity<SGLyricsAttributes>.activities) + live(Activity<SGLyricsWatchAttributes>.activities)
+    }
+
+    @objc public static var isShowing: Bool { !showing.isEmpty }
 
     // Updates and ends go out one at a time in the order asked for, since ActivityKit applies
     // concurrent ones in whatever order they finish. An update still waiting gives way to a newer one.
     private enum Change: Sendable {
-        case update(String, ActivityContent<SGLyricsAttributes.ContentState>)
+        case update(String, ActivityContent<State>)
         case end([String])
     }
 
@@ -51,12 +58,15 @@ public final class SGLiveActivityBridge: NSObject {
             }
             return pending.changes.removeFirst()
         }) {
-            let activities = Activity<SGLyricsAttributes>.activities
             switch change {
             case .update(let id, let content):
-                await activities.first { $0.id == id }?.update(content)
+                await Activity<SGLyricsAttributes>.activities.first { $0.id == id }?.update(content)
+                await Activity<SGLyricsWatchAttributes>.activities.first { $0.id == id }?.update(content)
             case .end(let ids):
-                for activity in activities where ids.contains(activity.id) {
+                for activity in Activity<SGLyricsAttributes>.activities where ids.contains(activity.id) {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
+                for activity in Activity<SGLyricsWatchAttributes>.activities where ids.contains(activity.id) {
                     await activity.end(nil, dismissalPolicy: .immediate)
                 }
             }
@@ -89,8 +99,8 @@ public final class SGLiveActivityBridge: NSObject {
             log.notice("[spotifyglass] live activity: \(size, privacy: .public) bytes, sent without the cover")
         }
         let content = ActivityContent(state: state, staleDate: nil)
-        if let activity = current {
-            queue(.update(activity.id, content))
+        if let id = showing.first {
+            queue(.update(id, content))
             return
         }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
@@ -98,8 +108,13 @@ public final class SGLiveActivityBridge: NSObject {
             return
         }
         do {
-            let activity = try Activity.request(attributes: SGLyricsAttributes(), content: content, pushType: nil)
-            log.notice("[spotifyglass] live activity: started \(activity.id, privacy: .public)")
+            let id: String
+            if #available(iOS 18.0, *) {
+                id = try Activity.request(attributes: SGLyricsWatchAttributes(), content: content, pushType: nil).id
+            } else {
+                id = try Activity.request(attributes: SGLyricsAttributes(), content: content, pushType: nil).id
+            }
+            log.notice("[spotifyglass] live activity: started \(id, privacy: .public)")
         } catch {
             log.error("[spotifyglass] live activity: request failed: \(String(describing: error), privacy: .public)")
         }
@@ -107,6 +122,6 @@ public final class SGLiveActivityBridge: NSObject {
 
     // Named now, so an activity requested after this call is not ended with them.
     @objc public static func end() {
-        queue(.end(Activity<SGLyricsAttributes>.activities.map(\.id)))
+        queue(.end(Activity<SGLyricsAttributes>.activities.map(\.id) + Activity<SGLyricsWatchAttributes>.activities.map(\.id)))
     }
 }

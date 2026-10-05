@@ -56,6 +56,15 @@ struct SGLyricsAttributes: ActivityAttributes {
     }
 }
 
+// The same activity under a second name. Apple Watch and CarPlay show an activity's own small layout
+// only when its widget declares that family, which only an iOS 18 widget can, and a widget built for
+// iOS 17 still has to cover the old type. So from iOS 18 the tweak asks for this one, and the iOS 18
+// widget is the one that answers it.
+@available(iOS 16.1, *)
+struct SGLyricsWatchAttributes: ActivityAttributes {
+    typealias ContentState = SGLyricsAttributes.ContentState
+}
+
 // LiveActivityIntents run in the app's process, where the tweak acts on these notifications.
 let SGLiveActivityPlayNotification = Notification.Name("SGLiveActivityPlay")
 let SGLiveActivityActionNotification = Notification.Name("SGLiveActivityAction")

@@ -283,7 +283,8 @@ static void tick(void) API_AVAILABLE(ios(17.0)) {
     }
 
     BOOL panel = view == SGLiveActivityPanel;
-    NSString *title = panel ? track.trackTitle : @"", *artist = panel ? track.artistName ?: @"" : @"";
+    // Every view sends the track, which Apple Watch and CarPlay show beside the cover.
+    NSString *title = track.trackTitle ?: @"", *artist = track.artistName ?: @"";
     BOOL shuffle = panel && state.options.shufflingContext;
     NSInteger repeatMode = panel ? repeatModeOf(state.options) : 0;
     NSInteger tab = panel ? sg_tab : 0;
