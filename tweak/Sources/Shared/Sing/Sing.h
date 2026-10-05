@@ -4,10 +4,14 @@
 //
 //     SGSingModel.m       the voice model: downloaded, each file checked against its size and SHA-256, loaded
 //     SGSingSeparator.m   the STFT around the model: two seconds in, their vocals out
-//     SGSingEngine.m      Spotify's mixer pulled ahead of what plays, the vocals separated in the lead and mixed down
+//     SGSingEngine.m      Spotify's mixer pulled ahead of what plays, the vocals separated in the lead, mixed down
+//                         and put where spatial voice holds them
 //     Sing.x              the engine put between Spotify's mixer and its output (through Shared/Player/SpeedPitch.x's
-//                         chain), Spotify's clock and seeks kept true to what plays, the heat, and what Sing is doing
-//     SingSettings.m      the Sing page
+//                         chain), Spotify's clock and seeks kept true to what plays, the heat, what Sing is doing,
+//                         and the head's turn for spatial voice (Shared/HeadGestures' motion)
+//     SingSettings.m      the Sing page, and Spatial voice's under it
+//     SGSpatialPreview.m  the Spatial voice page's preview: the voice in front of the listener on a field of dots,
+//                         turned by the head the way the audio is
 //
 // The voice model is public and MIT licensed: Mel-Band RoFormer (Ju-Chiang Wang, Wei-Tsung Lu, Minz Won) with
 // KimberleyJensen's vocal checkpoint, its spectral core exported for Core ML with two-second windows, from
@@ -25,6 +29,9 @@
 #define SGKeySingIgnoreHeat @"spotifyglass.sing.ignoreHeat"
 // Where the model runs: an index into SGSingComputeUnitNames(), read as it loads.
 #define SGKeySingComputeUnits @"spotifyglass.sing.computeUnits"
+// Spatial voice: through headphones that track the head, the vocals stay in front as it turns; off until
+// switched on, and at once.
+#define SGKeySingSpatial @"spotifyglass.sing.spatial"
 
 // Posted on the main thread whenever what Sing is doing, or its model's download, changes.
 extern NSString *const SGSingChangedNotification;
@@ -57,6 +64,19 @@ void SGSetSingLevel(float level);
 // A level as the slider reads it out: Gone, a percentage, As sung, Backing and a percentage, Vocals only.
 NSString *SGSingLevelText(double level);
 void SGSetSingIgnoresHeat(BOOL ignores);
+// Whether this iPhone runs Sing and reads headphone motion, which spatial voice needs.
+BOOL SGSingSpatialAvailable(void);
+BOOL SGSingSpatial(void);
+// Stored, the motion's permission asked for when it goes on, and applied at once.
+void SGSetSingSpatial(BOOL on);
+
+// The top of the Spatial voice page: listener and voice on a field of dots seen from behind the head, which
+// follows the head through HeadGestures' motion while it is on screen and the motion is allowed, and idles
+// otherwise, a line under it saying which.
+@interface SGSpatialPreview : UIView
+// Reads the switch and the motion's permission again.
+- (void)refresh;
+@end
 // Loads the model again on the compute units now stored, if it is loaded.
 void SGSingComputeUnitsChanged(void);
 // What the main page's Sing row reads out: On, Off, or how far the model has come.

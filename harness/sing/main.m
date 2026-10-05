@@ -9,8 +9,15 @@
 //   thread that keeps real time, while the engine's worker separates ahead: the lead it builds, every frame
 //   out in order, the vocals level applied, a flush, the lead given back when Sing is switched off, and
 //   no allocation on the render thread.
+// - spatial voice, without the model: a separator that hands the whole window back as vocals, so what plays is
+//   the vocals placed. A tone straight ahead plays exactly as it came; at 90 degrees right the right ear has it
+//   louder by the pan's 7.7 dB at the same power and the left ear late by the delay around the head; at 90
+//   degrees left the same mirrored; back ahead it is exact again; and no turn clicks. Then the front the voice
+//   is held off: a turned head has it off to the side, the front catching up over 20 s, across +-180 degrees
+//   without a jump, and ahead again after a gap in the motion.
 //
 //     ./build.sh && build/sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]
+//     ./build.sh && build/sing spatial
 #import <Foundation/Foundation.h>
 #import <Accelerate/Accelerate.h>
 #import <AudioToolbox/AudioToolbox.h>
@@ -356,11 +363,132 @@ static void checkEngine(SGSingSeparator *separator, Audio mix, Audio voice, Audi
     SGSingEngineDestroy(engine);
 }
 
+#pragma mark - spatial voice
+
+// Every window is all vocals.
+@interface SGWholeSeparator : SGSingSeparator
+@end
+
+@implementation SGWholeSeparator
+- (BOOL)separateLeft:(const float *)left right:(const float *)right vocalsLeft:(float *)vocalsLeft vocalsRight:(float *)vocalsRight error:(NSError **)error {
+    memcpy(vocalsLeft, left, kSGSingWindowFrames * sizeof(float));
+    memcpy(vocalsRight, right, kSGSingWindowFrames * sizeof(float));
+    return YES;
+}
+@end
+
+static double energy(const float *samples, size_t from, size_t to) {
+    double sum = 0;
+    for (size_t i = from; i < to; i++) sum += (double)samples[i] * samples[i];
+    return sum;
+}
+
+// The lag in frames by which the left channel follows the right, the best of +-45 (the tone's period is 100).
+static int leftLag(Audio audio, size_t from, size_t to) {
+    int best = 0;
+    double bestSum = -INFINITY;
+    for (int lag = -45; lag <= 45; lag++) {
+        double sum = 0;
+        for (size_t i = from; i < to; i++) sum += (double)audio.right[i] * audio.left[i + lag];
+        if (sum > bestSum) bestSum = sum, best = lag;
+    }
+    return best;
+}
+
+static void checkSpatial(void) {
+    size_t frames = 14 * kSGSingRate;
+    Audio tone = makeAudio(frames);
+    for (size_t i = 0; i < frames; i++) tone.left[i] = tone.right[i] = (float)(0.5 * sin(2 * M_PI * 440 * i / kSGSingRate));
+    SGSingEngine *engine = SGSingEngineCreate();
+    SGSingEngineSetSeparator(engine, [[SGWholeSeparator alloc] initWithModel:nil]);
+    SGSingEngineSetLevel(engine, 1);
+    SGSingEngineSetOn(engine, true);
+    Source source = {tone, 0};
+    atomic_store(&sg_renderAllocations, 0);
+    malloc_logger = countAllocation;
+    Audio out = play(engine, tone, &source, 1024, 14, ^(double played) {
+        if (played >= 5 && played < 8) SGSingEngineSetVoiceAngle(engine, (float)M_PI_2);
+        if (played >= 8 && played < 11) SGSingEngineSetVoiceAngle(engine, -(float)M_PI_2);
+        if (played >= 11) SGSingEngineSetVoiceAngle(engine, 0);
+    });
+    malloc_logger = NULL;
+    CHECK(atomic_load(&sg_renderAllocations) == 0, "spatial voice: no allocation on the render thread (%u)", atomic_load(&sg_renderAllocations));
+    SGSingEngineStats stats = SGSingEngineReadStats(engine);
+    CHECK(stats.ready > 0 && stats.dryFrames < 4 * kSGSingRate, "spatial voice: the vocals are in (%.2f s separated ahead, %.2f s played dry)",
+          stats.ready, stats.dryFrames / (double)kSGSingRate);
+
+    double ahead = 0;
+    for (size_t i = 3 * kSGSingRate; i < 5 * kSGSingRate; i++) ahead = fmax(ahead, fmax(fabsf(out.left[i] - tone.left[i]), fabsf(out.right[i] - tone.right[i])));
+    CHECK(ahead == 0, "straight ahead the vocals play exactly as they came (%.2g)", ahead);
+
+    // Expected at 90 degrees: the pan's gains, sqrt 2 times the cosine and sine of (0.5 + 1) * 45 degrees.
+    double panDB = 20 * log10(sin(1.5 * M_PI_4) / cos(1.5 * M_PI_4));
+    size_t rightFrom = (size_t)(6.5 * kSGSingRate), rightTo = (size_t)(7.5 * kSGSingRate);
+    size_t leftFrom = (size_t)(9.5 * kSGSingRate), leftTo = (size_t)(10.5 * kSGSingRate);
+    double toneEnergy = energy(tone.left, rightFrom, rightTo);
+    double rightDB = 10 * log10(energy(out.right, rightFrom, rightTo) / energy(out.left, rightFrom, rightTo));
+    double rightPower = 10 * log10((energy(out.left, rightFrom, rightTo) + energy(out.right, rightFrom, rightTo)) / (2 * toneEnergy));
+    int rightLag = leftLag(out, rightFrom, rightTo);
+    CHECK(fabs(rightDB - panDB) < 0.5 && fabs(rightPower) < 0.5,
+          "at 90 degrees right the right ear is %.2f dB louder (the pan's %.2f), at %+.2f dB of the power ahead", rightDB, panDB, rightPower);
+    // The delay around the head, 28.7 frames, and the low-pass's own lag at 440 Hz, about 2.
+    CHECK(rightLag >= 27 && rightLag <= 33, "and the left ear hears it %d frames later (%.2f ms)", rightLag, rightLag * 1000.0 / kSGSingRate);
+    double leftDB = 10 * log10(energy(out.left, leftFrom, leftTo) / energy(out.right, leftFrom, leftTo));
+    int leftLagFrames = leftLag(out, leftFrom, leftTo);
+    CHECK(fabs(leftDB - panDB) < 0.5 && leftLagFrames <= -27 && leftLagFrames >= -33,
+          "at 90 degrees left the left ear is %.2f dB louder and the right ear %d frames later", leftDB, -leftLagFrames);
+
+    double back = 0;
+    for (size_t i = 12 * kSGSingRate; i < 14 * kSGSingRate - 1024; i++) back = fmax(back, fmax(fabsf(out.left[i] - tone.left[i]), fabsf(out.right[i] - tone.right[i])));
+    CHECK(back == 0, "back straight ahead, exactly as they came again (%.2g)", back);
+
+    // No click: from one frame to the next the output moves no further than the tone at its loudest placement.
+    double toneStep = 0, step = 0;
+    for (size_t i = 3 * kSGSingRate; i < 14 * kSGSingRate - 1024; i++) {
+        toneStep = fmax(toneStep, fabsf(tone.left[i] - tone.left[i - 1]));
+        step = fmax(step, fmax(fabsf(out.left[i] - out.left[i - 1]), fabsf(out.right[i] - out.right[i - 1])));
+    }
+    double loudest = M_SQRT2 * sin(1.5 * M_PI_4);
+    CHECK(step <= toneStep * loudest * 1.02, "no click through the turns: the largest step is %.4f, the tone's %.4f times the louder gain %.3f",
+          step, toneStep, loudest);
+    writeWAV(@"spatial.wav", out);
+    SGSingEngineDestroy(engine);
+}
+
+// The front the voice is held off (SGSpatialVoiceAngle), fed at 25 Hz as AirPods send their motion.
+static void checkFront(void) {
+    SGSpatialFront front = {0};
+    double angle = SGSpatialVoiceAngle(&front, 0.3, 10);
+    CHECK(angle == 0, "the first motion is the front: the voice straight ahead (%.3f)", angle);
+    // The head turned 60 degrees left (yaw grows) at once, then held there.
+    double turned = SGSpatialVoiceAngle(&front, 0.3 + M_PI / 3, 10.04), held = turned;
+    double time = 10.04;
+    for (; time < 30.04 - 1e-9; time += 0.04) held = SGSpatialVoiceAngle(&front, 0.3 + M_PI / 3, time + 0.04);
+    CHECK(fabs(turned - M_PI / 3) < 0.01 && fabs(held - M_PI / 3 * exp(-1)) < 0.01,
+          "a head turned 60 degrees left has the voice %.1f degrees right, and 20 s on %.1f (the front's 1/e: %.1f)",
+          turned * 180 / M_PI, held * 180 / M_PI, 60 * exp(-1));
+    // Across the back: yaw wraps from +179 to -179 degrees, which is 2 degrees further left, not 358 right.
+    SGSpatialFront back = {0};
+    SGSpatialVoiceAngle(&back, M_PI - 0.01, 0);
+    double wrapped = SGSpatialVoiceAngle(&back, -M_PI + 0.01, 0.04);
+    CHECK(fabs(wrapped - 0.02) < 0.001, "across +-180 degrees the voice moves %.2f degrees", wrapped * 180 / M_PI);
+    // Headphones out for 2 s and in again: the front starts over where the head points.
+    double again = SGSpatialVoiceAngle(&front, -1, time + 2);
+    CHECK(again == 0, "after a gap in the motion the voice is ahead again (%.3f)", again);
+}
+
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IOLBF, 0);
     @autoreleasepool {
+        if (argc == 2 && !strcmp(argv[1], "spatial")) {
+            sg_outDir = NSTemporaryDirectory();
+            checkSpatial();
+            checkFront();
+            printf("%s\n", sg_failures ? "FAILED" : "all passed");
+            return sg_failures ? 1 : 0;
+        }
         if (argc < 4) {
-            printf("usage: sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]\n");
+            printf("usage: sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]\n       sing spatial\n");
             return 2;
         }
         NSString *modelPath = @(argv[1]), *units = argc > 4 ? @(argv[4]) : @"all";
@@ -401,6 +529,8 @@ int main(int argc, char **argv) {
         writeWAV(@"accompaniment.wav", accompaniment);
 
         checkEngine(separator, mix, padded, vocals);
+        checkSpatial();
+        checkFront();
         printf("%s\n", sg_failures ? "FAILED" : "all passed");
         return sg_failures ? 1 : 0;
     }

@@ -17,15 +17,32 @@ files from https://huggingface.co/My-Name-Is-Jeff/vitrine-sing, a mirror of Dark
   with Sing on from the start: the mix plays dry while the lead fills, then exactly the mix less the vocals the
   offline pass finds, the lead given back after Sing is switched off and the mix playing on where it was, the
   top of the slider playing the vocals alone, a flush dropping the lead, and no allocation on the render thread
-  (`malloc_logger`).
+  (`malloc_logger`);
+- spatial voice, without the model (a separator that hands each window back whole as vocals, so what plays is the
+  vocals placed): a 440 Hz tone at level 1 plays exactly as it came straight ahead; set 90 degrees right, the right
+  ear has it 7.75 dB louder (the narrowed pan's 7.66 and the far ear's low-pass) at the same power, and the left ear
+  31 frames later (the 28.7 frames around a head and the low-pass's own lag); 90 degrees left mirrors it; back ahead
+  it is exact again; no step from one frame to the next is larger than the tone's own at the louder gain, so no
+  turn clicks; and nothing is allocated on the render thread;
+- the front spatial voice holds the voice off (SGSpatialVoiceAngle, shared with the Spatial voice page's preview),
+  fed at 25 Hz: a head turned 60 degrees left has the voice 60 degrees right, and 20 s on 22 (the front's 1/e);
+  yaw wrapping across 180 degrees moves the voice by the 1 degree it turned; a gap of 2 s starts it ahead again.
 
 The voice is macOS's own speech, `say -o speech.aiff "..."` (any file ExtAudioFile reads will do), repeated a
 second apart over 30 seconds.
 
     ./build.sh && build/sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]
     ./build.sh thread && build/sing-thread <separator.mlmodelc> <voice> <out dir> gpu     (ThreadSanitizer)
+    ./build.sh && build/sing spatial                                                         (spatial voice alone)
 
-The out dir gets `mix.wav`, `vocals.wav`, `accompaniment.wav` and `engine.wav` (what played).
+The out dir gets `mix.wav`, `vocals.wav`, `accompaniment.wav`, `engine.wav` (what played) and `spatial.wav` (the
+tone turned; the temporary folder's with `spatial` alone).
+
+2026-10-05, spatial voice: everything passes, under ThreadSanitizer too. The full run passes with it; one run on a
+Mac loaded far past its cores had the model fall behind (790 ms a window, 3.6 s played dry) and failed the two
+vocals scores; the harness built from before spatial voice passed right after it, and this one on the next run.
+
+2026-10-06, the front: `build/sing spatial` passes with its four checks.
 
 2026-10-05, a MacBook with an M4, macOS 27: everything passes under `gpu` and under ThreadSanitizer.
 

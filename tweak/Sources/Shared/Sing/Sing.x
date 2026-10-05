@@ -20,13 +20,22 @@
 // The model is held only while the mic is on, and loaded on a queue of its own. From the thermal state
 // Serious on, the engine is held and plays dry, unless Ignore heat warnings is on.
 //
-// Threading: the stage on the render thread; Spotify starts its output on a thread of its own; the rest main.
+// Spatial voice listens to Shared/HeadGestures' motion (the app's one CMHeadphoneMotionManager) while Sing is
+// on and Spotify plays, and hands the engine the head's yaw off a front that follows where the head points over
+// 20 s, so the voice drifts back ahead of a head that stays turned and the attitude's own drift never carries
+// it off. With no motion (no such headphones, Motion & Fitness not allowed) the voice stays ahead. iOS's own
+// spatial audio on the route already holds the whole song in place, so spatial voice stands down for it.
+//
+// Threading: the stage on the render thread; Spotify starts its output on a thread of its own; the head's
+// motion on HeadGestures' queue; the rest main.
 #import <AudioToolbox/AudioToolbox.h>
+#import <AVFoundation/AVFoundation.h>
 #import <CoreML/CoreML.h>
 #import <pthread.h>
 #import <stdatomic.h>
 #import "Core/SGCore.h"
 #import "Core/SGRebind.h"
+#import "Shared/HeadGestures/HeadGestures.h"
 #import "Shared/Player/PlayerState.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "Sing.h"
@@ -166,6 +175,58 @@ static void unloadModel(void) {
     if (engine) SGSingEngineSetSeparator(engine, nil);
 }
 
+#pragma mark - spatial voice
+
+static BOOL sg_spatialListening;
+// On HeadGestures' motion queue only.
+static SGSpatialFront sg_front;
+
+static void headMoved(CMDeviceMotion *motion) {
+    SGSingEngine *engine = atomic_load_explicit(&sg_engine, memory_order_acquire);
+    if (!motion) {
+        sg_front.hasFront = false;
+        if (engine) SGSingEngineSetVoiceAngle(engine, 0);
+        return;
+    }
+    double angle = SGSpatialVoiceAngle(&sg_front, motion.attitude.yaw, motion.timestamp);
+    if (engine) SGSingEngineSetVoiceAngle(engine, (float)angle);
+}
+
+// iOS's own spatial audio (Spatialize Stereo, or a spatial headphone's own) on the route.
+static BOOL systemSpatial(void) {
+    for (AVAudioSessionPortDescription *port in AVAudioSession.sharedInstance.currentRoute.outputs) {
+        if (port.spatialAudioEnabled) return YES;
+    }
+    return NO;
+}
+
+// Listens to the head while Sing is on, spatial voice is on and Spotify plays, and iOS does not hold the song in
+// place itself; otherwise the voice goes back ahead (HeadGestures hands a listener taken out nil).
+static void updateSpatial(void) {
+    SPTPlayerState *player = SGPlayerState();
+    BOOL wanted = SGSingOn() && !SGSingMissing() && SGSingSpatial() && player.isPlaying && !player.isPaused;
+    BOOL listen = wanted && !systemSpatial();
+    if (listen == sg_spatialListening) return;
+    sg_spatialListening = listen;
+    SGLog(@"sing: spatial voice %@", listen ? @"follows the head" : wanted ? @"stands down for iOS's own spatial audio" : @"is ahead");
+    SGHeadMotionListen(@"sing", listen ? ^(CMDeviceMotion *motion) { headMoved(motion); } : nil);
+}
+
+BOOL SGSingSpatialAvailable(void) {
+    return SGSingOSSupported() && SGSingDeviceSupported() && SGHeadGesturesAvailable();
+}
+
+BOOL SGSingSpatial(void) {
+    return SGHidden(SGKeySingSpatial);
+}
+
+void SGSetSingSpatial(BOOL on) {
+    SGSetEnabled(SGKeySingSpatial, on);
+    // Asked while the Sing page is in front, rather than with the next song.
+    if (on) SGHeadMotionAskPermission();
+    updateSpatial();
+}
+
 #pragma mark - the state
 
 static void watch(void);
@@ -187,6 +248,7 @@ static void apply(void) {
     SGSingEngineSetOn(engine, on);
     if (on) loadModel();
     else unloadModel();
+    updateSpatial();
     watch();
 }
 
@@ -364,8 +426,9 @@ static void tick(void) {
     if (engine && SGSingOn() && CFAbsoluteTimeGetCurrent() - summarized >= 30) {
         summarized = CFAbsoluteTimeGetCurrent();
         SGSingEngineStats stats = SGSingEngineReadStats(engine);
-        SGLog(@"sing: %@, %llu windows at %.0f ms each (1500 ms keeps up), lead %.2f s of %.2f s, %.2f s separated ahead, %llu frames dry, %llu failures",
-              SGSingStatusText(), stats.windows, stats.averageMS, stats.lead, stats.targetLead, stats.ready, stats.dryFrames, stats.failures);
+        SGLog(@"sing: %@, %llu windows at %.0f ms each (1500 ms keeps up), lead %.2f s of %.2f s, %.2f s separated ahead, %llu frames dry, %llu failures%@",
+              SGSingStatusText(), stats.windows, stats.averageMS, stats.lead, stats.targetLead, stats.ready, stats.dryFrames, stats.failures,
+              sg_spatialListening ? [NSString stringWithFormat:@", the voice %.0f degrees right", stats.voiceAngle * 180 / M_PI] : @"");
     }
     // Off, with the lead given back: nothing left to watch.
     if (!SGSingOn() && (!engine || SGSingEngineLead(engine) <= 0)) {
@@ -386,6 +449,7 @@ static void watch(void) {
 @implementation SGSingTrackWatcher
 // A new track well before the last one's end was played, not reached: the lead is the old track's.
 - (void)playerStateDidChange:(SPTPlayerState *)state {
+    updateSpatial();
     NSString *track = SGURIString(state.track.URI);
     if (track && sg_lastTrack && ![track isEqualToString:sg_lastTrack] && sg_lastRaw >= 0 && sg_lastDuration > 0
         && sg_lastDuration - sg_lastRaw > kEndSlack + kWatchEvery && CFAbsoluteTimeGetCurrent() - sg_lastFlush > 1) {
@@ -468,6 +532,11 @@ static void readHeat(void) {
         SGAddPlayerStateObserver(watcher);
         [NSNotificationCenter.defaultCenter addObserverForName:NSProcessInfoThermalStateDidChangeNotification object:nil queue:NSOperationQueue.mainQueue
                                                     usingBlock:^(NSNotification *note) { readHeat(); }];
+        // Headphones in or out, or iOS's own spatial audio switched.
+        for (NSNotificationName name in @[AVAudioSessionRouteChangeNotification, AVAudioSessionSpatialPlaybackCapabilitiesChangedNotification]) {
+            [NSNotificationCenter.defaultCenter addObserverForName:name object:nil queue:NSOperationQueue.mainQueue
+                                                        usingBlock:^(NSNotification *note) { updateSpatial(); }];
+        }
         [NSNotificationCenter.defaultCenter addObserverForName:SGSingChangedNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
             // A download finishing with the mic already on loads the model.
             if (SGSingOn() && !sg_separator && !sg_loading && !sg_loadError) apply();

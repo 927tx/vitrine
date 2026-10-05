@@ -159,9 +159,15 @@ Shared:
                   and an engine that stands in Speed and pitch's chain between Spotify's mixer and its output
                   (SGPlayerSetStage), pulls the mixer a few seconds ahead of what plays, separates two-second windows
                   there on a worker thread and mixes the vocals down on the render thread. Spotify's clock has the lead
-                  taken off (SPTPlayerState's positionAsOfTimestamp), and a seek, a skip or a stop drops it. The mic is
-                  on the redesign's lyrics (Redesigned/Lyrics/SGRSingButton.m). Tested on the Mac against harness/sing/,
-                  the download against its download/
+                  taken off (SPTPlayerState's positionAsOfTimestamp), and a seek, a skip or a stop drops it. Spatial
+                  voice holds the separated vocals in front as the head turns: HeadGestures' motion gives the yaw off a
+                  front that follows the head over 20 s, and the render thread pans the vocals' middle at equal power,
+                  narrowed, with the far ear up to 0.65 ms late and low-passed; it stands down for iOS's own spatial
+                  audio. The Spatial voice page's preview (SGSpatialPreview.m) turns a disc of dots under the listener by
+                  the same front (SGSpatialVoiceAngle, SGSingEngine.h), on Core Animation alone and only while the page
+                  shows. The mic is on the redesign's lyrics (Redesigned/Lyrics/SGRSingButton.m). Tested on the Mac
+                  against harness/sing/ (spatial voice and its front without the model: `build/sing spatial`), the
+                  download against its download/, the pages in the simulator against harness/spatial-page/
     Haptics/      Vibrations (Haptics.h lists its files): a tap of UIKit's feedback generators for the player's and the now
                   playing bar's controls, the scrubber's tenths and ends, cover swipes, gestures and the lyrics page's tap to
                   seek, at the strength set for them (ControlHaptics.x, SGFeedback.m); and Music Haptics, Core Haptics
@@ -179,7 +185,9 @@ Shared:
                   Spotify's collection platform (addURL:showUIConfirmation:completion:), and a shake, which skips; a
                   tone played through Spotify's playback session confirms each, whatever the Ring/Silent switch says.
                   Learning one's own nod and shake sets the thresholds, each kept only if the detector, set to it,
-                  finds the gesture in what was recorded. The detector is
+                  finds the gesture in what was recorded. The one CMHeadphoneMotionManager is lent to other features
+                  (SGHeadMotionListen: Sing's spatial voice), and runs for them with the switch off, the detector then
+                  unfed. The detector is
                   tested on the Mac against harness/head-gestures/, the hook and the page in the simulator against its sim/
     LiveActivity/ a Live Activity on the lock screen and in the Dynamic Island in one of three views, the line being
                   sung with the next one under it, the tracks up next (a tap on one skipping ahead to it), or a control
@@ -328,7 +336,10 @@ lyrics for every track, naming the source in the redesign, the lock screen, and 
 the redesign also which of the lyrics, their pronunciation and their translation is set largest, and the
 translation's language. Sing, under either look, on the main page and as Lyrics' first row, the row reading out On,
 Off or how far the voice model's download has come, kept up to date while the page shows: Sing's switch, which turns
-the mic on and off at once, its Status (a tap says more), the Vocals slider (gone, as sung, the vocals alone), the voice model's download, Runs on (GPU, GPU
+the mic on and off at once, its Status (a tap says more), the Vocals slider (gone, as sung, the vocals alone), Spatial voice
+(where the iPhone reads headphone motion; a page of its own, reading out On or Off, with a live preview at its top that
+follows the head through AirPods, or sways gently without them and holds still under Reduce Motion, a line under it
+saying which, then the switch), the voice model's download, Runs on (GPU, GPU
 and Neural Engine, Neural Engine) and Ignore heat warnings, all applying straight away. Player: Gestures, AirPods gestures, Blocked
 artists (with the count on the row) and Lock screen widget (Moving artwork, Lyrics or Every song, and the
 lyrics' style, Still or Animated), which work with either look;

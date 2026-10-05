@@ -15,6 +15,13 @@ static const double kLeadPerModelTime = 1.5, kLeadSpare = 0.25;
 static const float kFadeSeconds = 0.1f;
 // How often the worker looks for a new window.
 static const useconds_t kPoll = 10000;
+// Spatial voice: at 90 degrees the pan goes this far of the way to one ear, the far ear hears the voice this
+// many frames late (0.65 ms, sound's way around a head) and through a one-pole low-pass of this coefficient
+// (about 3 kHz); the angle glides to where it is set over this long.
+static const float kVoiceWidth = 0.5f;
+static const float kVoiceDelay = 0.00065f * kSGSingRate;
+static const float kVoiceShadow = 0.35f;
+static const float kVoiceGlideSeconds = 0.05f;
 
 struct SGSingEngine {
     float *left, *right, *vocalsLeft, *vocalsRight;   // rings, a frame at position p at p % kRing
@@ -25,11 +32,13 @@ struct SGSingEngine {
     _Atomic uint64_t base;        // where the worker starts over, at the latest flush
     atomic_uint generation;       // counts the flushes
     atomic_bool flushAsked, on, paused, hasSeparator;
-    atomic_uint levelBits, targetLead;
+    atomic_uint levelBits, targetLead, voiceAngleBits;
 
     // The render thread's own.
     bool running;                 // the rings are in use: Sing is on, or the lead is not given back yet
     float amount, vocalsGain, otherGain;
+    float voiceAngle;             // where the voice is now, gliding to voiceAngleBits
+    float shadowLeft, shadowRight;   // the low-passes' last outputs, an ear each
 
     // The worker's.
     pthread_t worker;
@@ -85,6 +94,38 @@ static void gainsFor(float level, float *vocals, float *other) {
     *other = level <= 1 ? 1 : 2 - level;
 }
 
+// Where the voice is put at an angle: each ear's gain, delay in frames and low-pass coefficient (1 passes).
+typedef struct {
+    float gain[2], delay[2], shadow[2];
+} Placement;
+
+static Placement placementAt(float angle) {
+    if (angle == 0) return (Placement){{1, 1}, {0, 0}, {1, 1}};
+    // From -1 (the left ear) to 1 (the right): behind sounds as the front does, as it does to two ears.
+    float side = sinf(angle), far = fabsf(side);
+    // Equal power, with straight ahead at 1 each: the gains' squares always add up to 2.
+    float pan = (kVoiceWidth * side + 1) * (float)M_PI_4;
+    float gainLeft = (float)M_SQRT2 * cosf(pan), gainRight = (float)M_SQRT2 * sinf(pan);
+    float delay = far * kVoiceDelay, shadow = 1 - far * (1 - kVoiceShadow);
+    return side > 0 ? (Placement){{gainLeft, gainRight}, {delay, 0}, {shadow, 1}}
+                    : (Placement){{gainLeft, gainRight}, {0, delay}, {1, shadow}};
+}
+
+// The vocals' middle at `position`.
+static inline float middleAt(SGSingEngine *engine, uint64_t position) {
+    uint64_t index = position % kRing;
+    return (engine->vocalsLeft[index] + engine->vocalsRight[index]) * 0.5f;
+}
+
+// The vocals' middle `delay` frames before `position`, between two frames; at once where that is before the
+// rings started over at `base`, whose frames are a different moment's.
+static inline float middleBefore(SGSingEngine *engine, uint64_t position, uint64_t base, float delay) {
+    uint64_t whole = (uint64_t)delay;
+    float part = delay - (float)whole;
+    if (position < base + whole + 1) return middleAt(engine, position);
+    return middleAt(engine, position - whole) * (1 - part) + middleAt(engine, position - whole - 1) * part;
+}
+
 OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, float *right, SGSingPull pull, void *context) {
     // Larger than any slice an output asks for, and more than the rings leave room for: passed as it is.
     if (frames > kSGSingRate / 4) return pull(context, frames, left, right);
@@ -123,6 +164,17 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
     gainsFor(loadFloat(&engine->levelBits), &vocalsTo, &otherTo);
     float vocalsStep = (vocalsTo - engine->vocalsGain) / frames, otherStep = (otherTo - engine->otherGain) / frames;
     float fade = 1.0f / (kFadeSeconds * kSGSingRate), amountTo = on ? 1 : 0;
+
+    // The voice's angle glides the short way round towards the one set, and lands on it; within the buffer
+    // each ear's gain, delay and low-pass move in a straight line from where the angle was to where it is.
+    float angleTo = loadFloat(&engine->voiceAngleBits), angleFrom = engine->voiceAngle;
+    float turn = remainderf(angleTo - angleFrom, 2 * (float)M_PI);
+    float angle = fabsf(turn) < 1e-4f ? angleTo : remainderf(angleFrom + turn * (1 - expf(-(float)frames / (kVoiceGlideSeconds * kSGSingRate))), 2 * (float)M_PI);
+    engine->voiceAngle = angle;
+    bool placed = angleFrom != 0 || angle != 0;
+    Placement from = placementAt(angleFrom), to = placementAt(angle);
+    uint64_t base = atomic_load_explicit(&engine->base, memory_order_relaxed);
+
     uint64_t dry = 0;
     for (UInt32 i = 0; i < frames; i++) {
         uint64_t position = played + i, index = position % kRing;
@@ -131,10 +183,23 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
         engine->otherGain += otherStep;
         if (position < ready) {
             engine->amount += fmaxf(-fade, fminf(amountTo - engine->amount, fade));
-            float a = engine->amount, vocalsGain = engine->vocalsGain - 1, otherGain = engine->otherGain - 1;
+            float a = engine->amount, otherGain = engine->otherGain - 1;
             float v = engine->vocalsLeft[index], w = engine->vocalsRight[index];
-            left[i] = x + a * (vocalsGain * v + otherGain * (x - v));
-            right[i] = y + a * (vocalsGain * w + otherGain * (y - w));
+            // The vocals where they are to sound: as separated straight ahead.
+            float placedLeft = v, placedRight = w;
+            if (placed) {
+                float t = (float)(i + 1) / (float)frames, sides = (v - w) * 0.5f;
+                float leftIn = middleBefore(engine, position, base, from.delay[0] + (to.delay[0] - from.delay[0]) * t);
+                float rightIn = middleBefore(engine, position, base, from.delay[1] + (to.delay[1] - from.delay[1]) * t);
+                engine->shadowLeft += (from.shadow[0] + (to.shadow[0] - from.shadow[0]) * t) * (leftIn - engine->shadowLeft);
+                engine->shadowRight += (from.shadow[1] + (to.shadow[1] - from.shadow[1]) * t) * (rightIn - engine->shadowRight);
+                placedLeft = (from.gain[0] + (to.gain[0] - from.gain[0]) * t) * engine->shadowLeft + sides;
+                placedRight = (from.gain[1] + (to.gain[1] - from.gain[1]) * t) * engine->shadowRight - sides;
+            } else {
+                engine->shadowLeft = engine->shadowRight = (v + w) * 0.5f;
+            }
+            left[i] = x + a * (engine->vocalsGain * placedLeft - v + otherGain * (x - v));
+            right[i] = y + a * (engine->vocalsGain * placedRight - w + otherGain * (y - w));
         } else {
             engine->amount = 0;
             left[i] = x;
@@ -304,6 +369,10 @@ void SGSingEngineSetLevel(SGSingEngine *engine, float level) {
     storeFloat(&engine->levelBits, level);
 }
 
+void SGSingEngineSetVoiceAngle(SGSingEngine *engine, float radians) {
+    storeFloat(&engine->voiceAngleBits, isfinite(radians) ? remainderf(radians, 2 * (float)M_PI) : 0);
+}
+
 void SGSingEngineSetPaused(SGSingEngine *engine, bool paused) {
     atomic_store(&engine->paused, paused);
 }
@@ -326,6 +395,7 @@ SGSingEngineStats SGSingEngineReadStats(SGSingEngine *engine) {
         .targetLead = atomic_load(&engine->targetLead) / (double)kSGSingRate,
         .ready = ((double)ready - (double)played) / kSGSingRate,
         .averageMS = atomic_load(&engine->averageMicroseconds) / 1000.0,
+        .voiceAngle = loadFloat(&engine->voiceAngleBits),
         .windows = atomic_load(&engine->windows),
         .failures = atomic_load(&engine->failures),
         .dryFrames = atomic_load(&engine->dryFrames),

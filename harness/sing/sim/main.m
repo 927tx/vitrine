@@ -42,6 +42,13 @@ id SGPlayerState(void) {
     return nil;
 }
 
+// Shared/HeadGestures' head motion, for spatial voice: none in the simulator, so the voice stays ahead.
+void SGHeadMotionListen(NSString *name, void (^handler)(id motion)) {}
+void SGHeadMotionAskPermission(void) {}
+BOOL SGHeadGesturesAvailable(void) {
+    return NO;
+}
+
 @interface SPTPlayerState : NSObject
 @property (nonatomic) double positionAsOfTimestamp;
 @property (nonatomic, strong) NSDate *timestamp;
