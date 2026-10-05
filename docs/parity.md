@@ -170,4 +170,3 @@ Rebuilt from behaviour-only descriptions; each commit credits the PR's author.
 ## Still open
 
 - Device checks: nothing above has run on a phone. Each commit body lists what to check.
-- Ad and upsell hiding came back with the revert of `5705ca1`. Credit EeveeSpotify on the Licenses page.

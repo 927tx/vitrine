@@ -33,12 +33,19 @@ UIViewController *SGLicensesPage(void) {
     SGModRow *mod = SGLinkRow(@"Vitrine", @"GNU General Public License v3.0", @"https://www.gnu.org/licenses/gpl-3.0.html");
     SGModRow *bs2b = SGLinkRow(@"libbs2b", @"Crossfeed · MIT License", @"https://github.com/alexmarsev/libbs2b");
     SGModRow *wdl = SGLinkRow(@"WDL", @"Liveprog's EEL2 · zlib License", @"https://github.com/justinfrankel/WDL");
+    // EeveeSpotify's repo was taken down, so the row opens the license both projects are under.
+    SGModRow *eevee = SGLinkRow(@"EeveeSpotify", @"Ads, upsells, Spoof Premium · GNU GPL v3.0", @"https://www.gnu.org/licenses/gpl-3.0.html");
     // Not shipped: the Headphones page downloads its results when asked, but they are AutoEq's work all the same.
     SGModRow *autoEq = SGLinkRow(@"AutoEq", @"Headphone corrections · MIT License", @"https://github.com/jaakkopasanen/AutoEq");
     // Sing's voice model is downloaded rather than built in, and its NOTICE travels with it here all the same.
     SGModRow *voice = SGLinkRow(@"Sing's voice model", @"Mel-Band RoFormer · MIT License", @"https://huggingface.co/My-Name-Is-Jeff/vitrine-sing");
     return [[SGModPage alloc] initWithTitle:@"Licenses" intro:@"The mod's own license, and the code from others it includes." sections:@[
         SGSection(nil, @[mod]),
+        SGNotedSection(nil, @[eevee], @"By whoeevee (whoeevee/EeveeSpotify), under the GNU General Public License v3.0, as Vitrine is.\n\n"
+                                      @"Ported from it, on the Premium, ads & privacy page: Hide ads (the ad services kept from starting, "
+                                      @"ad components taken out of Home and Search, ad sections out of the feeds, ad requests answered empty), "
+                                      @"Hide upsells (the Premium pop-ups, and the ad and upsell flags it turns off) and Spoof Premium "
+                                      @"(the account attributes and flag rules it rewrites, and crossfade under it)."),
         SGNotedSection(nil, @[bs2b], [@"Copyright (c) 2005 Boris Mikhaylov\n\n" stringByAppendingString:kMIT]),
         SGNotedSection(nil, @[wdl], [@"Copyright (C) 2004-2013 Cockos Incorporated\nCopyright (C) 1999-2003 Nullsoft, Inc.\n\n"
                                      stringByAppendingString:kZlib]),
