@@ -48,6 +48,11 @@ struct SGLyricsAttributes: ActivityAttributes {
         var pausedAt: Double?
         // The line's translation, when the lyrics have one and translations are shown.
         var translation: String?
+        // The cover as a JPEG of a few dozen pixels a side, nil before it is read or when it does not fit.
+        // Optional, as everything added later is, so an activity left by the build before still decodes.
+        var cover: Data?
+        // The lyrics' size, SGLiveActivityTextSize's values: 0 small, 1 medium, 2 large.
+        var textSize: Int?
     }
 }
 

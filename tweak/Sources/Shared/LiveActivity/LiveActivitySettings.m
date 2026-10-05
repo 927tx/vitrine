@@ -11,8 +11,12 @@ UIViewController *SGLiveActivitySettingsPage(void) {
     SGModRow *on = SGOptionRow(@"Live Activity", nil, SGKeyLiveActivity);
     on.changed = ^(BOOL value) { SGSetLiveActivityEnabled(value); };
     SGModRow *view = SGChoiceRow(@"Shows", nil, SGKeyLiveActivityView, viewNames(), SGLiveActivityLyrics);
+    // The lyrics view's own rows, shown while it is picked; the tick reads them, so they apply at once.
+    SGModRow *translation = SGOptionRow(@"Translations", @"Under the line, when the lyrics have one", SGKeyLiveActivityTranslation);
+    SGModRow *size = SGChoiceRow(@"Text size", nil, SGKeyLiveActivityTextSize, @[@"Small", @"Medium", @"Large"], SGLiveActivityTextMedium);
+    for (SGModRow *row in @[translation, size]) row.visible = ^BOOL { return SGInt(SGKeyLiveActivityView, SGLiveActivityLyrics) == SGLiveActivityLyrics; };
     return [[SGModPage alloc] initWithTitle:@"Live Activity" intro:nil sections:@[
-        SGSection(nil, @[on, view]),
+        SGSection(nil, @[on, view, translation, size]),
     ] footer:nil];
 }
 

@@ -7,6 +7,7 @@
 import ActivityKit
 import AppIntents
 import SwiftUI
+import UIKit
 import WidgetKit
 
 private let green = Color(red: 0.12, green: 0.84, blue: 0.38)
@@ -27,6 +28,39 @@ private func tint(_ state: State) -> Color {
     guard let hex = state.tint, hex.count == 6, let value = Int(hex, radix: 16) else { return Color.black.opacity(0.75) }
     return Color(red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255,
                  blue: Double(value & 0xFF) / 255)
+}
+
+private func coverImage(_ state: State) -> UIImage? {
+    state.cover.flatMap(UIImage.init(data:))
+}
+
+// The cover, a few dozen pixels a side and drawn larger, so it reads as the cover and not as a picture of it.
+private struct Cover: View {
+    let image: UIImage
+    let side: CGFloat
+
+    var body: some View {
+        Image(uiImage: image)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: side, height: side)
+            .clipShape(RoundedRectangle(cornerRadius: side / 6, style: .continuous))
+    }
+}
+
+// The compact and minimal Dynamic Island's leading view, which Apple Watch and CarPlay show too: the
+// cover, or a note before it is read.
+private struct Badge: View {
+    let state: State
+
+    var body: some View {
+        if let image = coverImage(state) {
+            Cover(image: image, side: 22)
+        } else {
+            Image(systemName: "music.note")
+                .foregroundStyle(green)
+        }
+    }
 }
 
 extension SGLyricsAttributes.Tab {
@@ -69,8 +103,7 @@ struct SGLyricsLiveActivity: Widget {
                     .padding(.horizontal, 4)
                 }
             } compactLeading: {
-                Image(systemName: "music.note")
-                    .foregroundStyle(green)
+                Badge(state: context.state)
             } compactTrailing: {
                 if let end = context.state.timerEnd, end > Date() {
                     Text(timerInterval: Date()...end, countsDown: true)
@@ -81,21 +114,26 @@ struct SGLyricsLiveActivity: Widget {
                     ProgressRing(state: context.state)
                 }
             } minimal: {
-                Image(systemName: "music.note")
-                    .foregroundStyle(green)
+                Badge(state: context.state)
             }
             .widgetURL(URL(string: "spotify:"))
         }
     }
 }
 
-// The lock screen's card, and StandBy's: what the view shows, and the bar under it.
+// The lock screen's card, and StandBy's: the cover beside what the view shows, and the bar under both.
+// The control menu's five chips need the whole width, so it goes without the cover.
 private struct FamilyView: View {
     let state: State
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ContentView(state: state, upNext: 4)
+            HStack(alignment: .center, spacing: 12) {
+                if state.view != .panel, let image = coverImage(state) {
+                    Cover(image: image, side: 52)
+                }
+                ContentView(state: state, upNext: 4)
+            }
             ProgressBar(state: state)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -165,10 +203,19 @@ private struct ContentView: View {
 private struct LyricsView: View {
     let state: State
 
+    // The page's Text size; the scale factor below still keeps a long line inside the 160 point clip.
+    private var lineFont: Font {
+        switch state.textSize {
+        case 0: .headline
+        case 2: .title2
+        default: .title3
+        }
+    }
+
     var body: some View {
         VStack(alignment: .center, spacing: 4) {
             Text(state.line)
-                .font(.title3.weight(.bold))
+                .font(lineFont.weight(.bold))
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
                 .multilineTextAlignment(.center)
@@ -186,7 +233,7 @@ private struct LyricsView: View {
             if !state.nextLine.isEmpty {
                 Text(state.nextLine)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
                     .direction(of: state.nextLine)
             }
@@ -232,7 +279,7 @@ private struct QueueView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Up next")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(.white.opacity(0.6))
             if state.tracks.isEmpty {
                 Text("Nothing up next")
                     .font(.subheadline)
@@ -241,7 +288,7 @@ private struct QueueView: View {
             ForEach(Array(state.tracks.prefix(upNext).enumerated()), id: \.offset) { _, track in
                 // A tap skips ahead to the track.
                 Button(intent: SGPlayQueuedTrackIntent(track.uri)) {
-                    (Text(track.title).fontWeight(.semibold) + Text("  " + track.artist).foregroundColor(.white.opacity(0.5)))
+                    (Text(track.title).fontWeight(.semibold) + Text("  " + track.artist).foregroundColor(.white.opacity(0.6)))
                         .font(.subheadline)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -385,7 +432,7 @@ private struct ControlsPage: View {
                     .font(.subheadline.weight(.semibold))
                 Text(state.artist)
                     .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.white.opacity(0.6))
             }
             .lineLimit(1)
             .invalidatableContent()
@@ -413,7 +460,7 @@ private struct QueuePage: View {
             if state.tracks.isEmpty {
                 Text("Nothing up next")
                     .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.white.opacity(0.6))
                     .frame(maxWidth: .infinity, minHeight: 60)
             }
             ForEach(Array(state.tracks.prefix(3).enumerated()), id: \.offset) { _, track in
@@ -426,7 +473,7 @@ private struct QueuePage: View {
                             .font(.footnote.weight(.semibold))
                         Text(track.artist)
                             .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.55))
+                            .foregroundStyle(.white.opacity(0.6))
                         Spacer(minLength: 0)
                     }
                     .lineLimit(1)
@@ -451,7 +498,7 @@ private struct TimerPage: View {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Music stops")
                             .font(.caption)
-                            .foregroundStyle(.white.opacity(0.55))
+                            .foregroundStyle(.white.opacity(0.6))
                         if let end = state.timerEnd {
                             Text(timerInterval: Date()...end, countsDown: true)
                                 .font(.system(size: 34, weight: .bold).monospacedDigit())

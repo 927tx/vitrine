@@ -165,10 +165,14 @@ Shared:
                   sung with the next one under it, the tracks up next (a tap on one skipping ahead to it), or a control
                   menu of tabs, Controls (previous, play and pause, next, shuffle, repeat), Queue and a sleep Timer of
                   the mod's own that pauses Spotify (LiveActivity.h lists its files): a timer polls the player and
-                  sends a new state only when what the view shows changes, local updates only, no push. Taps are
+                  sends a new state only when what the view shows changes, local updates only, no push. The card
+                  is tinted with the cover's colour and shows the cover itself, a JPEG of a few dozen pixels inside
+                  the state, which ActivityKit caps at 4 KB (the bridge sends it without the cover when it would
+                  not fit); the colour is darkened to a luminance of 0.04 at most, so the white text keeps 4.5:1 on any
+                  cover, and the cover is read only once the now playing title is the new track's. Taps are
                   LiveActivityIntents run inside Spotify and take a second or two to show on the card. The widget is extension/LiveActivity; ActivityKit pairs the two
                   by the attributes' type in LiveActivityShared.swift, compiled into both. It starts only with Spotify
-                  in front; its switch and its view apply at once
+                  in front; its settings apply at once
 
     ListeningStats/ listening stats kept on the phone (ListeningStats.h lists its files): each music track timed while
                   it plays through PlayerState's observer and written to a text log in Application Support once it ran 30 s
@@ -311,8 +315,8 @@ Controls into its Strength (10 to 100%, a tap at the new strength with each step
 Strength (20 to 200%, 100% being how it first shipped) and Follows, Everything (a tap on each kick and
 snare and a rumble under the bass), Beat (the taps without the rumble) or Bass (the kicks' taps and the
 rumble), all applying straight away. Live Activity, on iOS 17 and up under either look: its switch and which view it
-shows, Lyrics, Queue or Control menu, both
-applying straight away, the row reading out the view or Off. Audio effects, in either look (Shared/AudioEffects/AudioEffectsPage.m):
+shows, Lyrics, Queue or Control menu, and for Lyrics its Translations (off until switched on) and Text
+size (Small, Medium or Large), all applying straight away, the row reading out the view or Off. Audio effects, in either look (Shared/AudioEffects/AudioEffectsPage.m):
 the effects' switch with what the engine is doing under it, Presets (built-in ones and your own, saved, loaded
 and deleted there) and Headphones (AutoEq's corrections, searched and applied to the Graphic EQ), either of which
 turns the effects on, then a card per effect, each opening out into its sliders, choices, curve or file library

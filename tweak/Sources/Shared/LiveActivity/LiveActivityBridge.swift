@@ -7,6 +7,8 @@ import os
 @objc(SGLiveActivityBridge)
 public final class SGLiveActivityBridge: NSObject {
     private static let log = Logger(subsystem: "spotifyglass", category: "live activity")
+    // Under ActivityKit's 4096, with room for its own wrapping.
+    private static let maxStateBytes = 3800
 
     private static var current: Activity<SGLyricsAttributes>? {
         Activity<SGLyricsAttributes>.activities.first { $0.activityState == .active || $0.activityState == .stale }
@@ -68,17 +70,24 @@ public final class SGLiveActivityBridge: NSObject {
                                   titles: [String], artists: [String], uris: [String],
                                   tab: Int, title: String, artist: String, shuffle: Bool, repeatMode: Int,
                                   timerEnd: Date?, timerEndOfTrack: Bool,
-                                  tint: String?, trackStart: Date?, trackEnd: Date?, pausedAt: NSNumber?, translation: String?) {
+                                  tint: String?, trackStart: Date?, trackEnd: Date?, pausedAt: NSNumber?, translation: String?,
+                                  cover: Data?, textSize: Int) {
         let tracks = titles.indices.map {
             SGLyricsAttributes.Track(title: titles[$0], artist: artists[$0], uri: uris[$0])
         }
-        let state = SGLyricsAttributes.ContentState(
+        var state = SGLyricsAttributes.ContentState(
             view: SGLyricsAttributes.View(rawValue: view) ?? .lyrics, paused: paused,
             line: line, nextLine: nextLine, tracks: tracks,
             tab: SGLyricsAttributes.Tab(rawValue: tab) ?? .controls, title: title, artist: artist,
             shuffle: shuffle, repeatMode: repeatMode, timerEnd: timerEnd, timerEndOfTrack: timerEndOfTrack,
             tint: tint, trackStart: trackStart, trackEnd: trackEnd, pausedAt: pausedAt?.doubleValue,
-            translation: translation)
+            translation: translation, cover: cover, textSize: textSize)
+        // ActivityKit drops a state over 4 KB without a word and the card freezes, so with long lines and
+        // a busy cover the cover gives way.
+        if cover != nil, let size = try? JSONEncoder().encode(state).count, size > maxStateBytes {
+            state.cover = nil
+            log.notice("[spotifyglass] live activity: \(size, privacy: .public) bytes, sent without the cover")
+        }
         let content = ActivityContent(state: state, staleDate: nil)
         if let activity = current {
             queue(.update(activity.id, content))
