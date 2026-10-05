@@ -1,4 +1,5 @@
 #import "Core/SGCore.h"
+#import "Shared/AppIcon/AppIcon.h"
 #import "Shared/Fonts/Fonts.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Redesigned/Player/Player.h"
@@ -60,6 +61,7 @@ SGModSection *SGAppearanceSection(void) {
         NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:unavailableRow()];
         [rows addObjectsFromArray:SGNativeAppearanceRows()];
         [rows addObject:font];
+        if (SGAppIconRow()) [rows addObject:SGAppIconRow()];
         return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
     }
     SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
@@ -72,6 +74,7 @@ SGModSection *SGAppearanceSection(void) {
     NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:SGWithSymbol(redesign, @"sparkles")];
     [rows addObjectsFromArray:SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()];
     [rows addObject:font];
+    if (SGAppIconRow()) [rows addObject:SGAppIconRow()];
     return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
 }
 

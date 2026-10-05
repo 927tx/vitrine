@@ -3,6 +3,8 @@
 #
 #   scripts/pipeline.sh <decrypted.ipa> [-o out.ipa] [--no-flex] [--install] [--name N] [--icon P.png]   (or: make build / make install)
 #
+# Every icons/NAME.png becomes an alternate icon (icons/README.md).
+#
 # --install hands the result to install.sh (sign with your certificate, push to the plugged-in iPhone).
 #
 # The IPA is yours to supply: drop a decrypted Spotify .ipa in ipa/ and the Makefile finds it.
@@ -125,6 +127,33 @@ if unzip -l "$OUT" "$WIDGET_BIN" >/dev/null 2>&1; then
   rm -rf "$PATCH"
 else
   echo "    no WidgetExtension.appex in this IPA"
+fi
+
+shopt -s nullglob
+ICONS=("$ROOT"/icons/*.png)
+shopt -u nullglob
+if [ ${#ICONS[@]} -gt 0 ]; then
+  echo "==> adding ${#ICONS[@]} alternate icons from icons/"
+  PATCH="$(mktemp -d)"
+  unzip -q "$OUT" "${APP_DIR}Info.plist" -d "$PATCH"
+  PLIST="$PATCH/${APP_DIR}Info.plist"
+  for png in "${ICONS[@]}"; do
+    name="$(basename "$png" .png)"
+    [[ "$name" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "icon names are letters, digits, _ and - only: $png" >&2; exit 1; }
+    sips -s format png -z 120 120 "$png" --out "$PATCH/$APP_DIR$name@2x.png" >/dev/null
+    sips -s format png -z 180 180 "$png" --out "$PATCH/$APP_DIR$name@3x.png" >/dev/null
+    sips -s format png -z 152 152 "$png" --out "$PATCH/$APP_DIR$name@2x~ipad.png" >/dev/null
+    for key in CFBundleIcons 'CFBundleIcons~ipad'; do
+      /usr/libexec/PlistBuddy -c "Print :$key" "$PLIST" >/dev/null 2>&1 || continue
+      /usr/libexec/PlistBuddy -c "Add :$key:CFBundleAlternateIcons dict" "$PLIST" 2>/dev/null || true
+      /usr/libexec/PlistBuddy -c "Delete :$key:CFBundleAlternateIcons:$name" "$PLIST" 2>/dev/null || true
+      /usr/libexec/PlistBuddy -c "Add :$key:CFBundleAlternateIcons:$name:CFBundleIconFiles array" \
+        -c "Add :$key:CFBundleAlternateIcons:$name:CFBundleIconFiles:0 string $name" "$PLIST"
+    done
+  done
+  OUT_ABS="$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")"
+  (cd "$PATCH" && zip -q -r "$OUT_ABS" "$APP_DIR")
+  rm -rf "$PATCH"
 fi
 
 if [ -n "${EXT_DIR:-}" ]; then
