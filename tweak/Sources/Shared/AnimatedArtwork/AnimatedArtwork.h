@@ -3,8 +3,19 @@
 // as a local file, the form the system's lock screen takes.
 #import <UIKit/UIKit.h>
 
-// Off until switched on.
+// What the lock screen fills the screen with, stored as the index of SGLockArtwork. It took over from the
+// Moving artwork switch, whose key is moved onto it once: on is Moving artwork, off is Off.
+#define SGKeyLockScreenArtwork @"spotifyglass.lockscreen.artwork"
 #define SGKeyLockScreenMotion @"spotifyglass.lockscreen.motion"
+typedef NS_ENUM(NSInteger, SGLockArtwork) {
+    SGLockArtworkOff = 0,
+    SGLockArtworkMotion,   // the Canvas, else Apple Music's animated cover (LockScreenMotion.x)
+    SGLockArtworkLyrics,   // a clip per line of lyrics (Shared/LockScreenLyrics/LyricsArtwork.x)
+};
+// Off below iOS 26, which has no animated artwork on the lock screen.
+SGLockArtwork SGLockScreenArtwork(void);
+// How the lyrics are drawn, stored as the index of SGLyricsClipStyle (Still unless changed).
+#define SGKeyLockScreenLyricsStyle @"spotifyglass.lockscreen.lyricsStyle"
 // Off until switched on: download in Low Data Mode too.
 #define SGKeyMotionLowData @"spotifyglass.motion.lowdata"
 
@@ -34,7 +45,7 @@ void SGMotionFile(NSURL *remote, void (^done)(NSURL *file));
 // The first frame of a local video. Main queue.
 void SGMotionPoster(NSURL *file, void (^done)(UIImage *poster));
 
-// Settings: the lock screen switch and Low Data Mode.
+// Settings: what the lock screen shows, the lyrics' style and Low Data Mode.
 NSArray *SGLockScreenMotionRows(void);
 
 // Pure steps, for the harness.

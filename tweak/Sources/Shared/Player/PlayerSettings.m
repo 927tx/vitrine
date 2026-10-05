@@ -6,7 +6,7 @@
 
 UIViewController *SGLockScreenWidgetPage(void) {
     NSArray *motion = SGLockScreenMotionRows();
-    NSArray<SGModSection *> *mod = motion.count ? @[SGSection(@"Moving artwork", motion)] : @[];
+    NSArray<SGModSection *> *mod = motion.count ? @[SGSection(@"Lock screen artwork", motion)] : @[];
     return [[SGModPage alloc] initWithTitle:@"Lock screen widget" intro:SGRestartNote sections:[mod arrayByAddingObjectsFromArray:@[
         SGSection(@"Controls", @[
             SGFlagRow(@"Like and dislike buttons", @"ios-feature-lockscreen.like_dislike_enabled"),

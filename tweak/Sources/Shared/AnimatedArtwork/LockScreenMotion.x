@@ -60,7 +60,7 @@ static void show(NSString *uri, NSURL *file) {
 @end
 
 %ctor {
-    if (!SGFlag(SGKeyLockScreenMotion, NO)) return;
+    if (SGLockScreenArtwork() != SGLockArtworkMotion) return;
     if (@available(iOS 26.0, *)) {
         static SGLockScreenMotion *observer;
         observer = [SGLockScreenMotion new];
