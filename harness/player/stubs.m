@@ -106,6 +106,8 @@ NSString *SGKaraokePlayingTrack(void) { return sg_track; }
 NSArray<SGKaraokeLine *> *SGKaraokeLinesForTrack(NSString *trackID) { return sg_lines; }
 void SGKaraokeKeepLines(NSString *trackID, NSArray<SGKaraokeLine *> *lines) { sg_lines = lines; }
 void SGKaraokeRequestLyrics(NSString *trackID) {}
+NSNotificationName const SGKaraokeLinesKeptNotification = @"harness.karaokeLinesKept";
+BOOL SGKaraokeLooking(NSString *trackID) { return NO; }
 id SGKaraokePlayer(void) { return nil; }
 SPTPlayerTrack *SGKaraokeTrackFor(NSString *trackID) { return nil; }
 void SGKaraokeRememberTrack(SPTPlayerTrack *track) {}
@@ -139,6 +141,7 @@ UIViewController *SGTopController(void) { return UIApplication.sharedApplication
 // Local files: no edits in the harness, so the name is all PlayerLyrics.x needs to watch for one.
 #import "Shared/LocalFiles/LocalFiles.h"
 NSNotificationName const SGLocalFileEditsDidChangeNotification = @"harness.localFileEditsDidChange";
+NSString *SGLocalFileCoverInURL(NSString *url) { return nil; }
 
 // Speed and pitch: a number the harness keeps, with no audio behind it.
 static double sg_speed = 1;
