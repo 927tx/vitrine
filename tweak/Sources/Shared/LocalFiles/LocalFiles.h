@@ -6,6 +6,7 @@
 //     LocalFileInfo.x    the edits applied: the player's track metadata, the cover's image request and
 //                        the system's now playing artwork
 //     EditInfoMenu.x     Edit info in the player's ⋯ menu while a local file plays, and its editor
+//     LocalLyrics.h      the user's own .lrc files, linked to a local file or matched by its names
 //
 // The file itself is never written: Spotify read its tags when it scanned it, and writing them back
 // would take a tag writer per format. So an edit is stored by URI and laid over what Spotify read.

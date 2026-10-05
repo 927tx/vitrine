@@ -10,3 +10,9 @@ xcrun -sdk macosx clang -target arm64-apple-ios17.0-macabi -isysroot "$SDK" -ifr
     -fobjc-arc -g -Wall -Werror -I"$SRC" "$HERE/check.m" "$SRC/Shared/LocalFiles/LocalFiles.m" \
     -framework UIKit -framework CoreGraphics -framework Foundation -o "$HERE/build/check"
 CFFIXED_USER_HOME="$HERE/build/home" "$HERE/build/check"
+# The imported LRC files, with the lyrics engine's line timing as the tweak has it.
+xcrun -sdk macosx clang -target arm64-apple-ios17.0-macabi -isysroot "$SDK" -iframework "$SDK/System/iOSSupport/System/Library/Frameworks" \
+    -fobjc-arc -g -Wall -Werror -I"$SRC" "$HERE/lrc.m" "$SRC/Shared/LocalFiles/LocalLyrics.m" "$SRC/Shared/LocalFiles/LocalFiles.m" \
+    "$SRC/Shared/Lyrics/KaraokeTiming.m" "$SRC/Shared/AdBlock/Protobuf.m" \
+    -framework UIKit -framework CoreGraphics -framework Foundation -o "$HERE/build/lrc"
+CFFIXED_USER_HOME="$HERE/build/home" "$HERE/build/lrc"

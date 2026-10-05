@@ -10,8 +10,14 @@ back, that no other path comes back through it, and that a replaced or dropped c
 It runs on the Mac as a Mac Catalyst binary with `CFFIXED_USER_HOME` set to `build/home`, so its
 defaults and its covers never reach the Mac's own.
 
-It does not cover the hooks in `LocalFileInfo.x` or the lyrics engine asking for the
-new key (`Shared/Lyrics/KaraokeSource.x`).
+It then builds `lrc.m` against `LocalLyrics.m` and the engine's line timing: an `.lrc` import (empty,
+over 1 MB and tagless files refused, UTF-16 kept as UTF-8, a taken name numbered), the stamps read
+(several on a line, every fraction form, `[offset:]`, untimed text), a file linked to a local file through
+a rename's key and gone with a delete, and the match by title and artist, folded, with an
+"Artist - Title" name's sides worked out from the track.
+
+It does not cover the hooks in `LocalFileInfo.x`, the lyrics engine asking for the new key
+(`Shared/Lyrics/KaraokeSource.x`) or the Imported LRC files page.
 
 ## Edit info in the simulator
 
@@ -26,3 +32,16 @@ largest accessibility text size, where each label goes above its field, and sets
     THEOS=$HOME/theos sim/build-sim.sh <udid> [large]
 
 It does not cover the pickers themselves, the keyboard over the sheet, or Spotify's own menu closing.
+
+## The lyrics pages in the simulator
+
+`lyrics/build.sh <udid>` builds the native look's lyrics page for a local file
+(`Native/LocalFiles/LocalLyricsPage.m`) with `LocalLyrics.m` as the tweak compiles them, over a stand-in
+player whose clock runs at four times the song's speed. It imports and links an `.lrc` file, opens the
+page, checks that every line shows and that the line being sung is the one lit, then moves to a track with
+no file and checks that the lines go. `settings` as the second argument shows the Imported LRC files page
+instead. Screenshots go into `build/lyrics/shots/`.
+
+    lyrics/build.sh <udid> [settings]
+
+It does not cover the button on Spotify's footer, Files, or a swipe to delete.

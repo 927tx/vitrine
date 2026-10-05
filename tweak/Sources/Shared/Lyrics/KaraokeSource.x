@@ -7,6 +7,7 @@
 #import "Core/SGCore.h"
 #import "Lyrics.h"
 #import "Shared/LocalFiles/LocalFiles.h"
+#import "Shared/LocalFiles/LocalLyrics.h"
 #import "Shared/LockScreenLyrics/LockScreenLyrics.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/LyricsSources/LyricsSources.h"
@@ -273,8 +274,15 @@ static BOOL askLrcLib(NSString *trackID, void (^done)(SGLyricsResult *lyrics)) {
 // Main queue only.
 void SGKaraokeRequestLyrics(NSString *trackID) {
     if (!trackID || sg_lyrics[trackID] || [sg_requested containsObject:trackID]) return;
-    // spclient has nothing for a local file, which only the sources can name.
+    // spclient has nothing for a local file, which only the sources can name. A file of the user's own,
+    // linked to it or matching its names, comes before every source.
     BOOL local = SGLocalFileIs(trackID);
+    SGLyricsResult *imported = local ? SGImportedLRCFor(trackID, nil, nil) : nil;
+    if (imported) {
+        keep(trackID, imported.karaokeLines);
+        SGLyricsSetCredit(trackID, imported.provider);
+        return;
+    }
     if (!sg_ownSources && !local) {
         requestFromSpotify(trackID);
         return;
@@ -470,6 +478,22 @@ static void prefetch(SPTPlayerTrack *track, NSString *trackID, SPTPlayerState *s
                                                 usingBlock:^(NSNotification *note) {
         NSString *key = SGLocalFileLyricsKey(note.object);
         if (key && [key isEqualToString:SGKaraokePlayingTrack()]) SGKaraokeRequestLyrics(key);
+    }];
+    // An imported or deleted LRC file can change any local file's lyrics, found or missed: they are
+    // forgotten, but for a look still out, and the file playing is asked for again.
+    [NSNotificationCenter.defaultCenter addObserverForName:SGImportedLRCDidChangeNotification object:nil queue:nil
+                                                usingBlock:^(NSNotification *note) {
+        for (NSString *track in [sg_requested setByAddingObjectsFromArray:sg_lyrics.allKeys]) {
+            if (!SGLocalFileIs(track) || [sg_looking containsObject:track]) continue;
+            [sg_lyrics removeObjectForKey:track];
+            [sg_requested removeObject:track];
+            [sg_asking removeObject:track];
+            [sg_losses removeObjectForKey:track];
+        }
+        NSString *playing = SGKaraokePlayingTrack();
+        if (!SGLocalFileIs(playing)) return;
+        SGKaraokeRequestLyrics(playing);
+        announce(playing);
     }];
     %init;
     SGLog(@"karaoke: on");

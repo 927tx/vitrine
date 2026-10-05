@@ -2,6 +2,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Lyrics.h"
+#import "Shared/LocalFiles/LocalLyrics.h"
 #import "Shared/LockScreenLyrics/LockScreenLyrics.h"
 #import "Shared/LyricsSources/LyricsSources.h"
 
@@ -12,7 +13,12 @@ SGModSection *SGLyricsSourcesSection(BOOL namingSource) {
         for (NSString *key in SGLyricsOrder()) [names addObject:SGLyricsProviderFor(key).name];
         return names.count ? [names componentsJoinedByString:@", "] : @"Off";
     };
-    NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObjects:sources,
+    SGModRow *imported = SGPageRow(@"Imported LRC files", ^UIViewController *{ return SGImportedLRCPage(); });
+    imported.value = ^NSString *{
+        NSUInteger count = SGImportedLRCFiles().count;
+        return count ? @(count).stringValue : @"None";
+    };
+    NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObjects:sources, imported,
         SGOptionRow(@"Lyrics for every track", @"Even where Spotify has none", SGKeyLyricsAllTracks), SGSpicyLyricsKeyRow(), nil];
     if (namingSource) [rows addObject:SGOptionRow(@"Show source", nil, SGKeyLyricsCredit)];
     return SGSection(@"Sources", rows);

@@ -11,6 +11,7 @@
 #import "LyricsSources.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/LocalFiles/LocalFiles.h"
+#import "Shared/LocalFiles/LocalLyrics.h"
 #import "Headers/SPTPlayer.h"
 #import <stdatomic.h>
 
@@ -162,6 +163,7 @@ NSArray<SGLyricsProvider *> *SGLyricsAllProviders(void) {
             make(SGSpicyLyricsKey, @"Spicy Lyrics", @"Community word syncs, your own key", SGSpicyLyricsAsk),
             make(@"qqmusic", @"QQ Music", @"Line timing, Chinese catalogue", SGQQMusicAsk),
             make(@"kugou", @"KuGou", @"Word timing, Chinese catalogue", SGKuGouAsk),
+            make(SGImportedLRCKey, @"Imported LRC", @"Your own .lrc files", SGImportedLRCAsk),
         ];
     });
     return all;

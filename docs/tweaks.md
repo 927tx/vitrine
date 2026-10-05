@@ -128,8 +128,15 @@ Shared:
                   lyrics are kept under the URI and asked of the sources by name, since Spotify never asks for them;
                   with no source switched on, of LRCLIB alone, which then gets the file's title, artist, album and
                   length. A rename gives a new key (a cover alone does not), asked for at once while the file plays.
-                  A miss is asked again a few times, in case it was a lost request. The model is checked on the Mac
-                  against harness/local-files/, the row and the editor in the simulator against its sim/
+                  A miss is asked again a few times, in case it was a lost request. The user's own .lrc files
+                  (LocalLyrics.m), imported from Files on the Imported LRC files page under Lyrics' sources and kept
+                  as UTF-8 in Documents/Vitrine/Lyrics, come before any source: a file linked to the local file
+                  playing (Import for current track) is its lyrics whatever its tags say, and any other is matched by
+                  [ti:] and [ar:], or a name of "Artist - Title", folded; an import or a delete has the engine forget
+                  what it kept for local files and ask again. SGImportedLRCAsk is the same as a source for the
+                  order, which moves it on top at the first import and at every link once LyricsSources lists it.
+                  The model and the LRC reading are checked on the Mac against harness/local-files/, the row and
+                  the editor in the simulator against its sim/
     Navigation/   the page transition fix (PageTransition.x) and opening a spotify: link (Links.x)
     Player/       the player's open and close announced (PlayerEvents.x), what the player is doing read through
                   one hook for every feature that wants it (PlayerState.x), the lock screen widget's flags, and in the
@@ -241,6 +248,10 @@ Native:
                   (LyricsCard.x), the gestures' hookup and the hold on either side of the cover that plays at 2x until
                   the finger lifts (PlayerGestures.x), the Queue & devices flags
     Lyrics/       the full screen lyrics page on glass (LyricsPage.x)
+    LocalFiles/   a lyrics button on the player's footer for a local file with an LRC file linked to it, a fifth of the
+                  way in from the leading edge, which opens a page of the lines on black that follows the song
+                  (LocalLyrics.h lists its files); the file's metadata says has_lyrics. Checked in the simulator
+                  against harness/local-files/lyrics/
     Home/         the Home gradient, Home's sections and pills hidden (HomeDeclutter.x), the Home & Library page
     Playlist/     the playlist header and pills, hidden one switch each
     Album/, Artist/ their pages' parts hidden, and the cover or photo behind their headers
