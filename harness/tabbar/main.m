@@ -2,6 +2,7 @@
 // screen, laid out with the constraints 9.1.78 makes (see the README for the addresses), under Spotify's
 // class names, with Spotify's message bar (Offline, Private Session) able to come in under the tab bar.
 #import <UIKit/UIKit.h>
+#import "Core/SGViewTree.h"
 
 #pragma mark - Spotify's classes, by the names the hooks look for
 
@@ -401,6 +402,18 @@ static NSArray<UITabBar *> *systemBarsIn(UIView *root) {
     return bars;
 }
 
+extern __weak UIView *sgHarnessLitTab;
+
+// The item of the stock row named `title`.
+static UIView *stockItem(SGHarnessChrome *chrome, NSString *title) {
+    for (UIView *item in SGRowIn(chrome.tabs.bar).arrangedSubviews) {
+        for (UIView *sub in item.subviews) {
+            if ([sub isKindOfClass:UILabel.class] && [((UILabel *)sub).text isEqualToString:title]) return item;
+        }
+    }
+    return nil;
+}
+
 // A tab picked on whichever system bar shows it, the calls a finger ends in.
 static void pick(SGHarnessChrome *chrome, NSString *title) {
     for (UITabBar *bar in systemBarsIn(chrome.tabs.bar)) {
@@ -517,6 +530,18 @@ static void after(double seconds, dispatch_block_t block) {
         after(1.0, ^{ SGRSetTabBarMinimized(YES, YES); });
         after(3.5, ^{ SGRSetTabBarMinimized(NO, YES); });
         after(5.0, ^{ report(chrome, @"expanded again"); });
+    }
+    // `lit`: Library stands in for a tab of the mod's own whose page is up at 2 s, while Spotify still paints
+    // Home white: the glass bar selects Library. Home picked at 3.5 s takes the light back.
+    if ([mode isEqualToString:@"lit"]) {
+        after(2.0, ^{
+            sgHarnessLitTab = stockItem(chrome, @"Your Library");
+            [chrome.tabs.bar setNeedsLayout];
+            [chrome.tabs.bar layoutIfNeeded];
+        });
+        after(2.5, ^{ reportSelection(chrome, @"with Library lit"); });
+        after(3.5, ^{ pick(chrome, @"Home"); });
+        after(4.5, ^{ reportSelection(chrome, @"after Home"); });
     }
     // `pick`: Search picked at 2 s and Home at 4 s, which bar selects what logged after each.
     if ([mode isEqualToString:@"pick"]) {

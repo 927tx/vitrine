@@ -11,6 +11,10 @@
 // the stack, past that count, and take a slot with the rest. A tap on one goes through Spotify's
 // link dispatcher, the same route the app takes for a link it opens itself, so any URI works.
 //
+// The page that link pushes is the tab's: the glass bar lights the tab while that page is on its stack and
+// the stack is on screen, and a second tap goes back to the page rather than opening the link again, the
+// way a second tap on one of Spotify's tabs goes back to its root.
+//
 // Tree (trees/home.txt): NavigationUI_TabBarImpl.TabBarView > TabBarCompactView > UIStackView
 //   402x49 of four ElementContentView<TabBarItemElement> 100x49, each an SPTEncoreIconView 24x24
 //   at y 12.5 over an SPTEncoreLabel at y 35.
@@ -44,6 +48,18 @@ static NSMutableArray<NSString *> *sg_stockOrder;
 static NSUInteger sg_apartCount;
 
 static UIColor *itemColor(void) { return [UIColor colorWithWhite:0xB3 / 255.0 alpha:1]; }
+
+// A page pushed this soon after a tap on a tab of the mod's own is the page the tab opened.
+static const CFTimeInterval kTabPush = 1;
+static __weak UIView *sg_tappedTab, *sg_pageTab;
+static CFTimeInterval sg_tappedAt;
+static __weak UIViewController *sg_tabPage;
+
+static BOOL tabPageShowing(void) {
+    UIViewController *page = sg_tabPage;
+    UINavigationController *nav = page.navigationController;
+    return sg_pageTab && nav.viewIfLoaded.window && [nav.viewControllers containsObject:page];
+}
 
 #pragma mark - the mod's own items
 
@@ -117,6 +133,19 @@ static UIView *iconView(NSDictionary *entry) {
 // Through the app's own link dispatcher (Shared/Navigation/Links.h). What the dispatcher makes of the
 // URI goes to the log first, so a tab that ends in Spotify's "Couldn't open link" says why.
 - (void)open {
+    UIViewController *page = sg_tabPage;
+    if (sg_pageTab == self && tabPageShowing()) {
+        UINavigationController *nav = page.navigationController;
+        if (nav.topViewController != page) [nav popToViewController:page animated:YES];
+        SGLog(@"navbar: back to the tab's page %@", NSStringFromClass(page.class));
+        return;
+    }
+    sg_tappedTab = self;
+    sg_tappedAt = CACurrentMediaTime();
+    // A link that pushes no page leaves the light where Spotify has it.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((kTabPush + 0.05) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        SGRRefreshTabBar();
+    });
     NSURL *url = SGRNavbarTabURL(self.uri);
     NSString *via = nil;
     SGLinkRoute route = SGSpotifyURIRoute(url, &via);
@@ -325,6 +354,36 @@ static CGFloat slotCentreX(UIView *view) {
 }
 %end
 
+UIView *SGRNavbarLitTab(void) {
+    if (tabPageShowing()) return sg_pageTab;
+    // From the tap until its page comes, so the bar does not go back to Spotify's tab in between.
+    return CACurrentMediaTime() - sg_tappedAt < kTabPush ? sg_tappedTab : nil;
+}
+
+void SGRNavbarForgetTab(void) {
+    sg_tappedTab = sg_pageTab = nil;
+    sg_tabPage = nil;
+}
+
+%hook SPNavigationController
+- (void)pushViewController:(UIViewController *)page animated:(BOOL)animated {
+    UIView *tab = sg_tappedTab;
+    if (tab && CACurrentMediaTime() - sg_tappedAt < kTabPush) {
+        sg_pageTab = tab;
+        sg_tabPage = page;
+        sg_tappedTab = nil;
+        SGLog(@"navbar: %@ is the tab's page", NSStringFromClass(page.class));
+    }
+    %orig;
+}
+
+// A push, a pop or a swipe back: the bar looks again at whether the tab's page is still up.
+- (void)navigationController:(UINavigationController *)controller didShowViewController:(UIViewController *)page animated:(BOOL)animated {
+    %orig;
+    if (sg_pageTab) SGRRefreshTabBar();
+}
+%end
+
 BOOL SGRTabIsApart(UIView *item) {
     return objc_getAssociatedObject(item, &kApartKey) != nil;
 }
@@ -383,6 +442,7 @@ void SGRLogTabBarRow(UIView *tabBar) {
     if (!SGRedesignedUI()) return;
     %init;
     SGRequireClasses(@[
+        @"SPNavigationController",
         @"SPTEncoreIcon",
         @"SPTEncoreIconView",
         @"SPTEncoreLabel",

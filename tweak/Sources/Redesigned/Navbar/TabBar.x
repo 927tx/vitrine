@@ -5,7 +5,8 @@
 // bar is taller than Spotify's, Spotify is made to leave it the room (see "room for the glass bar").
 //
 // A tab picked on the system bar is passed on as a tap on the hidden Spotify item it mirrors, and the
-// system bar's selection follows whichever Spotify label is painted white. Navbar.x composes the
+// system bar's selection follows whichever Spotify label is painted white, or the tab of the mod's own whose
+// page is up (SGRNavbarLitTab), which Spotify does not know of. Navbar.x composes the
 // hidden row, so its order, hidden tabs and tabs of the mod's own carry over. Always on in the redesign.
 //
 // Tree (trees/home.txt): NavigationUI_TabBarImpl.TabBarView > TabBarCompactView > UIStackView of
@@ -223,8 +224,11 @@ static void forwardTap(UIView *item) {
         SGRSetTabBarMinimized(NO, YES);
         return;
     }
+    // One of Spotify's own takes the light back from a tab of the mod's own.
+    UIView *source = self.sources[index];
+    if (![NSStringFromClass(source.class) isEqualToString:@"SGRTabItemView"]) SGRNavbarForgetTab();
     // Home tapped while on Home pops Spotify's stack, which would take Mod Settings straight off it.
-    if (!self.holding) forwardTap(self.sources[index]);
+    if (!self.holding) forwardTap(source);
     self.partner.selectedItem = nil;
     self.partner.shown = nil;
     // Spotify repaints its labels a moment later; a tap it did not take snaps the selection back.
@@ -506,7 +510,8 @@ static void syncBar(UIView *stockBar) {
     // An item with no title is drawn by UIKit as its glyph alone, centred, on a bar of the same height.
     BOOL hideLabels = SGHidden(SGRKeyNavbarHideLabels);
     SGRSystemTabBar *apartBar = objc_getAssociatedObject(stockBar, &kApartBarKey);
-    UIView *active = nil;
+    UIView *active = SGRNavbarLitTab();
+    if (![sources containsObject:active]) active = nil;
     for (UIView *source in sources) if (!active && isActive(source)) active = source;
     active = active ?: selectedSource(bar) ?: selectedSource(apartBar);
 

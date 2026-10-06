@@ -34,6 +34,10 @@ void SGRLogTabBarRow(UIView *tabBar);
 void SGRRefreshTabBar(void);
 // Whether a tab of the composed row is one of the split tabs at its trailing end, for TabBar.x's second bar.
 BOOL SGRTabIsApart(UIView *item);
+// The tab of the mod's own whose page is on screen, which the glass bar shows selected; nil when none is.
+UIView *SGRNavbarLitTab(void);
+// A tap on one of Spotify's tabs: no tab of the mod's own is lit any more.
+void SGRNavbarForgetTab(void);
 
 // The glass bar minimizes as a page scrolls down (TabBarMinimize.x): it shrinks to two of its tabs, the
 // now playing card coming down between them. On unless switched off; read as each scroll goes.

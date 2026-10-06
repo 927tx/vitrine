@@ -21,6 +21,13 @@ BOOL SGRTabIsApart(UIView *item) {
     return NO;
 }
 void SGRLogTabBarRow(UIView *tabBar) {}
+// The tab of the mod's own whose page is up (Navbar.x), which the `lit` launch word sets by hand.
+__weak UIView *sgHarnessLitTab = nil;
+UIView *SGRNavbarLitTab(void) { return sgHarnessLitTab; }
+void SGRNavbarForgetTab(void) {
+    if (sgHarnessLitTab) NSLog(@"[harness] the lit tab forgotten");
+    sgHarnessLitTab = nil;
+}
 void SGOpenModSettings(UIView *source) {}
 // Shared/Player/PlayerEvents.x, which TabBarMinimize.x listens to.
 NSString *const SGPlayerTransitionNotification = @"spotifyglass.playerTransition";

@@ -556,8 +556,9 @@ Spotify's router cannot open is refused there), and an icon picked from Encore's
 searchable. Split tabs sets chosen tabs apart at the right end of the bar: after a gap in the native look,
 on a glass bar of their own in the redesign, like Search in the Music app. Spotify's own tabs are kept by the
 name under their icon, so they can be hidden but never removed, and switching the app's language
-starts the order over. A tab of the mod's own opens its link through Spotify's link dispatcher, so it
-never lights up as the tab you are on. In the redesign (Redesigned/Navbar/NavbarSettings.m) the page leads
+starts the order over. A tab of the mod's own opens its link through Spotify's link dispatcher. In the native
+look it never lights up as the tab you are on; on the redesign's glass bar it does while the page it opened is
+up, and a second tap goes back to that page. In the redesign (Redesigned/Navbar/NavbarSettings.m) the page leads
 with a preview of the glass bar, drawn by the same system UITabBar as the bar itself from the list as it
 stands, the split tabs on a bar of their own, and changing with every change on the page; then Custom tab
 bar (off, the bar is Spotify's own tabs in Spotify's order, the list kept); two picture cards for the labels,

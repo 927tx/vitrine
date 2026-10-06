@@ -40,6 +40,9 @@ half way through a slide what the screen shows of the message bar, the tab bar a
 stands on a glass bar of its own, and the platters of both bars are logged. `pick` picks Search at 2 s and
 Home at 4 s through the system bar's delegate, the mock tab repainting its label white as Spotify's does,
 and logs which bar selects what after each: `xcrun simctl launch <udid> com.vojta.tabbarharness pick split`.
+`lit` has Your Library stand in for a tab of the mod's own whose page is up (stubs.m answers `SGRNavbarLitTab`
+with it) at 2 s, while Home's label stays white: the selection logged at 2.5 s should be Your Library. Home is
+picked at 3.5 s, which forgets the lit tab, and the selection at 4.5 s should be Home.
 
     xcrun simctl spawn <udid> log show --last 1m --style compact --predicate 'eventMessage CONTAINS "[harness]" OR eventMessage CONTAINS "tab bar:"'
 
