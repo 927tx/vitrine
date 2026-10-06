@@ -4,8 +4,11 @@
 //   tour        the tour, as on a first launch (the default)
 //   old         the tour as below iOS 26: the redesign card untested, Legacy picked
 //   whatsnew    the What's new sheet
-//   pick        taps the other look's card two seconds in, to see the note change
+//   pick        taps the other look's card three seconds in, to see the note change
+//   environment loads a stand-in EeveeSpotify.dylib and runs the install check (the harness's own
+//               version, 1.0, is not Spotify's either), whose alert follows about 5 s in
 #import <UIKit/UIKit.h>
+#import <dlfcn.h>
 #import "App/Onboarding/Onboarding.h"
 #import "Core/SGPrefs.h"
 
@@ -24,6 +27,8 @@ NSString *SGRedesignUntestedWarning(void) {
     return [NSString stringWithFormat:@"The redesign is built on iOS 26's Liquid Glass. iOS %@ draws a blur in its place, and nobody has tested the redesign there: pages can be laid out wrongly, and Spotify can freeze as it starts. If Spotify does not start with it, the next launch goes back to Legacy.", @"17.5"];
 }
 void SGShowSigningFixIfPending(void) {}
+// Settings/SGModPage.m, for the Mod Settings rows, which the harness does not show.
+SGModRow *SGWarningRow(NSString *title, NSString *subtitle, void (^action)(void)) { return nil; }
 
 @interface Delegate : UIResponder <UIApplicationDelegate>
 @end
@@ -53,6 +58,15 @@ void SGShowSigningFixIfPending(void) {}
     self.window.rootViewController = home;
     [self.window makeKeyAndVisible];
 
+    if ([arguments containsObject:@"environment"]) {
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:@"spotifyglass.environment.told"];
+        NSString *eevee = [NSBundle.mainBundle pathForResource:@"EeveeSpotify" ofType:@"dylib"];
+        NSLog(@"harness: EeveeSpotify.dylib %@", dlopen(eevee.UTF8String, RTLD_NOW) ? @"loaded" : @"not loaded");
+        NSLog(@"harness: injected %d, Spotify %@", SGEeveeSpotifyInjected(), SGSpotifyVersion());
+        SGCheckEnvironmentOnce();
+        [NSUserDefaults.standardUserDefaults setBool:YES forKey:SGKeyOnboardingSeen];
+        return;
+    }
     BOOL whatsNew = [arguments containsObject:@"whatsnew"];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         NSLog(@"harness: %lu changes in the notes", (unsigned long)SGWhatsNewChanges().count);

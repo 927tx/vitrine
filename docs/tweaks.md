@@ -384,7 +384,10 @@ App:
                    on the first launch of a new version instead, What's new (WhatsNew.m), this version's section of
                    CHANGELOG.md, which scripts/whats-new.sh writes into a gitignored header at each make (a section
                    that came over from upstream is left out, so a build without its own has no sheet). The Mod
-                   page offers both again. Laid out on the simulator by harness/onboarding/
+                   page offers both again. Environment.m says once per install state, a few seconds in, when
+                   EeveeSpotify is injected too (a dyld image named so) or Spotify is not the version the mod is
+                   made for (SGSpotifyMadeFor), and when a redesign below iOS 26 did not start; the first two stay
+                   as red rows at the top of Mod Settings. Laid out on the simulator by harness/onboarding/
 
 Every key a feature stores starts with `spotifyglass.`, whatever it holds: Reset all settings on
 the Mod page removes by that prefix and has no list to keep up to date. It leaves `SGKeyStock` behind,

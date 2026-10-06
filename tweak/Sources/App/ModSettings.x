@@ -24,6 +24,7 @@
 #import "Shared/ListeningStats/ListeningStats.h"
 #import "Shared/Sing/Sing.h"
 #import "App/About/About.h"
+#import "App/Onboarding/Onboarding.h"
 #import "Redesigned/Album/Album.h"
 #import "Pages.h"
 
@@ -42,7 +43,9 @@ static UIViewController *modSettingsPage(void) {
     // A build the lock screen cannot open leads the page, above the tweaks: it is the one thing here
     // that no switch can put right, and it is worth reading before anything else.
     SGModRow *signing = SGSigningWarningRow();
-    if (signing) [sections addObject:SGSection(nil, @[signing])];
+    NSMutableArray<SGModRow *> *warnings = [NSMutableArray arrayWithArray:SGEnvironmentWarningRows()];
+    if (signing) [warnings insertObject:signing atIndex:0];
+    if (warnings.count) [sections addObject:SGSection(nil, warnings)];
     // Appearance opens a page of its own, on a card of its own, so the parts below stay one tap from the top.
     [sections addObject:SGSection(nil, @[pageRow(@"Appearance", @"paintpalette", UIColor.systemBlueColor, ^UIViewController *{ return SGAppearancePage(); })])];
     SGModRow *mod = pageRow(@"Mod", @"info.circle", UIColor.systemGrayColor, ^UIViewController *{ return SGAboutPage(); });

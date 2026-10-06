@@ -21,5 +21,15 @@ NSArray<SGUpdateChange *> *SGWhatsNewChanges(void);
 void SGShowWhatsNew(void);
 BOOL SGWhatsNewShowing(void);
 
+// Environment.m: what about the install can work against the mod. Said once per install state, a few
+// seconds after Spotify comes up and behind the tour, What's new and the signing sheet, and kept as
+// warning rows at the top of Mod Settings while it lasts.
+#define SGSpotifyMadeFor @"9.1.78"   // the Spotify this build is made for, and its flag table read from
+@class SGModRow;
+// SGEeveeSpotifyInjected() is Shared/Lyrics/Lyrics.h's.
+NSString *SGSpotifyVersion(void);
+NSArray<SGModRow *> *SGEnvironmentWarningRows(void);
+void SGCheckEnvironmentOnce(void);
+
 // The tour's prominent glass button, also What's new's Continue.
 UIButton *SGOnboardingButton(NSString *title);

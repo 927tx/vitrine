@@ -25,6 +25,7 @@ static BOOL newVersion(void) {
 %end
 
 %ctor {
+    SGCheckEnvironmentOnce();
     if (SGFlag(SGKeyOnboardingSeen, NO) && !newVersion()) return;
     %init;
     SGRequireClasses(@[@"_TtC19Home_FunkisPageImpl20FunkisViewController"]);
