@@ -22,7 +22,7 @@
     scripts/                    pipeline.sh (build + inject), build-extension.sh (the widget extension, without an
                                 Xcode project), merge-appintents.py (the widget's intents into Spotify's), insert-dylib.py (a load command into
                                 Spotify's widget), install.sh (sign + install), record-trees.py, record-session.py,
-                                dump-log.sh, extract-flags.py
+                                dump-log.sh, extract-flags.py, check-layers.sh (the one-way imports between layers)
     trees/                      recorded view trees, one per screen; the input for every new hook. trees/clean/ holds
                                 the numbered snapshots per screen of record-session.py, taken of Spotify as it came
     plist/                      Info.plist overrides merged into the app (turns UIDesignRequiresCompatibility off; the
