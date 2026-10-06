@@ -185,9 +185,17 @@ static NSArray<NSString *> *fromLegacyKeys(void) {
     return order;
 }
 
+// With nothing stored and nothing to carry over, every source is on: the user's own files first, word
+// timing ahead of line timing, and the two Chinese catalogues last, asked only once the rest have missed.
+// Spicy Lyrics passes straight on without its key.
+static NSArray<NSString *> *defaultOrder(void) {
+    return @[SGImportedLRCKey, SGSpicyLyricsKey, @"binilyrics", @"musixmatch", @"unison", @"netease", @"lrclib", @"qqmusic", @"kugou"];
+}
+
 NSArray<NSString *> *SGLyricsOrder(void) {
     id stored = [NSUserDefaults.standardUserDefaults arrayForKey:SGKeyLyricsProviders];
-    NSArray *keys = [stored isKindOfClass:NSArray.class] ? stored : fromLegacyKeys();
+    NSArray *legacy = fromLegacyKeys();
+    NSArray *keys = [stored isKindOfClass:NSArray.class] ? stored : legacy.count ? legacy : defaultOrder();
     NSMutableArray<NSString *> *order = [NSMutableArray array];
     for (id key in keys) {
         if ([key isKindOfClass:NSString.class] && SGLyricsProviderFor(key) && ![order containsObject:key]) [order addObject:key];
