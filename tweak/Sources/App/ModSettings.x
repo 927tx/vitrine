@@ -50,6 +50,8 @@ static UIViewController *modSettingsPage(void) {
     SGModRow *signing = SGSigningWarningRow();
     NSMutableArray<SGModRow *> *warnings = [NSMutableArray arrayWithArray:SGEnvironmentWarningRows()];
     if (signing) [warnings insertObject:signing atIndex:0];
+    // A free Apple ID's week runs out with no warning from iOS, so its date waits here too, not only under Mod.
+    if (SGSigningWeekLong()) [warnings addObject:SGWithSymbol(SGSigningExpiryRow(), @"clock.badge.exclamationmark")];
     if (warnings.count) [sections addObject:SGSection(nil, warnings)];
 
     // The rows of one look are asked again as Redesigned UI is flipped, so the page shows what the restart brings.

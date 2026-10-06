@@ -21,5 +21,10 @@ effects, Vibrations, Live Activity, AirPods gestures and Listening stats; Lock s
 All flags; Mod with the version. Flipping Redesigned UI on in the native look offers the restart and swaps Home &
 Library for Albums & artists in place.
 
+`App/About/Signing.m` is the real one. A free Apple ID's "Signed until" row joins the top section once the
+.app holds an `embedded.mobileprovision` whose `ExpirationDate` is under eight days after its `CreationDate`; the
+parser takes a plain XML plist as well as a signed one, so one written by hand will do (copy it in after
+`build.sh`, before `simctl install`).
+
 What it does not cover: the pages the rows open, the row the mod adds to Spotify's settings list and side drawer,
 and iOS below 26, where the switch warns first.

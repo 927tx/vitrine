@@ -51,6 +51,10 @@ BOOL SGSigningOpensFromLockScreen(void);     // YES when unreadable, so a build 
 SGModRow *SGSigningWarningRow(void);          // nil while the signature is sound
 void SGCheckSigningOnce(void);
 void SGShowSigningFixIfPending(void);   // the sheet the tour held back, if any
+// When the provisioning profile the build is signed with runs out, read from embedded.mobileprovision:
+// nil without one. A free Apple ID's lasts a week, after which Spotify no longer opens.
+BOOL SGSigningWeekLong(void);
+SGModRow *SGSigningExpiryRow(void);   // "Signed until …", nil without a profile
 
 // Backup.m: the settings out to a JSON file through the share sheet, and back in from one, replacing
 // what is set and restarting.

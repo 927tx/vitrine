@@ -49,12 +49,13 @@ UIViewController *SGAboutPage(void) {
         withSymbol(SGActionRow(@"Welcome tour", nil, ^{ SGShowOnboarding(); }), @"map"),
     ]];
     if (SGWhatsNewChanges().count) [links insertObject:withSymbol(SGActionRow(@"What's New", nil, ^{ SGShowWhatsNew(); }), @"sparkles") atIndex:links.count - 1];
+    NSMutableArray<SGModRow *> *build = [NSMutableArray arrayWithObjects:updates,
+        SGStatRow(@"Version", ^NSString *{ return @(SG_VERSION); }),
+        SGStatRow(@"Spotify", ^NSString *{ return spotify; }), nil];
+    SGModRow *signedUntil = SGSigningExpiryRow();
+    if (signedUntil) [build addObject:signedUntil];
     return [[SGModPage alloc] initWithTitle:@"Mod" intro:nil sections:@[
-        SGSection(nil, @[
-            updates,
-            SGStatRow(@"Version", ^NSString *{ return @(SG_VERSION); }),
-            SGStatRow(@"Spotify", ^NSString *{ return spotify; }),
-        ]),
+        SGSection(nil, build),
         SGSection(nil, links),
         SGSection(nil, @[
             withSymbol(SGActionRow(@"Export settings", nil, ^{ SGExportSettings(); }), @"square.and.arrow.up"),

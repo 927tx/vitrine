@@ -1,6 +1,5 @@
 // What Mod Settings' main page links to and reads, stood in for: every page is an empty page of its own
-// name, the values beside the chevrons are what a fresh install reads, and the update and signing checks do
-// nothing.
+// name, the values beside the chevrons are what a fresh install reads, and the update check does nothing.
 #import <UIKit/UIKit.h>
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
@@ -40,8 +39,9 @@ BOOL SGSingSpatial(void) { return NO; }
 
 void SGCheckForUpdate(BOOL force) {}
 void SGWatchForUpdates(void) {}
-void SGCheckSigningOnce(void) {}
-SGModRow *SGSigningWarningRow(void) { return nil; }
+// Signing.m is the real one: its row stays away while the harness's own signature is sound, and its
+// "Signed until" row shows once the .app holds an embedded.mobileprovision (README).
+BOOL SGOnboardingShowing(void) { return NO; }
 // Environment.m's red row, as a phone with EeveeSpotify injected too shows it.
 NSArray<SGModRow *> *SGEnvironmentWarningRows(void) {
     if (!SGHarnessWarning) return @[];
