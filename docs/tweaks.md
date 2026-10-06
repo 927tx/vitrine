@@ -252,9 +252,11 @@ Native:
                   keeps what the native tweaks stripped transparent
     Navbar/       Spotify's tab bar composed (Navbar.x, NavbarLayout.m, hooked from TabBarHooks.x), the Navbar and Add a tab pages
     NowPlayingBar/ the device button hidden, the bar's flags
-    Player/       the full screen player (Player.x), its cards and buttons hidden (PlayerDeclutter.x), the glass lyrics card
-                  (LyricsCard.x), the gestures' hookup and the hold on either side of the cover that plays at 2x until
-                  the finger lifts (PlayerGestures.x), the Queue & devices flags
+    Player/       the full screen player (Player.x), its cards and buttons hidden and a hidden lyric preview's room given
+                  to the cover (PlayerDeclutter.x), the glass lyrics card (LyricsCard.x), the gestures' hookup and the hold
+                  on either side of the cover that plays at 2x until the finger lifts (PlayerGestures.x), the list's pull
+                  held off while the progress bar is scrubbed (PlayerScrub.x), the Queue & devices flags. The scrub and
+                  the cover's room are checked in the simulator against harness/native-player/
     Lyrics/       the full screen lyrics page on glass (LyricsPage.x)
     LocalFiles/   a lyrics button on the player's footer for a local file with an LRC file linked to it, a fifth of the
                   way in from the leading edge, which opens a page of the lines on black that follows the song
