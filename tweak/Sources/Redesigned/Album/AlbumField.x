@@ -81,6 +81,10 @@ void SGRAlbumSetSpotifyColor(UIView *view, UIColor *color) {
     if (color) [fieldOn(view) setProvisionalColor:color];
 }
 
+void SGRAlbumHoldPage(UIView *page) {
+    [fieldOn(page) holdPage:page];
+}
+
 static SGRArtworkField *fieldIn(UIView *page) {
     SGRArtworkField *field = objc_getAssociatedObject(page, &kFieldKey);
     if (field) return field;

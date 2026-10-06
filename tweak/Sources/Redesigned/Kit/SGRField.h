@@ -54,4 +54,17 @@ extern NSNotificationName const SGRFieldColorDidChangeNotification;
 // as the last call is a no-op, and a result that lands after a newer call is dropped. nil keeps
 // what the field shows.
 - (void)setArtwork:(UIImage *)image identity:(NSString *)identity animated:(BOOL)animated;
+
+// A page that comes in whole rather than a piece at a time: until the field has read its first artwork, a veil
+// of the neutral field lies over everything `page` holds but its pinned ⋯ (SGRPinnedMore), and then fades away
+// at once, with the cover, the colour and the text that arrived under it. The back button is the navigation
+// bar's, outside the page, and stays. A page whose artwork never comes is shown after SGRFieldHoldLimit, and
+// one that knows it has none releases itself (-showPage). Called from the page's own pass, which keeps the
+// veil on top; nothing once the page has been shown, so a page coming back is never held again.
+- (void)holdPage:(UIView *)page;
+- (void)showPage;
 @end
+
+// How long a page waits for its artwork before it is shown anyway. The Music app shows something at once
+// (HIG, Loading: "Show something as soon as possible"), so the wait is short; a page then loads as it used to.
+extern const NSTimeInterval SGRFieldHoldLimit;

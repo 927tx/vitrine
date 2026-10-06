@@ -531,6 +531,20 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
               alpha(headingPaint), alpha(badge), alpha(card), alpha(refreshPaint), alpha(plainHeadingPaint));
     });
 
+    // The page comes in whole (Kit/SGRField.h): a veil over it until the cover has been read, or, with no cover,
+    // until it has its title. Just after launch it is there or already fading; by 3 s, past the field's limit, it is gone.
+    for (NSNumber *when in @[@0.01, @3]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(when.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            UIView *veil = nil;
+            for (UIView *sub in page.view.subviews) {
+                if ([NSStringFromClass(sub.class) isEqualToString:@"SGRFieldVeil"]) veil = sub;
+            }
+            NSLog(@"[harness] whole page at %.2f s: %@", when.doubleValue,
+                  veil ? [NSString stringWithFormat:@"veil a=%.2f, %@ the pinned more", veil.layer.presentationLayer.opacity,
+                          page.view.subviews.lastObject == veil ? @"over" : @"under"] : @"no veil");
+        });
+    }
+
     if ([NSProcessInfo.processInfo.arguments containsObject:@"liked"]) {
         buildLikedSongs(page, W);
         [self.window makeKeyAndVisible];

@@ -534,6 +534,7 @@ static void applyWash(UIView *page) {
 
 static void applyHeader(UIView *header, UIView *page) {
     if (!SGRFindByIdentifier(header, @"CreativeWorkPlatform.Components.UI.TitleRow", &kTitleKey)) return;
+    SGRAlbumHoldPage(page);
     applyWash(page);
     SGRHeaderInfo *info = applyInfo(header, page);
 

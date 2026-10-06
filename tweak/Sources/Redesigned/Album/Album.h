@@ -62,3 +62,6 @@ void SGRAlbumSetArtwork(UIView *view, UIImage *image);
 // The colour Spotify picked for the album, read off the wash it paints behind the header: the field shows it
 // until the cover's own main colour has been read, and not after.
 void SGRAlbumSetSpotifyColor(UIView *view, UIColor *color);
+// The page comes in whole once its cover has been read (Kit/SGRField.h). Called from the album header's pass
+// only, so a podcast's episode page, the same template with no cover for the field to read, is never held.
+void SGRAlbumHoldPage(UIView *page);

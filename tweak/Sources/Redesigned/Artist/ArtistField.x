@@ -75,6 +75,8 @@ static SGRArtworkField *fieldIn(UIView *page) {
     if (field.superview != page) [page insertSubview:field atIndex:0];
     else if (page.subviews.firstObject != field) [page sendSubviewToBack:field];
     if (!CGRectEqualToRect(field.frame, page.bounds)) field.frame = page.bounds;
+    // The page comes in whole once its photo has been read (Kit/SGRField.h).
+    [field holdPage:page];
 }
 %end
 

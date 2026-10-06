@@ -68,3 +68,7 @@ a plain UICollectionViewCell straight in the list: "plain heading a=0" once the 
 The owner's picture is an image view inside the creator button's facepile, filled at 1.5 s, after the header has
 laid out. At 2.2 s the log line "owner picture" says where the redesign drew it: round, a line high, just before
 the name, the two centred together. "none" means the late image was missed.
+
+"whole page" lines, in every mode: just after launch the page is under the field's veil, below the pinned ⋯, and at
+3 s there is "no veil". The redesign's own line says why it lifted (`log stream`, "page shown whole"): "its artwork
+was read" for a playlist and a mix, "it has no artwork" for Liked Songs, a few tens of ms after its title.

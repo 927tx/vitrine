@@ -44,3 +44,5 @@ UIView *SGRPlaylistPageOf(UIView *view);
 UIColor *SGRPlaylistFieldColor(UIView *view);
 // The cover of the page `view` is on, for its field to take its colour from. The same image again is a no-op.
 void SGRPlaylistSetArtwork(UIView *view, UIImage *image);
+// The page `view` is on has no cover to wait for (Liked Songs): shown now rather than after the field's limit.
+void SGRPlaylistShowPage(UIView *view);

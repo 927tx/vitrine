@@ -31,7 +31,39 @@ static NSDictionary *noActions(void) {
     return none;
 }
 
+const NSTimeInterval SGRFieldHoldLimit = 1.0;
+
+// The veil over a held page: black, the redesign's field before a colour arrives (SGRAmoled.x), painted on a
+// sublayer for the reason the field is, so the repaint hook does not take it for Spotify's base surface.
+@interface SGRFieldVeil : UIView
+@end
+
+@implementation SGRFieldVeil {
+    CALayer *_paint;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (!(self = [super initWithFrame:frame])) return nil;
+    self.userInteractionEnabled = NO;
+    self.accessibilityElementsHidden = YES;
+    _paint = [CALayer layer];
+    _paint.actions = noActions();
+    _paint.backgroundColor = UIColor.blackColor.CGColor;
+    [self.layer addSublayer:_paint];
+    return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    _paint.frame = self.bounds;
+}
+
+@end
+
 @implementation SGRArtworkField {
+    SGRFieldVeil *_veil;
+    CFTimeInterval _heldSince;
+    BOOL _shown;   // the page has been shown once, and is never held again
     CALayer *_solid;
     CAGradientLayer *_black;
     CALayer *_backdrop;
@@ -243,8 +275,52 @@ static NSDictionary *noActions(void) {
     }];
 }
 
+#pragma mark - holding a page
+
+- (void)holdPage:(UIView *)page {
+    if (_shown || _read || !page) return;
+    if (!_veil) {
+        _veil = [[SGRFieldVeil alloc] initWithFrame:page.bounds];
+        _heldSince = CACurrentMediaTime();
+        __weak SGRArtworkField *weakSelf = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SGRFieldHoldLimit * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [weakSelf sgr_showPage:@"the artwork took too long"];
+        });
+    }
+    if (!CGRectEqualToRect(_veil.frame, page.bounds)) _veil.frame = page.bounds;
+    // On top of everything the page holds but its pinned ⋯, which brings itself to the front on the header's
+    // passes. Moved only when out of place: a move lays the page out again. The class is looked up by name so a
+    // screen that has a field and no action row (the player) does not have to link SGRActionRow.m.
+    static Class pinned;
+    if (!pinned) pinned = NSClassFromString(@"SGRMirrorButton");
+    NSArray<UIView *> *subviews = page.subviews;
+    UIView *top = subviews.lastObject;
+    if (pinned && [top isKindOfClass:pinned]) {
+        if (subviews.count < 2 || subviews[subviews.count - 2] != _veil) [page insertSubview:_veil belowSubview:top];
+    } else if (top != _veil) {
+        [page addSubview:_veil];
+    }
+}
+
+- (void)showPage {
+    [self sgr_showPage:@"it has no artwork"];
+}
+
+- (void)sgr_showPage:(NSString *)why {
+    if (_shown) return;
+    _shown = YES;
+    SGRFieldVeil *veil = _veil;
+    _veil = nil;
+    if (!veil) return;
+    static NSUInteger logged;
+    if (logged++ < 4) SGLog(@"redesign kit: page shown whole after %.0f ms, %@", (CACurrentMediaTime() - _heldSince) * 1000, why);
+    SGRAnimate(SGRMotionFade, ^{ veil.alpha = 0; }, ^(BOOL finished) { [veil removeFromSuperview]; });
+}
+
 - (void)applyPalette:(SGRPalette *)palette animated:(BOOL)animated {
     _read = YES;
+    // Under the veil the colour goes in at once, and the page fades in with it.
+    if (_veil) animated = NO;
     if (_flows && palette.flowColors) {
         [_flow setColors:palette.flowColors animated:animated && !_flow.hidden];
         _flow.hidden = NO;
@@ -267,6 +343,7 @@ static NSDictionary *noActions(void) {
         [CATransaction commit];
     }
     [self applyColor:palette.fieldColor animated:animated];
+    [self sgr_showPage:@"its artwork was read"];
 }
 
 @end

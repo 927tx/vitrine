@@ -563,6 +563,8 @@ static void applyHeader(UIView *layout) {
     }
     CGFloat reach = rest - SGRHeaderInfoBottom - [info contentHeightForWidth:info.bounds.size.width] + SGRHeaderInfoTitleRise;
     if (cover) applyHero(layout, cover, plane, block, reach, stretch);
+    // Liked Songs has no cover at all, so there is nothing for its page to wait for once it has its title.
+    else if (info.window && modelString(viewModelOf(headerVC), @"playlistName")) SGRPlaylistShowPage(layout);
 }
 
 // The content layout of the page `root` belongs to, kept weakly on it: the header lays out on every step of

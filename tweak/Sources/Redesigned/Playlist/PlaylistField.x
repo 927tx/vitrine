@@ -45,6 +45,10 @@ void SGRPlaylistSetArtwork(UIView *view, UIImage *image) {
     if (image) [fieldOn(view) setArtwork:image identity:nil animated:YES];
 }
 
+void SGRPlaylistShowPage(UIView *view) {
+    [fieldOn(view) showPage];
+}
+
 static SGRArtworkField *fieldIn(UIView *page) {
     SGRArtworkField *field = objc_getAssociatedObject(page, &kFieldKey);
     if (field) return field;
@@ -66,6 +70,8 @@ static SGRArtworkField *fieldIn(UIView *page) {
     if (field.superview != page) [page insertSubview:field atIndex:0];
     else if (page.subviews.firstObject != field) [page sendSubviewToBack:field];
     if (!CGRectEqualToRect(field.frame, page.bounds)) field.frame = page.bounds;
+    // The page comes in whole once its cover has been read (Kit/SGRField.h).
+    [field holdPage:page];
 }
 
 // The page the repaint hook keeps clear is the one on screen; another playlist pushed over this one sets
