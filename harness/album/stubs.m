@@ -14,3 +14,6 @@ void SGRObservePlayerTransition(id owner, void (^began)(id owner), void (^ended)
 
 // Shared/Fonts/FontImport.m: no font of the user's own in the harness.
 NSString *SGRegisterCustomFont(void) { return nil; }
+
+// MotionSources.m: Apple Music is on, as it is by default.
+BOOL SGMotionAppleMusicOn(void) { return YES; }

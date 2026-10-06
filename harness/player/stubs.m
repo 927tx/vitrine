@@ -166,3 +166,13 @@ NSString *SGSingModelError(void) { return nil; }
 NSString *SGSingModelSizeText(void) { return @""; }
 void SGSingDownloadModel(void) {}
 void SGSingCancelModelDownload(void) {}
+
+// MotionSources.m: the default order, Canvas then Apple Music, over the catalog the harness builds.
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
+void SGMotionClipFor(NSURL *canvas, NSString *artist, NSString *album, SGMotionShape shape, CGFloat pixels, void (^done)(NSURL *file)) {
+    void (^apple)(void) = ^{ SGMotionAlbumCover(artist, album, shape, pixels, done); };
+    if (!canvas) { apple(); return; }
+    SGMotionFile(canvas, ^(NSURL *file) { if (file) done(file); else apple(); });
+}
+SGModRow *SGMotionSourcesRow(void) { return nil; }
+BOOL SGMotionAppleMusicOn(void) { return YES; }

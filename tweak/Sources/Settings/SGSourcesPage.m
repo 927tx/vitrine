@@ -1,8 +1,17 @@
-// Drag sources into the order they are asked; the ones below the line are off.
 #import "Core/SGCore.h"
-#import "Settings/SGPage.h"
-#import "Settings/SGPageStyle.h"
-#import "LyricsSources.h"
+#import "SGPage.h"
+#import "SGPageStyle.h"
+#import "SGSourcesPage.h"
+
+@implementation SGSource
++ (instancetype)sourceWithKey:(NSString *)key name:(NSString *)name detail:(NSString *)detail {
+    SGSource *source = [self new];
+    source.key = key;
+    source.name = name;
+    source.detail = detail;
+    return source;
+}
+@end
 
 typedef NS_ENUM(NSInteger, SGSourcesSection) {
     SGSourcesSectionOn = 0,
@@ -11,6 +20,10 @@ typedef NS_ENUM(NSInteger, SGSourcesSection) {
 };
 
 @interface SGSourcesPage : SGPage
+@property (nonatomic, copy) NSString *note;
+@property (nonatomic, copy) NSArray<SGSource *> *all;
+@property (nonatomic, copy) NSArray<NSString *> *(^order)(void);
+@property (nonatomic, copy) void (^setOrder)(NSArray<NSString *> *keys);
 @end
 
 @implementation SGSourcesPage {
@@ -19,22 +32,22 @@ typedef NS_ENUM(NSInteger, SGSourcesSection) {
     UIView *_footer;
 }
 
-- (instancetype)init {
-    if (!(self = [super initWithStyle:UITableViewStyleInsetGrouped])) return nil;
-    self.title = @"Lyrics sources";
-    return self;
+- (SGSource *)sourceFor:(NSString *)key {
+    for (SGSource *source in self.all) if ([source.key isEqualToString:key]) return source;
+    return nil;
 }
 
 - (void)read {
-    _on = [SGLyricsOrder() mutableCopy];
+    _on = [NSMutableArray array];
+    for (NSString *key in self.order()) if ([self sourceFor:key] && ![_on containsObject:key]) [_on addObject:key];
     _off = [NSMutableArray array];
-    for (SGLyricsProvider *provider in SGLyricsAllProviders()) {
-        if (![_on containsObject:provider.key]) [_off addObject:provider.key];
+    for (SGSource *source in self.all) {
+        if (![_on containsObject:source.key]) [_off addObject:source.key];
     }
 }
 
 - (void)save {
-    SGLyricsSetOrder(_on);
+    self.setOrder(_on);
 }
 
 - (void)viewDidLoad {
@@ -42,8 +55,7 @@ typedef NS_ENUM(NSInteger, SGSourcesSection) {
     [self read];
     self.tableView.editing = YES;
     self.tableView.allowsSelectionDuringEditing = YES;
-    _footer = SGNote(@"Asked top to bottom until one has word timing. Sources get only the track, never "
-                      "your account.");
+    _footer = SGNote(self.note);
     self.tableView.tableFooterView = _footer;
 }
 
@@ -84,7 +96,7 @@ typedef NS_ENUM(NSInteger, SGSourcesSection) {
 
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
     UITableViewCell *cell = SGDequeueCell(table, @"source");
-    SGLyricsProvider *provider = SGLyricsProviderFor([self keysIn:path.section][(NSUInteger)path.row]);
+    SGSource *provider = [self sourceFor:[self keysIn:path.section][(NSUInteger)path.row]];
     BOOL on = path.section == SGSourcesSectionOn;
     // The asked ones are numbered, so the order reads as an order rather than a list.
     NSString *title = on ? [NSString stringWithFormat:@"%ld. %@", (long)path.row + 1, provider.name] : provider.name;
@@ -130,9 +142,9 @@ typedef NS_ENUM(NSInteger, SGSourcesSection) {
         [_on removeObject:key];
         // Back to where it sits among the sources that are off, in the order they all come in.
         NSUInteger at = 0;
-        for (SGLyricsProvider *provider in SGLyricsAllProviders()) {
-            if ([provider.key isEqualToString:key]) break;
-            if ([_off containsObject:provider.key]) at++;
+        for (SGSource *source in self.all) {
+            if ([source.key isEqualToString:key]) break;
+            if ([_off containsObject:source.key]) at++;
         }
         [_off insertObject:key atIndex:at];
     } else {
@@ -145,6 +157,13 @@ typedef NS_ENUM(NSInteger, SGSourcesSection) {
 
 @end
 
-UIViewController *SGLyricsSourcesPage(void) {
-    return [SGSourcesPage new];
+UIViewController *SGSourcesPageMake(NSString *title, NSString *note, NSArray<SGSource *> *all,
+                                    NSArray<NSString *> *(^order)(void), void (^setOrder)(NSArray<NSString *> *keys)) {
+    SGSourcesPage *page = [[SGSourcesPage alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    page.title = title;
+    page.note = note;
+    page.all = all;
+    page.order = order;
+    page.setOrder = setOrder;
+    return page;
 }

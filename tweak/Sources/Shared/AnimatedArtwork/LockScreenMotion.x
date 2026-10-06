@@ -101,19 +101,9 @@ static void showCover(NSString *uri, NSString *picture) {
         CGFloat pixels = SGMotionPixels();
         BOOL everySong = SGLockScreenArtwork() == SGLockArtworkEverySong;
         NSString *picture = pictureOf(state.track, metadata);
-        void (^apple)(void) = ^{
-            SGMotionAlbumCover(artist, album, SGMotionTall, pixels, ^(NSURL *file) {
-                if (file) show(uri, file);
-                else if (everySong) showCover(uri, picture);
-            });
-        };
-        if (!canvas) {
-            apple();
-            return;
-        }
-        SGMotionFile(canvas, ^(NSURL *file) {
+        SGMotionClipFor(canvas, artist, album, SGMotionTall, pixels, ^(NSURL *file) {
             if (file) show(uri, file);
-            else apple();
+            else if (everySong) showCover(uri, picture);
         });
     }
 }

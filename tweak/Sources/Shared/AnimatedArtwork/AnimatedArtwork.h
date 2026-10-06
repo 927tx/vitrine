@@ -42,6 +42,19 @@ CGFloat SGMotionPixels(void);
 // when the catalog could not be asked. Kept for the launch. Main queue.
 void SGMotionSongsWithISRC(NSString *isrc, void (^done)(NSArray *songs));
 
+// Where moving artwork comes from (MotionSources.m): the keys that are on, in the order they are asked,
+// Spotify's Canvas then Apple Music's animated cover unless the user changed it.
+#define SGKeyMotionSources @"spotifyglass.motion.sources"
+NSArray<NSString *> *SGMotionSourceOrder(void);
+BOOL SGMotionAppleMusicOn(void);
+// The first clip the order finds for a track, as a local file, or nil. `canvas` is the track's Canvas
+// video, nil when it has none. Main queue.
+void SGMotionClipFor(NSURL *canvas, NSString *artist, NSString *album, SGMotionShape shape, CGFloat pixels,
+                     void (^done)(NSURL *file));
+// The row that opens the ordered list, for the Player page and the lock screen's.
+@class SGModRow;
+SGModRow *SGMotionSourcesRow(void);
+
 // Any remote video (a Canvas) as a local file, or nil. Main queue.
 void SGMotionFile(NSURL *remote, void (^done)(NSURL *file));
 // Where a video the mod makes itself is kept under `key`, among the downloads, which are kept to the

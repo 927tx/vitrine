@@ -374,19 +374,9 @@ void SGRPlayerMotionLyricsChanged(void) {
     NSURL *canvas = video && [address isKindOfClass:NSString.class] ? [NSURL URLWithString:address] : nil;
     NSString *artist = state.track.artistName, *album = metadata[@"album_title"];
     CGFloat pixels = SGMotionPixels();
-    void (^apple)(void) = ^{
-        SGMotionAlbumCover(artist, album, SGMotionTall, pixels, ^(NSURL *file) { show(track, file); });
-    };
     static NSUInteger logged;
     if (logged++ < 3) SGLog(@"redesign player: canvas %@ (%@)", canvas ? @"found" : @"none", type ?: @"no type");
-    if (!canvas) {
-        apple();
-        return;
-    }
-    SGMotionFile(canvas, ^(NSURL *file) {
-        if (file) show(track, file);
-        else apple();
-    });
+    SGMotionClipFor(canvas, artist, album, SGMotionTall, pixels, ^(NSURL *file) { show(track, file); });
 }
 @end
 

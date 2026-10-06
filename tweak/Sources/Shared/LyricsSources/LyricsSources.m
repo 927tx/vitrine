@@ -12,6 +12,7 @@
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/LocalFiles/LocalFiles.h"
 #import "Shared/LocalFiles/LocalLyrics.h"
+#import "Settings/SGSourcesPage.h"
 #import "Headers/SPTPlayer.h"
 #import <stdatomic.h>
 
@@ -552,4 +553,13 @@ void SGLyricsMigrateLegacyKeys(void) {
     SGLyricsSetOrder(order);
     SGSetEnabled(SGKeyLyricsAllTracks, SGFlag(kLegacyAllTracks, NO));
     SGLog(@"lyrics: carried the Musixmatch switches over as %@", [order componentsJoinedByString:@", "]);
+}
+
+UIViewController *SGLyricsSourcesPage(void) {
+    NSMutableArray<SGSource *> *all = [NSMutableArray array];
+    for (SGLyricsProvider *provider in SGLyricsAllProviders()) {
+        [all addObject:[SGSource sourceWithKey:provider.key name:provider.name detail:provider.detail]];
+    }
+    return SGSourcesPageMake(@"Lyrics sources", @"Asked top to bottom until one has word timing. Sources get only the track, never your account.",
+                             all, ^NSArray<NSString *> * { return SGLyricsOrder(); }, ^(NSArray<NSString *> *keys) { SGLyricsSetOrder(keys); });
 }

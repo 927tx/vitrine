@@ -303,10 +303,12 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     });
     SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Animated artwork, up to about 7 MB a song", SGKeyMotionLowData);
     lowData.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; };
+    SGModRow *sources = SGMotionSourcesRow();
+    sources.visible = lowData.visible;
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
-        SGNotedSection(nil, @[background, lowData],
-                       @"Animated plays the Canvas or Apple Music's animated cover over Fluid, and the player's ⋯ menu switches between the two."),
+        SGNotedSection(nil, @[background, sources, lowData],
+                       @"Animated plays the first clip its sources have, over Fluid, and the player's ⋯ menu switches between the two."),
         SGSection(nil, SGRNowPlayingBarRows()), nil];
     [sections addObjectsFromArray:more];
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:nil];

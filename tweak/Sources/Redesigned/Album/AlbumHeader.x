@@ -205,7 +205,7 @@ static void *kReadyContext = &kReadyContext;
 
 - (void)playMotionForArtist:(NSString *)artist album:(NSString *)album {
     NSString *key = artist.length && album.length ? [NSString stringWithFormat:@"%@\n%@", artist, album] : nil;
-    if (!key || [key isEqualToString:_motionAlbum] || !SGEnabled(SGRKeyAlbumMotion)) return;
+    if (!key || [key isEqualToString:_motionAlbum] || !SGEnabled(SGRKeyAlbumMotion) || !SGMotionAppleMusicOn()) return;
     _motionAlbum = key;
     // The player's size: at the screen's full width a square cover ran to the 1920 stream, tens of MB.
     CGFloat pixels = SGMotionPixels();
