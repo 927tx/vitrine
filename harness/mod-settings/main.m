@@ -14,8 +14,10 @@
 // section of twelve rows shown only while the switch is on, and a row that comes by itself), later (that row
 // let come; the page's ticker brings it), top (scrolled to the start), layout (the scroll offset, and each
 // section's rows and heading and note heights, to the log), needs (the Lock screen artwork section below iOS
-// 26), tap=<section>.<row> (that row selected, and the alert it brings up logged).
+// 26), tap=<section>.<row> (that row selected, and the alert it brings up logged), rows (the row the mod adds to
+// Spotify's settings list and drawer, after each list is emptied of its subviews, counted to the log).
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
 #import "Settings/SGModPage.h"
@@ -30,6 +32,17 @@ BOOL SGHarnessWarning;
 static void findViews(UIView *root, Class kind, NSMutableArray *found) {
     if ([root isKindOfClass:kind]) [found addObject:root];
     for (UIView *sub in root.subviews) findViews(sub, kind, found);
+}
+
+// With `rows` on the launch line, Spotify's settings list controller and the side drawer's list by their own
+// names, made before ModSettings.x's %ctor hooks them (constructor priorities hold within this binary).
+static const char *const kDrawerClass = "_TtC23SideDrawer_ListPageImplP33_1D8CA7A9CC41E8D184AF8B9AAE4E684E28SideDrawerListCollectionView";
+static const char *const kSettingsClass = "_TtC21Settings_PlatformImpl26SettingsListViewController";
+
+__attribute__((constructor(101))) static void harnessClasses(void) {
+    if (![NSProcessInfo.processInfo.arguments containsObject:@"rows"]) return;
+    objc_registerClassPair(objc_allocateClassPair(UICollectionView.class, kDrawerClass, 0));
+    objc_registerClassPair(objc_allocateClassPair(UIViewController.class, kSettingsClass, 0));
 }
 
 // The `gated` page: a switch, ten rows of filler, then a headed and noted section whose twelve rows show only
@@ -124,6 +137,35 @@ static UIViewController *gatedPage(void) {
         [table setContentOffset:CGPointMake(0, MAX(-table.adjustedContentInset.top, table.contentSize.height - table.bounds.size.height + table.adjustedContentInset.bottom)) animated:NO];
     } else if ([verb isEqualToString:@"gated"]) {
         [self.nav pushViewController:gatedPage() animated:NO];
+    } else if ([verb isEqualToString:@"rows"]) {
+        // The row ModSettings.x adds to Spotify's settings list and to the side drawer's list, each emptied of its
+        // subviews afterwards as Spotify can do, then laid out again.
+        NSUInteger (^count)(UIView *) = ^NSUInteger(UIView *list) {
+            NSUInteger n = 0;
+            for (UIView *sub in list.subviews) n += [NSStringFromClass(sub.class) isEqualToString:@"SGModSettingsRow"];
+            return n;
+        };
+        void (^empty)(UIView *) = ^(UIView *list) {
+            for (UIView *sub in [list.subviews copy]) [sub removeFromSuperview];
+            [list setNeedsLayout];
+            [list layoutIfNeeded];
+        };
+        UICollectionView *drawer = [[NSClassFromString(@(kDrawerClass)) alloc] initWithFrame:CGRectMake(0, 0, 390, 600)
+                                                                         collectionViewLayout:[UICollectionViewFlowLayout new]];
+        [self.window addSubview:drawer];
+        [drawer layoutIfNeeded];
+        NSUInteger drawerFirst = count(drawer);
+        empty(drawer);
+        UIViewController *settings = [NSClassFromString(@(kSettingsClass)) new];
+        UICollectionView *list = [[UICollectionView alloc] initWithFrame:CGRectMake(0, 0, 390, 600) collectionViewLayout:[UICollectionViewFlowLayout new]];
+        [settings.view addSubview:list];
+        [settings viewDidLayoutSubviews];
+        [list layoutIfNeeded];
+        NSUInteger settingsFirst = count(list);
+        empty(list);
+        NSLog(@"[harness] rows: drawer %lu on its first layout, %lu after it was emptied; settings %lu, %lu after it was emptied",
+              (unsigned long)drawerFirst, (unsigned long)count(drawer), (unsigned long)settingsFirst, (unsigned long)count(list));
+        [drawer removeFromSuperview];
     } else if ([verb isEqualToString:@"needs"]) {
         [self.nav pushViewController:[[SGModPage alloc] initWithTitle:@"Lock screen" intro:nil sections:@[
             SGSection(@"Lock screen artwork", @[SGLockScreenArtworkNeedsRow()]),

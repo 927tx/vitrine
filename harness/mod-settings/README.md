@@ -26,6 +26,11 @@ switch brings it in with its 38 pt heading and 28 pt note and scrolls 362 pt, ha
 ticker brings the later row within a second without moving the page; the switch off takes the heading and note
 away again.
 
+`rows` on the launch line makes Spotify's settings list controller and the side drawer's list class under their own
+names before the hooks are set, then lays a drawer list out and a settings list out under its controller, empties
+each of its subviews as Spotify can, and lays it out again. It logs how many Mod Settings rows each has: 1 and 1 for
+both. With main's ModSettings.x before the fix it read 0 and 0 for the drawer and 1 then 0 for the settings list.
+
 `needs` pushes the Lock screen page's artwork section as iOS 18 to 25 get it (the real
 `AnimatedArtworkSettings.m`'s `SGLockScreenArtworkNeedsRow`), and `tap=<section>.<row>` selects a row and logs the
 alert it brings up: "Full-screen artwork", "Needs iOS 26", and an alert naming the iOS version.
@@ -41,5 +46,5 @@ Library for Albums & artists in place.
 parser takes a plain XML plist as well as a signed one, so one written by hand will do (copy it in after
 `build.sh`, before `simctl install`).
 
-What it does not cover: the pages the rows open, the row the mod adds to Spotify's settings list and side drawer,
-and iOS below 26, where the switch warns first.
+What it does not cover: the pages the rows open, the row the mod adds to Spotify's settings list and side drawer
+in Spotify's real lists (`rows` uses stand-ins of the same names), and iOS below 26, where the switch warns first.

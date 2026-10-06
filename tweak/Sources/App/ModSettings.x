@@ -260,31 +260,51 @@ static BOOL isSettingsRoot(UIViewController *list) {
 %end
 
 // The drawer's list (trees/test6.txt: SideDrawerListCollectionView under the profile header, Your
-// plan its first cell) is one of several collection views on the page, so it is found by name.
+// plan its first cell) is one of several collection views on the page, so it is found by name, and
+// its class is kept for the list's own layout below to know it by. Spotify 9.1.78's private class is
+// looked up at launch, so the list gets its row on its first layout, even before its controller's.
+static NSString *const kDrawerList = @"_TtC23SideDrawer_ListPageImplP33_1D8CA7A9CC41E8D184AF8B9AAE4E684E28SideDrawerListCollectionView";
+static Class sg_drawerList;
+
+// Spotify can take the list's subviews away and fill it again while keeping the list itself, so a
+// row that has lost its place is put back rather than a second one made.
+static void attachDrawerRow(UICollectionView *list) {
+    SGModSettingsRow *row = objc_getAssociatedObject(list, &kRowKey);
+    if (!row) {
+        row = [[SGModSettingsRow alloc] initWithFrame:CGRectZero];
+        row.drawer = YES;
+        objc_setAssociatedObject(list, &kRowKey, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (row.superview != list) [list addSubview:row];
+}
+
 %hook _TtC23SideDrawer_ListPageImpl18ListViewController
 - (void)viewDidLayoutSubviews {
     %orig;
     SGForEachView(((UIViewController *)self).view, ^(UIView *v) {
         if (![v isKindOfClass:UICollectionView.class] || ![NSStringFromClass(v.class) containsString:@"SideDrawerListCollectionView"]) return;
-        if (objc_getAssociatedObject(v, &kRowKey)) return;
-        SGModSettingsRow *row = [[SGModSettingsRow alloc] initWithFrame:CGRectZero];
-        row.drawer = YES;
-        objc_setAssociatedObject(v, &kRowKey, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        [v addSubview:row];
+        sg_drawerList = v.class;
+        attachDrawerRow((UICollectionView *)v);
     });
 }
 %end
 
-// The lists lay out after their controllers and again whenever their content changes.
+// The lists lay out after their controllers and again whenever their content changes. The drawer's
+// can fill after its controller laid out, so its row is made or put back there too. Either list's row
+// that Spotify took away with the list's subviews is put back before it is placed.
 %hook UICollectionView
 - (void)layoutSubviews {
     %orig;
+    if (sg_drawerList && [self isKindOfClass:sg_drawerList]) attachDrawerRow(self);
     SGModSettingsRow *row = objc_getAssociatedObject(self, &kRowKey);
-    if (row) placeRow(self, row);
+    if (!row) return;
+    if (row.superview != self) [self addSubview:row];
+    placeRow(self, row);
 }
 %end
 
 %ctor {
+    sg_drawerList = NSClassFromString(kDrawerList);
     %init;
     SGRequireClasses(@[@"_TtC21Settings_PlatformImpl26SettingsListViewController", @"_TtC23SideDrawer_ListPageImpl18ListViewController"]);
     SGRegisterPages();
