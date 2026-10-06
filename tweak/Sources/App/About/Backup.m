@@ -2,6 +2,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGPageStyle.h"
 #import "About.h"
+#import "Redesigned/Player/Player.h"
 
 // Every key under the prefix travels, the way the reset sweeps them, so a new switch needs nothing
 // here. What is left out belongs to this install rather than to its user's choices.
@@ -55,8 +56,40 @@ static Class kindOf(id value) {
 
 // A key already stored keeps its type: the hooks send boolValue to whatever they find at launch, and
 // an array there would crash Spotify before the reset row could be reached.
+// Settings exported by Chroma (spoti.pw 0.50) under its own names, in ours. Its player background knows only
+// Fluid (0) and Animated (1); its artwork sources call Spotify's clips "spotify". Its menu row cache and
+// one-time notices have no counterpart and are left out.
+static NSDictionary *fromChroma(NSDictionary *settings) {
+    NSDictionary<NSString *, NSString *> *renamed = @{
+        @"spotifyglass.redesign.sing": @"spotifyglass.sing",
+        @"spotifyglass.redesign.sing.ignoreHeat": @"spotifyglass.sing.ignoreHeat",
+        @"spotifyglass.redesign.spatialVoice": @"spotifyglass.sing.spatial",
+        @"spotifyglass.redesign.player.hideVideoSwitch": @"spotifyglass.hide.videoSwitch",
+        @"spotifyglass.gestures.head": @"spotifyglass.headgestures",
+        @"spotifyglass.redesign.inlinePlayer": @"spotifyglass.redesign.navbar.minimize",
+    };
+    NSSet<NSString *> *dropped = [NSSet setWithArray:@[@"spotifyglass.redesign.menuNumbers", @"spotifyglass.eevee.warned",
+                                                       @"spotifyglass.spotifyversion.warned", @"spotifyglass.lockscreen.lyricsartwork"]];
+    NSMutableDictionary *ours = [NSMutableDictionary dictionary];
+    for (NSString *key in settings) {
+        id value = settings[key];
+        if ([dropped containsObject:key]) continue;
+        if ([key isEqualToString:@"spotifyglass.redesign.player.backdrop"]) {
+            ours[@"spotifyglass.redesign.player.background"] = @([value integerValue] == 1 ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundFluid);
+        } else if ([key isEqualToString:@"spotifyglass.redesign.player.artworksources"] && [value isKindOfClass:NSArray.class]) {
+            NSMutableArray *sources = [NSMutableArray array];
+            for (NSString *source in value) [sources addObject:[source isEqual:@"spotify"] ? @"canvas" : source];
+            ours[@"spotifyglass.motion.sources"] = sources;
+        } else {
+            ours[renamed[key] ?: key] = value;
+        }
+    }
+    return ours;
+}
+
 static void importSettings(NSDictionary *settings) {
     NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+    settings = fromChroma(settings);
     NSDictionary *stored = storedDefaults();
     for (NSString *key in stored) {
         if (isSetting(key)) [store removeObjectForKey:key];
