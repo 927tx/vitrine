@@ -1,6 +1,5 @@
-// Mod Settings > Player's Vibrations cards (Shared/Haptics/HapticsSettings.m) on an SGModPage laid out like the
-// Player page in the redesign, with the real Settings/ framework and SGFeedback.m behind them and stubs.m for
-// Music Haptics' engine. The launch line sets the switches up and then plays actions, one every 0.7 s from 1 s
+// Mod Settings > Player > Vibrations (Shared/Haptics/HapticsSettings.m), its preview (SGVibrationsPreview.m) and
+// its cards, with the real Settings/ framework and SGFeedback.m behind them and stubs.m for Music Haptics' engine. The launch line sets the switches up and then plays actions, one every 0.7 s from 1 s
 // in; screenshot after.
 //
 //     THEOS=$HOME/theos ./build.sh && xcrun simctl install <udid> build/HapticsPageHarness.app
@@ -10,7 +9,8 @@
 // controls-off (Controls switched off), music (Music Haptics on Generated), native (on Native iOS), follows=<n>, slow (animations at a twentieth
 // of their speed).
 // Actions: toggle=<section>.<row> (that row's switch flipped the way a tap does), slide=<section>.<row>:<value>
-// (that slider dragged there and let go), swipe=<section>.<row>:<n> (VoiceOver's swipe up on it, n times, down
+// (that slider dragged there and let go), tap (the preview tapped, as VoiceOver's double tap does it),
+// pulse=<intensity> (a tap of Music Haptics' handed to the preview, as the engine does while the page shows), swipe=<section>.<row>:<n> (VoiceOver's swipe up on it, n times, down
 // for a negative n), info=<section>.<row> (a tap on its ⓘ), select=<section>.<row> (a tap on a row of the page
 // on top), pop, bottom (scrolled to the end), dump (the stored haptics keys, what the hooks would read, and the
 // rows each section shows, to the log).
@@ -18,6 +18,8 @@
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Shared/Haptics/Haptics.h"
+
+void SGHarnessPulse(float intensity);   // stubs.m
 
 static void findViews(UIView *root, Class kind, NSMutableArray *found) {
     if ([root isKindOfClass:kind]) [found addObject:root];
@@ -30,22 +32,6 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
 @end
 
 @implementation AppDelegate
-
-// The Player page as App/Pages.m builds it in the redesign, its links standing in for the pages they open.
-- (UIViewController *)playerPage {
-    UIViewController *(^none)(void) = ^UIViewController *{ return nil; };
-    SGModRow *blocked = SGPageRow(@"Blocked artists", none);
-    blocked.value = ^NSString *{ return @"Off"; };
-    NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithArray:@[
-        SGSection(nil, @[SGWithTile(SGPageRow(@"Gestures", none), @"hand.tap", UIColor.systemBlueColor), SGWithTile(SGPageRow(@"Lyrics", none), @"quote.bubble", UIColor.systemPurpleColor),
-                         SGWithTile(blocked, @"person.crop.circle.badge.xmark", UIColor.systemRedColor)]),
-        SGSection(nil, @[SGWithTile(SGPageRow(@"Now playing", none), @"rectangle.bottomthird.inset.filled", UIColor.systemPinkColor),
-                         SGWithTile(SGPageRow(@"Lock screen widget", none), @"lock", UIColor.systemGrayColor)]),
-    ]];
-    [sections addObjectsFromArray:SGVibrationsSections()];
-    return [[SGModPage alloc] initWithTitle:@"Player" intro:@"Changes apply after you restart Spotify. Gestures, Blocked artists and Vibrations apply straight away."
-                                   sections:sections footer:nil];
-}
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)options {
     NSArray<NSString *> *args = NSProcessInfo.processInfo.arguments;
@@ -66,7 +52,7 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
 
     self.window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
     self.window.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
-    self.nav = [[UINavigationController alloc] initWithRootViewController:[self playerPage]];
+    self.nav = [[UINavigationController alloc] initWithRootViewController:SGVibrationsSettingsPage()];
     self.window.rootViewController = self.nav;
     [self.window makeKeyAndVisible];
     if ([args containsObject:@"slow"]) self.window.layer.speed = 0.05;
@@ -131,6 +117,10 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
         NSLog(@"[harness] the ⓘ shows \"%@\": %@", alert.title, [alert.message substringToIndex:MIN(60, alert.message.length)]);
     } else if ([verb isEqualToString:@"select"]) {
         [table.delegate tableView:table didSelectRowAtIndexPath:[self pathFrom:value]];
+    } else if ([verb isEqualToString:@"tap"]) {
+        [table.tableHeaderView accessibilityActivate];
+    } else if ([verb isEqualToString:@"pulse"]) {
+        SGHarnessPulse(value.floatValue);
     } else if ([verb isEqualToString:@"pop"]) {
         [self.nav popViewControllerAnimated:YES];
     } else if ([verb isEqualToString:@"bottom"]) {

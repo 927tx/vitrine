@@ -7,7 +7,8 @@
 //     SGMusicAnalyzer.m    the listening: taps and a rumble out of the samples
 //     SystemMusicHaptics.x iOS's own Music Haptics given the song's Apple Music id or ISRC (Native iOS)
 //     SGHapticTrack.m      the pure steps behind it: Spotify's extended metadata asked and read, Apple's songs matched
-//     HapticsSettings.m    the Vibrations cards, with each one's strength, what Music Haptics plays and follows
+//     HapticsSettings.m    the Vibrations page: its cards, with each one's strength, what Music Haptics plays and follows
+//     SGVibrationsPreview.m the rings at the top of the page, which ripple and play the first feature on when tapped
 //
 // Everything on them applies at once, without a restart. Everything hooked is Spotify's own (its controls
 // by accessibility identifier, its scrubber, its cover and title lists, its audio unit), so all of it works
@@ -78,6 +79,12 @@ SGMusicHapticsMode SGMusicHapticsModeNow(void);
 extern NSNotificationName const SGMusicHapticsModeChangedNotification;
 // From its strength and its choice of what to follow: reads them again, for the next tap.
 void SGMusicHapticsSettingsChanged(void);
+// One kick of Generated's at its strength, with the rumble under it unless it follows the beat alone, played
+// at once: the Vibrations preview's tap. Nothing while Generated is not listening.
+void SGMusicHapticsPreview(void);
+// Each tap Generated plays from now on is handed to `watcher` on the main thread as it is felt, with its
+// intensity before the strength, 0 to 1; nil stops it. Main thread.
+void SGMusicHapticsWatchTaps(void (^watcher)(float intensity));
 // What iOS's own Music Haptics is doing, for the settings to read out: SystemMusicHaptics.x sets it. Main thread.
 NSString *SGMusicHapticsStatus(void);
 void SGSetMusicHapticsStatus(NSString *status);
@@ -86,7 +93,8 @@ void SGSetMusicHapticsStatus(NSString *status);
 double SGHapticsStrength(NSString *key);
 SGMusicFollows SGMusicHapticsFollows(void);
 
-@class SGModSection;
-// The Vibrations sections of the Player page: a card for Controls and one for Music Haptics, each opening
-// out into its settings while its switch is on.
-NSArray<SGModSection *> *SGVibrationsSections(void);
+// The Vibrations page, linked from the Player page: the preview, then a card for Controls and one for Music
+// Haptics, each opening out into its settings while it is on.
+UIViewController *SGVibrationsSettingsPage(void);
+// What the Player page's Vibrations row reads out: which of the two are on.
+NSString *SGVibrationsSummary(void);

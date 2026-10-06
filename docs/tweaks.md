@@ -441,8 +441,8 @@ the mic on and off at once, its Status (a tap says more), the Vocals slider (gon
 (where the iPhone reads headphone motion; a page of its own, reading out On or Off, with a live preview at its top that
 follows the head through AirPods, or sways gently without them and holds still under Reduce Motion, a line under it
 saying which, then the switch), the voice model's download, Runs on (GPU, GPU
-and Neural Engine, Neural Engine) and Ignore heat warnings, all applying straight away. Player: Gestures, AirPods gestures, Blocked
-artists (with the count on the row) and Lock screen widget (Moving artwork, Lyrics or Every song, and the
+and Neural Engine, Neural Engine) and Ignore heat warnings, all applying straight away. Player: Gestures, AirPods gestures, Vibrations (which
+of the two are on read out on the row), Blocked artists (with the count on the row) and Lock screen widget (Moving artwork, Lyrics or Every song, and the
 lyrics' style, Still or Animated, and Spotify's like and dislike buttons' flag; its podcast, audiobook and artwork
 flags stay in All flags), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
@@ -452,12 +452,18 @@ buttons to hide); in the redesign the page instead leads with a showcase of the 
 PlayerSettings.m): a small copy of it over the background chosen, the cover, title and artist, and a glass sheet over
 the artwork with its progress and volume sliders and the transport between them; under it the Background pull-down
 (Still, Colours, Fluid, Animated, changing the showcase at once), Download in Low Data Mode while Animated is
-chosen, and the now playing bar's device button, checked in the simulator against harness/player/ (`settings`). Then Vibrations under either look, a card for
+chosen, and the now playing bar's device button, checked in the simulator against harness/player/ (`settings`). Vibrations, a page of its own under either
+look, leads with a preview (Shared/Haptics/SGVibrationsPreview.m): rings of dots that a tap sends a crest across, out
+from the middle in the accent colour, higher and further the stronger the Strength, while the first of Controls and
+Generated that is on plays its own tap through its own path (Controls' add tap, or one kick of Generated's with its
+rumble unless it follows Beat), the line under it naming which, or saying why there is none. While the page shows,
+each tap Generated plays sends a low crest too. Nothing runs between crests, and with Reduce Motion the rings light
+up together and fade instead of moving. Under it a card for
 Controls (on until switched off) and one for Music Haptics, a choice of None, Generated or Native iOS
 (left out below iOS 18) with an ⓘ saying what each does. Someone with no choice stored gets Native iOS
 when Music Haptics is on in Accessibility, else Generated if the old switch was on, else None. Controls
 has its Strength under it, greyed out while the switch is off (10 to 100%, a tap at the new strength with each step);
-Generated into its Strength (20 to 200%, 100% being how it first shipped) and Follows, Everything (a tap on
+Generated into its Strength (20 to 200%, 100% being how it first shipped, a kick at the new strength with each step) and Follows, Everything (a tap on
 each kick and snare and a rumble under the bass), Beat (the taps without the rumble) or Bass (the kicks'
 taps and the rumble); Native iOS into a Status row (Off in iOS, Paused, Waiting, Checking, Ready, Playing
 or Unavailable), all applying straight away. Live Activity, on iOS 17 and up under either look: its switch and which view it

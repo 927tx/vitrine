@@ -135,11 +135,15 @@ UIViewController *SGPlayerSettingsPage(void) {
     blocked.value = ^NSString *{
         return SGFlag(SGKeyArtistBlock, NO) ? @(SGBlockedArtists().count).stringValue : @"Off";
     };
+    // Vibrations hook Spotify's own controls and its audio, so they answer under either look.
+    SGModRow *vibrations = SGPageRow(@"Vibrations", ^UIViewController *{ return SGVibrationsSettingsPage(); });
+    vibrations.value = ^NSString *{ return SGVibrationsSummary(); };
     BOOL native = !SGRedesignedUIStored();
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGSection(nil, @[
         SGWithTile(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap", UIColor.systemBlueColor),
         SGWithTile(SGPageRow(@"AirPods gestures", ^UIViewController *{ return SGHeadGesturesSettingsPage(); }), @"airpods.pro", UIColor.systemGrayColor),
+        SGWithTile(vibrations, @"iphone.radiowaves.left.and.right", UIColor.systemOrangeColor),
         SGWithTile(blocked, @"person.crop.circle.badge.xmark", UIColor.systemRedColor),
     ])];
     NSMutableArray<SGModRow *> *pages = [NSMutableArray array];
@@ -154,8 +158,6 @@ UIViewController *SGPlayerSettingsPage(void) {
     [sections addObject:SGSection(native ? nil : @"Hide on the player", @[
         SGHideRow(@"Switch to video", @"The chip over the title of a song with a music video", SGKeyHideVideoSwitch),
     ])];
-    // Vibrations hook Spotify's own controls and its audio, so they answer under either look.
-    [sections addObjectsFromArray:SGVibrationsSections()];
 
     // The redesign's page leads with a showcase of its player, the background and device button rows under it.
     if (!native) return SGRPlayerSettingsPage(sections);

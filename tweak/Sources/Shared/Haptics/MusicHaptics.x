@@ -16,6 +16,8 @@
 // continuous event whose intensity follows the level. The strength scales both as they are played, and
 // what Music Haptics follows leaves out the snares' taps (Bass) or the rumble (Beat) there too, so a change
 // applies to the next event.
+// The Vibrations page's preview asks for one kick, which the same thread plays at once through the same
+// engine and strength, and while the page shows, each tap played is handed back to it for its rings.
 //
 // The rebinding and the notify are in place under either look, so the choice works at once; with
 // anything but Generated chosen the notify returns straight away. Nothing listens while Spotify is not the
@@ -73,6 +75,8 @@ static atomic_uint_fast64_t sg_skipped;   // renders whose buffers were not laid
 // The strength's factor and what is followed, set on the main thread, read on the player thread.
 static atomic_uint_fast64_t sg_strengthBits;
 static atomic_int sg_follows;
+// A tap the Vibrations preview asked for, and whether it is watching the taps (SGMusicHapticsWatchTaps).
+static atomic_bool sg_previewAsked, sg_watched;
 
 static SGMusicEvent sg_ring[kRingSize];
 static atomic_uint sg_head, sg_tail;   // head moved by the render thread, tail by the player thread
@@ -334,6 +338,14 @@ static CHHapticEventParameter *parameter(CHHapticEventParameterID identifier, fl
     return [[CHHapticEventParameter alloc] initWithParameterID:identifier value:value];
 }
 
+static void (^sg_watcher)(float intensity);   // main thread
+
+static void tellWatcher(float intensity, double lead) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(MAX(0, lead) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (sg_watcher) sg_watcher(intensity);
+    });
+}
+
 static void playTap(const SGMusicEvent *event) {
     double lead;
     NSTimeInterval at = engineTime(event->hostTime, &lead);
@@ -355,8 +367,28 @@ static void playTap(const SGMusicEvent *event) {
         return;
     }
     sg_stats.taps++;
+    if (atomic_load_explicit(&sg_watched, memory_order_relaxed)) tellWatcher(event->intensity, lead);
     sg_stats.leadSum += lead;
     sg_stats.leadMin = sg_stats.taps == 1 ? lead : MIN(sg_stats.leadMin, lead);
+}
+
+// The preview's kick: a tap at the strength a full kick plays at, and under it a moment of the rumble unless
+// only the beat is followed, both now rather than when a sound is heard.
+static void playPreview(BOOL rumbles) {
+    NSMutableArray<CHHapticEvent *> *events = [NSMutableArray arrayWithObject:[[CHHapticEvent alloc] initWithEventType:CHHapticEventTypeHapticTransient parameters:@[
+        parameter(CHHapticEventParameterIDHapticIntensity, MIN(1, kTapGain * strength())),
+        parameter(CHHapticEventParameterIDHapticSharpness, 0.4f),
+    ] relativeTime:0]];
+    if (rumbles) {
+        [events addObject:[[CHHapticEvent alloc] initWithEventType:CHHapticEventTypeHapticContinuous parameters:@[
+            parameter(CHHapticEventParameterIDHapticIntensity, MIN(1, 0.5f * kRumbleGain * strength())),
+            parameter(CHHapticEventParameterIDHapticSharpness, 0),
+        ] relativeTime:0.02 duration:0.22]];
+    }
+    NSError *error = nil;
+    CHHapticPattern *pattern = [[CHHapticPattern alloc] initWithEvents:events parameters:@[] error:&error];
+    id<CHHapticPatternPlayer> player = pattern ? [sg_engine createPlayerWithPattern:pattern error:&error] : nil;
+    if (!player || ![player startAtTime:CHHapticTimeImmediate error:&error]) SGLog(@"music haptics: the preview did not play: %@", error);
 }
 
 static void stopRumble(NSTimeInterval at) {
@@ -450,6 +482,7 @@ static void *playerLoop(void *unused) {
         @autoreleasepool {
             double now = hostSeconds(mach_absolute_time());
             if (!atomic_load(&sg_listening)) {
+                atomic_store(&sg_previewAsked, false);
                 atomic_store(&sg_tail, atomic_load(&sg_head));
                 stopEngine();
                 idle = YES;
@@ -459,6 +492,10 @@ static void *playerLoop(void *unused) {
             BOOL rumbles = follows != SGMusicFollowsBeat, snares = follows != SGMusicFollowsBass;
             if (!rumbles) stopRumble(CHHapticTimeImmediate);
             BOOL any = NO;
+            if (atomic_exchange(&sg_previewAsked, false) && startEngine()) {
+                playPreview(rumbles);
+                any = YES;
+            }
             unsigned head = atomic_load(&sg_head), tail = atomic_load(&sg_tail);
             if (tail != head && startEngine()) {
                 for (; tail != head; tail++) {
@@ -526,6 +563,17 @@ void SGMusicHapticsSettingsChanged(void) {
     readSettings();
     // A rumble that is not to play any more stops now rather than with the next event.
     dispatch_semaphore_signal(sg_wake);
+}
+
+void SGMusicHapticsPreview(void) {
+    if (!sg_wake || !atomic_load(&sg_listening)) return;
+    atomic_store(&sg_previewAsked, true);
+    dispatch_semaphore_signal(sg_wake);
+}
+
+void SGMusicHapticsWatchTaps(void (^watcher)(float intensity)) {
+    sg_watcher = [watcher copy];
+    atomic_store(&sg_watched, watcher != nil);
 }
 
 %ctor {
