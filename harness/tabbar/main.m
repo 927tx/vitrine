@@ -179,8 +179,19 @@ static __weak UIView *sgJamStrip;
 - (UIView *)tabBarView { return self.bar; }
 - (void)setSelectedViewController:(UIViewController *)controller {}
 
+// A tap on a mock item does what Spotify's does to the bar: its label goes white and the others grey.
++ (void)tapped:(UITapGestureRecognizer *)tap {
+    for (UIView *item in tap.view.superview.subviews) {
+        for (UIView *sub in item.subviews) {
+            if ([sub isKindOfClass:UILabel.class]) ((UILabel *)sub).textColor = item == tap.view ? UIColor.whiteColor : [UIColor colorWithWhite:0xB3 / 255.0 alpha:1];
+        }
+    }
+    for (UIView *v = tap.view; v; v = v.superview) [v setNeedsLayout];
+}
+
 static UIView *item(Class cls, NSString *title, NSString *symbol, BOOL active) {
     UIView *item = [cls new];
+    [item addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:_TtC23NavigationUI_TabBarImpl19TabBarContainerImpl.class action:@selector(tapped:)]];
     UIImageView *icon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:symbol]];
     icon.tintColor = UIColor.whiteColor;
     icon.contentMode = UIViewContentModeScaleAspectFit;
@@ -382,6 +393,32 @@ static UITabBar *systemBarIn(UIView *root) {
     return nil;
 }
 
+static NSArray<UITabBar *> *systemBarsIn(UIView *root) {
+    NSMutableArray<UITabBar *> *bars = [NSMutableArray array];
+    if ([root isKindOfClass:UITabBar.class]) [bars addObject:(UITabBar *)root];
+    else for (UIView *sub in root.subviews) [bars addObjectsFromArray:systemBarsIn(sub)];
+    return bars;
+}
+
+// A tab picked on whichever system bar shows it, the calls a finger ends in.
+static void pick(SGHarnessChrome *chrome, NSString *title) {
+    for (UITabBar *bar in systemBarsIn(chrome.tabs.bar)) {
+        for (UITabBarItem *item in bar.items) {
+            if (![item.title isEqualToString:title]) continue;
+            bar.selectedItem = item;
+            [bar.delegate tabBar:bar didSelectItem:item];
+        }
+    }
+}
+
+static void reportSelection(SGHarnessChrome *chrome, NSString *moment) {
+    NSMutableString *out = [NSMutableString stringWithFormat:@"[harness] %@ selection", moment];
+    for (UITabBar *bar in systemBarsIn(chrome.tabs.bar)) {
+        [out appendFormat:@" | bar%@ %@: %@", bar.hidden ? @" (hidden)" : @"", [bar.items valueForKey:@"title"], bar.selectedItem.title ?: @"none"];
+    }
+    NSLog(@"%@", [out stringByReplacingOccurrencesOfString:@"\n" withString:@" "]);
+}
+
 static void report(SGHarnessChrome *chrome, NSString *moment) {
     UIWindow *window = chrome.view.window;
     UIView *stock = chrome.tabs.bar;
@@ -409,6 +446,18 @@ static void report(SGHarnessChrome *chrome, NSString *moment) {
     }
     UIView *strip = sgJamStrip;
     if (strip.window) NSLog(@"[harness] %@ strip %@", moment, NSStringFromCGRect([strip convertRect:strip.bounds toView:window]));
+    // Every glass platter on the bar: with `split`, the main bar's and the split bar's.
+    NSMutableString *platters = [NSMutableString stringWithFormat:@"[harness] %@ platters", moment];
+    NSMutableArray<UIView *> *found = [NSMutableArray array];
+    NSMutableArray<UIView *> *walk = [NSMutableArray arrayWithObject:stock];
+    while (walk.count) {
+        UIView *v = walk.firstObject;
+        [walk removeObjectAtIndex:0];
+        if ([NSStringFromClass(v.class) hasSuffix:@"PlatterView"]) [found addObject:v];
+        else [walk addObjectsFromArray:v.subviews];
+    }
+    for (UIView *v in found) [platters appendFormat:@" %@ %@", NSStringFromClass(v.class), NSStringFromCGRect([v convertRect:v.bounds toView:window])];
+    NSLog(@"%@", platters);
 }
 
 #pragma mark - the app
@@ -454,6 +503,13 @@ static void after(double seconds, dispatch_block_t block) {
         after(4.5, ^{ report(chrome, @"left the jam"); });
     }
     if ([mode isEqualToString:@"away"]) [chrome setBanner:YES animated:NO];
+    // `pick`: Search picked at 2 s and Home at 4 s, which bar selects what logged after each.
+    if ([mode isEqualToString:@"pick"]) {
+        after(2.0, ^{ pick(chrome, @"Search"); });
+        after(3.0, ^{ reportSelection(chrome, @"after Search"); });
+        after(4.0, ^{ pick(chrome, @"Home"); });
+        after(5.0, ^{ reportSelection(chrome, @"after Home"); });
+    }
     after(0.5, ^{
         UITableView *list = (UITableView *)chrome.tabs.childViewControllers.firstObject.view;
         [list scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:29 inSection:0] atScrollPosition:UITableViewScrollPositionBottom animated:NO];

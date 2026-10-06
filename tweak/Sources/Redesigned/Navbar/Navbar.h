@@ -16,6 +16,9 @@ extern NSString *const SGRNavbarIconSet; // NSString, SGTabIconSetSymbols when t
 extern NSString *const SGRNavbarHidden;  // NSNumber
 NSArray<NSDictionary *> *SGRNavbarLayout(void);
 void SGRSetNavbarLayout(NSArray<NSDictionary *> *layout);
+// The tabs set apart at the trailing end of the bar (Split tabs), by their entries' identities.
+NSArray<NSString *> *SGRNavbarSplit(void);
+void SGRSetNavbarSplit(NSArray<NSString *> *split);
 // Spotify's own tabs in Spotify's order, as Navbar.x last saw them on the bar.
 NSArray<NSString *> *SGRNavbarStock(void);
 void SGRSetNavbarStock(NSArray<NSString *> *stock);
@@ -29,6 +32,8 @@ void SGRComposeTabBar(UIView *tabBar);
 void SGRLogTabBarRow(UIView *tabBar);
 // Lays the bar out again after the Navbar page changes something, so it does not wait for a touch.
 void SGRRefreshTabBar(void);
+// Whether a tab of the composed row is one of the split tabs at its trailing end, for TabBar.x's second bar.
+BOOL SGRTabIsApart(UIView *item);
 
 UIViewController *SGRNavbarSettingsPage(void);   // the tab editor, in Mod Settings
 UIViewController *SGRNavbarEditorPage(void);     // the tab editor alone, for the welcome tour

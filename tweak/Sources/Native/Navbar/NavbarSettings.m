@@ -58,10 +58,88 @@ static void appendTab(NSDictionary *tab) {
     SGRefreshTabBar();
 }
 
+// Split tabs: a switch per tab of the bar, on to set it apart at the trailing end.
+@interface SGSplitTabsPage : SGPage
+@end
+
+@implementation SGSplitTabsPage {
+    NSArray<NSDictionary *> *_entries;
+    NSMutableSet<NSString *> *_split;
+    UIView *_intro;
+}
+
+- (instancetype)init {
+    if (!(self = [super initWithStyle:UITableViewStyleInsetGrouped])) return nil;
+    self.title = @"Split Tabs";
+    return self;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    _intro = SGNote(@"Tabs switched on here sit apart from the others at the right end of the bar, the way the Music "
+                    "app sets Search apart. Hidden tabs stay hidden.");
+    self.tableView.tableHeaderView = _intro;
+    _entries = navbarEntries();
+    _split = [NSMutableSet setWithArray:SGNavbarSplit()];
+}
+
+- (void)viewWillLayoutSubviews {
+    [super viewWillLayoutSubviews];
+    SGFitNote(self.tableView, _intro, 24, 0);
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    SGInsetForBars(self.tableView);
+}
+
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
+    return (NSInteger)_entries.count;
+}
+
+- (UIView *)tableView:(UITableView *)table viewForHeaderInSection:(NSInteger)section {
+    return SGSectionHeader(table, @"Tabs");
+}
+
+- (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
+    return SGSectionHeaderHeight;
+}
+
+- (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {
+    return CGFLOAT_MIN;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
+    UITableViewCell *cell = SGDequeueCell(table, @"split");
+    NSDictionary *entry = _entries[(NSUInteger)path.row];
+    BOOL apart = [_split containsObject:entry[SGNavbarID]];
+    NSString *where = [entry[SGNavbarHidden] boolValue] ? @"Hidden" : apart ? @"Apart, on the right" : @"With the others";
+    SGFillCell(cell, entry[SGNavbarTitle], where, nil, nil);
+    UISwitch *toggle = [UISwitch new];
+    toggle.onTintColor = SGGreen();
+    toggle.on = apart;
+    toggle.tag = path.row;
+    [toggle addTarget:self action:@selector(toggled:) forControlEvents:UIControlEventValueChanged];
+    cell.accessoryView = toggle;
+    return cell;
+}
+
+- (void)toggled:(UISwitch *)toggle {
+    NSString *ident = _entries[(NSUInteger)toggle.tag][SGNavbarID];
+    if (toggle.on) [_split addObject:ident];
+    else [_split removeObject:ident];
+    SGSetNavbarSplit(_split.allObjects);
+    SGRefreshTabBar();
+    [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:toggle.tag inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
+}
+
+@end
+
 typedef NS_ENUM(NSInteger, SGNavbarSection) {
     SGNavbarSectionSwitch,
     SGNavbarSectionTabs,
     SGNavbarSectionAdd,
+    SGNavbarSectionSplit,
     SGNavbarSectionReset,
     SGNavbarSectionCount,
 };
@@ -109,6 +187,9 @@ typedef NS_ENUM(NSInteger, SGNavbarSection) {
 
 - (void)save {
     SGSetNavbarLayout(_entries);
+    // A split tab swiped away leaves the split list with it.
+    NSArray *idents = [_entries valueForKey:SGNavbarID];
+    SGSetNavbarSplit([SGNavbarSplit() filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"SELF IN %@", idents]]);
     SGRefreshTabBar();
 }
 
@@ -160,6 +241,11 @@ typedef NS_ENUM(NSInteger, SGNavbarSection) {
         }
         case SGNavbarSectionAdd:
             SGFillCell(cell, @"Add a tab…", nil, nil, @"plus");
+            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+            break;
+        case SGNavbarSectionSplit:
+            SGFillCell(cell, @"Split tabs", @"Place chosen tabs apart on the right", nil, @"rectangle.split.2x1");
+            cell.accessoryView = SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightSemibold, 16);
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
             break;
         default:
@@ -215,6 +301,8 @@ typedef NS_ENUM(NSInteger, SGNavbarSection) {
             appendTab(tab);
             [weakSelf reload];
         });
+    } else if (path.section == SGNavbarSectionSplit) {
+        [self.navigationController pushViewController:[SGSplitTabsPage new] animated:YES];
     } else if (path.section == SGNavbarSectionReset) {
         [self reset];
     }
@@ -227,11 +315,12 @@ typedef NS_ENUM(NSInteger, SGNavbarSection) {
 
 - (void)reset {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Use Spotify's order"
-                                                                  message:@"Every tab of Spotify's comes back where Spotify put it, and the tabs you added go."
+                                                                  message:@"Every tab of Spotify's comes back where Spotify put it, the tabs you added go, and no tab is split apart."
                                                            preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Reset" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
         SGSetNavbarLayout(@[]);
+        SGSetNavbarSplit(@[]);
         SGRefreshTabBar();
         self->_entries = navbarEntries();
         [self.tableView reloadData];

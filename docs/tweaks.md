@@ -143,7 +143,9 @@ Shared:
                   as the picture of a local file whose metadata names none. A cover picked in Edit info wins.
                   The model and the LRC reading are checked on the Mac against harness/local-files/, the row and
                   the editor in the simulator against its sim/
-    Navigation/   the page transition fix (PageTransition.x) and opening a spotify: link (Links.x)
+    Navigation/   the page transition fix (PageTransition.x), opening a spotify: link (Links.x), and either look's
+                  Add a Tab sheet (AddTabSheet.m) with the icons a tab can wear, Encore's glyphs or SF Symbols
+                  (TabIcons.m). The sheet runs in the simulator in harness/addtab/
     Player/       the player's open and close announced (PlayerEvents.x), what the player is doing read through
                   one hook for every feature that wants it (PlayerState.x), the lock screen widget's flags, and in the
                   more button's menu Speed and pitch: both done to Spotify's audio by Apple's time and pitch unit, put
@@ -435,7 +437,10 @@ registers in `Core/SGFlagForce.h`. A change shows after Spotify restarts.
 
 The tab editor on the Navbar page is the exception and applies as soon as the bar lays out again. It lists the tabs in the order
 the bar shows them: drag to reorder, tap to hide or show, and Add a tab puts a page of Spotify's or
-any `spotify:` link on the bar with one of Encore's own glyphs. Spotify's own tabs are kept by the
+any `spotify:` link on the bar. It is a sheet: a name, a link picked from Spotify's pages or pasted (one
+Spotify's router cannot open is refused there), and an icon picked from Encore's glyphs or the SF Symbols,
+searchable. Split tabs sets chosen tabs apart at the right end of the bar: after a gap in the native look,
+on a glass bar of their own in the redesign, like Search in the Music app. Spotify's own tabs are kept by the
 name under their icon, so they can be hidden but never removed, and switching the app's language
 starts the order over. A tab of the mod's own opens its link through Spotify's link dispatcher, so it
 never lights up as the tab you are on. Hide labels, on the same page, leaves the glass bar with its

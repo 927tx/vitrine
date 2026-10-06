@@ -13,6 +13,9 @@ extern NSString *const SGNavbarIconSet; // NSString, SGTabIconSetSymbols when th
 extern NSString *const SGNavbarHidden;  // NSNumber
 NSArray<NSDictionary *> *SGNavbarLayout(void);
 void SGSetNavbarLayout(NSArray<NSDictionary *> *layout);
+// The tabs set apart at the trailing end of the bar (Split tabs), by their entries' identities.
+NSArray<NSString *> *SGNavbarSplit(void);
+void SGSetNavbarSplit(NSArray<NSString *> *split);
 // Spotify's own tabs in Spotify's order, as Navbar.x last saw them on the bar.
 NSArray<NSString *> *SGNavbarStock(void);
 void SGSetNavbarStock(NSArray<NSString *> *stock);

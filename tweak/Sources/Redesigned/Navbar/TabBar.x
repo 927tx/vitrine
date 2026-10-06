@@ -17,7 +17,7 @@
 #import "Headers/SPTEncoreIconView.h"
 #import <objc/message.h>
 
-static char kBarKey, kHostKey;
+static char kBarKey, kApartBarKey, kHostKey;
 static __weak UIView *sg_stockBar;
 static CGFloat sg_room, sg_glassHeight;   // see "room for the glass bar"
 
@@ -26,6 +26,8 @@ static CGFloat sg_room, sg_glassHeight;   // see "room for the glass bar"
 @property (nonatomic, copy) NSArray<UIView *> *sources;
 @property (nonatomic, weak) UILongPressGestureRecognizer *hold;
 @property (nonatomic) BOOL holding;
+// The other bar, when the split tabs have one of their own: a tab picked on one bar clears the other's.
+@property (nonatomic, weak) SGRSystemTabBar *partner;
 @end
 
 static void syncBar(UIView *stockBar);
@@ -186,6 +188,7 @@ static void forwardTap(UIView *item) {
     if (index == NSNotFound || index >= self.sources.count) return;
     // Home tapped while on Home pops Spotify's stack, which would take Mod Settings straight off it.
     if (!self.holding) forwardTap(self.sources[index]);
+    self.partner.selectedItem = nil;
     // Spotify repaints its labels a moment later; a tap it did not take snaps the selection back.
     UIView *stockBar = self.stockBar;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -332,43 +335,25 @@ static void makeRoom(UIViewController *container) {
     SGLog(@"tab bar: %.0f pt of room made under Spotify's bar for the glass bar's %.0f, over an inset of %.0f", room, height, inset);
 }
 
-static void syncBar(UIView *stockBar) {
-    sg_stockBar = stockBar;
+static SGRSystemTabBar *makeBar(UIView *stockBar) {
+    SGRSystemTabBar *bar = [[SGRSystemTabBar alloc] initWithFrame:stockBar.bounds];
+    // UIKit draws the glass in the appearance the bar inherits, and the bar is outside the navigation
+    // stacks Spotify makes dark itself (-[SPNavigationController viewDidLoad] while +[SPTLiquidGlass
+    // isEnabled]), so a phone in light mode had it light over Spotify's black. Spotify is dark whatever
+    // the system is, and so is the bar.
+    bar.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    bar.delegate = bar;
+    bar.stockBar = stockBar;
+    UILongPressGestureRecognizer *hold = [[UILongPressGestureRecognizer alloc] initWithTarget:bar action:@selector(held:)];
+    hold.delegate = bar;
+    [bar addGestureRecognizer:hold];
+    bar.hold = hold;
+    return bar;
+}
 
-    SGRSystemTabBar *bar = objc_getAssociatedObject(stockBar, &kBarKey);
-    if (!bar) {
-        bar = [[SGRSystemTabBar alloc] initWithFrame:stockBar.bounds];
-        // UIKit draws the glass in the appearance the bar inherits, and the bar is outside the navigation
-        // stacks Spotify makes dark itself (-[SPNavigationController viewDidLoad] while +[SPTLiquidGlass
-        // isEnabled]), so a phone in light mode had it light over Spotify's black. Spotify is dark whatever
-        // the system is, and so is the bar.
-        bar.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
-        bar.delegate = bar;
-        bar.stockBar = stockBar;
-        UILongPressGestureRecognizer *hold = [[UILongPressGestureRecognizer alloc] initWithTarget:bar action:@selector(held:)];
-        hold.delegate = bar;
-        [bar addGestureRecognizer:hold];
-        bar.hold = hold;
-        objc_setAssociatedObject(stockBar, &kBarKey, bar, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        SGRTabBarHost *host = [SGRTabBarHost new];
-        [host addSubview:bar];
-        objc_setAssociatedObject(stockBar, &kHostKey, host, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
+// One bar's share of the tabs: its items, their glyphs and titles. YES while a glyph is still missing.
+static BOOL fillBar(SGRSystemTabBar *bar, NSArray<UIView *> *sources, BOOL hideLabels) {
     bar.tintColor = SGRAccent();
-    UIView *host = objc_getAssociatedObject(stockBar, &kHostKey);
-
-    for (UIView *sub in stockBar.subviews) {
-        if (sub == host) continue;
-        sub.alpha = 0;
-        sub.userInteractionEnabled = NO;
-    }
-    stockBar.superview.layer.backgroundColor = NULL;
-
-    NSArray<UIView *> *sources = tabItems(stockBar);
-    if (!sources.count) return;
-    // An item with no title is drawn by UIKit as its glyph alone, centred, on a bar of the same height.
-    BOOL hideLabels = SGHidden(SGRKeyNavbarHideLabels);
-
     if (![sources isEqualToArray:bar.sources]) {
         NSMutableArray<UITabBarItem *> *items = [NSMutableArray array];
         for (UIView *source in sources) [items addObject:[[UITabBarItem alloc] initWithTitle:hideLabels ? nil : labelIn(source).text image:nil tag:items.count]];
@@ -386,7 +371,6 @@ static void syncBar(UIView *stockBar) {
         SGLogLong(@"navbar", out);
     }
 
-    UITabBarItem *selected = nil;
     BOOL missing = NO;
     for (NSUInteger i = 0; i < sources.count; i++) {
         UITabBarItem *item = bar.items[i];
@@ -395,9 +379,74 @@ static void syncBar(UIView *stockBar) {
         missing |= !item.image || !item.selectedImage;
         NSString *title = hideLabels ? nil : labelIn(sources[i]).text;
         if (hideLabels ? item.title != nil : title.length && ![title isEqualToString:item.title]) item.title = title;
-        if (!selected && isActive(sources[i])) selected = item;
     }
-    if (selected && bar.selectedItem != selected) bar.selectedItem = selected;
+    return missing;
+}
+
+// The bar holding the tab Spotify paints as selected selects it, and the other one lets go. With no tab
+// painted (a tab of the mod's own, a repaint still to come) both keep what they have.
+static void selectActive(SGRSystemTabBar *bar, UIView *active) {
+    NSUInteger index = active ? [bar.sources indexOfObject:active] : NSNotFound;
+    UITabBarItem *item = index == NSNotFound ? nil : bar.items[index];
+    if (active && bar.selectedItem != item) bar.selectedItem = item;
+}
+
+// Split tabs stand on a glass bar of their own at the trailing end, the way the Music app sets Search
+// apart. A standalone UITabBar has no way to set an item apart (iOS 27 SDK: only UITabBarController's
+// UISearchTab does), so it is a second bar. UIKit draws each bar's platter 21 pt in from its sides
+// (harness/tabbar, iPhone 17 Pro, iOS 27: a 72 pt bar got a 30 pt platter at x 21), so a split bar is
+// a 62 pt platter, a circle as tall as the bar's, per tab plus those insets, and the main bar runs under
+// its leading inset to leave 12 pt of glassless gap between the two platters.
+static const CGFloat kPlatterInset = 21, kApartItemWidth = 62, kPlatterGap = 12;
+
+static void syncBar(UIView *stockBar) {
+    sg_stockBar = stockBar;
+
+    SGRSystemTabBar *bar = objc_getAssociatedObject(stockBar, &kBarKey);
+    if (!bar) {
+        bar = makeBar(stockBar);
+        objc_setAssociatedObject(stockBar, &kBarKey, bar, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        SGRTabBarHost *host = [SGRTabBarHost new];
+        [host addSubview:bar];
+        objc_setAssociatedObject(stockBar, &kHostKey, host, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    UIView *host = objc_getAssociatedObject(stockBar, &kHostKey);
+
+    for (UIView *sub in stockBar.subviews) {
+        if (sub == host) continue;
+        sub.alpha = 0;
+        sub.userInteractionEnabled = NO;
+    }
+    stockBar.superview.layer.backgroundColor = NULL;
+
+    NSArray<UIView *> *sources = tabItems(stockBar);
+    if (!sources.count) return;
+    // An item with no title is drawn by UIKit as its glyph alone, centred, on a bar of the same height.
+    BOOL hideLabels = SGHidden(SGRKeyNavbarHideLabels);
+
+    NSMutableArray<UIView *> *main = [NSMutableArray array], *apart = [NSMutableArray array];
+    for (UIView *source in sources) [(SGRTabIsApart(source) ? apart : main) addObject:source];
+    if (!main.count) {
+        main = [sources mutableCopy];
+        [apart removeAllObjects];
+    }
+    SGRSystemTabBar *apartBar = objc_getAssociatedObject(stockBar, &kApartBarKey);
+    if (apart.count && !apartBar) {
+        apartBar = makeBar(stockBar);
+        objc_setAssociatedObject(stockBar, &kApartBarKey, apartBar, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        apartBar.partner = bar;
+        bar.partner = apartBar;
+        [host addSubview:apartBar];
+    }
+    apartBar.hidden = !apart.count;
+    if (!apart.count) apartBar.sources = nil;
+
+    BOOL missing = fillBar(bar, main, hideLabels);
+    if (apart.count) missing |= fillBar(apartBar, apart, hideLabels);
+    UIView *active = nil;
+    for (UIView *source in sources) if (!active && isActive(source)) active = source;
+    selectActive(bar, active);
+    if (apart.count) selectActive(apartBar, active);
     // An icon view Spotify has not built yet is looked for again shortly, not on the next touch.
     static NSUInteger retries;
     if (missing && retries++ < 40) {
@@ -411,7 +460,14 @@ static void syncBar(UIView *stockBar) {
     CGFloat height = MAX(bounds.size.height, glassHeight(bar, stockBar));
     CGRect frame = CGRectMake(0, CGRectGetMaxY(bounds) - height, width, height);
     if (!CGRectEqualToRect(host.frame, frame)) host.frame = frame;
-    if (!CGRectEqualToRect(bar.frame, host.bounds)) bar.frame = host.bounds;
+    CGRect mainFrame = host.bounds, apartFrame = CGRectZero;
+    if (apart.count) {
+        CGFloat apartWidth = MIN(width / 2, apart.count * kApartItemWidth + 2 * kPlatterInset);
+        CGRectDivide(host.bounds, &apartFrame, &mainFrame, apartWidth, CGRectMaxXEdge);
+        mainFrame.size.width += 2 * kPlatterInset - kPlatterGap;
+    }
+    if (!CGRectEqualToRect(bar.frame, mainFrame)) bar.frame = mainFrame;
+    if (apart.count && !CGRectEqualToRect(apartBar.frame, apartFrame)) apartBar.frame = apartFrame;
     if (host.superview != stockBar) [stockBar addSubview:host];
     else if (stockBar.subviews.lastObject != host) [stockBar bringSubviewToFront:host];
     logBarOnce(bar);

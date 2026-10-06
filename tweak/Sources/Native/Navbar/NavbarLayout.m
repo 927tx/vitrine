@@ -10,6 +10,7 @@ NSString *const SGNavbarHidden = @"hidden";
 
 static NSString *const kNavbarLayout = @"spotifyglass.navbar.layout";
 static NSString *const kNavbarStock = @"spotifyglass.navbar.stock";
+static NSString *const kNavbarSplit = @"spotifyglass.navbar.split";
 
 // Only property list types go in, so a corrupt read cannot be anything but an array of dictionaries.
 static NSArray *listOfKind(NSString *key, Class kind) {
@@ -24,6 +25,14 @@ NSArray<NSDictionary *> *SGNavbarLayout(void) {
 
 void SGSetNavbarLayout(NSArray<NSDictionary *> *layout) {
     [NSUserDefaults.standardUserDefaults setObject:layout ?: @[] forKey:kNavbarLayout];
+}
+
+NSArray<NSString *> *SGNavbarSplit(void) {
+    return listOfKind(kNavbarSplit, NSString.class);
+}
+
+void SGSetNavbarSplit(NSArray<NSString *> *split) {
+    [NSUserDefaults.standardUserDefaults setObject:split ?: @[] forKey:kNavbarSplit];
 }
 
 NSArray<NSString *> *SGNavbarStock(void) {

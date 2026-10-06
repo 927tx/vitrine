@@ -11,5 +11,14 @@ __weak UIView *sgr_albumRoot = nil;
 __weak UIView *sgr_artistRoot = nil;
 
 void SGRComposeTabBar(UIView *tabBar) {}
+
+// With `split` among the launch words, Search is a split tab, which TabBar.x stands on a bar of its own.
+BOOL SGRTabIsApart(UIView *item) {
+    if (![NSProcessInfo.processInfo.arguments containsObject:@"split"]) return NO;
+    for (UIView *sub in item.subviews) {
+        if ([sub isKindOfClass:UILabel.class] && [((UILabel *)sub).text isEqualToString:@"Search"]) return YES;
+    }
+    return NO;
+}
 void SGRLogTabBarRow(UIView *tabBar) {}
 void SGOpenModSettings(UIView *source) {}

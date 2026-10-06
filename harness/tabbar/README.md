@@ -36,6 +36,11 @@ logged in window points, with the gap between the bottom of the now playing card
 glass bar's platter (8 pt is the redesign's own, on a Face ID phone with nothing under the bar), and
 half way through a slide what the screen shows of the message bar, the tab bar and the now playing bar:
 
+`split` after the first word makes Search a split tab (stubs.m answers `SGRTabIsApart` for it), so it
+stands on a glass bar of its own, and the platters of both bars are logged. `pick` picks Search at 2 s and
+Home at 4 s through the system bar's delegate, the mock tab repainting its label white as Spotify's does,
+and logs which bar selects what after each: `xcrun simctl launch <udid> com.vojta.tabbarharness pick split`.
+
     xcrun simctl spawn <udid> log show --last 1m --style compact --predicate 'eventMessage CONTAINS "[harness]" OR eventMessage CONTAINS "tab bar:"'
 
 `jam` plays a Jam: a strip under the class name of Spotify's (a SwiftUI hosting view of
