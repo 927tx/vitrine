@@ -214,7 +214,22 @@ static CGFloat anchorMiss(SGRKaraokeView *karaoke) {
     return fabs(view.center.y - view.bounds.size.height / 2 - karaoke.bounds.size.height * 0.28);
 }
 
+static NSString *textsOf(NSArray<SGKaraokeLine *> *lines) {
+    NSMutableArray<NSString *> *texts = [NSMutableArray array];
+    for (SGKaraokeLine *line in lines) [texts addObject:SGKaraokeLineText(line)];
+    return [texts componentsJoinedByString:@" "];
+}
+
 static void runChecks(SGRKaraokeView *karaoke, UIView *host) {
+    // Lines listed out of time order are estimated up to the line sung after it, and kept in time order.
+    NSArray<SGKaraokeLine *> *estimated = SGKaraokeInTimeOrder(SGKaraokeEstimatedLines(@[@1000, @8000, @6000, @3000, @6000], @[@"a", @"b", @"c", @"d", @"e"]));
+    expect([textsOf(estimated) isEqualToString:@"a d c e b"] && estimated[1].end <= 6000,
+           [NSString stringWithFormat:@"lines going back in time are read in time order (%@)", textsOf(estimated)]);
+    NSArray<SGKaraokeLine *> *listed = @[timed(5000, @"x", nil), timed(2000, @"y", nil), timed(5000, @"z", nil), timed(1000, @"w", nil)];
+    NSArray<SGKaraokeLine *> *ordered = SGKaraokeInTimeOrder(listed);
+    expect([textsOf(ordered) isEqualToString:@"w y x z"] && SGKaraokeInTimeOrder(ordered) == ordered,
+           [NSString stringWithFormat:@"kept lines are put in time order, the same array once they are (%@)", textsOf(ordered)]);
+
     // A held last word keeps its glow as its line goes dim, and loses it once the line has.
     SGKaraokeLine *line = timed(0, @"hold this", @"v1");
     line.words.lastObject.end = line.words.lastObject.start + 3000;

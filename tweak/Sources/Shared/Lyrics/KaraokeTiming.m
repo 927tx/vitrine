@@ -219,12 +219,19 @@ static SGKaraokeLine *timedLine(NSString *text, NSInteger start, NSInteger gap) 
 }
 
 NSArray<SGKaraokeLine *> *SGKaraokeEstimatedLines(NSArray<NSNumber *> *starts, NSArray<NSString *> *texts) {
+    // A line listed out of time order is given the gap to the line sung after it, not the one listed after
+    // it. The lines stay in the order they were listed: a source pairs them up with its own by position, and
+    // the lines are put in time order where they are kept (SGKaraokeInTimeOrder).
+    NSUInteger count = MIN(texts.count, starts.count);
     NSMutableArray<SGKaraokeLine *> *lines = [NSMutableArray array];
-    for (NSUInteger i = 0; i < texts.count; i++) {
+    for (NSUInteger i = 0; i < count; i++) {
         if (isBreak(texts[i])) continue;
-        NSInteger start = starts[i].integerValue;
-        NSInteger gap = i + 1 < starts.count ? starts[i + 1].integerValue - start : 0;
-        [lines addObject:timedLine(texts[i], start, MAX(gap, 0))];
+        NSInteger start = starts[i].integerValue, gap = 0;
+        for (NSUInteger j = 0; j < count; j++) {   // ponytail: quadratic, a song's few hundred lines at most
+            NSInteger after = starts[j].integerValue - start;
+            if (after > 0 && (!gap || after < gap)) gap = after;
+        }
+        [lines addObject:timedLine(texts[i], start, gap)];
     }
     return lines.count ? lines : nil;
 }
@@ -247,6 +254,18 @@ SGKaraokeTiming SGKaraokeLinesTiming(NSArray<SGKaraokeLine *> *lines) {
     SGKaraokeTiming finest = SGKaraokeTimingNone;
     for (SGKaraokeLine *line in lines) finest = MIN(finest, line.timing);
     return finest;
+}
+
+// Some sources list a line out of its place in time: a chorus written once with its repeats after it,
+// or one voice's lines listed after the other's. Everything that reads lines takes them in time order.
+NSArray<SGKaraokeLine *> *SGKaraokeInTimeOrder(NSArray<SGKaraokeLine *> *lines) {
+    for (NSUInteger i = 1; i < lines.count; i++) {
+        if (lines[i].start >= lines[i - 1].start) continue;
+        return [lines sortedArrayWithOptions:NSSortStable usingComparator:^NSComparisonResult(SGKaraokeLine *a, SGKaraokeLine *b) {
+            return a.start < b.start ? NSOrderedAscending : a.start > b.start ? NSOrderedDescending : NSOrderedSame;
+        }];
+    }
+    return lines;
 }
 
 #pragma mark - Spotify's own bodies
