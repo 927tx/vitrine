@@ -8,7 +8,9 @@
 // reads the buffer bound for the speaker into float lanes, runs the engine over them and writes them back, in
 // place: the way the first version of Pitch worked on the phone. A notify stays on a unit that was the music's
 // once and does nothing there, so one engine never runs on two render threads. Speed and pitch feeds the
-// unit's input, so its sound reaches the notify changed.
+// unit's input, so its sound reaches the notify changed. After the engine, with the switch on or off, the notify
+// hands the music's buffer mixed to mono to one reader (SGAudioSetOutputReader), the player's Visualiser, which
+// only reads it.
 //
 // The engine is made the first time the output starts with the master switch on, at the output's rate,
 // and lives as long as Spotify: the render thread may be holding it at any time. With the switch off the
@@ -108,6 +110,14 @@ static BOOL anySound(const float *samples, UInt32 count) {
     return NO;
 }
 
+static BOOL laidOut(const AudioBufferList *data, UInt32 frames, UInt32 channels, UInt32 bytes, BOOL split) {
+    BOOL fits = split ? data->mNumberBuffers == channels : data->mNumberBuffers == 1 && data->mBuffers[0].mNumberChannels == channels;
+    for (UInt32 b = 0; fits && b < data->mNumberBuffers; b++) {
+        fits = data->mBuffers[b].mData && data->mBuffers[b].mDataByteSize == frames * bytes * (split ? 1 : channels);
+    }
+    return fits;
+}
+
 // The buffer through the engine in place, whatever its format: the buffers themselves as the engine's lanes
 // when they are float, one per channel (the hardware's usual), otherwise read into the scratch lanes and
 // written back. The first two channels are the engine's; a mono output is fed to both and gets their mean.
@@ -120,11 +130,7 @@ static void processBuffer(SGDSPEngine *engine, AudioUnitRenderActionFlags *flags
     if ((bytes != 2 && bytes != 4) || channels < 1) return;
     // Buffers not laid out as the format says are left alone rather than read as noise: the format read at
     // the start can be a moment old.
-    BOOL fits = split ? data->mNumberBuffers == channels : data->mNumberBuffers == 1 && data->mBuffers[0].mNumberChannels == channels;
-    for (UInt32 b = 0; fits && b < data->mNumberBuffers; b++) {
-        fits = data->mBuffers[b].mData && data->mBuffers[b].mDataByteSize == frames * bytes * (split ? 1 : channels);
-    }
-    if (!fits) {
+    if (!laidOut(data, frames, channels, bytes, split)) {
         atomic_fetch_add_explicit(&sg_skipped, 1, memory_order_relaxed);
         return;
     }
@@ -168,16 +174,49 @@ static void processBuffer(SGDSPEngine *engine, AudioUnitRenderActionFlags *flags
     if (loud) *flags &= ~kAudioUnitRenderAction_OutputIsSilence;
 }
 
-// `refCon` is the unit; only the music's output is processed.
+#pragma mark - the output's sound, read (AudioEffects.h)
+
+static _Atomic(SGAudioOutputReader) sg_reader;
+static float sg_mono[kScratchFrames];
+
+void SGAudioSetOutputReader(SGAudioOutputReader reader) {
+    atomic_store_explicit(&sg_reader, reader, memory_order_release);
+}
+
+// The buffer, as the effects left it, mixed to mono for the reader: its first two channels, or its one.
+static void readOut(SGAudioOutputReader reader, AudioUnitRenderActionFlags flags, UInt32 frames, const AudioBufferList *data) {
+    uint64_t layout = atomic_load_explicit(&sg_layout, memory_order_relaxed);
+    UInt32 formatFlags = (UInt32)layout, channels = (UInt32)(layout >> 32) & 0xffff, bytes = (UInt32)(layout >> 48);
+    BOOL isFloat = (formatFlags & kAudioFormatFlagIsFloat) != 0, split = (formatFlags & kAudioFormatFlagIsNonInterleaved) != 0;
+    UInt32 fraction = (formatFlags & kLinearPCMFormatFlagsSampleFractionMask) >> kLinearPCMFormatFlagsSampleFractionShift;
+    if ((bytes != 2 && bytes != 4) || channels < 1 || !laidOut(data, frames, channels, bytes, split)) return;
+    BOOL silent = (flags & kAudioUnitRenderAction_OutputIsSilence) != 0;
+    double rate = loadDouble(&sg_rateBits);
+    const void *first = data->mBuffers[0].mData, *second = split && channels > 1 ? data->mBuffers[1].mData : first;
+    UInt32 stride = split ? 1 : channels, secondOffset = !split && channels > 1 ? 1 : 0;
+    for (UInt32 done = 0; done < frames;) {
+        UInt32 count = MIN(frames - done, (UInt32)kScratchFrames);
+        for (UInt32 i = 0; i < count; i++) {
+            UInt32 at = (done + i) * stride;
+            sg_mono[i] = silent ? 0 : 0.5f * (readSample(first, at, bytes, isFloat, fraction) + readSample(second, at + secondOffset, bytes, isFloat, fraction));
+        }
+        reader(sg_mono, count, rate);
+        done += count;
+    }
+}
+
+// `refCon` is the unit; only the music's output is processed and read.
 static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                          UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
     if (refCon != SGPlayerMusicOutput()) return noErr;
-    if (!atomic_load_explicit(&sg_running, memory_order_acquire)) return noErr;
-    SGDSPEngine *engine = atomic_load_explicit(&sg_engine, memory_order_acquire);
-    // A new rate is being set up on the queue: until then the sound passes as it is.
-    if (!engine || SGDSPEngineSampleRate(engine) != loadDouble(&sg_rateBits)) return noErr;
-    processBuffer(engine, flags, frames, data);
+    if (atomic_load_explicit(&sg_running, memory_order_acquire)) {
+        SGDSPEngine *engine = atomic_load_explicit(&sg_engine, memory_order_acquire);
+        // A new rate is being set up on the queue: until then the sound passes as it is.
+        if (engine && SGDSPEngineSampleRate(engine) == loadDouble(&sg_rateBits)) processBuffer(engine, flags, frames, data);
+    }
+    SGAudioOutputReader reader = atomic_load_explicit(&sg_reader, memory_order_acquire);
+    if (reader) readOut(reader, *flags, frames, data);
     return noErr;
 }
 

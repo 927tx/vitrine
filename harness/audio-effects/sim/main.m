@@ -96,6 +96,7 @@ static void level(unsigned calls, double *left, double *right, unsigned *frames,
 }
 
 static int sg_failures;
+static void reportReader(double wantLeft, double wantRight);
 
 static void reportOutput(int which, NSString *what, double wantLeft, double wantRight) {
     double left, right;
@@ -106,6 +107,36 @@ static void reportOutput(int which, NSString *what, double wantLeft, double want
     NSLog(@"[harness] %@ %-44@ left %6.1f dB, right %6.1f dB (want %@, %@), slices of %u, %u silent; status \"%@\"", ok ? @"  ok  " : @"FAILED",
           what, left, right, isnan(wantLeft) ? @"any" : [NSString stringWithFormat:@"%.1f", wantLeft],
           isnan(wantRight) ? @"any" : [NSString stringWithFormat:@"%.1f", wantRight], frames, silent, SGDSPStatus());
+    reportReader(wantLeft, wantRight);
+}
+
+#pragma mark - the output's reader (SGAudioSetOutputReader)
+
+// What AudioEffects.x hands its one reader: the buffer after the effects, mixed to mono. The sine is in one
+// channel only, so the mix is it at half, 6 dB down.
+static float sg_readerLevels[kProbeCalls];
+static atomic_uint sg_readerCalls;
+static atomic_uint_fast64_t sg_readerRate;
+
+static void reader(const float *samples, uint32_t count, double rate) {
+    double sum = 0;
+    for (uint32_t i = 0; i < count; i++) sum += samples[i] * samples[i];
+    unsigned n = atomic_load(&sg_readerCalls);
+    sg_readerLevels[n % kProbeCalls] = count ? (float)(sum / count) : 0;
+    atomic_store(&sg_readerCalls, n + 1);
+    atomic_store(&sg_readerRate, (uint64_t)rate);
+}
+
+static void reportReader(double wantLeft, double wantRight) {
+    if (isnan(wantLeft) || isnan(wantRight)) return;
+    unsigned n = atomic_load(&sg_readerCalls), count = 0;
+    double sum = 0;
+    for (unsigned i = 0; i < 8 && i < n; i++, count++) sum += sg_readerLevels[(n - 1 - i) % kProbeCalls];
+    double got = count ? 10 * log10(sum / count + 1e-20) : -200, want = MAX(wantLeft, wantRight) - 6.02;
+    BOOL ok = count && (want < -150 ? got < -150 : fabs(got - want) < 0.6);
+    if (!ok) sg_failures++;
+    NSLog(@"[harness] %@        the reader: %6.1f dB (want %.1f) at %llu Hz, %u calls", ok ? @"  ok  " : @"FAILED", got, want,
+          (unsigned long long)atomic_load(&sg_readerRate), n);
 }
 
 static void report(NSString *what, double wantLeft, double wantRight) {
@@ -240,6 +271,7 @@ static void check(OSStatus status, const char *what) {
     double sine = 20 * log10(kAmplitude / M_SQRT2), nothing = -200, any = NAN;
     NSLog(@"[harness] the sine's level is %.1f dB RMS in the left channel", sine);
     SGDSPSetSwitch(SGKeyDSP, NO);
+    SGAudioSetOutputReader(reader);
     [self startSpotifyChainAt:44100];
 
     NSArray *script = @[

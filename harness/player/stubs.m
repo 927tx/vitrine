@@ -144,6 +144,48 @@ double SGPlayerSpeed(void) { return sg_speed; }
 BOOL SGPlayerSpeedAllowed(void) { return YES; }
 void SGSetPlayerSpeed(double speed) { sg_speed = speed; NSLog(@"[harness] speed %.2f", speed); }
 
+// The audio effects' reader (AudioEffects.x): a song of the harness's own, 120 beats a minute at 48 kHz, a kick on
+// every beat, hats between, a bass line, a chord and a tune, handed to the reader in buffers of 1024 on a queue of
+// its own, as the render thread would, for as long as one is set.
+#import <stdatomic.h>
+#import "Shared/AudioEffects/AudioEffects.h"
+
+static _Atomic(SGAudioOutputReader) sg_reader;
+static dispatch_source_t sg_audio;
+
+BOOL SGRHarnessReading(void) { return atomic_load(&sg_reader) != NULL; }
+
+static void synthesize(float *out, uint64_t start, int count, double rate) {
+    static const double bass[] = {55, 73.42, 65.41, 49}, tune[] = {440, 523.25, 587.33, 659.25, 783.99, 659.25, 587.33, 523.25};
+    for (int i = 0; i < count; i++) {
+        double t = (start + i) / rate, beat = fmod(t, 0.5), half = fmod(t + 0.25, 0.5);
+        int bar = (int)(t / 2) % 4, note = (int)(t / 0.5) % 8;
+        double kick = 0.55 * sin(2 * M_PI * 52 * beat) * exp(-9 * beat);
+        double hat = 0.12 * (2.0 * arc4random_uniform(1 << 16) / (1 << 16) - 1) * exp(-50 * half);
+        double low = 0.22 * sin(2 * M_PI * bass[bar] * t);
+        double chord = 0.05 * (0.6 + 0.4 * sin(2 * M_PI * 0.25 * t)) * (sin(2 * M_PI * 220 * t) + sin(2 * M_PI * 277.18 * t) + sin(2 * M_PI * 329.63 * t));
+        double lead = 0.08 * sin(2 * M_PI * tune[note] * t) * (1 - exp(-20 * beat));
+        out[i] = (float)(kick + hat + low + chord + lead);
+    }
+}
+
+void SGAudioSetOutputReader(SGAudioOutputReader reader) {
+    atomic_store(&sg_reader, reader);
+    NSLog(@"[harness] output reader %@", reader ? @"on" : @"off");
+    if (sg_audio) return;
+    __block uint64_t played = 0;
+    sg_audio = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_queue_create("harness.audio", DISPATCH_QUEUE_SERIAL));
+    dispatch_source_set_timer(sg_audio, DISPATCH_TIME_NOW, (uint64_t)(1024 / 48000.0 * NSEC_PER_SEC), NSEC_PER_MSEC);
+    dispatch_source_set_event_handler(sg_audio, ^{
+        static float buffer[1024];
+        synthesize(buffer, played, 1024, 48000);
+        played += 1024;
+        SGAudioOutputReader now = atomic_load(&sg_reader);
+        if (now) now(buffer, 1024, 48000);
+    });
+    dispatch_resume(sg_audio);
+}
+
 // Sing (the mic on the lyrics, SGRSingButton.m): never available, as on a phone that cannot run it.
 #import "Shared/Sing/Sing.h"
 NSString *const SGSingChangedNotification = @"harness.singChanged";

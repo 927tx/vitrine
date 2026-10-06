@@ -20,9 +20,13 @@
 //              laid out, then the field, the lyrics, a field built again, the menu's switch and the player
 //              closed, each step checked; the log ends with motion checks n of m right -- PASS or FAIL
 //     settings the redesign's Player page (PlayerSettings.m) over the player with the clip of `motion`: the
-//              card over Animated, then Fluid, Colours and Still as the segmented control picks them, and
-//              Animated again, the note under it changing and the rows under the header holding still;
-//              each step checked, the log ends with settings checks n of m right -- PASS or FAIL
+//              card over Animated, then Fluid, Colours, Still and Visualiser as the segmented control picks
+//              them, and Animated again, the note under it changing and the rows under the header holding
+//              still; each step checked, the log ends with settings checks n of m right -- PASS or FAIL
+//     visualiser the Visualiser background (PlayerVisualiser.m) fed a song of the harness's own (stubs.m):
+//              the hills moving, blurred behind the lyrics, settling and stopping on a pause, back on play,
+//              and the ⋯ menu's switch to Fluid and back; the log ends with visualiser checks n of m right
+//              -- PASS or FAIL
 // HARNESS_VOLUME=0 leaves out the volume row the phone has (trees/clean/player/01.txt has none).
 #import <AVFoundation/AVFoundation.h>
 #import <UIKit/UIKit.h>
@@ -563,6 +567,7 @@ static void loadLyrics(void) {
     else if ([scenario() isEqualToString:@"immersive"]) [self runImmersiveChecks];
     else if ([scenario() isEqualToString:@"settings"]) [self runSettingsChecks];
     else if ([scenario() isEqualToString:@"seek"]) [self runSeekChecks];
+    else if ([scenario() isEqualToString:@"visualiser"]) [self runVisualiserChecks];
     // Opened, closed and opened again, so a screenshot can be taken of each state and of the move itself.
     else for (NSNumber *at in @[@2, @6, @10]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -1001,19 +1006,20 @@ static UIView *firstOfClass(UIView *root, NSString *name) {
         segments.selectedSegmentIndex = (NSInteger)index;
         [segments sendActionsForControlEvents:UIControlEventValueChanged];
     };
-    void (^expectBackground)(NSString *, BOOL, BOOL, BOOL) = ^(NSString *step, BOOL fluid, BOOL flows, BOOL clip) {
+    void (^expectBackground)(NSString *, BOOL, BOOL, BOOL, BOOL) = ^(NSString *step, BOOL fluid, BOOL flows, BOOL clip, BOOL hills) {
         UIView *view = showcase();
         SGRArtworkField *field = (SGRArtworkField *)firstOfClass(view, @"SGRArtworkField");
-        UIView *motion = firstOfClass(view, @"SGRPlayerMotionView");
+        UIView *motion = firstOfClass(view, @"SGRPlayerMotionView"), *visualiser = firstOfClass(view, @"SGRVisualiserView");
         UIView *cover = [view valueForKey:@"_cover"];
         UILabel *note = [nav.topViewController valueForKey:@"_note"];
         NSInteger rows = [table() numberOfRowsInSection:0];
         CGFloat height = table().tableHeaderView.bounds.size.height;
-        BOOL ok = field && field.fluid == fluid && field.flows == flows && (motion != nil) == clip && !cover.hidden && rows == (clip ? 2 : 0)
+        BOOL ok = field && field.fluid == fluid && field.flows == flows && (motion != nil) == clip && (visualiser != nil) == hills
+                  && field.motionHeld == (clip || hills) && !cover.hidden && rows == (clip ? 2 : 0)
                   && note.text.length && (headerHeight == 0 || fabs(height - headerHeight) < 0.5);
         headerHeight = height;
-        [self expect:ok step:step detail:[NSString stringWithFormat:@"field %@ fluid %d flows %d, clip %@, cover %@, %ld rows over the Mini player (%@), header %.0f, note \"%@\"",
-                                          field ? @"in" : @"missing", field.fluid, field.flows, motion ? @"on" : @"off", cover.hidden ? @"hidden" : @"shown",
+        [self expect:ok step:step detail:[NSString stringWithFormat:@"field %@ fluid %d flows %d held %d, clip %@, hills %@, cover %@, %ld rows over the Mini player (%@), header %.0f, note \"%@\"",
+                                          field ? @"in" : @"missing", field.fluid, field.flows, field.motionHeld, motion ? @"on" : @"off", visualiser ? @"on" : @"off", cover.hidden ? @"hidden" : @"shown",
                                           (long)rows, view.accessibilityValue, height, note.text]];
     };
     // The clip is in by 3 s (the motion scenario's first step), and the page opens over the player then.
@@ -1027,22 +1033,119 @@ static UIView *firstOfClass(UIView *root, NSString *name) {
         UISegmentedControl *segments = control();
         CGRect card = view.frame, header = table().tableHeaderView.frame;
         BOOL shaped = view.window && card.size.width > card.size.height && card.size.width > header.size.width - 48;
-        [self expect:shaped && segments.numberOfSegments == 4 && CGRectGetMinY(segments.frame) > CGRectGetMaxY(card)
-                step:@"the card leads the page, the four backgrounds under it"
+        // Every segment's title whole: the widest, Visualiser's, is not cut short.
+        BOOL whole = YES;
+        for (UILabel *label in [self labelsIn:segments]) whole = whole && label.intrinsicContentSize.width <= label.bounds.size.width + 0.5;
+        [self expect:shaped && segments.numberOfSegments == 5 && whole && CGRectGetMinY(segments.frame) > CGRectGetMaxY(card)
+                step:@"the card leads the page, the five backgrounds under it, their names whole"
               detail:[NSString stringWithFormat:@"card %@ in a header of %@, control %@ with %ld segments", NSStringFromCGRect(card),
                       NSStringFromCGRect(header), NSStringFromCGRect(segments.frame), (long)segments.numberOfSegments]];
         NSInteger sections = table().numberOfSections;
         [self expect:sections == 2 && [table() numberOfRowsInSection:1] == 3 step:@"the Mini player section on the page"
               detail:[NSString stringWithFormat:@"%ld sections, %ld rows in the second", (long)sections, (long)[table() numberOfRowsInSection:1]]];
-        expectBackground(@"Animated", YES, NO, YES);
+        expectBackground(@"Animated", YES, NO, YES, NO);
         pick(2);
     });
-    after(5, ^{ expectBackground(@"Fluid", YES, NO, NO); pick(1); });
-    after(6, ^{ expectBackground(@"Colours", NO, YES, NO); pick(0); });
-    after(7, ^{ expectBackground(@"Still", NO, NO, NO); pick(3); });
+    after(5, ^{ expectBackground(@"Fluid", YES, NO, NO, NO); pick(1); });
+    after(6, ^{ expectBackground(@"Colours", NO, YES, NO, NO); pick(0); });
+    after(7, ^{ expectBackground(@"Still", NO, NO, NO, NO); pick(4); });
     after(8, ^{
-        expectBackground(@"Animated again", YES, NO, YES);
+        expectBackground(@"Visualiser", YES, NO, NO, YES);
+        NSLog(@"[harness] settings: screenshot the Visualiser card now");
+    });
+    // Held a little longer, so the screenshot catches it.
+    after(10, ^{ pick(3); });
+    after(11, ^{
+        expectBackground(@"Animated again", YES, NO, YES, NO);
         NSLog(@"[harness] settings checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
+              self->_failures ? @"FAIL" : @"PASS");
+    });
+}
+
+- (NSArray<UILabel *> *)labelsIn:(UIView *)view {
+    NSMutableArray<UILabel *> *labels = [NSMutableArray array];
+    for (UIView *sub in view.subviews) {
+        if ([sub isKindOfClass:UILabel.class]) [labels addObject:(UILabel *)sub];
+        [labels addObjectsFromArray:[self labelsIn:sub]];
+    }
+    return labels;
+}
+
+#pragma mark - the Visualiser
+
+BOOL SGRHarnessReading(void);
+
+static UIView *visualiserView(void) {
+    for (UIView *view in SGRPlayerField().subviews) {
+        if ([NSStringFromClass(view.class) isEqualToString:@"SGRVisualiserView"]) return view;
+    }
+    return nil;
+}
+
+// The tallest a hill stands over the screen's foot, in points, from its path's bounding box.
+static CGFloat hillHeight(UIView *view, NSString *ivar) {
+    CAShapeLayer *shape = [view valueForKey:ivar];
+    if (!shape.path) return 0;
+    return view.bounds.size.height > 0 ? [[view valueForKey:@"baseline"] doubleValue] - CGPathGetPathBoundingBox(shape.path).origin.y : 0;
+}
+
+- (void)runVisualiserChecks {
+    after(3, ^{
+        UIView *hills = visualiserView();
+        CADisplayLink *link = [hills valueForKey:@"_link"];
+        CGFloat front = hillHeight(hills, @"_frontShape"), back = hillHeight(hills, @"_backShape");
+        [self expect:hills && SGRPlayerVisualiserShowing() && SGRPlayerField().fluid && SGRPlayerField().motionHeld && link && SGRHarnessReading() && front > 40
+                step:@"playing"
+              detail:[NSString stringWithFormat:@"hills %@, field fluid %d held %d, link %@ at up to %.0f fps, reader %@, front %.0f pt, back %.0f pt",
+                      hills ? @"on the field" : @"missing", SGRPlayerField().fluid, SGRPlayerField().motionHeld, link ? @"running" : @"stopped",
+                      link.preferredFrameRateRange.maximum, SGRHarnessReading() ? @"on" : @"off", front, back]];
+        NSLog(@"[harness] visualiser: screenshot the hills now");
+    });
+    after(4, ^{ SGRPlayerToggleLyrics(); });
+    after(5.5, ^{
+        UIView *hills = visualiserView();
+        UIVisualEffectView *blur = [hills valueForKey:@"_lyricsBlur"];
+        CADisplayLink *link = [hills valueForKey:@"_link"];
+        [self expect:SGRPlayerLyricsOpen() && blur.effect && link.preferredFrameRateRange.maximum == 30 step:@"behind the lyrics"
+              detail:[NSString stringWithFormat:@"lyrics %@, blur %@, link at up to %.0f fps", SGRPlayerLyricsOpen() ? @"up" : @"down",
+                      blur.effect ? @"on" : @"off", link.preferredFrameRateRange.maximum]];
+        NSLog(@"[harness] visualiser: screenshot the lyrics now");
+    });
+    after(6.5, ^{ SGRPlayerToggleLyrics(); });
+    after(7.5, ^{ SGRHarnessSetTrack(@"spotify:track:harnessA", imageURI(@"aaaa"), YES); });
+    after(8, ^{
+        CADisplayLink *link = [visualiserView() valueForKey:@"_link"];
+        [self expect:link && !SGRHarnessReading() step:@"paused, settling"
+              detail:[NSString stringWithFormat:@"link %@, reader %@", link ? @"still running" : @"stopped", SGRHarnessReading() ? @"on" : @"off"]];
+    });
+    after(12, ^{
+        UIView *hills = visualiserView();
+        CADisplayLink *link = [hills valueForKey:@"_link"];
+        CGFloat front = hillHeight(hills, @"_frontShape");
+        [self expect:!link && !SGRHarnessReading() && front < 15 step:@"paused, settled"
+              detail:[NSString stringWithFormat:@"link %@, reader %@, front %.0f pt", link ? @"running" : @"stopped", SGRHarnessReading() ? @"on" : @"off", front]];
+        NSLog(@"[harness] visualiser: screenshot the paused hills now");
+        SGRHarnessSetTrack(@"spotify:track:harnessA", imageURI(@"aaaa"), NO);
+    });
+    after(13.5, ^{
+        UIView *hills = visualiserView();
+        [self expect:[hills valueForKey:@"_link"] && SGRHarnessReading() && hillHeight(hills, @"_frontShape") > 40 step:@"playing again"
+              detail:[NSString stringWithFormat:@"front %.0f pt", hillHeight(hills, @"_frontShape")]];
+        SGRPlayerMenuSetBackground(SGRPlayerBackgroundFluid);
+    });
+    after(14.2, ^{
+        [self expect:!visualiserView() && !SGRPlayerVisualiserShowing() && !SGRPlayerField().motionHeld && !SGRHarnessReading()
+                step:@"switched to Fluid from the menu"
+              detail:[NSString stringWithFormat:@"hills %@, field %@, reader %@", visualiserView() ? @"still there" : @"gone",
+                      SGRPlayerField().motionHeld ? @"held" : @"moving", SGRHarnessReading() ? @"on" : @"off"]];
+        SGRPlayerMenuSetBackground(SGRPlayerBackgroundVisualiser);
+    });
+    after(15.5, ^{
+        UIView *hills = visualiserView();
+        [self expect:hills && SGRPlayerField().motionHeld && SGRHarnessReading() && hillHeight(hills, @"_frontShape") > 40 step:@"back from the menu"
+              detail:[NSString stringWithFormat:@"hills %@, field %@, front %.0f pt", hills ? @"on the field" : @"missing",
+                      SGRPlayerField().motionHeld ? @"held" : @"moving", hillHeight(hills, @"_frontShape")]];
+        NSLog(@"[harness] visualiser checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
               self->_failures ? @"FAIL" : @"PASS");
     });
 }
@@ -1405,6 +1508,7 @@ static BOOL linesSeek(SGRKaraokeView *lyrics) {
 __attribute__((constructor(101))) static void sgr_harnessDefaults(void) {
     [NSUserDefaults.standardUserDefaults setBool:YES forKey:@"spotifyglass.redesign"];
     // Animated artwork, its clip served by the picture server to the shared session too.
+    if ([scenario() isEqualToString:@"visualiser"]) [NSUserDefaults.standardUserDefaults setInteger:4 forKey:@"spotifyglass.redesign.player.background"];
     if ([scenario() isEqualToString:@"motion"] || [scenario() isEqualToString:@"settings"]) {
         [NSUserDefaults.standardUserDefaults setInteger:3 forKey:@"spotifyglass.redesign.player.background"];
         setenv("HARNESS_CANVAS", "https://canvas.harness/clip.mp4", 1);

@@ -50,8 +50,9 @@ float SGPlayerReverb(void);
 void SGPlayerSetReverb(float amount);
 
 // The redesign's Animated artwork, switched in the same block: whether the player offers the switch (the
-// redesign is running and its background is Fluid or Animated, the two that share a field), whether it is
-// on, and switching it, which applies at once and is stored as the Background choice. Defined by
+// redesign is running and its background is Fluid, Animated or Visualiser, the three that share a field),
+// whether it is on, and switching it, which applies at once and is stored as the Background choice (off is
+// Fluid, and from the Visualiser changes nothing). Defined by
 // Redesigned/Player/PlayerMotion.x; NO from the first under the native look.
 BOOL SGPlayerMenuOffersAnimatedArtwork(void);
 BOOL SGPlayerMenuAnimatedArtwork(void);

@@ -4,12 +4,13 @@
 // page edge to edge, and over its foot the cover, the title, the artist and how far the track has played.
 // The progress is where the track was when the page appeared.
 //
-// The background is the player's own: a field of the same kind (Still, Colours, Fluid), and for Animated
+// The background is the player's own: a field of the same kind (Still, Colours, Fluid), for Animated
 // the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or Fluid while there is
-// none, as in the player. It moves under the field's own conditions (in a window, Spotify in front, Reduce
-// Motion and Low Power Mode off). Under the card a segmented control picks the background, all four of
-// them: the names are one short word each, so they fit side by side at the narrowest iPhone width, and
-// every choice stays one tap away with the card showing it at once. A note under the control says what the
+// none, as in the player, and for Visualiser the hills over Fluid held still (SGRPlayerVisualiserPreview),
+// moving with the song. It moves under the field's own conditions (in a window, Spotify in front, Reduce
+// Motion and Low Power Mode off). Under the card a segmented control picks the background, all five of
+// them: the names are one word each, each segment as wide as its name, so they fit side by side at an iPhone's
+// width, and every choice stays one tap away with the card showing it at once. A note under the control says what the
 // choice does; it is given the room of the longest note, so the rows under it hold still as it changes.
 //
 // Under the header: the rows that follow the choice (Animated's sources and its Low Data Mode switch;
@@ -36,7 +37,8 @@ static NSArray<NSString *> *backgroundNotes(void) {
         @"The cover, blurred and held still.",
         @"The cover's colours, drifting slowly.",
         @"The cover itself, blurred and slowly turning. It rests while a song is paused.",
-        @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between the two.",
+        @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between this, Fluid and Visualiser.",
+        @"The song's sound as gentle hills in the cover's colours, over Fluid held still. They settle while a song is paused.",
     ];
 }
 
@@ -47,7 +49,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 
 @implementation SGRPlayerShowcase {
     SGRArtworkField *_field;
-    UIView *_motion;
+    UIView *_motion, *_visualiser;
     UIImageView *_cover;
     UILabel *_title, *_artist;
     UIView *_progress, *_progressFill;
@@ -129,8 +131,8 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _title.text = track.trackTitle.length ? track.trackTitle : @"Not Playing";
     _artist.text = track.artistName ?: @"";
     _position = state.duration > 0 ? MIN(1, MAX(0, state.position / state.duration)) : 0;
-    // The clip covers the field, which then holds still, as in the player (PlayerMotion.x).
-    _field.motionHeld = state.isPaused || _motion != nil;
+    // The clip covers the field, and the hills move over it, which then holds still, as in the player.
+    _field.motionHeld = state.isPaused || _motion != nil || _visualiser != nil;
     if (SGRNowPlayingArtwork(NULL, NULL)) {
         [self artworkChanged];
     } else {
@@ -150,7 +152,10 @@ static NSArray<NSString *> *backgroundNotes(void) {
         [self->_motion removeFromSuperview];
         self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview() : nil;
         if (self->_motion) [self insertSubview:self->_motion aboveSubview:self->_field];
-        self->_field.motionHeld = SGPlayerState().isPaused || self->_motion != nil;
+        [self->_visualiser removeFromSuperview];
+        self->_visualiser = kind == SGRPlayerBackgroundVisualiser ? SGRPlayerVisualiserPreview() : nil;
+        if (self->_visualiser) [self insertSubview:self->_visualiser aboveSubview:self->_field];
+        self->_field.motionHeld = SGPlayerState().isPaused || self->_motion != nil || self->_visualiser != nil;
     };
     self.accessibilityValue = [SGRPlayerBackgroundNames()[(NSUInteger)kind] stringByAppendingString:@" background"];
     if (animated && self.window) {
@@ -172,6 +177,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _field.frame = bounds;
     _field.backdropHeight = h;
     _motion.frame = bounds;
+    _visualiser.frame = bounds;
 
     _cover.frame = CGRectMake(kCardPadding, h - kCardPadding - kCoverSide, kCoverSide, kCoverSide);
     CGFloat x = CGRectGetMaxX(_cover.frame) + 12, width = w - kCardPadding - x;
@@ -271,6 +277,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     UISegmentedControl *backgrounds = [[UISegmentedControl alloc] initWithItems:SGRPlayerBackgroundNames()];
     backgrounds.selectedSegmentIndex = SGRPlayerBackground();
     backgrounds.accessibilityLabel = @"Background";
+    backgrounds.apportionsSegmentWidthsByContent = YES;
 
     SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Up to about 7 MB a song", SGKeyMotionLowData);
     lowData.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; };

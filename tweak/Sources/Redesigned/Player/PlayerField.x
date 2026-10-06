@@ -43,11 +43,22 @@ SGRArtworkField *SGRPlayerField(void) {
 
 SGRPlayerBackgroundKind SGRPlayerBackground(void) {
     NSInteger kind = SGInt(SGRKeyPlayerBackground, SGEnabled(SGRKeyPlayerMotion) ? SGRPlayerBackgroundColours : SGRPlayerBackgroundStill);
-    return kind >= SGRPlayerBackgroundStill && kind <= SGRPlayerBackgroundAnimated ? kind : SGRPlayerBackgroundColours;
+    return kind >= SGRPlayerBackgroundStill && kind <= SGRPlayerBackgroundVisualiser ? kind : SGRPlayerBackgroundColours;
 }
 
 NSArray<NSString *> *SGRPlayerBackgroundNames(void) {
-    return @[@"Still", @"Colours", @"Fluid", @"Animated"];
+    return @[@"Still", @"Colours", @"Fluid", @"Animated", @"Visualiser"];
+}
+
+// A paused song holds the colours still, the way it rests the cover (PlayerArtwork.x), and so does what lies over
+// the field: an animated artwork's clip, which covers it (PlayerMotion.x), or the Visualiser's hills, which are
+// the one thing moving.
+static BOOL fieldHeld(void) {
+    return SGPlayerState().isPaused || SGRPlayerMotionShowing() || SGRPlayerVisualiserShowing();
+}
+
+void SGRPlayerHoldField(void) {
+    sg_field.motionHeld = fieldHeld();
 }
 
 #pragma mark - the field
@@ -66,9 +77,7 @@ static SGRArtworkField *fieldIn(UIView *plane) {
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
     field.flows = background == SGRPlayerBackgroundColours;
     field.fluid = background >= SGRPlayerBackgroundFluid;
-    // A paused song holds the colours still, the way it rests the cover (PlayerArtwork.x), and so does an
-    // animated artwork's clip, which covers the field (PlayerMotion.x).
-    field.motionHeld = SGPlayerState().isPaused || SGRPlayerMotionShowing();
+    field.motionHeld = fieldHeld();
     field.bleed = kBleed;
     objc_setAssociatedObject(plane, &kFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     sg_field = field;
@@ -91,6 +100,7 @@ static SGRArtworkField *fieldIn(UIView *plane) {
     else if (plane.subviews.lastObject != field) [plane bringSubviewToFront:field];
     if (!CGRectEqualToRect(field.frame, plane.bounds)) field.frame = plane.bounds;
     SGRPlayerMotionFieldLaidOut();
+    SGRPlayerVisualiserUpdate();
 }
 
 - (void)backgroundViewModel:(id)model didChangeColor:(id)color playerState:(id)state {
@@ -155,7 +165,7 @@ static void publishCover(void) {
 }
 
 - (void)playerStateDidChange:(SPTPlayerState *)state {
-    sg_field.motionHeld = state.isPaused || SGRPlayerMotionShowing();
+    SGRPlayerHoldField();
     NSString *track = SGURIString(state.track.URI);
     if (!track || [track isEqualToString:_track]) return;
     _track = track;

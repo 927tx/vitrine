@@ -15,7 +15,7 @@ sources, for example an older commit, to see a bug before its fix.
 
 `build.sh` runs `logos.pl -c generator=internal` over `PlayerLyrics.x`, `PlayerArtwork.x`,
 `PlayerControls.x`, `PlayerFooter.x`, `PlayerScroll.x`, `PlayerField.x` and the Kit's `SGRBridges.x`, and links them with
-the real `Core/`, `Redesigned/Kit/`, `SGRKaraokeView`, `Settings/` and the Player page. `stubs.m` stands in for the hooks the harness
+the real `Core/`, `Redesigned/Kit/`, `SGRKaraokeView`, `Settings/`, the Player page and the Visualiser (`PlayerVisualiser.m`, `SGRSpectrum.m`). `stubs.m` stands in for the hooks the harness
 does not compile (the Kit's accent and repaint, the rest of the player, the lyrics store, the haptics,
 Sing's mic) and plays a mock player: `SGRHarnessSetTrack` reports a track, with the image ids Spotify's
 metadata carries, to every state observer. A song of ten timed lines plays on from launch. `main.m` also answers
@@ -69,11 +69,17 @@ come late, out of order, or not at all.
   ends with `motion checks: n of 20 right -- PASS` or `FAIL`.
 
 - `settings` opens the redesign's Player page (`PlayerSettings.m`, with the real `Settings/` framework) over the
-  player at 3 s, with the clip of `motion` in. It checks the card leads the page with the four backgrounds'
-  segmented control under it, the Mini player section's three rows are on the page, and then, as the control
-  picks each in turn, that the card shows Animated (the clip, the sources and Low Data Mode's rows in), Fluid,
-  Colours, Still and Animated again, with a note for each and the header the same height throughout. The log
-  ends with `settings checks: n of 7 right -- PASS` or `FAIL`.
+  player at 3 s, with the clip of `motion` in. It checks the card leads the page with the five backgrounds'
+  segmented control under it, every name whole, the Mini player section's three rows are on the page, and then,
+  as the control picks each in turn, that the card shows Animated (the clip, the sources and Low Data Mode's rows
+  in), Fluid, Colours, Still, Visualiser (the hills over Fluid held still) and Animated again, with a note for
+  each and the header the same height throughout. The log ends with `settings checks: n of 8 right -- PASS` or
+  `FAIL`.
+- `visualiser` plays the Visualiser background, fed by `stubs.m`'s stand-in for the audio effects' reader: a song
+  of its own at 120 beats a minute, handed over in buffers of 1024 at 48 kHz. It checks the hills stand on the
+  Fluid field held still with the reader on and the link at up to 60 fps, blur behind the lyrics with the link at
+  30, settle and stop with the reader off on a pause, come back on play, and go and come back through the ⋯
+  menu's switch to Fluid and back. The log ends with `visualiser checks: n of 7 right -- PASS` or `FAIL`.
 
 - `seek` is the tap around the progress bar (`PlayerControls.x`): a mock slider with Spotify's identifier and
   the two times beside it. It checks that a tap counts below the bar and up to 12 pt past its ends, not on the

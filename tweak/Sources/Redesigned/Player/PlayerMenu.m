@@ -6,8 +6,9 @@
 //         Playback Speed      0.5× to 2× in the steps Podcasts offers, the current one checked
 //         Pitch               Pitch Follows Speed, then three semitones down to three up, Original between them
 //         Reverb              Off and a quarter at a time up to 100%, the audio effects' reverb
-//     Show Animated Artwork   or Show Fluid Artwork: a button that switches the background between the two,
-//                             while it is one of them, named for what it switches to
+//     Show Fluid Artwork, Show Animated Artwork, Show Visualiser
+//                             a button for each of the two the background is not, while it is one of the
+//                             three, named for what it switches to
 //
 // Each submenu says what it is set to under its name, so the menu reads as a settings summary without opening
 // anything. A public menu has no sliders, so the steps stand in for them: the sheet's block, with its finer
@@ -119,12 +120,19 @@ static UIMenu *soundMenu(void) {
 static NSArray<UIMenuElement *> *playerItems(void) {
     NSMutableArray<UIMenuElement *> *items = [NSMutableArray arrayWithObject:soundMenu()];
     if (SGPlayerMenuOffersAnimatedArtwork()) {
-        // A button named for what it does, not a checkmark: the HIG's changeable label for a toggled item.
-        BOOL on = SGPlayerMenuAnimatedArtwork();
-        UIAction *animated = [UIAction actionWithTitle:on ? @"Show Fluid Artwork" : @"Show Animated Artwork"
-                                                 image:symbol(on ? @"drop" : @"play.rectangle.on.rectangle") identifier:nil
-                                               handler:^(UIAction *action) { SGPlayerMenuSetAnimatedArtwork(!on); }];
-        [items addObject:animated];
+        // Buttons named for what they do, not checkmarks: the HIG's changeable label for a toggled item.
+        NSArray<NSArray *> *backgrounds = @[
+            @[@(SGRPlayerBackgroundFluid), @"Show Fluid Artwork", @"drop"],
+            @[@(SGRPlayerBackgroundAnimated), @"Show Animated Artwork", @"play.rectangle.on.rectangle"],
+            @[@(SGRPlayerBackgroundVisualiser), @"Show Visualiser", @"waveform"],
+        ];
+        SGRPlayerBackgroundKind current = SGRPlayerBackground();
+        for (NSArray *background in backgrounds) {
+            SGRPlayerBackgroundKind kind = [background[0] integerValue];
+            if (kind == current) continue;
+            [items addObject:[UIAction actionWithTitle:background[1] image:symbol(background[2]) identifier:nil
+                                               handler:^(UIAction *action) { SGRPlayerMenuSetBackground(kind); }]];
+        }
     }
     return items;
 }

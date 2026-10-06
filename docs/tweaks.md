@@ -204,7 +204,8 @@ Shared:
                   harness/sleep-timer/, the gain in the simulator against harness/speed/
     AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): a render
                   notify on the music's RemoteIO unit (SGPlayerMusicOutput, Shared/Player) runs each finished buffer through the mod's own engine, re-blocked to 1024 frames one block late,
-                  in place (AudioEffects.x, SGDSPEngine.m). The buffers are in the unit's output format, the
+                  in place (AudioEffects.x, SGDSPEngine.m), then hands it, mixed to mono, to one reader that only
+                  reads it, switch on or off (SGAudioSetOutputReader: the player's Visualiser). The buffers are in the unit's output format, the
                   hardware's, not the client format Spotify sets. The effects are the SGDSP*.m files, on Accelerate,
                   Apple's Reverb2 unit, libbs2b and EEL2 (vendor/audio). Settings apply as they change, on a queue of
                   its own; the file effects read their files from Documents/Vitrine/Audio effects
@@ -352,7 +353,7 @@ Redesigned:
                   dismisses it. Checked in the simulator against harness/system-menu/
     Player/       the redesigned full screen player (Player.h lists its files); its more button opens the system
                   menu (ContextMenu/), Spotify's rows and then Playback Speed, Pitch (with Pitch follows speed),
-                  Reverb and Animated artwork (PlayerMenu.m), and a hold on either side of the
+                  Reverb and the backgrounds it can switch to (PlayerMenu.m), and a hold on either side of the
                   cover plays at 2x until the finger lifts (PlayerArtwork.x), an octave higher while Pitch follows
                   speed is on. A Free account gets it too: Spotify's Reinvented Free player mode, whose units none of
                   the hooks reach, declines while the redesign runs, so the track falls to Spotify's other Free mode,
@@ -362,11 +363,20 @@ Redesigned:
                   from the seam under the controls and over the whole clip behind the lyrics. The clip and the cover
                   cross over as one comes and the other goes, the clip from its poster frame before the video has
                   decoded one, and the Fluid field under a clip holds still and, once the clip has faded in, is hidden
-                  (SGRArtworkField's covered); the menu switches it between Animated
-                  and Fluid without a restart. The clip holds its frame while the song is paused, goes while
+                  (SGRArtworkField's covered); the menu switches between Animated, Fluid and the Visualiser without
+                  a restart. The clip holds its frame while the song is paused, goes while
                   Spotify's music video shows, is given up when it has drawn nothing in 5 s on screen, and on a skip
                   stays a moment for the next track's to cross over it. Checked in the simulator against
-                  harness/player/ (`motion`)
+                  harness/player/ (`motion`). The Visualiser
+                  (PlayerVisualiser.m) draws two soft hills of the song's spectrum across the foot of the player in the
+                  cover's flow colours, over the Fluid field held still, blurred behind the lyrics: the audio effects'
+                  render notify on the music's output hands what it plays, mixed to mono, to one reader (SGAudioSetOutputReader), and
+                  SGRSpectrum.m cuts it into 24 bands with Accelerate's FFT on the render thread, without allocating or
+                  locking, and publishes them atomically; a display link of at most 60 Hz (30 behind the lyrics, 15
+                  with Reduce Motion, where the bands ease over seconds) draws them while the player is on screen,
+                  Spotify is in front, the player is not opening or closing and Low Power Mode is off, and stops once
+                  a paused song's hills have settled. The spectrum is checked on the Mac against harness/visualiser/,
+                  the view in the simulator against harness/player/ (`visualiser`)
     Lyrics/       the full screen lyrics page on glass with Apple Music style lyrics over it, always on (SGRKaraokeView,
                   which the player shows in itself too, Player/PlayerLyrics.x): lines sung over each other lit together,
                   the stack moving on once the first is sung out; an instrumental break of 7 s or more held by three dots
@@ -505,7 +515,7 @@ Spotify's own player screen (artwork background, glass header buttons, Disable C
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
 buttons to hide); in the redesign the page instead leads with a card of the player (Redesigned/Player/
 PlayerSettings.m): the background chosen edge to edge, and over its foot the cover, title, artist and progress;
-under it a segmented control of the four backgrounds (Still, Colours, Fluid, Animated, changing the card at once)
+under it a segmented control of the five backgrounds (Still, Colours, Fluid, Animated, Visualiser, changing the card at once)
 with a note on what the one picked does, Artwork sources and Download in Low Data Mode while Animated is chosen,
 and Mini player: Apple Music style (the tab bar's minimize on scroll), Device button (the now playing bar keeps
 Spotify's device button in that minimized row, off by default) and the device button hidden on the full bar,

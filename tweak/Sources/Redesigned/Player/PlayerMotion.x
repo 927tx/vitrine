@@ -274,7 +274,7 @@ static void cover(BOOL covering) {
 
 // The Fluid field under a clip holds still, as it does for a paused song (PlayerField.x): the clip covers it.
 static void holdField(void) {
-    SGRPlayerField().motionHeld = SGPlayerState().isPaused || sg_motion != nil;
+    SGRPlayerHoldField();
 }
 
 // The mask's opacity to `opacity`, from where it is drawn now, over the clip's own fade. The frame reaches a
@@ -441,12 +441,10 @@ static BOOL beginTrack(NSString *track) {
 
 #pragma mark - the ⋯ menu's switch (Shared/Player/SpeedPitch.h)
 
-// Fluid and Animated share the field, so the menu moves between the two without a restart. The other
-// backgrounds are a field of another kind, chosen on the Player page (PlayerSettings.m).
+// Fluid, Animated and the Visualiser share the field, so the menu moves between them without a restart. The
+// other backgrounds are a field of another kind, chosen on the Player page (PlayerSettings.m).
 BOOL SGPlayerMenuOffersAnimatedArtwork(void) {
-    if (!sg_follower) return NO;
-    SGRPlayerBackgroundKind background = SGRPlayerBackground();
-    return background == SGRPlayerBackgroundFluid || background == SGRPlayerBackgroundAnimated;
+    return sg_follower && SGRPlayerBackground() >= SGRPlayerBackgroundFluid;
 }
 
 BOOL SGPlayerMenuAnimatedArtwork(void) {
@@ -460,6 +458,8 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
     // The playing track is let go, and looked up again when switched on.
     clear(YES);
     [sg_follower restart];
+    // From the Visualiser, whose hills go.
+    SGRPlayerVisualiserUpdate();
 }
 
 %group SGRVideoSurfaces
@@ -500,7 +500,7 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
 %ctor {
     if (!SGRedesignedUI()) return;
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
-    if (background != SGRPlayerBackgroundFluid && background != SGRPlayerBackgroundAnimated) return;
+    if (background < SGRPlayerBackgroundFluid) return;
     sg_videos = [NSHashTable weakObjectsHashTable];
     sg_follower = [[SGMotionFollower alloc] initWithBegin:^BOOL(NSString *uri, SPTPlayerState *state) {
         return beginTrack(uri);
