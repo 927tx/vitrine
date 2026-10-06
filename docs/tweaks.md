@@ -135,6 +135,11 @@ Shared:
                   [ti:] and [ar:], or a name of "Artist - Title", folded; an import or a delete has the engine forget
                   what it kept for local files and ask again. SGImportedLRCAsk is the same as a source for the
                   order, which moves it on top at the first import and at every link once LyricsSources lists it.
+                  Where Spotify's player shows its placeholder for a local file, the file's own cover is found
+                  (LocalCover.m) in the image fields of its metadata or, while the titles and artists agree, in the
+                  system's now playing artwork, which the lock screen shows; the native look puts it into the front
+                  cover's empty image view (Native/LocalFiles/LocalCover.x), the redesign's artwork bridge takes it
+                  as the picture of a local file whose metadata names none. A cover picked in Edit info wins.
                   The model and the LRC reading are checked on the Mac against harness/local-files/, the row and
                   the editor in the simulator against its sim/
     Navigation/   the page transition fix (PageTransition.x) and opening a spotify: link (Links.x)
@@ -251,7 +256,8 @@ Native:
     LocalFiles/   a lyrics button on the player's footer for a local file with an LRC file linked to it, a fifth of the
                   way in from the leading edge, which opens a page of the lines on black that follows the song
                   (LocalLyrics.h lists its files); the file's metadata says has_lyrics. Checked in the simulator
-                  against harness/local-files/lyrics/
+                  against harness/local-files/lyrics/. And the file's own cover where the player shows
+                  Spotify's placeholder (LocalCover.x)
     Home/         the Home gradient, Home's sections and pills hidden (HomeDeclutter.x), the Home & Library page
     Playlist/     the playlist header and pills, hidden one switch each
     Album/, Artist/ their pages' parts hidden, and the cover or photo behind their headers

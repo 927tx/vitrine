@@ -7,6 +7,7 @@
 //                        the system's now playing artwork
 //     EditInfoMenu.x     Edit info in the player's ⋯ menu while a local file plays, and its editor
 //     LocalLyrics.h      the user's own .lrc files, linked to a local file or matched by its names
+//     LocalCover.m       the file's own cover, found where Spotify's player shows a placeholder
 //
 // The file itself is never written: Spotify read its tags when it scanned it, and writing them back
 // would take a tag writer per format. So an edit is stored by URI and laid over what Spotify read.
@@ -51,3 +52,9 @@ extern NSNotificationName const SGLocalFileEditsDidChangeNotification;
 
 // EditInfoMenu.x: the editor for a local file, presented over `presenter`.
 void SGLocalFilePresentEditor(UIViewController *presenter, NSString *uri);
+
+// LocalCover.m: the file's own cover for a local track whose player shows Spotify's placeholder, from the
+// image fields of its metadata or the system's now playing artwork; nil for any other track, for one with a
+// cover picked in Edit info, and until one is found. Main thread.
+@class SPTPlayerTrack;
+UIImage *SGLocalFileFallbackCover(SPTPlayerTrack *track);

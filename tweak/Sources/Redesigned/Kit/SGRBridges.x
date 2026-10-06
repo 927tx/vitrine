@@ -146,6 +146,18 @@ static void fetchPicture(NSString *key, NSURL *url, NSUInteger attempt) {
     [sg_fetch resume];
 }
 
+// A local file whose metadata names no picture: its own cover, found where Spotify shows it elsewhere
+// (Shared/LocalFiles/LocalCover.m), as the picture the track names, so a screen's placeholder never
+// replaces it. A cover picked in Edit info is named by the metadata and never gets here. NO when there
+// is none to publish.
+static BOOL publishLocalCover(void) {
+    if (![sg_wantedKey hasPrefix:@"track:"]) return NO;
+    UIImage *cover = SGLocalFileFallbackCover(SGPlayerState().track);
+    if (!cover) return NO;
+    if (cover != sg_artwork) publish(cover, sg_wantedKey, SGRArtworkQualityExact);
+    return YES;
+}
+
 // Brings the playing track's picture up to date with the player's state, and fetches a picture newly
 // wanted. Called on every state report and before any view read is believed, whichever comes first.
 static void followPlayer(void) {
@@ -164,6 +176,7 @@ static void followPlayer(void) {
     sg_fetch = nil;
     if ([key isEqualToString:sg_artworkKey] && sg_artworkQuality == SGRArtworkQualityExact) return;
     if (url) fetchPicture(key, url, 0);
+    else publishLocalCover();
 }
 
 void SGRSetNowPlayingArtwork(UIImage *image, NSString *trackURI, SGRArtworkQuality quality) {
@@ -210,6 +223,8 @@ static char kBarCardKey, kBarImageKey;
 static __weak UIView *sg_barView;
 
 static void publishBarArtwork(void) {
+    followPlayer();
+    if (publishLocalCover()) return;
     UIView *card = SGRFindByIdentifier(sg_barView, @"SPTNowPlayingBar", &kBarCardKey);
     UIView *holder = SGRFindByIdentifier(card, @"Encore.ImageView", &kBarImageKey);
     UIImageView *cover = nil;

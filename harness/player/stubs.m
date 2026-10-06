@@ -142,6 +142,7 @@ UIViewController *SGTopController(void) { return UIApplication.sharedApplication
 #import "Shared/LocalFiles/LocalFiles.h"
 NSNotificationName const SGLocalFileEditsDidChangeNotification = @"harness.localFileEditsDidChange";
 NSString *SGLocalFileCoverInURL(NSString *url) { return nil; }
+UIImage *SGLocalFileFallbackCover(SPTPlayerTrack *track) { return nil; }
 
 // Speed and pitch: a number the harness keeps, with no audio behind it.
 static double sg_speed = 1;
