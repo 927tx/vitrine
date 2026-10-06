@@ -198,16 +198,33 @@ UIViewController *SGDSPPresetsPage(void) {
 
 // AutoEq's headphones under a search field, the one in use ticked, with None above them. A tap downloads its
 // GraphicEQ and turns the Graphic EQ on with it; None turns it off again. Pulling down fetches the list again.
+// Above the field, Use for <the output playing now> remembers the pick for that output (AutoEq.m), and the
+// outputs remembered so far are listed with their corrections, a swipe removing one. The field sits right over
+// the list it searches, and while it is in use only the list stays under it, the way Settings' search does.
 @interface SGDSPHeadphoneList : SGPage <UISearchBarDelegate>
 @end
+
+static const CGFloat kSearchTop = 8;   // the field's gap from the card over it
+
+typedef NS_ENUM(NSInteger, SGDSPHeadphoneSection) {
+    SGDSPHeadphoneOutput,       // Use for <output>, while an output is known and no search is on
+    SGDSPHeadphoneRemembered,   // the remembered outputs, while there are any and no search is on
+    SGDSPHeadphoneSearch,       // no rows: the search field is its header
+    SGDSPHeadphoneNone,         // while no search is on
+    SGDSPHeadphoneMessage,      // loading, or why the list did not come
+    SGDSPHeadphoneAll,
+    SGDSPHeadphoneSections,
+};
 
 @implementation SGDSPHeadphoneList {
     NSArray<SGAutoEqHeadphone *> *_all, *_shown;
     NSString *_message;          // loading, or why the list did not come
     BOOL _failed;
     NSString *_applying;         // the path being downloaded
+    NSArray<NSDictionary<NSString *, NSString *> *> *_remembered;
     UISearchBar *_search;
-    UIView *_header, *_footer;
+    UIView *_searchHeader, *_header, *_footer;
+    BOOL _searching;             // the field in use, so only the list shows under it
 }
 
 - (instancetype)init {
@@ -226,20 +243,44 @@ UIViewController *SGDSPPresetsPage(void) {
     _search.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     _search.keyboardAppearance = UIKeyboardAppearanceDark;
     _search.delegate = self;
+    // The table insets the header to the cards' width; the bar reaches past them by the room it keeps
+    // around its field, so the field lines up with the cards.
+    _searchHeader = [UIView new];
+    _search.translatesAutoresizingMaskIntoConstraints = NO;
+    [_searchHeader addSubview:_search];
+    [NSLayoutConstraint activateConstraints:@[
+        [_search.leadingAnchor constraintEqualToAnchor:_searchHeader.leadingAnchor constant:-8],
+        [_search.trailingAnchor constraintEqualToAnchor:_searchHeader.trailingAnchor constant:8],
+        [_search.topAnchor constraintEqualToAnchor:_searchHeader.topAnchor constant:kSearchTop],
+        [_search.heightAnchor constraintEqualToConstant:44],
+    ]];
     _header = SGNote(@"Corrections that make your headphones sound neutral, measured by AutoEq. Picking one turns Audio effects and the Graphic EQ on with it.");
-    [_header addSubview:_search];
     table.tableHeaderView = _header;
     _footer = SGNote(@"From AutoEq by Jaakko Pasanen, MIT License. Pull down to fetch the list again.");
     table.tableFooterView = _footer;
     self.refreshControl = [UIRefreshControl new];
     [self.refreshControl addTarget:self action:@selector(refresh) forControlEvents:UIControlEventValueChanged];
+    _remembered = SGAutoEqRememberedOutputs();
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(outputsChanged) name:SGAutoEqOutputsChangedNotification object:nil];
     [self load:NO];
+}
+
+// Another output connected, or a pick changed what one remembers.
+- (void)outputsChanged {
+    _remembered = SGAutoEqRememberedOutputs();
+    [self reload:UITableViewRowAnimationNone];
+}
+
+// Every section but the field's: reloading the header the field is in would take the keyboard away mid-word.
+- (void)reload:(UITableViewRowAnimation)animation {
+    NSMutableIndexSet *sections = [NSMutableIndexSet indexSetWithIndexesInRange:NSMakeRange(0, SGDSPHeadphoneSections)];
+    [sections removeIndex:SGDSPHeadphoneSearch];
+    [self.tableView reloadSections:sections withRowAnimation:animation];
 }
 
 - (void)viewWillLayoutSubviews {
     [super viewWillLayoutSubviews];
-    _search.frame = CGRectMake(8, 4, self.tableView.bounds.size.width - 16, 44);
-    SGFitNote(self.tableView, _header, 52, 8);
+    SGFitNote(self.tableView, _header, 4, 8);
     SGFitNote(self.tableView, _footer, 16, 24);
 }
 
@@ -255,7 +296,8 @@ UIViewController *SGDSPPresetsPage(void) {
 - (void)load:(BOOL)refresh {
     if (!_all) _message = @"Loading AutoEq's list…";
     _failed = NO;
-    [self.tableView reloadData];
+    // From viewDidLoad the table has not asked for its rows yet, and will.
+    if (self.tableView.window) [self reload:UITableViewRowAnimationNone];
     SGAutoEqLoadIndex(refresh, ^(NSArray<SGAutoEqHeadphone *> *headphones, NSString *error) {
         [self.refreshControl endRefreshing];
         if (headphones) self->_all = headphones;
@@ -267,10 +309,26 @@ UIViewController *SGDSPPresetsPage(void) {
 
 - (void)filter {
     _shown = SGAutoEqSearch(_all ?: @[], _search.text);
-    [self.tableView reloadData];
+    BOOL searching = _search.isFirstResponder || _search.text.length > 0;
+    BOOL changed = searching != _searching;
+    _searching = searching;
+    // No fade: one over thousands of rows leaves the cards half drawn while the field moves up.
+    [self reload:UITableViewRowAnimationNone];
+    // What went from over the field could have taken it off the screen.
+    if (changed && searching) {
+        [self.tableView scrollRectToVisible:[self.tableView rectForHeaderInSection:SGDSPHeadphoneSearch] animated:YES];
+    }
 }
 
 - (void)searchBar:(UISearchBar *)bar textDidChange:(NSString *)text {
+    [self filter];
+}
+
+- (void)searchBarTextDidBeginEditing:(UISearchBar *)bar {
+    [self filter];
+}
+
+- (void)searchBarTextDidEndEditing:(UISearchBar *)bar {
     [self filter];
 }
 
@@ -283,42 +341,86 @@ static BOOL headphoneInUse(void) {
     return SGDSPSwitch(SGKeyDSPGraphicEq) && SGDSPString(SGKeyDSPGraphicEqHeadphone).length;
 }
 
-// Sections: the loading or error message, None, the headphones.
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table {
-    return 3;
+    return SGDSPHeadphoneSections;
 }
 
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return _message ? 1 : 0;
-    if (section == 1) return 1;
-    return _all && !_shown.count && _search.text.length ? 1 : (NSInteger)_shown.count;
+    switch (section) {
+        case SGDSPHeadphoneMessage: return _message ? 1 : 0;
+        case SGDSPHeadphoneOutput: return SGAutoEqOutputUID() && !_searching ? 1 : 0;
+        case SGDSPHeadphoneRemembered: return _searching ? 0 : (NSInteger)_remembered.count;
+        case SGDSPHeadphoneSearch: return 0;
+        case SGDSPHeadphoneNone: return _searching ? 0 : 1;
+        default: return _all && !_shown.count && _search.text.length ? 1 : (NSInteger)_shown.count;
+    }
 }
 
 - (UIView *)tableView:(UITableView *)table viewForHeaderInSection:(NSInteger)section {
-    return nil;
+    if (section == SGDSPHeadphoneSearch) return _searchHeader;
+    return section == SGDSPHeadphoneRemembered && [self tableView:table numberOfRowsInSection:section] ? SGSectionHeader(table, @"Remembered outputs") : nil;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return section == 0 && !_message ? CGFLOAT_MIN : SGSectionGap;
+    if (section == SGDSPHeadphoneSearch) return kSearchTop + 44 + 4;
+    if ([self tableView:table numberOfRowsInSection:section] == 0) return CGFLOAT_MIN;
+    return section == SGDSPHeadphoneRemembered ? SGSectionHeaderHeight : SGSectionGap;
+}
+
+- (NSString *)outputFooter {
+    NSString *name = SGAutoEqOutputName();
+    return [NSString stringWithFormat:@"With this on, the correction you pick is kept for %@. It comes back each time audio plays through "
+            "%@, and goes off on outputs with none remembered.", name, name];
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {
-    return nil;
+    return section == SGDSPHeadphoneOutput && [self tableView:table numberOfRowsInSection:section] ? SGSectionFooter(table, [self outputFooter]) : nil;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {
-    return CGFLOAT_MIN;
+    return section == SGDSPHeadphoneOutput && [self tableView:table numberOfRowsInSection:section] ? SGSectionFooterHeight(table, [self outputFooter]) : CGFLOAT_MIN;
+}
+
+// A remembered output's correction, by name.
+static NSString *correctionName(NSString *path) {
+    return path.length ? SGAutoEqNameOf(path) : @"None";
 }
 
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
     UITableViewCell *cell = SGDequeueCell(table, @"headphone");
-    if (path.section == 0) {
+    cell.accessoryView = nil;
+    if (path.section == SGDSPHeadphoneOutput) {
+        NSString *uid = SGAutoEqOutputUID();
+        BOOL remembered = SGAutoEqOutputRemembered(uid);
+        NSString *current = correctionName(headphoneInUse() ? SGDSPString(SGKeyDSPGraphicEqHeadphone) : nil);
+        SGFillCell(cell, [NSString stringWithFormat:@"Use for %@", SGAutoEqOutputName()],
+                   remembered ? [NSString stringWithFormat:@"%@ while it plays", current] : [NSString stringWithFormat:@"Remember %@ for this output", current], nil, nil);
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        UISwitch *toggle = [UISwitch new];
+        toggle.onTintColor = SGGreen();
+        toggle.on = remembered;
+        [toggle addTarget:self action:@selector(useToggled:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = toggle;
+        cell.accessibilityTraits = UIAccessibilityTraitNone;
+        return cell;
+    }
+    if (path.section == SGDSPHeadphoneRemembered) {
+        NSDictionary<NSString *, NSString *> *output = _remembered[(NSUInteger)path.row];
+        BOOL now = [output[@"uid"] isEqualToString:SGAutoEqOutputUID()];
+        SGFillCell(cell, output[@"name"], now ? [NSString stringWithFormat:@"%@ · playing now", correctionName(output[@"path"])] : correctionName(output[@"path"]), nil, nil);
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        cell.accessibilityTraits = UIAccessibilityTraitNone;
+        cell.accessibilityHint = @"Swipe left to remove";
+        return cell;
+    }
+    cell.accessibilityHint = nil;
+    if (path.section == SGDSPHeadphoneMessage) {
         SGFillCell(cell, _message, nil, _failed ? SGRed() : SGGrey(), _failed ? @"exclamationmark.triangle.fill" : nil);
         cell.selectionStyle = _failed ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
         return cell;
     }
     cell.accessibilityValue = nil;
-    if (path.section == 1) {
+    if (path.section == SGDSPHeadphoneNone) {
         SGFillCell(cell, @"None", nil, nil, nil);
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
         tick(cell, !headphoneInUse());
@@ -347,32 +449,47 @@ static BOOL headphoneInUse(void) {
 }
 
 - (BOOL)tableView:(UITableView *)table shouldHighlightRowAtIndexPath:(NSIndexPath *)path {
-    if (path.section == 0) return _failed;
-    return (path.section == 1 || _shown.count > 0) && !_applying;
+    if (path.section == SGDSPHeadphoneMessage) return _failed;
+    if (path.section == SGDSPHeadphoneOutput || path.section == SGDSPHeadphoneRemembered) return NO;
+    return (path.section == SGDSPHeadphoneNone || _shown.count > 0) && !_applying;
+}
+
+- (void)useToggled:(UISwitch *)toggle {
+    SGAutoEqRememberOutput(toggle.on);
+}
+
+- (UISwipeActionsConfiguration *)tableView:(UITableView *)table trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)path {
+    if (path.section != SGDSPHeadphoneRemembered) return nil;
+    NSString *uid = _remembered[(NSUInteger)path.row][@"uid"];
+    UIContextualAction *remove = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive title:@"Remove"
+        handler:^(UIContextualAction *action, UIView *view, void (^done)(BOOL)) {
+            SGAutoEqForgetOutput(uid);
+            done(YES);
+        }];
+    remove.image = [UIImage systemImageNamed:@"trash"];
+    return [UISwipeActionsConfiguration configurationWithActions:@[remove]];
 }
 
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path {
     [table deselectRowAtIndexPath:path animated:YES];
-    if (path.section == 0) {
+    if (path.section == SGDSPHeadphoneMessage) {
         if (_failed) [self load:YES];
         return;
     }
-    if (_applying) return;
-    if (path.section == 1) {
+    if (_applying || path.section == SGDSPHeadphoneOutput || path.section == SGDSPHeadphoneRemembered) return;
+    if (path.section == SGDSPHeadphoneNone) {
         // Only a headphone's correction is taken off: a curve of the user's own, with no headphone, stays.
-        if (!headphoneInUse()) return;
-        SGDSPSetString(SGKeyDSPGraphicEqHeadphone, @"");
-        SGDSPSetSwitch(SGKeyDSPGraphicEq, NO);
-        [table reloadData];
+        SGAutoEqTakeOff();
+        [self reload:UITableViewRowAnimationNone];
         return;
     }
     if (!_shown.count) return;
     SGAutoEqHeadphone *headphone = _shown[(NSUInteger)path.row];
     _applying = headphone.path;
-    [table reloadData];
+    [self reload:UITableViewRowAnimationNone];
     SGAutoEqApply(headphone, ^(NSString *error) {
         self->_applying = nil;
-        [self.tableView reloadData];
+        [self reload:UITableViewRowAnimationNone];
         if (error) showAlert(self, [NSString stringWithFormat:@"Could not apply %@", headphone.name], error);
     });
 }

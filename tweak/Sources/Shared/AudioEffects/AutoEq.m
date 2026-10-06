@@ -113,6 +113,54 @@ void SGAutoEqLoadIndex(BOOL refresh, void (^done)(NSArray<SGAutoEqHeadphone *> *
     });
 }
 
+#pragma mark - a correction per output
+
+static NSString *sg_outputUID, *sg_outputName;
+
+static NSDictionary<NSString *, NSDictionary *> *outputs(void) {
+    id value = [NSUserDefaults.standardUserDefaults objectForKey:SGKeyDSPOutputs];
+    return [value isKindOfClass:NSDictionary.class] ? value : @{};
+}
+
+static void setOutput(NSString *uid, NSDictionary *entry) {
+    NSMutableDictionary *all = [outputs() mutableCopy];
+    all[uid] = entry;
+    [NSUserDefaults.standardUserDefaults setObject:all forKey:SGKeyDSPOutputs];
+}
+
+static NSString *followed(void) {
+    return [NSUserDefaults.standardUserDefaults stringForKey:SGKeyDSPOutputFollowed] ?: @"";
+}
+
+static void setFollowed(NSString *uid) {
+    [NSUserDefaults.standardUserDefaults setObject:uid ?: @"" forKey:SGKeyDSPOutputFollowed];
+}
+
+static void changed(void) {
+    [NSNotificationCenter.defaultCenter postNotificationName:SGAutoEqOutputsChangedNotification object:nil];
+}
+
+// A headphone's correction is what the Graphic EQ plays, rather than nothing or the user's own curve.
+static BOOL correctionInUse(void) {
+    return SGDSPSwitch(SGKeyDSPGraphicEq) && SGDSPString(SGKeyDSPGraphicEqHeadphone).length;
+}
+
+static void takeOff(void) {
+    if (!correctionInUse()) return;
+    SGDSPSetString(SGKeyDSPGraphicEqHeadphone, @"");
+    SGDSPSetSwitch(SGKeyDSPGraphicEq, NO);
+}
+
+// The output playing now remembers what the Graphic EQ plays, when it is remembered.
+static void rememberPick(void) {
+    if (!sg_outputUID.length || !outputs()[sg_outputUID]) return;
+    BOOL on = correctionInUse();
+    setOutput(sg_outputUID, @{@"name": sg_outputName ?: sg_outputUID, @"path": on ? SGDSPString(SGKeyDSPGraphicEqHeadphone) : @"",
+                              @"nodes": on ? SGDSPString(SGKeyDSPGraphicEqNodes) : @""});
+    setFollowed(sg_outputUID);
+    changed();
+}
+
 BOOL SGAutoEqApplyText(NSString *path, NSString *text) {
     NSString *line = SGDSPGraphicEqLine(text);
     if (!line || !path.length) return NO;
@@ -121,7 +169,86 @@ BOOL SGAutoEqApplyText(NSString *path, NSString *text) {
     SGDSPSetSwitch(SGKeyDSPGraphicEq, YES);
     // The correction is meant to be heard: the master switch, off until asked for, comes on with it.
     if (!SGDSPSwitch(SGKeyDSP)) SGDSPSetSwitch(SGKeyDSP, YES);
+    rememberPick();
     return YES;
+}
+
+void SGAutoEqTakeOff(void) {
+    takeOff();
+    rememberPick();
+}
+
+void SGAutoEqOutputChanged(NSString *uid, NSString *name) {
+    if (!uid.length || [uid isEqualToString:sg_outputUID]) return;
+    sg_outputUID = [uid copy];
+    sg_outputName = name.length ? [name copy] : sg_outputUID;
+    NSDictionary *entry = outputs()[uid];
+    if (entry) {
+        if (![entry[@"name"] isEqual:sg_outputName]) {
+            NSMutableDictionary *renamed = [entry mutableCopy];
+            renamed[@"name"] = sg_outputName;
+            setOutput(uid, renamed);
+        }
+        NSString *path = entry[@"path"], *nodes = entry[@"nodes"];
+        if (path.length && nodes.length) {
+            SGDSPSetString(SGKeyDSPGraphicEqNodes, nodes);
+            SGDSPSetString(SGKeyDSPGraphicEqHeadphone, path);
+            SGDSPSetSwitch(SGKeyDSPGraphicEq, YES);
+            SGLog(@"autoeq: %@ connected, its correction %@ on%@", sg_outputName, SGAutoEqNameOf(path), SGDSPSwitch(SGKeyDSP) ? @"" : @" (Audio effects are off)");
+        } else {
+            takeOff();
+            SGLog(@"autoeq: %@ connected, None remembered for it", sg_outputName);
+        }
+        setFollowed(uid);
+    } else if (followed().length) {
+        // The correction came on for another output; this one has none.
+        if (correctionInUse()) SGLog(@"autoeq: %@ connected, with no correction remembered: %@ off", sg_outputName, SGAutoEqNameOf(SGDSPString(SGKeyDSPGraphicEqHeadphone)));
+        takeOff();
+        setFollowed(@"");
+    }
+    changed();
+}
+
+NSString *SGAutoEqOutputUID(void) {
+    return sg_outputUID;
+}
+
+NSString *SGAutoEqOutputName(void) {
+    return sg_outputName;
+}
+
+void SGAutoEqRememberOutput(BOOL remember) {
+    if (!sg_outputUID.length) return;
+    if (!remember) {
+        SGAutoEqForgetOutput(sg_outputUID);
+        return;
+    }
+    setOutput(sg_outputUID, @{@"name": sg_outputName, @"path": @"", @"nodes": @""});
+    rememberPick();
+}
+
+BOOL SGAutoEqOutputRemembered(NSString *uid) {
+    return uid.length && outputs()[uid] != nil;
+}
+
+// What plays stays: forgetting an output does not take its correction off now.
+void SGAutoEqForgetOutput(NSString *uid) {
+    if (!uid.length) return;
+    NSMutableDictionary *all = [outputs() mutableCopy];
+    [all removeObjectForKey:uid];
+    [NSUserDefaults.standardUserDefaults setObject:all forKey:SGKeyDSPOutputs];
+    if ([followed() isEqualToString:uid]) setFollowed(@"");
+    changed();
+}
+
+NSArray<NSDictionary<NSString *, NSString *> *> *SGAutoEqRememberedOutputs(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    [outputs() enumerateKeysAndObjectsUsingBlock:^(NSString *uid, NSDictionary *entry, BOOL *stop) {
+        if (![entry isKindOfClass:NSDictionary.class]) return;
+        [list addObject:@{@"uid": uid, @"name": entry[@"name"] ?: uid, @"path": entry[@"path"] ?: @""}];
+    }];
+    [list sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES selector:@selector(localizedCaseInsensitiveCompare:)]]];
+    return list;
 }
 
 void SGAutoEqApply(SGAutoEqHeadphone *headphone, void (^done)(NSString *)) {

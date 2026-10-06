@@ -11,14 +11,16 @@
 // Actions: scroll=<y>, section=<n> (that card at the top), toggle=<n> (flips card n's switch the way a tap
 // does), drag=<band>:<gain> (the equalizer's band mid-drag, the bubble up), release (lets it go),
 // preset=<i>, reset=eq, select=<section>.<row> (a tap on a row of the page on top), push=convolver|ddc|
-// liveprog|geq, import=<name> (a file of that name picked in the document picker), paste=<text> (the
+// liveprog|geq|headphones, output=<uid>:<name> (audio going to that output, as a route change hands it over),
+// import=<name> (a file of that name picked in the document picker), paste=<text> (the
 // GraphicEQ editor's Paste with that on the clipboard), slide=<section>.<row>:<value> (a slider dragged
 // there), swipe=<section>.<row>:<n> and band=<band>:<n> (VoiceOver's swipe on a slider or an equalizer band,
 // n times), string=<key after spotifyglass.dsp.>:<text> (stored behind the page's back, as the engine's
 // errors turn up), pop, delete=<row> (the library's swipe to delete on that file), hit (which band a finger
 // takes around each handle, to the log), confirm (the alert's destructive button), dump (the stored dsp keys and the first sections' frames to the log),
 // save=<name> (the settings saved as a preset of the user's, behind the page's back), rows (each visible row's
-// title, whether it is ticked and what VoiceOver reads as its value, to the log).
+// title, whether it is ticked and what VoiceOver reads as its value, to the log), remember (Headphones' Use for
+// <output> switched on), search=<text> (the search field on the page typed into; * only taps it; empty puts the keyboard away).
 // Without keep, the user's presets are cleared too.
 #import <UIKit/UIKit.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -161,8 +163,31 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
     } else if ([verb isEqualToString:@"push"]) {
         NSDictionary<NSString *, NSNumber *> *kinds = @{@"convolver": @(SGDSPFileImpulseResponse), @"ddc": @(SGDSPFileDDC), @"liveprog": @(SGDSPFileLiveprog)};
         UIViewController *page = kinds[value] ? SGDSPLibraryPage(kinds[value].integerValue)
-                               : [value isEqualToString:@"reference"] ? [self referencePage] : SGDSPGraphicEqPage();
+                               : [value isEqualToString:@"reference"] ? [self referencePage]
+                               : [value isEqualToString:@"headphones"] ? SGDSPHeadphonesPage() : SGDSPGraphicEqPage();
         [self.nav pushViewController:page animated:NO];
+    } else if ([verb isEqualToString:@"output"]) {
+        // output=<uid>:<name>, audio going to that output the way AudioEffects.x hands a route change over.
+        NSRange colon = [value rangeOfString:@":"];
+        SGAutoEqOutputChanged([value substringToIndex:colon.location], [value substringFromIndex:NSMaxRange(colon)]);
+    } else if ([verb isEqualToString:@"remember"]) {
+        // remember: Headphones' Use for <output> switched on for the output playing now.
+        SGAutoEqRememberOutput(YES);
+    } else if ([verb isEqualToString:@"search"]) {
+        // search=<text>: the page's search field tapped and that typed into it (empty: the keyboard put away).
+        NSMutableArray<UISearchBar *> *bars = [NSMutableArray array];
+        findViews(table, UISearchBar.class, bars);
+        UISearchBar *bar = bars.firstObject;
+        if ([value isEqualToString:@"*"]) {
+            [bar becomeFirstResponder];
+        } else if (value.length) {
+            [bar becomeFirstResponder];
+            bar.text = value;
+            [bar.delegate searchBar:bar textDidChange:value];
+        } else {
+            [bar resignFirstResponder];
+        }
+        NSLog(@"[harness] search field holds \"%@\", %@", bar.text, bar.isFirstResponder ? @"keyboard up" : @"keyboard down");
     } else if ([verb isEqualToString:@"import"]) {
         NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:value];
         [@"imported" writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];

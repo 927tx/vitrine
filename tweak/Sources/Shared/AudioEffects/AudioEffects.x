@@ -23,12 +23,14 @@
 // engine's render side. Spotify starts its output on a thread of its own. The effects are set on the queue;
 // SGDSPApply and the curves are main thread; SGDSPStatus and SGDSPError any thread.
 #import <AudioToolbox/AudioToolbox.h>
+#import <AVFoundation/AVFoundation.h>
 #import <os/lock.h>
 #import <stdatomic.h>
 #import "Core/SGCore.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "AudioEffects.h"
 #import "AudioEffectsApply.h"
+#import "AudioEffectsPresets.h"
 #import "SGDSPEngine.h"
 
 // A burst of changes to a setting is gathered this long before it applies.
@@ -566,7 +568,20 @@ void SGDSPCompanderResponse(NSArray<NSNumber *> *gains, NSInteger count, double 
     SGDSPEngineCompanderCurve(SGDSPCompanderFrequencies, bands, (int)count, frequencies, values);
 }
 
+// The output audio goes to now, for the corrections remembered per output (AutoEq.m).
+static void followRoute(void) {
+    AVAudioSessionPortDescription *port = AVAudioSession.sharedInstance.currentRoute.outputs.firstObject;
+    if (port) SGAutoEqOutputChanged(port.UID, port.portName);
+}
+
 %ctor {
+    [NSNotificationCenter.defaultCenter addObserverForName:AVAudioSessionRouteChangeNotification object:nil queue:NSOperationQueue.mainQueue
+                                                usingBlock:^(NSNotification *note) {
+        followRoute();
+    }];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        followRoute();
+    });
     sg_reachable = SGPlayerWatchMusicOutput(listenTo);
     if (!sg_reachable) {
         SGLog(@"dsp: Spotify's output cannot be reached, the effects cannot reach its sound");

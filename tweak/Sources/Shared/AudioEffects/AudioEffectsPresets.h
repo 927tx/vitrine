@@ -56,5 +56,34 @@ void SGAutoEqLoadIndex(BOOL refresh, void (^done)(NSArray<SGAutoEqHeadphone *> *
 // Downloads the headphone's GraphicEQ and applies it; `done` on the main queue with nil or why not.
 void SGAutoEqApply(SGAutoEqHeadphone *headphone, void (^done)(NSString *error));
 // The second half of that: the file's text into the Graphic EQ, its switch and the master switch on. NO when
-// it is not GraphicEQ.
+// it is not GraphicEQ. When the output playing now is remembered (below), the pick becomes its correction.
 BOOL SGAutoEqApplyText(NSString *path, NSString *text);
+// None: the headphone's correction off (a curve of the user's own, with no headphone, stays), and None
+// remembered for the output playing now when it is remembered.
+void SGAutoEqTakeOff(void);
+
+#pragma mark - a correction per output
+
+// The corrections remembered per output, by the port's UID: {uid: {name, path, nodes}}, `path` and `nodes`
+// empty for None. Outside the dsp. prefix, so presets never hold it. And the UID whose correction the Graphic
+// EQ plays because its output connected, empty when none does.
+#define SGKeyDSPOutputs          @"spotifyglass.audioOutputs"
+#define SGKeyDSPOutputFollowed   @"spotifyglass.audioOutputs.followed"
+// Posted on the main thread when the output or what is remembered changes.
+#define SGAutoEqOutputsChangedNotification @"SGAutoEqOutputsChangedNotification"
+
+// Audio went to another output (AVAudioSession's route, its first output; AudioEffects.x calls this at
+// launch and on every route change). A remembered output gets its correction, or None. Another output takes
+// off a correction that came on for a remembered one; a correction picked with no output remembered, and a
+// curve of the user's own, stay. Nothing happens while the UID stays the same. The master switch is left as
+// it is: a route change never turns the effects on.
+void SGAutoEqOutputChanged(NSString *uid, NSString *name);
+// The output playing now, nil before the first call.
+NSString *SGAutoEqOutputUID(void);
+NSString *SGAutoEqOutputName(void);
+// Remembers the correction in use (or None) for the output playing now, or forgets that output.
+void SGAutoEqRememberOutput(BOOL remember);
+BOOL SGAutoEqOutputRemembered(NSString *uid);
+void SGAutoEqForgetOutput(NSString *uid);
+// The remembered outputs, sorted by name: {uid, name, path}.
+NSArray<NSDictionary<NSString *, NSString *> *> *SGAutoEqRememberedOutputs(void);

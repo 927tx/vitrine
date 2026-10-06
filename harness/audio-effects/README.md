@@ -30,6 +30,10 @@ and 471 in turn, 512, and a mix down to single frames), and each check prints a 
     ./build.sh thread && build/audio-effects-thread <song> <out dir>
     ./build.sh address && build/audio-effects-address <song> <out dir>
 
+`./build.sh route && build/route-check` checks the corrections remembered per output (AutoEq.m) through the real
+settings, a route change being a direct call: the speaker, a pair remembered with a pick, another with None, a pick
+made with nothing remembered, a hand-made curve, the effects left off, forgetting and renaming.
+
 A last word `stress` runs the convolver, the threaded checks, rate changes and Liveprog only.
 
 ## The hook in the simulator (`sim/main.m`)

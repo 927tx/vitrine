@@ -194,7 +194,11 @@ Shared:
                   settings from before the page's first pick saved as one of them, Before presets, and AutoEq's
                   corrections, its INDEX.md fetched from GitHub and cached a month in Caches/Vitrine/AutoEq, a
                   headphone's GraphicEQ file put into the Graphic EQ (AutoEq.m), None taking it off; a pick turns the
-                  master switch on.
+                  master switch on. A pick can be kept per output (spotifyglass.audioOutputs, by the port's UID): on
+                  every AVAudioSessionRouteChangeNotification to another output (AudioEffects.x), a remembered output
+                  gets its correction or None, and any other output takes off a correction that came on for one; a
+                  pick made with nothing remembered and a curve of the user's own stay, and the master switch is
+                  never touched. Checked on the Mac by `harness/audio-effects/build.sh route`.
                   Tested on the Mac against harness/audio-effects/ and harness/autoeq/, the hook in the simulator
                   against its sim/, the page against harness/audio-effects-page/
     Sing/         Sing, a song's vocals turned down while it plays (Sing.h lists its files): the voice model (Mel-Band
@@ -496,7 +500,8 @@ row saying so whose tap opens its ⓘ, all applying straight away. Live Activity
 shows, Lyrics, Queue or Control menu, and for Lyrics its Translations (off until switched on) and Text
 size (Small, Medium or Large), all applying straight away, the row reading out the view or Off. Audio effects, in either look (Shared/AudioEffects/AudioEffectsPage.m):
 the effects' switch with what the engine is doing under it, Presets (built-in ones and your own, saved, loaded
-and deleted there) and Headphones (AutoEq's corrections, searched and applied to the Graphic EQ), either of which
+and deleted there) and Headphones (AutoEq's corrections, searched and applied to the Graphic EQ, with Use for <the
+output playing now> keeping the pick for that output and the remembered outputs listed, a swipe removing one), either of which
 turns the effects on, then a card per effect, each opening out into its sliders, choices, curve or file library
 while its switch is on (Reverb has its Room and its Amount, the amount the player's ⋯ menu also sets), everything
 applying as it changes; the row reads out Off, On or how many effects are on. Home & Library, in the native look only:

@@ -19,7 +19,7 @@ mkdir -p "$OUT/gen" "$OUT/AudioEffectsHarness.app"
 SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
 xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-arc -g -O1 -isysroot "$SDK" -Wno-deprecated-declarations \
     -I"$SRC" -I"$FX" -I"$SRC/Shared/Player" -isystem "$VENDOR/libbs2b" -isystem "$VENDOR/wdl/eel2" \
-    sim/main.m ../scene.m "$OUT/gen/AudioEffects.m" "$OUT/gen/SpeedPitch.m" "$SRC/Shared/Player/SGTimePitch.m" "$FX/AudioEffectsSettings.m" "$FX/AudioEffectsFiles.m" "$FX"/SGDSPEngine.m "$FX"/SGDSPFilters.m \
+    sim/main.m ../scene.m "$OUT/gen/AudioEffects.m" "$OUT/gen/SpeedPitch.m" "$SRC/Shared/Player/SGTimePitch.m" "$FX/AudioEffectsSettings.m" "$FX/AudioEffectsFiles.m" "$FX/AudioEffectsPresets.m" "$FX/AutoEq.m" "$FX"/SGDSPEngine.m "$FX"/SGDSPFilters.m \
     "$FX"/SGDSPConvolver.m "$FX"/SGDSPTone.m "$FX"/SGDSPDynamics.m "$FX"/SGDSPCrossfeed.m "$FX"/SGDSPReverb.m "$FX"/SGDSPLiveprog.m \
     "$SRC/Core/SGRebind.m" "$SRC/Core/SGLog.m" "$SRC/Core/SGPrefs.m" "$SRC/Core/SGUIMode.m" "$SRC/Core/SGFlagForce.m" "$VENDOR/build/sim/libsgaudio.a" \
     -framework UIKit -framework AudioToolbox -framework AVFoundation -framework Accelerate -framework Foundation \

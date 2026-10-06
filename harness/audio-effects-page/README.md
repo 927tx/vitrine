@@ -25,6 +25,13 @@ equalizer's curve the cascade's own response through its handles, the width show
 the stored 60), long choice names moving under the title at 375pt, an error row in the engine's wording, the
 credits under the reset; the values stored under the right keys, snapped to their steps.
 
+`output=<uid>:<name>` hands the page a route change to that output, the way AudioEffects.x does, and
+`push=headphones` opens the Headphones page, with Use for <output> and the remembered outputs over AutoEq's list. `remember`
+switches Use for <output> on, and `search=<text>` types into the page's search field (`search=` puts the keyboard
+away and keeps the text). 2026-10-06, iPhone 17 Pro on iOS 27.0: the field sits right over None and the list, under
+the remembered outputs, and lines up with the cards; typing keeps the keyboard up, leaves only the matches (or No
+headphones match) under the field, and keeps them after the keyboard goes.
+
 `save=<name>` stores a preset of the user's behind the page's back and `rows` logs each visible row with its tick
 and VoiceOver value. 2026-10-05, iPhone 17 Pro on iOS 27.0: the Presets page's first pick saves Before presets at
 the top of Yours and a tap on it puts the settings back; a swipe delete above the ticked preset keeps the tick on
