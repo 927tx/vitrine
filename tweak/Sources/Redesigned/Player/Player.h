@@ -104,8 +104,12 @@ void SGRPlayerMotionFieldLaidOut(void);
 // flown cover fade where they are rather than flying to or from it.
 BOOL SGRPlayerMotionShowing(void);
 // A view of its own playing that clip, drawn as the player draws it (its foot, the blur under the controls),
-// for the Player page's showcase; nil while no clip plays. It plays only in a window, like the player's.
-UIView *SGRPlayerMotionPreview(void);
+// for the Player page's showcase. It plays only in a window, like the player's. While the player has no clip
+// it is the playing track's, which the page looks up itself, by the player's sources and Low Data Mode, into
+// the store the player reads too: nil until it is in, and with `arrived` given the lookup starts, and
+// `arrived` runs once on the main queue when a call would return it (never when nothing is found, or the
+// track changed). Without `arrived` it only answers with a clip already in.
+UIView *SGRPlayerMotionPreview(void (^arrived)(void));
 
 #pragma mark - the Visualiser (PlayerVisualiser.m)
 

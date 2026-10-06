@@ -342,12 +342,61 @@ BOOL SGRPlayerMotionShowing(void) {
     return sg_motion != nil;
 }
 
-UIView *SGRPlayerMotionPreview(void) {
-    if (!sg_motionFile) return nil;
+static UIView *previewOf(NSURL *file, UIImage *poster) {
     SGRPlayerMotionView *preview = [[SGRPlayerMotionView alloc] initWithFrame:CGRectZero];
-    [preview playFile:sg_motionFile poster:sg_motionPoster];
+    [preview playFile:file poster:poster];
     [preview appear:NO then:^{}];
     return preview;
+}
+
+// The playing track's clip the Player page looked up itself while the player had none, and its poster; the
+// file is nil while the walk is out or after it found nothing. The walk is the player's (SGMotionClipFor, at
+// the size SGMotionFollower asks for), so its file lands in the store, where the player's own walk finds it.
+static NSString *sg_previewTrack;
+static NSURL *sg_previewFile;
+static UIImage *sg_previewPoster;
+static void (^sg_previewArrived)(void);
+
+UIView *SGRPlayerMotionPreview(void (^arrived)(void)) {
+    if (sg_motionFile) return previewOf(sg_motionFile, sg_motionPoster);
+    SPTPlayerState *state = SGPlayerState();
+    NSString *track = SGURIString(state.track.URI);
+    if (!track) return nil;
+    BOOL asked = [track isEqualToString:sg_previewTrack];
+    if (asked && sg_previewFile) return previewOf(sg_previewFile, sg_previewPoster);
+    if (!arrived) return nil;
+    // The newest page's to be told; a walk already out for this track is waited on rather than asked again.
+    sg_previewArrived = [arrived copy];
+    if (asked) return nil;
+    sg_previewTrack = track;
+    sg_previewFile = nil;
+    sg_previewPoster = nil;
+    NSDictionary *metadata = [state.track.metadata isKindOfClass:NSDictionary.class] ? state.track.metadata : nil;
+    SGLog(@"redesign player: the Player page looks up the clip of %@", track);
+    SGMotionClipFor(track, SGMotionCanvasIn(metadata), state.track.artistName, metadata[@"album_title"], SGMotionTall, SGMotionPixels(),
+                    ^(NSURL *file, NSString *source) {
+        if (![track isEqualToString:sg_previewTrack]) return;
+        // Nothing found is not kept: the page asks again the next time it shows Animated.
+        if (!file) {
+            sg_previewTrack = nil;
+            sg_previewArrived = nil;
+            return;
+        }
+        SGMotionPoster(file, ^(UIImage *poster) {
+            if (![track isEqualToString:sg_previewTrack]) return;
+            void (^done)(void) = sg_previewArrived;
+            sg_previewArrived = nil;
+            if (!poster || poster.size.width <= 0) {
+                sg_previewTrack = nil;
+                return;
+            }
+            sg_previewFile = file;
+            sg_previewPoster = poster;
+            SGLog(@"redesign player: the Player page's clip from %@, %@", source, file.lastPathComponent);
+            if (done) done();
+        });
+    });
+    return nil;
 }
 
 static SGMotionFollower *sg_follower;

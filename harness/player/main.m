@@ -23,6 +23,10 @@
 //              card over Animated, then Fluid, Colours, Still and Visualiser as the segmented control picks
 //              them, and Animated again, the note under it changing and the rows under the header holding
 //              still; each step checked, the log ends with settings checks n of m right -- PASS or FAIL
+//     preview  the Player page's card picking Animated while the player has no clip (the background Still at
+//              launch): the card looks the track's clip up itself, shows Fluid until it comes in 2 s late, then
+//              the clip; the clip is in the store for the player, and asked for only while the page shows;
+//              the log ends with preview checks n of m right -- PASS or FAIL
 //     visualiser the Visualiser background (PlayerVisualiser.m) fed a song of the harness's own (stubs.m):
 //              the hills moving, blurred behind the lyrics, settling and stopping on a pause, back on play,
 //              and the ⋯ menu's switch to Fluid and back; the log ends with visualiser checks n of m right
@@ -34,6 +38,7 @@
 #import <objc/message.h>
 #import "Shared/Lyrics/Lyrics.h"
 #import "Redesigned/Player/Player.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Redesigned/Kit/SGRBridges.h"
 #import "Redesigned/Kit/SGRField.h"
 #import "Redesigned/Lyrics/MeaningSheet.h"
@@ -61,6 +66,8 @@ static NSString *scenario(void) {
 
 static NSMutableDictionary<NSString *, SGRHarnessPicture *> *sg_pictures;
 static NSUInteger sg_served;
+// How many times the clip itself was served.
+static NSUInteger sg_canvasServed;
 
 static void serve(NSString *imageURI, UIImage *image, NSTimeInterval delay, BOOL fails) {
     if (!sg_pictures) sg_pictures = [NSMutableDictionary dictionary];
@@ -87,10 +94,15 @@ static void serve(NSString *imageURI, UIImage *image, NSTimeInterval delay, BOOL
 }
 
 - (void)startLoading {
-    // The motion scenario's clip, at once.
+    // The motion scenario's clip, at once, or HARNESS_CANVAS_DELAY seconds late.
     if ([self.request.URL.host isEqualToString:@"canvas.harness"]) {
-        const char *file = getenv("HARNESS_CANVAS_FILE");
-        [self answer:file ? [NSData dataWithContentsOfFile:@(file)] : nil];
+        const char *file = getenv("HARNESS_CANVAS_FILE"), *delay = getenv("HARNESS_CANVAS_DELAY");
+        NSData *data = file ? [NSData dataWithContentsOfFile:@(file)] : nil;
+        NSThread *thread = NSThread.currentThread;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((delay ? atof(delay) : 0) * NSEC_PER_SEC)), dispatch_get_global_queue(0, 0), ^{
+            sg_canvasServed++;
+            [self performSelector:@selector(answer:) onThread:thread withObject:data waitUntilDone:NO];
+        });
         return;
     }
     NSString *name = self.request.URL.lastPathComponent;
@@ -566,6 +578,7 @@ static void loadLyrics(void) {
     else if ([scenario() isEqualToString:@"cover"]) [self runCoverChecks];
     else if ([scenario() isEqualToString:@"immersive"]) [self runImmersiveChecks];
     else if ([scenario() isEqualToString:@"settings"]) [self runSettingsChecks];
+    else if ([scenario() isEqualToString:@"preview"]) [self runPreviewChecks];
     else if ([scenario() isEqualToString:@"seek"]) [self runSeekChecks];
     else if ([scenario() isEqualToString:@"visualiser"]) [self runVisualiserChecks];
     // Opened, closed and opened again, so a screenshot can be taken of each state and of the move itself.
@@ -1062,6 +1075,66 @@ static UIView *firstOfClass(UIView *root, NSString *name) {
     });
 }
 
+// The Player page opened with the player showing no clip, Animated picked on it: the card looks the clip up.
+- (void)runPreviewChecks {
+    __block UINavigationController *nav;
+    UIView *(^showcase)(void) = ^{
+        return firstOfClass(((UITableViewController *)nav.topViewController).tableView.tableHeaderView, @"SGRPlayerShowcase");
+    };
+    void (^pick)(NSUInteger) = ^(NSUInteger index) {
+        UISegmentedControl *segments = (UISegmentedControl *)firstOfClass(showcase().superview, @"UISegmentedControl");
+        segments.selectedSegmentIndex = (NSInteger)index;
+        [segments sendActionsForControlEvents:UIControlEventValueChanged];
+    };
+    NSString *(^card)(void) = ^{
+        UIView *view = showcase();
+        SGRArtworkField *field = (SGRArtworkField *)firstOfClass(view, @"SGRArtworkField");
+        UIView *motion = firstOfClass(view, @"SGRPlayerMotionView");
+        CALayer *still = [motion valueForKey:@"_still"];
+        return [NSString stringWithFormat:@"card: clip %@ (poster %@), field fluid %d held %d; the player's clip %@; the clip served %lu times",
+                motion ? @"in" : @"out", still.contents ? @"drawn" : @"none", field.fluid, field.motionHeld, SGRPlayerMotionShowing() ? @"in" : @"none",
+                (unsigned long)sg_canvasServed];
+    };
+    BOOL (^clipIn)(void) = ^{ return (BOOL)(firstOfClass(showcase(), @"SGRPlayerMotionView") != nil); };
+    after(1, ^{
+        [self expect:sg_canvasServed == 0 && !SGRPlayerMotionShowing() step:@"before the page, nothing asked for"
+              detail:[NSString stringWithFormat:@"the clip served %lu times, the player's clip %@", (unsigned long)sg_canvasServed, SGRPlayerMotionShowing() ? @"in" : @"none"]];
+        nav = [[UINavigationController alloc] initWithRootViewController:SGRPlayerSettingsPage(@[])];
+        nav.modalPresentationStyle = UIModalPresentationFullScreen;
+        [self.window.rootViewController presentViewController:nav animated:NO completion:nil];
+    });
+    after(2, ^{
+        [self expect:!clipIn() && sg_canvasServed == 0 step:@"Still on the page, nothing asked for" detail:card()];
+        pick(3);
+    });
+    after(2.5, ^{
+        SGRArtworkField *field = (SGRArtworkField *)firstOfClass(showcase(), @"SGRArtworkField");
+        [self expect:!clipIn() && field.fluid step:@"Animated picked, Fluid while the clip comes" detail:card()];
+    });
+    after(6, ^{
+        SGRArtworkField *field = (SGRArtworkField *)firstOfClass(showcase(), @"SGRArtworkField");
+        CALayer *still = [firstOfClass(showcase(), @"SGRPlayerMotionView") valueForKey:@"_still"];
+        [self expect:clipIn() && still.contents && field.motionHeld && sg_canvasServed == 1 && !SGRPlayerMotionShowing()
+                step:@"the clip in the card, the player left alone" detail:card()];
+        NSLog(@"[harness] preview: screenshot the card now");
+        // The player's walk asks the store the same way: it finds the file without asking the server again.
+        SGMotionFile([NSURL URLWithString:@(getenv("HARNESS_CANVAS"))], ^(NSURL *file) {
+            [self expect:file && sg_canvasServed == 1 step:@"the clip in the store for the player"
+                  detail:[NSString stringWithFormat:@"%@, served %lu times", file.lastPathComponent ?: @"no file", (unsigned long)sg_canvasServed]];
+        });
+    });
+    after(8, ^{ pick(2); });
+    after(8.5, ^{
+        [self expect:!clipIn() step:@"Fluid picked, the clip out" detail:card()];
+        pick(3);
+        [self expect:clipIn() && sg_canvasServed == 1 step:@"Animated again, the clip at once" detail:card()];
+    });
+    after(9.5, ^{
+        NSLog(@"[harness] preview checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
+              self->_failures ? @"FAIL" : @"PASS");
+    });
+}
+
 - (NSArray<UILabel *> *)labelsIn:(UIView *)view {
     NSMutableArray<UILabel *> *labels = [NSMutableArray array];
     for (UIView *sub in view.subviews) {
@@ -1509,6 +1582,13 @@ __attribute__((constructor(101))) static void sgr_harnessDefaults(void) {
     [NSUserDefaults.standardUserDefaults setBool:YES forKey:@"spotifyglass.redesign"];
     // Animated artwork, its clip served by the picture server to the shared session too.
     if ([scenario() isEqualToString:@"visualiser"]) [NSUserDefaults.standardUserDefaults setInteger:4 forKey:@"spotifyglass.redesign.player.background"];
+    // Still at launch, so the player looks up no clip; an address of this run's own, so the store has none of it yet.
+    if ([scenario() isEqualToString:@"preview"]) {
+        [NSUserDefaults.standardUserDefaults setInteger:0 forKey:@"spotifyglass.redesign.player.background"];
+        setenv("HARNESS_CANVAS", [NSString stringWithFormat:@"https://canvas.harness/preview-%d.mp4", getpid()].UTF8String, 1);
+        setenv("HARNESS_CANVAS_DELAY", "2", 1);
+        [NSURLProtocol registerClass:SGRHarnessPictureServer.class];
+    }
     if ([scenario() isEqualToString:@"motion"] || [scenario() isEqualToString:@"settings"]) {
         [NSUserDefaults.standardUserDefaults setInteger:3 forKey:@"spotifyglass.redesign.player.background"];
         setenv("HARNESS_CANVAS", "https://canvas.harness/clip.mp4", 1);

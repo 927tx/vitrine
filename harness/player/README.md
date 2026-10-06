@@ -75,6 +75,13 @@ come late, out of order, or not at all.
   in), Fluid, Colours, Still, Visualiser (the hills over Fluid held still) and Animated again, with a note for
   each and the header the same height throughout. The log ends with `settings checks: n of 8 right -- PASS` or
   `FAIL`.
+- `preview` opens the Player page with the background Still at launch, so the player looks up no clip, and picks
+  Animated on it. The card looks the track's clip up itself: nothing is asked for before the page or while Still
+  shows, the card is Fluid while the clip comes (`HARNESS_CANVAS_DELAY`, 2 s), then the clip is in it with its
+  poster and the field held, the player still without one, and the file in the store, where `SGMotionFile` finds
+  it without asking the server again. Fluid and then Animated again bring it back at once. The clip's address is
+  the run's own, so the store never has it from a run before. The log ends with
+  `preview checks: n of 7 right -- PASS` or `FAIL`; on the sources before the fix it read 5 of 7.
 - `visualiser` plays the Visualiser background, fed by `stubs.m`'s stand-in for the audio effects' reader: a song
   of its own at 120 beats a minute, handed over in buffers of 1024 at 48 kHz. It checks the hills stand on the
   Fluid field held still with the reader on and the link at up to 60 fps, blur behind the lyrics with the link at

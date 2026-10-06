@@ -525,6 +525,9 @@ Spotify's own player screen (artwork background, glass header buttons, Disable C
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
 buttons to hide); in the redesign the page instead leads with a card of the player (Redesigned/Player/
 PlayerSettings.m): the background chosen edge to edge, and over its foot the cover, title, artist and progress;
+for Animated while the player has no clip, the card looks the playing track's up itself while it is on screen
+(SGMotionClipFor, the player's sources, size and Low Data Mode, into the store the player reads), Fluid until it
+is in, then the clip over it, poster first (harness/player/ `preview`);
 under it a segmented control of the five backgrounds (Still, Colours, Fluid, Animated, Visualiser, changing the card at once)
 with a note on what the one picked does, Artwork sources and Download in Low Data Mode while Animated is chosen,
 and Mini player: Apple Music style (the tab bar's minimize on scroll), Device button (the now playing bar keeps

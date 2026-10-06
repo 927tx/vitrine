@@ -5,8 +5,10 @@
 // The progress is where the track was when the page appeared.
 //
 // The background is the player's own: a field of the same kind (Still, Colours, Fluid), for Animated
-// the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or Fluid while there is
-// none, as in the player, and for Visualiser the hills over Fluid held still (SGRPlayerVisualiserPreview),
+// the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or, while the player has
+// none, the playing track's clip looked up for the card while it is on screen, Fluid until it comes in and
+// for a track with none, as in the player; the clip crosses over the field as it arrives, its poster first
+// while its video decodes. And for Visualiser the hills over Fluid held still (SGRPlayerVisualiserPreview),
 // moving with the song. It moves under the field's own conditions (in a window, Spotify in front, Reduce
 // Motion and Low Power Mode off). Under the card a segmented control picks the background, all five of
 // them: the names are one word each, each segment as wide as its name, so they fit side by side at an iPhone's
@@ -142,15 +144,27 @@ static NSArray<NSString *> *backgroundNotes(void) {
     [self setNeedsLayout];
 }
 
-// The background chosen, read again; a new one crosses over when animated. The clip is the one playing when
-// this is called: a track changed while the page shows keeps the last one until the page appears again.
+// The card on screen with Animated and no clip in it: one is looked up, and shown once it is in.
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    if (self.window && !_motion && SGRPlayerBackground() == SGRPlayerBackgroundAnimated) [self reloadBackgroundAnimated:NO];
+}
+
+// The background chosen, read again; a new one crosses over when animated. The clip is the one playing, or
+// looked up, when this is called: a track changed while the page shows keeps the last one until the page
+// appears again. A clip is looked up only while the card is in a window.
 - (void)reloadBackgroundAnimated:(BOOL)animated {
     SGRPlayerBackgroundKind kind = SGRPlayerBackground();
+    __weak SGRPlayerShowcase *weakSelf = self;
+    void (^arrived)(void) = !self.window ? nil : ^{
+        SGRPlayerShowcase *showcase = weakSelf;
+        if (showcase.window && !showcase->_motion && SGRPlayerBackground() == SGRPlayerBackgroundAnimated) [showcase reloadBackgroundAnimated:YES];
+    };
     void (^apply)(void) = ^{
         self->_field.flows = kind == SGRPlayerBackgroundColours;
         self->_field.fluid = kind >= SGRPlayerBackgroundFluid;
         [self->_motion removeFromSuperview];
-        self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview() : nil;
+        self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview(arrived) : nil;
         if (self->_motion) [self insertSubview:self->_motion aboveSubview:self->_field];
         [self->_visualiser removeFromSuperview];
         self->_visualiser = kind == SGRPlayerBackgroundVisualiser ? SGRPlayerVisualiserPreview() : nil;
