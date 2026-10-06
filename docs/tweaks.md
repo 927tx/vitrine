@@ -98,8 +98,11 @@ Shared:
                   timed word by word (the translation taken in the Lyrics page's language); Musixmatch.m, matched by
                   Spotify's track id with an anonymous token, word timed where it has richsync; NetEase.m, word timing from yrc for what the others only line time; LrcLib.m, open and
                   keyless and timed by the line, the floor under the rest. SpicyLyrics.m, Spicy Lyrics' Developer Platform
-                  by track id on the user's own key (Keychain), syllable timed where it has a sync; checked on the Mac
-                  against harness/spicy-lyrics/. QQMusic.m (line timed LRC) and KuGou.m (word timed KRC, unpacked with
+                  by track id on the user's own publishable key (Keychain), syllable timed where it has a sync, with
+                  its pronunciations and translations; its credit, which its terms require, shows whatever Show source
+                  says and opens the uploader's and maker's pages from a tap (both looks), its answers and misses are
+                  kept per track, a rate limit is waited out and a refused key is left for 10 min, its reason on the
+                  source's row; checked on the Mac against harness/spicy-lyrics/. QQMusic.m (line timed LRC) and KuGou.m (word timed KRC, unpacked with
                   zlib and read by NetEase.m's parser) for Chinese and other Asian songs, matched by title, singer
                   and length; checked on the Mac against harness/lyrics-sources/. color-lyrics is answered with whichever won
                   (LyricsHook.x): Spotify's own 200 gets our lines swapped in; a track Spotify's metadata says has none has
@@ -289,7 +292,8 @@ Native:
                   on either side of the cover that plays at 2x until the finger lifts (PlayerGestures.x), the list's pull
                   held off while the progress bar is scrubbed (PlayerScrub.x), the Queue & devices flags. The scrub and
                   the cover's room are checked in the simulator against harness/native-player/
-    Lyrics/       the full screen lyrics page on glass (LyricsPage.x)
+    Lyrics/       the full screen lyrics page on glass, and a tap on the lyrics' footer opening the pages a credit
+                  links to (LyricsPage.x)
     LocalFiles/   a lyrics button on the player's footer for a local file with an LRC file linked to it, a fifth of the
                   way in from the leading edge, which opens a page of the lines on black that follows the song
                   (LocalLyrics.h lists its files); the file's metadata says has_lyrics. Checked in the simulator

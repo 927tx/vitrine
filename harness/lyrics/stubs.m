@@ -12,7 +12,29 @@ CFTimeInterval SGPlayerTransitionEnds(void) { return 0; }
 
 void SGRPlayFeedback(NSInteger feedback) {}
 void SGPlayFeedback(NSInteger feedback) {}   // the name it has had since Haptics moved to Shared
-NSString *SGLyricsCreditFor(NSString *trackID) { return @"the harness"; }
+// -credit names the source (Show source is -spotifyglass.lyricsCredit 1); one naming Spicy Lyrics is
+// required, so it shows either way, and links to two people, as SpicyLyrics.m's community syncs do.
+NSString *SGLyricsCreditFor(NSString *trackID) { return [NSUserDefaults.standardUserDefaults stringForKey:@"credit"] ?: @"the harness"; }
+// LyricsSources.h's, declared here: that header's SPTPlayerTrack clashes with the track stub below.
+@interface SGLyricsLink : NSObject
+@property (nonatomic, copy) NSString *title;
+@property (nonatomic, copy) NSURL *url;
+@end
+@implementation SGLyricsLink
+@end
+BOOL SGLyricsCreditRequired(NSString *credit) { return [credit hasPrefix:@"Spicy Lyrics"]; }
+NSArray<SGLyricsLink *> *SGLyricsCreditLinks(NSString *text) {
+    if (![text containsString:@"Spicy Lyrics"]) return nil;
+    NSMutableArray<SGLyricsLink *> *links = [NSMutableArray array];
+    for (NSString *who in @[@"Uploader", @"Maker"]) {
+        SGLyricsLink *link = [SGLyricsLink new];
+        link.title = [who stringByAppendingString:@": harness"];
+        link.url = [NSURL URLWithString:@"https://example.org/"];
+        [links addObject:link];
+    }
+    return links;
+}
+void SGLyricsOpenCreditLinks(NSArray<SGLyricsLink *> *links, UIView *from) { NSLog(@"harness: credit opens %lu links", (unsigned long)links.count); }
 // -translateTo es: the language the Lyrics page would ask translations for.
 NSString *SGLyricsTranslationLanguage(void) { return [NSUserDefaults.standardUserDefaults stringForKey:@"translateTo"]; }
 

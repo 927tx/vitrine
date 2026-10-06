@@ -148,7 +148,9 @@ static NSData *pageBody(SGLyricsResult *chain, NSData *colours) {
                                        SGPBString(2, [text isKindOfClass:NSString.class] ? text : @"")]);
         [lyrics addObject:SGPBBytes(2, line)];
     }
-    [lyrics addObject:SGPBString(5, chain.provider.length ? chain.provider : kUnnamedProvider)];
+    // The footer names whoever's text this is, which the terms of some sources ask for (SpicyLyrics.m).
+    NSString *provider = chain.pageProvider ?: chain.provider;
+    [lyrics addObject:SGPBString(5, provider.length ? provider : kUnnamedProvider)];
     return SGPBSerialize(@[SGPBBytes(1, SGPBSerialize(lyrics)), SGPBBytes(2, colours ?: defaultColours())]);
 }
 

@@ -33,8 +33,10 @@ static const CGFloat kBackingScale = 0.62, kBackingAlpha = 0.8, kBackingGap = 4;
 // for anyone else's.
 static const CGFloat kBubbleSide = 22, kBubbleGap = 8, kBubbleGlyph = 11, kBubbleAlpha = 0.75, kBubbleReach = 14;
 static const CGFloat kUnderlineDrop = 1, kUnderlineWidth = 2, kUnderlineAlpha = 0.35;
-// The line naming the source, under the lyrics and outside the fade so it does not dim with them.
-static const CGFloat kCreditSize = 12, kCreditAlpha = 0.4, kCreditBottom = 10;
+// The line naming the source, under the lyrics and outside the fade so it does not dim with them. It
+// wraps onto a second line rather than run under the buttons beside it, and a tap this far around it
+// opens the pages it links to.
+static const CGFloat kCreditSize = 12, kCreditAlpha = 0.4, kCreditBottom = 10, kCreditSlop = 8;
 // The button for the pronunciation and the translation, in the bottom leading corner as Apple Music
 // has it, and the gap between it and the credit beside it.
 static const CGFloat kExtrasSide = 44, kExtrasBottom = 12, kExtrasGlyph = 17, kExtrasCreditGap = 12;
@@ -1218,8 +1220,10 @@ typedef struct {
     BOOL _showing;
     CAGradientLayer *_fade;
     UILabel *_credit;
+    NSString *_creditSource;   // the source the credit was settled on, nil until the lyrics name one
+    NSArray<SGLyricsLink *> *_creditLinks;
     CGFloat _fontSize, _margin, _lineGap, _blurPerLine, _maxBlur;
-    BOOL _crediting;   // the switch is read once: the page asks for the source on every frame until it has one
+    BOOL _crediting;   // Show source, read once: the page asks for the source on every frame until it has one
     double _clock;
     NSInteger _reported;
     CFTimeInterval _clockTime;
@@ -1260,6 +1264,7 @@ typedef struct {
     _credit.font = [UIFont systemFontOfSize:kCreditSize weight:UIFontWeightSemibold];
     _credit.textColor = [UIColor colorWithWhite:1 alpha:kCreditAlpha];
     _credit.hidden = YES;
+    _credit.numberOfLines = 2;
     _crediting = SGFlag(SGKeyLyricsCredit, NO);
     _sweepsEstimates = SGFlag(SGKeyLyricsSimulateWords, NO);
     [self addSubview:_credit];
@@ -1330,6 +1335,11 @@ typedef struct {
 - (void)tapped:(UITapGestureRecognizer *)tap {
     if (_extrasBox && !_extrasBox.hidden && CGRectContainsPoint(_extrasBox.frame, [tap locationInView:self])) return;
     if (_sing.userInteractionEnabled && [_sing pointInside:[tap locationInView:_sing] withEvent:nil]) return;
+    if (_creditLinks.count && !_credit.hidden
+        && CGRectContainsPoint(CGRectInset(_credit.frame, -kCreditSlop, -kCreditSlop), [tap locationInView:self])) {
+        SGLyricsOpenCreditLinks(_creditLinks, _credit);
+        return;
+    }
     CGPoint point = [tap locationInView:_scroll];
     for (SGRKaraokeLineView *view in _shown.allValues) {
         CGRect target = view.bubbleTarget;
@@ -1511,15 +1521,21 @@ typedef struct {
     [super layoutSubviews];
     [self alignFade];
     _scroll.contentSize = self.bounds.size;
-    [_credit sizeToFit];
-    _credit.frame = CGRectMake(_margin, self.bounds.size.height - _credit.bounds.size.height - kCreditBottom,
-                               _credit.bounds.size.width, _credit.bounds.size.height);
-    if (_extrasBox && !_extrasBox.hidden) {
+    _sing.frame = CGRectMake(self.bounds.size.width - _margin - kExtrasSide, self.bounds.size.height - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
+    BOOL extras = _extrasBox && !_extrasBox.hidden;
+    // Between the pronunciation button and the mic, wrapping to fit.
+    CGFloat left = extras ? _margin + kExtrasSide + kExtrasCreditGap : _margin;
+    CGFloat right = _sing ? CGRectGetMinX(_sing.frame) - kExtrasCreditGap : self.bounds.size.width - _margin;
+    CGFloat room = MAX(right - left, 0);
+    CGSize credit = [_credit sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)];
+    credit.width = MIN(ceil(credit.width), room);
+    credit.height = ceil(credit.height);
+    _credit.frame = CGRectMake(left, self.bounds.size.height - credit.height - kCreditBottom, credit.width, credit.height);
+    if (extras) {
         _extrasBox.frame = CGRectMake(_margin, self.bounds.size.height - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
         SGRShowGlass(SGRGlassInside(_extrasBox, &kExtrasGlassKey, kExtrasSide), !_extrasHidden);
-        _credit.center = CGPointMake(CGRectGetMaxX(_extrasBox.frame) + kExtrasCreditGap + _credit.bounds.size.width / 2, _extrasBox.center.y);
+        _credit.center = CGPointMake(_credit.center.x, _extrasBox.center.y);
     }
-    _sing.frame = CGRectMake(self.bounds.size.width - _margin - kExtrasSide, self.bounds.size.height - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
     if (_lines && self.bounds.size.width != _builtWidth) {
         [self rebuild];
     } else if (_tops && self.bounds.size.height != _placedHeight) {
@@ -1921,8 +1937,13 @@ static BOOL hasWords(SGKaraokeLine *line) {
     _dots.frame = CGRectMake(_margin, top, _builtWidth - 2 * _margin, _dots.bounds.size.height);
 }
 
+// A credit the source's terms require shows whatever Show source says (Shared/LyricsSources/SpicyLyrics.m).
 - (void)creditTo:(NSString *)source {
-    NSString *text = source.length && _crediting ? [NSString stringWithFormat:@"Lyrics from %@", source] : nil;
+    _creditSource = source;
+    BOOL shown = source.length && (_crediting || SGLyricsCreditRequired(source));
+    NSString *text = shown ? [NSString stringWithFormat:@"Lyrics from %@", source] : nil;
+    _creditLinks = shown ? SGLyricsCreditLinks(source) : nil;
+    _credit.accessibilityTraits = _creditLinks.count ? UIAccessibilityTraitLink : UIAccessibilityTraitStaticText;
     if (text == _credit.text || [text isEqualToString:_credit.text]) return;
     _credit.text = text;
     _credit.hidden = !_showing || !text.length;
@@ -2022,7 +2043,7 @@ static BOOL hasWords(SGKaraokeLine *line) {
     }
     [self setShowing:_tops != nil];
     // The source is settled a moment after the lines are, so it is asked for until it answers.
-    if (_crediting && _lines && !_credit.text.length) [self creditTo:SGLyricsCreditFor(track)];
+    if (!_sample && _lines && !_creditSource) [self creditTo:SGLyricsCreditFor(track)];
     if (!_tops) return;
     [self alignFade];
     if (_plain) {

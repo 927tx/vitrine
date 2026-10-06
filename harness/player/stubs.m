@@ -94,6 +94,9 @@ void SGPrepareFeedback(NSInteger feedback) {}
 #pragma mark - Shared/LyricsSources
 
 NSString *SGLyricsCreditFor(NSString *trackID) { return @"the harness"; }
+BOOL SGLyricsCreditRequired(NSString *credit) { return NO; }
+NSArray *SGLyricsCreditLinks(NSString *text) { return nil; }
+void SGLyricsOpenCreditLinks(NSArray *links, UIView *from) {}
 
 #pragma mark - Shared/Lyrics/KaraokeSource.x
 
