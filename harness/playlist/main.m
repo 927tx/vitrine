@@ -59,6 +59,8 @@
 }
 // Spotify's own is what reports a scroll to the header; here it only gives the hook something to run after.
 - (void)entityHeaderViewController:(id)controller didUpdateVisibleRect:(CGRect)rect {}
+// Spotify's runs when the page's model changes (a save); here it only gives PlaylistHeader.x's hook a method.
+- (void)update {}
 @end
 
 @interface _TtC28EncoreConsumerMobile_BaseKit19HeaderContentLayout : UIView @end
@@ -634,6 +636,9 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             NSLog(@"[harness] late: Play's right shows \"%@\"", trailingLabel(page.view));
         });
+    } else if ([NSProcessInfo.processInfo.arguments containsObject:@"saved"]) {
+        // Save with the Encore object behind it (download-mock.h), so the redesign can read whether it is saved.
+        mockAddToButton(box(actions, UIView.class, CGRectMake(58, 0, 48, 48), nil));
     } else {
         actionButton(actions, CGRectMake(58, 0, 48, 48), @"Components.UI.AddToButton", @"Like");
     }
@@ -728,6 +733,28 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
     BOOL downloads = [NSProcessInfo.processInfo.arguments containsObject:@"download"];
     if (downloads) {
         downloadScript();
+        return YES;
+    }
+    // `other saved`: save becomes download once the playlist is saved, and save again once it is removed, each
+    // change heard through the header controller's -update as on the phone (nothing is laid out).
+    if ([NSProcessInfo.processInfo.arguments containsObject:@"saved"]) {
+        at(2, ^{ NSLog(@"[harness] saved: before, Play's right shows \"%@\"", trailingLabel(page.view)); });
+        at(2.5, ^{
+            setAddTo(1);
+            [(id)headerVC update];
+        });
+        at(3.2, ^{ NSLog(@"[harness] saved: saved, Play's right shows \"%@\"", trailingLabel(page.view)); });
+        at(4.5, ^{
+            setAddTo(0);
+            [(id)headerVC update];
+        });
+        at(5.2, ^{ NSLog(@"[harness] saved: removed, Play's right shows \"%@\"", trailingLabel(page.view)); });
+        at(6, ^{
+            ((UIButton *)sgh_downloadButton).enabled = NO;
+            setAddTo(1);
+            [(id)headerVC update];
+        });
+        at(6.7, ^{ NSLog(@"[harness] saved: saved, download disabled, Play's right shows \"%@\"", trailingLabel(page.view)); });
         return YES;
     }
     for (NSUInteger i = 0; i < 3; i++) {

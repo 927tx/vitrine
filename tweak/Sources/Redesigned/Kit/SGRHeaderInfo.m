@@ -185,7 +185,13 @@ static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
         if (playColor) _play.contentColor = playColor;
         [_play feedFrom:play];
     }
-    if (trailing) [_trailing feedFrom:trailing];
+    // Another of Spotify's buttons in the trailing place (save becoming download once the playlist is saved) is
+    // a crossfade, a change of what the button is rather than a move.
+    if (trailing && _trailing.source && trailing != _trailing.source && !_trailing.hidden && self.window) {
+        [UIView transitionWithView:_trailing duration:SGRCrossfade options:UIViewAnimationOptionTransitionCrossDissolve
+                        animations:^{ [self->_trailing feedFrom:trailing]; } completion:nil];
+    }
+    else if (trailing) [_trailing feedFrom:trailing];
 
     BOOL changed = NO;
     NSArray<UIView *> *buttons = @[_shuffle, _play, _trailing];

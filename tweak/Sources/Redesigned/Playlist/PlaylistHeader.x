@@ -310,10 +310,23 @@ static NSString *lengthIn(UIView *block) {
     return firstText(SGRFindByIdentifier(block, @"Components.Header.UI.Metadata", &kMetaKey), nil);
 }
 
+// Someone else's playlist shows save until it is in the library, and then download in its place, as the
+// Music app turns add into download once a playlist is added; taking it out of the library again is
+// Spotify's own Remove from Your Library in the ⋯ menu. Download only where Spotify has put its own
+// download button in the row and left it enabled, so an account that cannot download keeps save (and its
+// checkmark) and nothing is offered that Spotify does not offer: the button fires Spotify's. A playlist
+// already downloading or downloaded shows download whatever save says.
+static BOOL showsDownload(UIView *save, UIView *download) {
+    if (![download isKindOfClass:UIControl.class] || !((UIControl *)download).enabled) return NO;
+    BOOL added = NO;
+    SGRDownloadState state = SGRDownloadNone;
+    return (SGRReadAddTo(save, &added) && added) || (SGRReadDownload(download, &state, NULL) && state != SGRDownloadNone);
+}
+
 // What the playlist's header shows: the name and the description from the page's model, the creator and the
-// length from Spotify's concealed labels, and on Play's right save for someone else's playlist, download for
-// one's own and for Liked Songs, which Spotify reports as neither owned nor unsaved (isOwnedBySelf NO,
-// formatListType liked-songs).
+// length from Spotify's concealed labels, and on Play's right save for someone else's playlist (download once
+// it is saved, showsDownload), download for one's own and for Liked Songs, which Spotify reports as neither
+// owned nor unsaved (isOwnedBySelf NO, formatListType liked-songs).
 static void showPlaylist(SGRHeaderInfo *info, UIView *block, UIView *root, id model) {
     NSString *title = modelString(model, @"playlistName") ?: firstText(block, nil);
     [info showTitle:title creator:creatorIn(block) length:lengthIn(block)
@@ -324,7 +337,9 @@ static void showPlaylist(SGRHeaderInfo *info, UIView *block, UIView *root, id mo
     UIView *shuffle = SGRFindByIdentifier(block, @"Components.UI.ShuffleButton", &kShuffleKey);
     UIView *play = SGRFindByIdentifier(root, @"header-play-button", &kPlayKey);
     UIView *save = own ? nil : SGRFindByIdentifier(block, @"Components.UI.AddToButton", &kAddKey);
-    UIView *download = save ? nil : SGRFindByIdentifier(block, @"DownloadButton.Granular*", &kDownloadKey);
+    UIView *download = SGRFindByIdentifier(block, @"DownloadButton.Granular*", &kDownloadKey);
+    if (save && showsDownload(save, download)) save = nil;
+    if (save) download = nil;
     [info showShuffle:shuffle play:play trailing:save ?: download
      trailingFallback:[UIImage systemImageNamed:save ? @"plus" : @"arrow.down"] playColor:SGRPlaylistFieldColor(info)];
     // Only what the button draws goes: a concealed layer still sends the actions the capsule fires.

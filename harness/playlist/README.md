@@ -34,6 +34,12 @@ subview of HeaderActionsRow, which lays out nothing above the row. At 3 s the lo
 right: "Like" once `PlaylistHeader.x` watches the row, "Download" before it did (issue #19). The scripted states
 from 4 s on lay the header out and would hide the difference, so read it before then.
 
+`other saved` gives save the Encore object behind it (`../download-mock.h`), so the redesign can read whether the
+playlist is saved, and plays save turning into download. Each change is heard through the header controller's
+`-update`, with nothing laid out, as on the phone. The log reads, on Play's right: "Save to Your Library" at 2 s,
+"Download" once saved, "Save to Your Library" once removed, and "Remove from Your Library" (save's checkmark) when
+it is saved again with Spotify's download button disabled, as for an account that cannot download.
+
 `mix` on the launch line builds a playlist Spotify makes (Indie Rock Mix), from `trees/continuous/4.txt`
 (2026-09-20): no cover square anywhere, and in its place a `HeaderFullbleedCentralView` holding the picture,
 the fade under it and Spotify's own 45pt title. Before any other pass it runs the one the page opens with,
