@@ -453,11 +453,13 @@ flags stay in All flags), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
-buttons to hide); in the redesign the page instead leads with a showcase of the player (Redesigned/Player/
-PlayerSettings.m): a small copy of it over the background chosen, the cover, title and artist, and a glass sheet over
-the artwork with its progress and volume sliders and the transport between them; under it the Background pull-down
-(Still, Colours, Fluid, Animated, changing the showcase at once), Download in Low Data Mode while Animated is
-chosen, and the now playing bar's device button, checked in the simulator against harness/player/ (`settings`). Vibrations, a page of its own under either
+buttons to hide); in the redesign the page instead leads with a card of the player (Redesigned/Player/
+PlayerSettings.m): the background chosen edge to edge, and over its foot the cover, title, artist and progress;
+under it a segmented control of the four backgrounds (Still, Colours, Fluid, Animated, changing the card at once)
+with a note on what the one picked does, Artwork sources and Download in Low Data Mode while Animated is chosen,
+and Mini player: Apple Music style (the tab bar's minimize on scroll), Device button (the now playing bar keeps
+Spotify's device button in that minimized row, off by default) and the device button hidden on the full bar,
+checked in the simulator against harness/player/ (`settings`). Vibrations, a page of its own under either
 look, leads with a preview (Shared/Haptics/SGVibrationsPreview.m): rings of dots that a tap sends a crest across, out
 from the middle in the accent colour, higher and further the stronger the Strength, while the first of Controls and
 Generated that is on plays its own tap through its own path (Controls' add tap, or one kick of Generated's with its

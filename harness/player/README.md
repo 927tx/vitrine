@@ -63,10 +63,11 @@ come late, out of order, or not at all.
   `motion checks: n of 11 right -- PASS` or `FAIL`.
 
 - `settings` opens the redesign's Player page (`PlayerSettings.m`, with the real `Settings/` framework) over the
-  player at 3 s, with the clip of `motion` in. It checks the showcase leads the page in the window's shape, the
-  background and device button rows are on the page, and then, as the Background pull-down picks each in turn,
-  that the showcase shows Animated (the clip, the cover gone, Low Data Mode's row in), Fluid, Colours, Still and
-  Animated again. The log ends with `settings checks: n of 7 right -- PASS` or `FAIL`.
+  player at 3 s, with the clip of `motion` in. It checks the card leads the page with the four backgrounds'
+  segmented control under it, the Mini player section's three rows are on the page, and then, as the control
+  picks each in turn, that the card shows Animated (the clip, the sources and Low Data Mode's rows in), Fluid,
+  Colours, Still and Animated again, with a note for each and the header the same height throughout. The log
+  ends with `settings checks: n of 7 right -- PASS` or `FAIL`.
 
 `HARNESS_VOLUME=0` leaves out the volume row that the phone has and the tree does not.
 

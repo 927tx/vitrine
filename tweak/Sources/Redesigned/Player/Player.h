@@ -100,8 +100,9 @@ UIView *SGRPlayerMotionPreview(void);
 
 #pragma mark - Mod Settings (PlayerSettings.m)
 
-// The redesign's Player page: a showcase of the player over the background chosen, the background's and
-// the now playing bar's rows under it, then `more`, the sections either look shares (App/Pages.m).
+// The redesign's Player page: a card of the player over the background chosen and the control that picks
+// it, the background's rows and the Mini player section under it, then `more`, the sections either look
+// shares (App/Pages.m).
 UIViewController *SGRPlayerSettingsPage(NSArray *more);
 
 // Alpha 0, no touches, hidden from accessibility, set again on every call: for Spotify's Swift views,

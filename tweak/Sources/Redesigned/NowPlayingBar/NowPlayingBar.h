@@ -8,8 +8,14 @@
 @class SGModRow;
 
 #define SGRHideBarConnect @"spotifyglass.redesign.hide.barConnect"   // the device button on the card
+// The device button kept on the card in the minimized tab bar's row (NowPlayingBar.x), off unless set: by
+// default the row has the cover, the title and play alone, as the Music app's. Read each time the card goes
+// into the row, so a change shows the next time the bar minimizes.
+#define SGRKeyBarInlineConnect @"spotifyglass.redesign.nowPlayingBar.inlineConnect"
 
-// The bar's rows, on the Player page under its showcase (Redesigned/Player/PlayerSettings.m).
+// The bar's rows, the Mini player section of the Player page (Redesigned/Player/PlayerSettings.m): Apple
+// Music style (the tab bar's Minimize on scroll, Redesigned/Navbar/Navbar.h), the device button in that
+// row, and the device button hidden on the full card.
 NSArray<SGModRow *> *SGRNowPlayingBarRows(void);
 
 // The bar's glass card in `host`'s coordinates, with its corner radius; CGRectNull before the bar has

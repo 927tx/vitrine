@@ -20,8 +20,9 @@
 //              laid out, then the field, the lyrics, a field built again, the menu's switch and the player
 //              closed, each step checked; the log ends with motion checks n of m right -- PASS or FAIL
 //     settings the redesign's Player page (PlayerSettings.m) over the player with the clip of `motion`: the
-//              showcase over Animated, then Fluid, Colours and Still as the Background menu picks them, and
-//              Animated again; each step checked, the log ends with settings checks n of m right -- PASS or FAIL
+//              card over Animated, then Fluid, Colours and Still as the segmented control picks them, and
+//              Animated again, the note under it changing and the rows under the header holding still;
+//              each step checked, the log ends with settings checks n of m right -- PASS or FAIL
 // HARNESS_VOLUME=0 leaves out the volume row the phone has (trees/clean/player/01.txt has none).
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
@@ -919,28 +920,33 @@ static UIView *firstOfClass(UIView *root, NSString *name) {
     return nil;
 }
 
-// The Player page over the player, its showcase checked for each background the Background menu picks.
+// The Player page over the player, its card checked for each background the segmented control picks.
 - (void)runSettingsChecks {
     __block UINavigationController *nav;
+    __block CGFloat headerHeight = 0;
     UITableView *(^table)(void) = ^{ return ((UITableViewController *)nav.topViewController).tableView; };
     UIView *(^showcase)(void) = ^{ return firstOfClass(table().tableHeaderView, @"SGRPlayerShowcase"); };
-    // The Background row's pull-down, picked as a tap on its item does.
+    UISegmentedControl *(^control)(void) = ^{ return (UISegmentedControl *)firstOfClass(table().tableHeaderView, @"UISegmentedControl"); };
+    // A segment picked as a tap on it does.
     void (^pick)(NSUInteger) = ^(NSUInteger index) {
-        UIButton *button = (UIButton *)[table() cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]].accessoryView;
-        UIAction *item = (UIAction *)button.menu.children[index];
-        NSLog(@"[harness] Background menu offers %@, picking %@", [[button.menu.children valueForKey:@"title"] componentsJoinedByString:@" / "], item.title);
-        [item performWithSender:button target:nil];
+        UISegmentedControl *segments = control();
+        segments.selectedSegmentIndex = (NSInteger)index;
+        [segments sendActionsForControlEvents:UIControlEventValueChanged];
     };
     void (^expectBackground)(NSString *, BOOL, BOOL, BOOL) = ^(NSString *step, BOOL fluid, BOOL flows, BOOL clip) {
         UIView *view = showcase();
         SGRArtworkField *field = (SGRArtworkField *)firstOfClass(view, @"SGRArtworkField");
         UIView *motion = firstOfClass(view, @"SGRPlayerMotionView");
         UIView *cover = [view valueForKey:@"_cover"];
-        NSInteger lowData = [table() numberOfRowsInSection:0];
-        BOOL ok = field && field.fluid == fluid && field.flows == flows && (motion != nil) == clip && cover.hidden == clip && lowData == (clip ? 2 : 1);
-        [self expect:ok step:step detail:[NSString stringWithFormat:@"field %@ fluid %d flows %d, clip %@, cover %@, %ld rows over the device button (%@)",
+        UILabel *note = [nav.topViewController valueForKey:@"_note"];
+        NSInteger rows = [table() numberOfRowsInSection:0];
+        CGFloat height = table().tableHeaderView.bounds.size.height;
+        BOOL ok = field && field.fluid == fluid && field.flows == flows && (motion != nil) == clip && !cover.hidden && rows == (clip ? 2 : 0)
+                  && note.text.length && (headerHeight == 0 || fabs(height - headerHeight) < 0.5);
+        headerHeight = height;
+        [self expect:ok step:step detail:[NSString stringWithFormat:@"field %@ fluid %d flows %d, clip %@, cover %@, %ld rows over the Mini player (%@), header %.0f, note \"%@\"",
                                           field ? @"in" : @"missing", field.fluid, field.flows, motion ? @"on" : @"off", cover.hidden ? @"hidden" : @"shown",
-                                          (long)lowData, view.accessibilityValue]];
+                                          (long)rows, view.accessibilityValue, height, note.text]];
     };
     // The clip is in by 3 s (the motion scenario's first step), and the page opens over the player then.
     after(3, ^{
@@ -950,13 +956,16 @@ static UIView *firstOfClass(UIView *root, NSString *name) {
     });
     after(4, ^{
         UIView *view = showcase();
-        CGSize window = self.window.bounds.size;
-        BOOL shaped = view.window && fabs(view.bounds.size.width / view.bounds.size.height - window.width / window.height) < 0.01;
-        [self expect:shaped step:@"the showcase leads the page"
-              detail:[NSString stringWithFormat:@"%@ in a header of %@", NSStringFromCGRect(view.frame), NSStringFromCGRect(table().tableHeaderView.frame)]];
+        UISegmentedControl *segments = control();
+        CGRect card = view.frame, header = table().tableHeaderView.frame;
+        BOOL shaped = view.window && card.size.width > card.size.height && card.size.width > header.size.width - 48;
+        [self expect:shaped && segments.numberOfSegments == 4 && CGRectGetMinY(segments.frame) > CGRectGetMaxY(card)
+                step:@"the card leads the page, the four backgrounds under it"
+              detail:[NSString stringWithFormat:@"card %@ in a header of %@, control %@ with %ld segments", NSStringFromCGRect(card),
+                      NSStringFromCGRect(header), NSStringFromCGRect(segments.frame), (long)segments.numberOfSegments]];
         NSInteger sections = table().numberOfSections;
-        [self expect:sections == 2 && [table() numberOfRowsInSection:1] == 1 step:@"the background and device button rows on the page"
-              detail:[NSString stringWithFormat:@"%ld sections", (long)sections]];
+        [self expect:sections == 2 && [table() numberOfRowsInSection:1] == 3 step:@"the Mini player section on the page"
+              detail:[NSString stringWithFormat:@"%ld sections, %ld rows in the second", (long)sections, (long)[table() numberOfRowsInSection:1]]];
         expectBackground(@"Animated", YES, NO, YES);
         pick(2);
     });

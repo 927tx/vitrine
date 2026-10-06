@@ -230,7 +230,8 @@ static BOOL setEdges(UIView *bar, CGFloat left, CGFloat right) {
 }
 
 // In the row the card keeps the cover, the title and play, as the Music app's does: the device and add
-// buttons stand aside while it is there and come back with the full card. Only what this hid is shown again.
+// buttons stand aside while it is there and come back with the full card, the device button staying when the
+// Player page's Device button asks for it (SGRKeyBarInlineConnect). Only what this hid is shown again.
 static NSHashTable<UIView *> *sg_tucked;
 
 static void tuckExtras(UIView *bar, BOOL tuck) {
@@ -240,9 +241,11 @@ static void tuckExtras(UIView *bar, BOOL tuck) {
         [sg_tucked removeAllObjects];
         return;
     }
+    BOOL keepConnect = SGHidden(SGRKeyBarInlineConnect);
     SGForEachView(bar, ^(UIView *v) {
         NSString *name = v.accessibilityIdentifier;
-        if (![name isEqualToString:@"Components.ConnectButtonOutputSwitcher"] && ![name isEqualToString:@"Components.UI.AddToButton"]) return;
+        BOOL connect = [name isEqualToString:@"Components.ConnectButtonOutputSwitcher"];
+        if ((!connect || keepConnect) && ![name isEqualToString:@"Components.UI.AddToButton"]) return;
         // The stack's own item, so the stack closes the gap.
         UIView *item = v;
         while (item.superview && item.superview != bar && ![item.superview isKindOfClass:UIStackView.class]) item = item.superview;

@@ -1,21 +1,22 @@
 // The redesign's Player page in Mod Settings (App/Pages.m opens it in place of the native look's).
 //
-// It leads with a showcase of the player: a small copy of it in the player's own proportions, over the
-// background chosen on the page, with the playing track's cover, title and artist, and above the artwork a
-// glass sheet carrying the player's sliders, progress and volume, with previous, play and next between
-// them. The progress is where the track was when the page appeared and the volume is the phone's.
+// It leads with a card of the player as the now playing track shows on it: the background chosen on the
+// page edge to edge, and over its foot the cover, the title, the artist and how far the track has played.
+// The progress is where the track was when the page appeared.
 //
 // The background is the player's own: a field of the same kind (Still, Colours, Fluid), and for Animated
-// the clip the player is playing (SGRPlayerMotionPreview) in place of the cover, or Fluid and the cover
-// while there is none, as in the player. It moves under the field's own conditions (in a window, Spotify
-// in front, Reduce Motion and Low Power Mode off). Picking another background changes the showcase at
-// once; the player takes it after a restart, as the note under the showcase says.
+// the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or Fluid while there is
+// none, as in the player. It moves under the field's own conditions (in a window, Spotify in front, Reduce
+// Motion and Low Power Mode off). Under the card a segmented control picks the background, all four of
+// them: the names are one short word each, so they fit side by side at the narrowest iPhone width, and
+// every choice stays one tap away with the card showing it at once. A note under the control says what the
+// choice does; it is given the room of the longest note, so the rows under it hold still as it changes.
 //
-// Under the showcase: the background and its Low Data Mode switch, the now playing bar's device button
-// (Redesigned/NowPlayingBar/NowPlayingBarSettings.m), then the sections either look shares.
+// Under the header: the rows that follow the choice (Animated's sources and its Low Data Mode switch;
+// Fluid has no settings of its own), the Mini player section (Redesigned/NowPlayingBar/
+// NowPlayingBarSettings.m), then the sections either look shares.
 //
 // Threading: main thread only.
-#import <AVFoundation/AVFoundation.h>
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
@@ -24,12 +25,20 @@
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Player.h"
 
-// The showcase's height on the page; its width follows the window's shape.
-static const CGFloat kShowcaseHeight = 340;
-// The player's layout on a 402 x 874 screen, as shares of the showcase's width (w) and height (h).
-static const CGFloat kCoverTop = 0.14;      // h, the cover's top under the header
-static const CGFloat kCoverSide = 0.88;     // w, 354 of 402
-static const CGFloat kScreenRadius = 0.063; // h, a 55pt display corner
+// The card's height as a share of its width, kept between the two bounds.
+static const CGFloat kCardAspect = 0.5, kCardMinHeight = 168, kCardMaxHeight = 220;
+static const CGFloat kCardRadius = 26;   // continuous, the radius of the page's own cards and then some
+static const CGFloat kCardPadding = 16, kCoverSide = 64;
+
+// What each background does, in SGRPlayerBackgroundKind's order.
+static NSArray<NSString *> *backgroundNotes(void) {
+    return @[
+        @"The cover, blurred and held still.",
+        @"The cover's colours, drifting slowly.",
+        @"The cover itself, blurred and slowly turning. It rests while a song is paused.",
+        @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between the two.",
+    ];
+}
 
 @interface SGRPlayerShowcase : UIView <SGPlayerStateObserver>
 - (void)reloadTrack;
@@ -41,37 +50,15 @@ static const CGFloat kScreenRadius = 0.063; // h, a 55pt display corner
     UIView *_motion;
     UIImageView *_cover;
     UILabel *_title, *_artist;
-    UIVisualEffectView *_sheet;
-    UIView *_progress, *_progressFill, *_volume, *_volumeFill;
-    UIImageView *_previous, *_play, *_next, *_quiet, *_loud;
-    CGFloat _position, _level;
-}
-
-// A slider of the player as it is drawn at rest: a track, and in it a fill up to the value (its only subview).
-static UIView *bar(UIView *host) {
-    UIView *track = [UIView new];
-    track.backgroundColor = [UIColor colorWithWhite:1 alpha:0.2];
-    track.layer.cornerCurve = kCACornerCurveContinuous;
-    track.clipsToBounds = YES;
-    UIView *fill = [UIView new];
-    fill.backgroundColor = SGRPrimary();
-    [track addSubview:fill];
-    [host addSubview:track];
-    return track;
-}
-
-static UIImageView *glyph(UIView *host, NSString *symbol, UIColor *color) {
-    UIImageView *view = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:symbol]];
-    view.tintColor = color;
-    view.contentMode = UIViewContentModeCenter;
-    [host addSubview:view];
-    return view;
+    UIView *_progress, *_progressFill;
+    CGFloat _position;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
     if (!(self = [super initWithFrame:frame])) return nil;
     self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     self.clipsToBounds = YES;
+    self.layer.cornerRadius = kCardRadius;
     self.layer.cornerCurve = kCACornerCurveContinuous;
     self.backgroundColor = SGRNeutralField();
     self.userInteractionEnabled = NO;
@@ -86,33 +73,30 @@ static UIImageView *glyph(UIView *host, NSString *symbol, UIColor *color) {
     _cover = [UIImageView new];
     _cover.contentMode = UIViewContentModeScaleAspectFill;
     _cover.clipsToBounds = YES;
+    _cover.layer.cornerRadius = 8;
     _cover.layer.cornerCurve = kCACornerCurveContinuous;
     _cover.tintColor = SGRTertiary();
     _cover.backgroundColor = SGRSolidGlassFill();
+    _cover.preferredSymbolConfiguration = [UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightRegular];
     [self addSubview:_cover];
 
     _title = [UILabel new];
     _title.textColor = SGRPrimary();
+    _title.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     [self addSubview:_title];
     _artist = [UILabel new];
     _artist.textColor = SGRSecondary();
+    _artist.font = [UIFont systemFontOfSize:15];
     [self addSubview:_artist];
 
-    // The sheet is the control layer, so it is glass; the artwork under it is content.
-    _sheet = [[UIVisualEffectView alloc] initWithEffect:SGRReduceTransparency() ? nil : SGGlassEffect()];
-    if (SGRReduceTransparency()) _sheet.backgroundColor = SGRSolidGlassFill();
-    _sheet.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
-    [self addSubview:_sheet];
-    UIView *content = _sheet.contentView;
-    _progress = bar(content);
-    _progressFill = _progress.subviews.firstObject;
-    _volume = bar(content);
-    _volumeFill = _volume.subviews.firstObject;
-    _previous = glyph(content, @"backward.fill", SGRPrimary());
-    _play = glyph(content, @"play.fill", SGRPrimary());
-    _next = glyph(content, @"forward.fill", SGRPrimary());
-    _quiet = glyph(content, @"speaker.fill", SGRSecondary());
-    _loud = glyph(content, @"speaker.wave.3.fill", SGRSecondary());
+    // The player's slider as it is drawn at rest: a track, and in it a fill up to where the song is.
+    _progress = [UIView new];
+    _progress.backgroundColor = [UIColor colorWithWhite:1 alpha:0.2];
+    _progress.clipsToBounds = YES;
+    _progressFill = [UIView new];
+    _progressFill.backgroundColor = SGRPrimary();
+    [_progress addSubview:_progressFill];
+    [self addSubview:_progress];
 
     SGAddPlayerStateObserver(self);
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(artworkChanged) name:SGRNowPlayingArtworkDidChangeNotification object:nil];
@@ -138,15 +122,13 @@ static UIImageView *glyph(UIView *host, NSString *symbol, UIColor *color) {
     [_field setArtwork:image identity:identity animated:self.window != nil];
 }
 
-// The track, where it is, whether it plays, and the volume, read again.
+// The track, where it is and whether it plays, read again.
 - (void)reloadTrack {
     SPTPlayerState *state = SGPlayerState();
     SPTPlayerTrack *track = state.track;
     _title.text = track.trackTitle.length ? track.trackTitle : @"Not Playing";
     _artist.text = track.artistName ?: @"";
     _position = state.duration > 0 ? MIN(1, MAX(0, state.position / state.duration)) : 0;
-    _level = AVAudioSession.sharedInstance.outputVolume;
-    _play.image = [UIImage systemImageNamed:state.isPlaying && !state.isPaused ? @"pause.fill" : @"play.fill"];
     // The clip covers the field, which then holds still, as in the player (PlayerMotion.x).
     _field.motionHeld = state.isPaused || _motion != nil;
     if (SGRNowPlayingArtwork(NULL, NULL)) {
@@ -168,7 +150,6 @@ static UIImageView *glyph(UIView *host, NSString *symbol, UIColor *color) {
         [self->_motion removeFromSuperview];
         self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview() : nil;
         if (self->_motion) [self insertSubview:self->_motion aboveSubview:self->_field];
-        self->_cover.hidden = self->_motion != nil;
         self->_field.motionHeld = SGPlayerState().isPaused || self->_motion != nil;
     };
     self.accessibilityValue = [SGRPlayerBackgroundNames()[(NSUInteger)kind] stringByAppendingString:@" background"];
@@ -182,60 +163,26 @@ static UIImageView *glyph(UIView *host, NSString *symbol, UIColor *color) {
     [self setNeedsLayout];
 }
 
+// The clip runs from the card's top at its width, as in the player, and its blur comes in from the
+// seam under the controls, which on a card this short is over its foot, under the words.
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGRect bounds = self.bounds;
     CGFloat w = bounds.size.width, h = bounds.size.height;
-    self.layer.cornerRadius = round(h * kScreenRadius);
     _field.frame = bounds;
     _field.backdropHeight = h;
     _motion.frame = bounds;
 
-    CGFloat side = round(w * kCoverSide), x = round((w - side) / 2);
-    _cover.frame = CGRectMake(x, round(h * kCoverTop), side, side);
-    _cover.layer.cornerRadius = side * SGRRadiusArtwork / 354;
-    _cover.preferredSymbolConfiguration = [UIImageSymbolConfiguration configurationWithPointSize:side * 0.3 weight:UIImageSymbolWeightRegular];
-
-    _title.font = [UIFont systemFontOfSize:w * 0.055 weight:UIFontWeightBold];
-    _artist.font = [UIFont systemFontOfSize:w * 0.045];
-    CGFloat y = CGRectGetMaxY(_cover.frame) + round(h * 0.035);
-    _title.frame = CGRectMake(x, y, side, ceil(_title.font.lineHeight));
-    _artist.frame = CGRectMake(x, CGRectGetMaxY(_title.frame), side, ceil(_artist.font.lineHeight));
-
-    CGFloat inset = round(w * 0.035), top = CGRectGetMaxY(_artist.frame) + round(h * 0.025);
-    _sheet.frame = CGRectMake(inset, top, w - 2 * inset, h - inset - top);
-    SGShapeGlass(_sheet, round(w * 0.075), NO);
-    if (!_sheet.effect) {
-        _sheet.layer.cornerRadius = round(w * 0.075);
-        _sheet.layer.cornerCurve = kCACornerCurveContinuous;
-        _sheet.clipsToBounds = YES;
-    }
-
-    CGSize sheet = _sheet.bounds.size;
-    CGFloat pad = round(sheet.width * 0.07), line = MAX(2, round(w * 0.012));
-    CGFloat width = sheet.width - 2 * pad;
-    _progress.frame = CGRectMake(pad, round(sheet.height * 0.17), width, line);
+    _cover.frame = CGRectMake(kCardPadding, h - kCardPadding - kCoverSide, kCoverSide, kCoverSide);
+    CGFloat x = CGRectGetMaxX(_cover.frame) + 12, width = w - kCardPadding - x;
+    CGFloat line = 4, titleHeight = ceil(_title.font.lineHeight), artistHeight = ceil(_artist.font.lineHeight);
+    CGFloat bottom = CGRectGetMaxY(_cover.frame);
+    _progress.frame = CGRectMake(x, bottom - line - 2, width, line);
+    _progress.layer.cornerRadius = line / 2;
     _progressFill.frame = CGRectMake(0, 0, round(width * _position), line);
-
-    CGFloat speaker = round(w * 0.06), gap = round(w * 0.02);
-    CGFloat volumeY = round(sheet.height * 0.83);
-    _quiet.frame = CGRectMake(pad, volumeY - speaker / 2, speaker, speaker);
-    _loud.frame = CGRectMake(sheet.width - pad - speaker, volumeY - speaker / 2, speaker, speaker);
-    CGFloat volumeX = CGRectGetMaxX(_quiet.frame) + gap, volumeWidth = CGRectGetMinX(_loud.frame) - gap - volumeX;
-    _volume.frame = CGRectMake(volumeX, volumeY - line / 2, volumeWidth, line);
-    _volumeFill.frame = CGRectMake(0, 0, round(volumeWidth * _level), line);
-    _progress.layer.cornerRadius = _volume.layer.cornerRadius = line / 2;
-
-    CGFloat middle = round(sheet.height * 0.5), button = round(w * 0.16);
-    _play.frame = CGRectMake(round((sheet.width - button) / 2), middle - button / 2, button, button);
-    _previous.frame = CGRectOffset(_play.frame, -round(sheet.width * 0.28), 0);
-    _next.frame = CGRectOffset(_play.frame, round(sheet.width * 0.28), 0);
-    UIImageSymbolConfiguration *large = [UIImageSymbolConfiguration configurationWithPointSize:w * 0.1 weight:UIImageSymbolWeightBold];
-    UIImageSymbolConfiguration *small = [UIImageSymbolConfiguration configurationWithPointSize:w * 0.07 weight:UIImageSymbolWeightBold];
-    _play.preferredSymbolConfiguration = large;
-    _previous.preferredSymbolConfiguration = _next.preferredSymbolConfiguration = small;
-    _quiet.preferredSymbolConfiguration = _loud.preferredSymbolConfiguration =
-        [UIImageSymbolConfiguration configurationWithPointSize:w * 0.032 weight:UIImageSymbolWeightSemibold];
+    CGFloat textBottom = CGRectGetMinY(_progress.frame) - 10;
+    _artist.frame = CGRectMake(x, textBottom - artistHeight, width, artistHeight);
+    _title.frame = CGRectMake(x, CGRectGetMinY(_artist.frame) - titleHeight, width, titleHeight);
 }
 
 @end
@@ -244,6 +191,7 @@ static UIImageView *glyph(UIView *host, NSString *symbol, UIColor *color) {
 
 @interface SGRPlayerPage : SGModPage
 @property (nonatomic, strong) SGRPlayerShowcase *showcase;
+@property (nonatomic, strong) UISegmentedControl *backgrounds;
 @end
 
 @implementation SGRPlayerPage {
@@ -255,29 +203,46 @@ static UIImageView *glyph(UIView *host, NSString *symbol, UIColor *color) {
     [super viewDidLoad];
     _header = [UIView new];
     [_header addSubview:self.showcase];
+    [_header addSubview:self.backgrounds];
     _note = [UILabel new];
-    _note.text = SGRestartNote;
     _note.font = SGSubtitleFont();
     _note.textColor = SGGrey();
     _note.numberOfLines = 0;
     [_header addSubview:_note];
+    [self showNote];
     self.tableView.tableHeaderView = _header;
 }
 
+- (void)showNote {
+    _note.text = backgroundNotes()[(NSUInteger)SGRPlayerBackground()];
+    [self.view setNeedsLayout];
+}
+
 // The header keeps the height it is given, so it is sized here and given back to the table only when that
-// changes (a table header set on every pass lays the table out again forever).
+// changes (a table header set on every pass lays the table out again forever). The note's room is that of
+// the longest note at this width, so picking a background never moves the rows.
 - (void)viewWillLayoutSubviews {
     [super viewWillLayoutSubviews];
     UITableView *table = self.tableView;
     CGFloat width = table.bounds.size.width, inset = table.layoutMargins.left;
-    CGSize window = table.window.bounds.size;
-    CGFloat aspect = window.height > 0 ? window.width / window.height : 402.0 / 874.0;
-    CGFloat showcaseWidth = round(kShowcaseHeight * aspect);
-    self.showcase.frame = CGRectMake(round((width - showcaseWidth) / 2), 16, showcaseWidth, kShowcaseHeight);
-    CGFloat noteWidth = width - 2 * inset;
+    CGFloat cardWidth = width - 2 * inset;
+    CGFloat cardHeight = round(MIN(kCardMaxHeight, MAX(kCardMinHeight, cardWidth * kCardAspect)));
+    self.showcase.frame = CGRectMake(inset, 16, cardWidth, cardHeight);
+    CGFloat controlHeight = MAX(32, ceil([self.backgrounds sizeThatFits:CGSizeMake(cardWidth, CGFLOAT_MAX)].height));
+    self.backgrounds.frame = CGRectMake(inset, CGRectGetMaxY(self.showcase.frame) + 12, cardWidth, controlHeight);
+
+    CGFloat noteWidth = cardWidth - 2 * 4, room = 0;
+    UILabel *measure = [UILabel new];
+    measure.font = _note.font;
+    measure.numberOfLines = 0;
+    for (NSString *text in backgroundNotes()) {
+        measure.text = text;
+        room = MAX(room, ceil([measure sizeThatFits:CGSizeMake(noteWidth, CGFLOAT_MAX)].height));
+    }
     CGFloat noteHeight = ceil([_note sizeThatFits:CGSizeMake(noteWidth, CGFLOAT_MAX)].height);
-    _note.frame = CGRectMake(inset, CGRectGetMaxY(self.showcase.frame) + 16, noteWidth, noteHeight);
-    CGSize size = CGSizeMake(width, CGRectGetMaxY(_note.frame));
+    CGFloat noteTop = CGRectGetMaxY(self.backgrounds.frame) + 8;
+    _note.frame = CGRectMake(inset + 4, noteTop, noteWidth, noteHeight);
+    CGSize size = CGSizeMake(width, noteTop + room);
     if (CGSizeEqualToSize(_header.bounds.size, size)) return;
     _header.frame = (CGRect){CGPointZero, size};
     table.tableHeaderView = _header;
@@ -285,34 +250,43 @@ static UIImageView *glyph(UIView *host, NSString *symbol, UIColor *color) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    // The player's ⋯ menu can switch Animated and Fluid while the page is away.
+    self.backgrounds.selectedSegmentIndex = SGRPlayerBackground();
+    [self showNote];
     [self.showcase reloadTrack];
     [self.showcase reloadBackgroundAnimated:NO];
+}
+
+- (void)backgroundPicked {
+    SGSetInt(SGRKeyPlayerBackground, self.backgrounds.selectedSegmentIndex);
+    [self.showcase reloadBackgroundAnimated:YES];
+    [self showNote];
+    [self refreshVisibility];
 }
 
 @end
 
 UIViewController *SGRPlayerSettingsPage(NSArray *more) {
-    SGRPlayerShowcase *showcase = [[SGRPlayerShowcase alloc] initWithFrame:CGRectMake(0, 0, 160, kShowcaseHeight)];
-    __block __weak SGRPlayerPage *weakPage;
-    NSArray<NSString *> *names = SGRPlayerBackgroundNames();
-    // A pull-down rather than a list of its own, so the showcase changes in front of you.
-    SGModRow *background = SGMenuRow(@"Background", names, ^NSString *{ return names[(NSUInteger)SGRPlayerBackground()]; }, ^(NSInteger index) {
-        SGSetInt(SGRKeyPlayerBackground, index);
-        [showcase reloadBackgroundAnimated:YES];
-        [weakPage refreshVisibility];
-    });
-    SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Animated artwork, up to about 7 MB a song", SGKeyMotionLowData);
+    SGRPlayerShowcase *showcase = [[SGRPlayerShowcase alloc] initWithFrame:CGRectMake(0, 0, 320, kCardMinHeight)];
+    UISegmentedControl *backgrounds = [[UISegmentedControl alloc] initWithItems:SGRPlayerBackgroundNames()];
+    backgrounds.selectedSegmentIndex = SGRPlayerBackground();
+    backgrounds.accessibilityLabel = @"Background";
+
+    SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Up to about 7 MB a song", SGKeyMotionLowData);
     lowData.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; };
     SGModRow *sources = SGMotionSourcesRow();
     sources.visible = lowData.visible;
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
-        SGNotedSection(nil, @[background, sources, lowData],
-                       @"Animated plays the first clip its sources have, over Fluid, and the player's ⋯ menu switches between the two."),
-        SGSection(nil, SGRNowPlayingBarRows()), nil];
+        SGSection(nil, @[sources, lowData]),
+        SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
+                       @"Apple Music style shrinks the tab bar to two tabs as a page scrolls down and puts the now "
+                       "playing bar between them; scrolling back up undoes it. There the bar keeps its cover, title "
+                       "and play button, and the device button too when it is on."), nil];
     [sections addObjectsFromArray:more];
-    SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:nil];
+    SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:SGRestartNote];
     page.showcase = showcase;
-    weakPage = page;
+    page.backgrounds = backgrounds;
+    [backgrounds addTarget:page action:@selector(backgroundPicked) forControlEvents:UIControlEventValueChanged];
     return page;
 }

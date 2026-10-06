@@ -174,5 +174,11 @@ void SGMotionClipFor(NSURL *canvas, NSString *artist, NSString *album, SGMotionS
     if (!canvas) { apple(); return; }
     SGMotionFile(canvas, ^(NSURL *file) { if (file) done(file); else apple(); });
 }
-SGModRow *SGMotionSourcesRow(void) { return nil; }
+// The Artwork sources row as a link to nowhere, so the Player page's rows under the card can be counted.
+#import "Settings/SGModPage.h"
+SGModRow *SGMotionSourcesRow(void) { return SGPageRow(@"Artwork sources", ^UIViewController *{ return nil; }); }
 BOOL SGMotionAppleMusicOn(void) { return YES; }
+
+// TabBar.x: the Mini player section's Apple Music style switch lays the tab bar out again; there is none here.
+void SGRSetTabBarMinimized(BOOL minimized, BOOL animated) {}
+void SGRRefreshTabBar(void) {}
