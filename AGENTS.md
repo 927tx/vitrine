@@ -66,6 +66,9 @@ Rules:
 - Known traps: anything pushed onto Spotify's nav stack must conform to `SPTPageController`
   (`Settings/SGPage.m`). Setting `hidden` on views inside Spotify's `OverflowStackView` or its Encore
   stacks crashes, so use alpha. A `CADisplayLink` capped at 60 Hz drags the player's 120 Hz
-  transitions down with it. Glass takes the appearance it inherits, and outside Spotify's navigation
+  transitions down with it. Never observe a notification that other threads post (`NSUserDefaultsDidChangeNotification`,
+  `AVAudioSessionRouteChangeNotification`) with `queue:NSOperationQueue.mainQueue`: the posting thread waits
+  for main, and at launch main waits on Spotify's CoreThread, so Spotify hangs and is killed. Use `queue:nil`
+  and `dispatch_async` to main. Glass takes the appearance it inherits, and outside Spotify's navigation
   stacks (the tab bar, the now playing bar, the player) that is the system's: set every pane of the
   mod's to `overrideUserInterfaceStyle = UIUserInterfaceStyleDark`, or it goes light in light mode.

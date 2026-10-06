@@ -166,13 +166,17 @@ static void showCover(NSString *picture) {
             if (file) show(file);
             else if (sg_choice == SGLockArtworkEverySong) showCover(sg_picture);
         }];
-        [NSNotificationCenter.defaultCenter addObserverForName:NSUserDefaultsDidChangeNotification object:nil queue:NSOperationQueue.mainQueue
+        // Heard on the writing thread and handed to main without waiting: a main-queue observer makes every
+        // background defaults write wait for main, which deadlocks launch while main waits on Spotify's CoreThread.
+        [NSNotificationCenter.defaultCenter addObserverForName:NSUserDefaultsDidChangeNotification object:nil queue:nil
                                                     usingBlock:^(NSNotification *note) {
-            SGLockArtwork choice = SGLockScreenArtwork();
-            if (choice == sg_choice) return;
-            SGLog(@"lock motion: the choice changed to %ld, the playing track looked up again", (long)choice);
-            sg_choice = choice;
-            [sg_follower restart];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                SGLockArtwork choice = SGLockScreenArtwork();
+                if (choice == sg_choice) return;
+                SGLog(@"lock motion: the choice changed to %ld, the playing track looked up again", (long)choice);
+                sg_choice = choice;
+                [sg_follower restart];
+            });
         }];
         SGLog(@"lock motion: %@, the lock screen takes %@", motionOn(sg_choice) ? (sg_choice == SGLockArtworkEverySong ? @"on for every song" : @"on") : @"off",
               MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys);

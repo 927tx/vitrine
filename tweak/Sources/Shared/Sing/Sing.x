@@ -906,12 +906,15 @@ static void readHeat(void) {
         }];
         // Headphones in or out, or iOS's own spatial audio switched.
         for (NSNotificationName name in @[AVAudioSessionRouteChangeNotification, AVAudioSessionSpatialPlaybackCapabilitiesChangedNotification]) {
-            [center addObserverForName:name object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
-                if (SGSingOn() && readRefusal()) {
-                    apply();
-                    announce();
-                }
-                updateSpatial();
+            // Posted on the audio session's thread: handed to main without waiting, so it cannot deadlock against main.
+            [center addObserverForName:name object:nil queue:nil usingBlock:^(NSNotification *note) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (SGSingOn() && readRefusal()) {
+                        apply();
+                        announce();
+                    }
+                    updateSpatial();
+                });
             }];
         }
         // A load starts only while Spotify is active, so never in a launch into the background, and the faster copy

@@ -614,9 +614,10 @@ static void followRoute(void) {
 }
 
 %ctor {
-    [NSNotificationCenter.defaultCenter addObserverForName:AVAudioSessionRouteChangeNotification object:nil queue:NSOperationQueue.mainQueue
+    // Posted on the audio session's thread: handed to main without waiting, so it cannot deadlock against main.
+    [NSNotificationCenter.defaultCenter addObserverForName:AVAudioSessionRouteChangeNotification object:nil queue:nil
                                                 usingBlock:^(NSNotification *note) {
-        followRoute();
+        dispatch_async(dispatch_get_main_queue(), ^{ followRoute(); });
     }];
     dispatch_async(dispatch_get_main_queue(), ^{
         followRoute();
