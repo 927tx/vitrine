@@ -13,6 +13,9 @@ UIViewController *SGRAlbumSettingsPage(void) {
             SGSwitchRow(@"Artist logos", @"In place of the name on an artist's page", SGRKeyArtistLogo),
             SGOptionRow(@"Download in Low Data Mode", nil, SGKeyMotionLowData),
         ], @"Only the album's or artist's name is sent to Apple Music."),
+        SGSection(@"Hide on an album's page", @[
+            SGSwitchRow(@"Repeated track artists", @"The artist under a track when it is the album's own", SGRKeyAlbumHideTrackArtists),
+        ]),
         SGNotedSection(@"Hide under an album's tracks", @[
             SGSwitchRow(@"More by the artist", nil, SGRKeyAlbumHideMoreBy),
             SGSwitchRow(@"Related music videos", nil, SGRKeyAlbumHideVideos),

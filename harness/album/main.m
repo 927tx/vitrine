@@ -65,6 +65,15 @@ static UILabel *label(UIView *parent, CGRect frame, NSString *text, CGFloat size
     return inner;
 }
 
+static UIView *byIdentifier(UIView *root, NSString *identifier) {
+    if ([root.accessibilityIdentifier isEqualToString:identifier]) return root;
+    for (UIView *sub in root.subviews) {
+        UIView *found = byIdentifier(sub, identifier);
+        if (found) return found;
+    }
+    return nil;
+}
+
 static UIImage *artwork(void) {
     UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(300, 300)];
     return [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
@@ -311,13 +320,20 @@ static NSString *trailingLabel(UIView *root) {
     UIView *collection = box(_listView, UIView.class, _listView.bounds, nil);
     collection.backgroundColor = [UIColor colorWithWhite:0.07 alpha:1];
 
-    NSArray<NSArray<NSString *> *> *tracks = @[@[@"Wake Me Up (feat. Justice)", @"The Weeknd, Justice"],
-                                               @[@"Cry For Me", @"The Weeknd"],
-                                               @[@"I Can't Fucking Sing", @"The Weeknd"],
-                                               @[@"São Paulo (feat. Anitta)", @"The Weeknd, Anitta"],
-                                               @[@"Until We're Skin & Bones", @"The Weeknd"],
-                                               @[@"Baptized In Fear", @"The Weeknd"]];
+    // The third column: E for a row with Spotify's explicit badge, a label-backed view beside the artist line.
+    // The artists the redesign drops are the ones that only repeat the header's The Weeknd; Justice named with
+    // no "feat." and Playboi Carti with no mention at all keep theirs.
+    NSArray<NSArray<NSString *> *> *tracks = @[@[@"Wake Me Up (feat. Justice)", @"The Weeknd, Justice", @"E"],
+                                               @[@"Cry For Me", @"The Weeknd", @""],
+                                               @[@"I Can't Fucking Sing", @"The Weeknd", @"E"],
+                                               @[@"São Paulo (feat. Anitta)", @"The Weeknd, Anitta", @"E"],
+                                               @[@"Until We're Skin & Bones", @"The Weeknd", @""],
+                                               @[@"Timeless Justice", @"The Weeknd, Justice", @""],
+                                               @[@"Timeless", @"The Weeknd, Playboi Carti", @"E"],
+                                               @[@"A Title Long Enough To Run Under The Badge And Beyond", @"The Weeknd", @"E"],
+                                               @[@"Baptized In Fear", @"The Weeknd", @""]];
     CGFloat y = 8;
+    NSMutableArray<UICollectionViewCell *> *trackCells = [NSMutableArray array];
     for (NSArray<NSString *> *track in tracks) {
         UICollectionViewCell *cell = [[_TtC12Element_List18CollectionViewCell alloc] initWithFrame:CGRectMake(0, y, W, 56)];
         cell.backgroundColor = [UIColor colorWithWhite:0.07 alpha:1];
@@ -326,11 +342,63 @@ static NSString *trailingLabel(UIView *root) {
         UIView *row = box(content, UIView.class, content.bounds, @"Components.UI.RetrievalRowElementUI");
         row.backgroundColor = [UIColor colorWithWhite:0.07 alpha:1];
         label(row, CGRectMake(16, 8, W - 90, 18), track[0], 13, UIColor.whiteColor, @"EncoreConsumerMobile.View.Granular.Title");
-        label(row, CGRectMake(16, 30, W - 90, 15.33), track[1], 11, UIColor.whiteColor, @"EncoreConsumerMobile.View.Granular.Subtitle");
+        CGFloat artistX = 16;
+        if (track[2].length) {
+            UIView *badge = box(row, UIView.class, CGRectMake(16, 31, 13, 13), @"Components.UI.ExplicitIcon");
+            badge.backgroundColor = [UIColor colorWithWhite:0.7 alpha:1];
+            badge.layer.cornerRadius = 2;
+            UILabel *e = [[UILabel alloc] initWithFrame:badge.bounds];
+            e.text = @"E";
+            e.font = [UIFont boldSystemFontOfSize:9];
+            e.textAlignment = NSTextAlignmentCenter;
+            e.textColor = UIColor.blackColor;
+            [badge addSubview:e];
+            artistX = 33;
+        }
+        label(row, CGRectMake(artistX, 30, W - 74 - artistX, 15.33), track[1], 11, UIColor.whiteColor, @"EncoreConsumerMobile.View.Granular.Subtitle");
         actionButton(row, CGRectMake(W - 64, 4, 48, 48), @"Components.UI.ContextMenuButton-5673WA8EEUSPx1ir26lhGW", @"ellipsis", @"More options");
+        [trackCells addObject:cell];
         y += 56;
     }
     _tracksBottom = y;
+
+    // What each row shows once the header has given its artist: the line's alpha, how far the title moved, and
+    // where the badge is drawn against the end of the title's text. Then the first row is prepared for reuse and
+    // has to come back as Spotify drew it, and laid out again has to be dropped again.
+    NSString *(^rowState)(UICollectionViewCell *) = ^NSString *(UICollectionViewCell *cell) {
+        [cell layoutIfNeeded];
+        UIView *subtitle = byIdentifier(cell, @"EncoreConsumerMobile.View.Granular.Subtitle");
+        UIView *badge = byIdentifier(cell, @"Components.UI.ExplicitIcon");
+        UILabel *title = (UILabel *)byIdentifier(cell, @"EncoreConsumerMobile.View.Granular.Title-internal");
+        UIImageView *drawn = nil;
+        for (UIView *v in subtitle.superview.subviews) {
+            if ([v isKindOfClass:UIImageView.class]) drawn = (UIImageView *)v;
+        }
+        NSString *line = subtitle.alpha == 0 ? @"hidden" : @"shown";
+        NSString *badgeState = !badge ? @"" : (drawn ? [NSString stringWithFormat:@", badge drawn %.0fpt after the text (original a=%.0f, a11y %d)",
+            CGRectGetMinX([drawn.superview convertRect:drawn.frame toView:title]) -
+                [title textRectForBounds:title.bounds limitedToNumberOfLines:1].size.width, badge.alpha, drawn.isAccessibilityElement] : @", badge where it was");
+        return [NSString stringWithFormat:@"\"%@\": line %@, title moved %.1fpt, title width %.0f%@", title.text, line,
+                title.transform.ty, title.bounds.size.width, badgeState];
+    };
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        for (UICollectionViewCell *cell in trackCells) NSLog(@"[harness] row %@", rowState(cell));
+    });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [trackCells[0] prepareForReuse];
+        NSLog(@"[harness] reused, before its pass: needs layout %d", trackCells[0].layer.needsLayout);
+        UIView *row = trackCells[0].contentView.subviews.firstObject.subviews.firstObject;
+        __block CGFloat subtitleAlpha = -1, badgeAlpha = -1;
+        __block NSUInteger drawnCount = 0;
+        for (UIView *v in row.subviews) {
+            if ([v.accessibilityIdentifier isEqualToString:@"EncoreConsumerMobile.View.Granular.Subtitle"]) subtitleAlpha = v.alpha;
+            if ([v.accessibilityIdentifier isEqualToString:@"Components.UI.ExplicitIcon"]) badgeAlpha = v.alpha;
+            if ([v isKindOfClass:UIImageView.class]) drawnCount++;
+        }
+        NSLog(@"[harness] reused, restored: line a=%.0f, badge a=%.0f, drawn badges %lu", subtitleAlpha, badgeAlpha,
+              (unsigned long)drawnCount);
+        NSLog(@"[harness] reused, laid out again: row %@", rowState(trackCells[0]));
+    });
 
     // and under it the footer Spotify sends: the album's own line, the copyright, and the sections the
     // redesign drops -- each with the 16pt spacer Spotify puts between them. Fans also like stands for a

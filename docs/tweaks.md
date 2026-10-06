@@ -322,7 +322,10 @@ Redesigned:
                   is decoded and moving only in front of the app with Reduce Motion and Low Power Mode off and Auto-Play
                   Video Previews on), the title, the artist and the kind and date centred under it, and the same row of glass
                   controls -- play and shuffle float over the album page outside its header, so they are concealed
-                  there and the row carries the Kit's stand-ins, which draw their glyph and fire them. Under the tracks
+                  there and the row carries the Kit's stand-ins, which draw their glyph and fire them. A track's artist line
+                  goes where it only repeats the album's artist (with the guests the title names after "feat." and the
+                  like), its explicit badge drawn after the title instead (AlbumCredits.m decides, checked on the Mac
+                  by harness/album-credits/; a switch on the Albums & artists page). Under the tracks
                   everything the server sends is dropped -- more by the artist, videos, concerts, merch, you might also
                   like, and whatever it adds next -- but the album's own line and its copyright, each section back
                   once its switch on the Albums & artists page is off (told apart by its English heading; in another

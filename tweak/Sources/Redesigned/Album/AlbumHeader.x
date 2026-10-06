@@ -418,6 +418,8 @@ static SGRHeaderInfo *applyInfo(UIView *header, UIView *page) {
     NSString *length = metadataText(metadata);
     [info showTitle:firstText(title) creator:firstText(parent) ?: trimmed(parent.accessibilityLabel)
              length:length about:nil];
+    // The line as it reads, without the accessibility label to fall back on: no line, no row loses its artist.
+    SGRAlbumSetArtist(page, firstText(parent));
     // The kind and the date are cells the metadata row's collection view makes on its own pass, after the
     // header's, and nothing lays the header out again when they arrive; the collection is Spotify's own Swift
     // class, which cannot be watched. So an empty row is read again a moment later, a few times at most.

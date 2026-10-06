@@ -12,7 +12,8 @@
 //                      screen forces
 //     AlbumHeader.x    the header: the cover full bleed at the top dissolving into the field, and the Kit's
 //                      SGRHeaderInfo over it -- title, artist, kind and date, shuffle, a white Play, add
-//     AlbumRows.x      the track rows on the field with no surface of their own and a hairline between them
+//     AlbumRows.x      the track rows on the field with no surface of their own and a hairline between them,
+//                      and no artist line where it only repeats the album's (AlbumCredits.m decides)
 //     AlbumSections.x  everything under the tracks dropped but the album's own line and its copyright: no
 //                      more by the artist, no videos, no concerts, no merch, no you might also like, each
 //                      back once its switch is off
@@ -35,6 +36,16 @@ UIViewController *SGRAlbumSettingsPage(void);
 #define SGRKeyAlbumHideMerch @"spotifyglass.redesign.album.hide.merch"
 #define SGRKeyAlbumHideYouMightLike @"spotifyglass.redesign.album.hide.youMightLike"
 #define SGRKeyAlbumHideOther @"spotifyglass.redesign.album.hide.other"
+
+// AlbumRows.x. A track row's artist line goes when it only repeats the album's artist, with the explicit badge
+// moved up beside the title; on until switched off (AlbumSettings.m).
+#define SGRKeyAlbumHideTrackArtists @"spotifyglass.redesign.album.hide.trackArtists"
+// The album's artist as the header of the page `view` is on shows it, for the rows to compare theirs with. A
+// change lays the page's track rows out again; the same artist again is a no-op.
+void SGRAlbumSetArtist(UIView *view, NSString *artist);
+// AlbumCredits.m. Whether a row's artist line says nothing the album's header does not: it is the album's
+// artist, or the album's artist and the guests the title names after "feat.", "ft.", "featuring" or "with".
+BOOL SGRCreditRepeatsAlbum(NSString *albumArtist, NSString *rowArtist, NSString *title);
 
 // The album page `view` is on, or nil: the CreativeWorkTemplateView that carries the header, the list and
 // the two floating controls (trees/clean/album/01.txt:22).
