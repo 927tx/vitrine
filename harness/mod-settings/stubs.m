@@ -31,8 +31,6 @@ NSArray<NSDictionary *> *SGBlockedArtists(void) { return @[]; }
 
 NSString *SGDSPSummary(void) { return @"Off"; }
 NSString *SGSingSummary(void) { return @"Off"; }
-NSString *SGLiveActivitySummary(void) { return @"Off"; }
-NSString *SGVibrationsSummary(void) { return @"Controls"; }
 // An iPhone that reads headphone motion, with Spatial voice off.
 BOOL SGSingSpatialAvailable(void) { return YES; }
 BOOL SGSingSpatial(void) { return NO; }

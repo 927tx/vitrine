@@ -35,7 +35,6 @@ typedef NS_ENUM(NSInteger, SGDSPRowKind) {
 @property (nonatomic, copy) NSString *key;   // the switch; nil for output control, which is always on
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, copy) NSString *subtitle;
-@property (nonatomic, copy) NSString *symbol;
 @property (nonatomic, copy) NSArray<SGDSPRow *> *rows;
 @end
 
@@ -76,12 +75,11 @@ static SGDSPRow *fileRow(NSString *title, SGDSPFileKind kind) {
     return pageRow(title, ^NSString *{ return SGDSPChosenFile(kind); }, ^UIViewController *{ return SGDSPLibraryPage(kind); });
 }
 
-static SGDSPEffect *effect(NSString *key, NSString *title, NSString *subtitle, NSString *symbol, NSArray<SGDSPRow *> *rows) {
+static SGDSPEffect *effect(NSString *key, NSString *title, NSString *subtitle, NSArray<SGDSPRow *> *rows) {
     SGDSPEffect *e = [SGDSPEffect new];
     e.key = key;
     e.title = title;
     e.subtitle = subtitle;
-    e.symbol = symbol;
     e.rows = rows;
     return e;
 }
@@ -110,45 +108,45 @@ static NSArray<SGDSPEffect *> *effects(void) {
     SGDSPRow *width = slider(@"Width", SGKeyDSPStereoWideLevel, @"%");
     width.scale = 2;
     return @[
-        effect(nil, @"Output control", @"Gain and limiter, always on", @"speaker.wave.2", @[
+        effect(nil, @"Output control", @"Gain and limiter, always on", @[
             slider(@"Post gain", SGKeyDSPPostGain, @" dB"),
             slider(@"Limiter threshold", SGKeyDSPLimiterThreshold, @" dB"),
             slider(@"Limiter release", SGKeyDSPLimiterRelease, @" ms"),
         ]),
-        effect(SGKeyDSPCompander, @"Multiband compander", @"Evens out or livens up the dynamics", @"rectangle.compress.vertical", @[
+        effect(SGKeyDSPCompander, @"Multiband compander", @"Evens out or livens up the dynamics", @[
             row(SGDSPRowCurve, nil, SGKeyDSPCompanderGains),
             slider(@"Release", SGKeyDSPCompanderTime, @" s"),
         ]),
-        effect(SGKeyDSPBass, @"Bass boost", @"Lifts the low end", @"hifispeaker", @[
+        effect(SGKeyDSPBass, @"Bass boost", @"Lifts the low end", @[
             slider(@"Maximum gain", SGKeyDSPBassGain, @" dB"),
         ]),
-        effect(SGKeyDSPEqualizer, @"Equalizer", @"15 bands, with presets", @"slider.vertical.3", @[
+        effect(SGKeyDSPEqualizer, @"Equalizer", @"15 bands, with presets", @[
             row(SGDSPRowCurve, nil, SGKeyDSPEqualizerGains),
         ]),
-        effect(SGKeyDSPGraphicEq, @"Graphic EQ", @"Any curve, like AutoEq's corrections", @"chart.xyaxis.line", @[
+        effect(SGKeyDSPGraphicEq, @"Graphic EQ", @"Any curve, like AutoEq's corrections", @[
             pageRow(@"Response", ^NSString *{ return graphicEqSummary(); }, ^UIViewController *{ return SGDSPGraphicEqPage(); }),
         ]),
-        effect(SGKeyDSPConvolver, @"Convolver", @"Recorded rooms and speakers", @"waveform.path", @[
+        effect(SGKeyDSPConvolver, @"Convolver", @"Recorded rooms and speakers", @[
             fileRow(@"Impulse response", SGDSPFileImpulseResponse),
             choice(@"Optimization", SGKeyDSPConvolverMode, SGDSPConvolverModeNames()),
         ]),
-        effect(SGKeyDSPDDC, @"ViPER DDC", @"Headphone correction files", @"headphones", @[
+        effect(SGKeyDSPDDC, @"ViPER DDC", @"Headphone correction files", @[
             fileRow(@"DDC file", SGDSPFileDDC),
         ]),
-        effect(SGKeyDSPLiveprog, @"Liveprog", @"Effects written as EEL scripts", @"chevron.left.forwardslash.chevron.right", @[
+        effect(SGKeyDSPLiveprog, @"Liveprog", @"Effects written as EEL scripts", @[
             fileRow(@"Script", SGDSPFileLiveprog),
         ]),
-        effect(SGKeyDSPReverb, @"Reverb", @"A room around the music", @"building.columns", @[
+        effect(SGKeyDSPReverb, @"Reverb", @"A room around the music", @[
             choice(@"Room", SGKeyDSPReverbPreset, SGDSPReverbPresetNames()),
             slider(@"Amount", SGKeyDSPReverbAmount, @"%"),
         ]),
-        effect(SGKeyDSPStereoWide, @"Stereo widening", @"A wider or narrower stereo image", @"arrow.left.and.right", @[
+        effect(SGKeyDSPStereoWide, @"Stereo widening", @"A wider or narrower stereo image", @[
             width,
         ]),
-        effect(SGKeyDSPCrossfeed, @"Crossfeed", @"Softer stereo on headphones", @"ear", @[
+        effect(SGKeyDSPCrossfeed, @"Crossfeed", @"Softer stereo on headphones", @[
             choice(@"Preset", SGKeyDSPCrossfeedMode, SGDSPCrossfeedModeNames()),
         ]),
-        effect(SGKeyDSPTube, @"Analog modelling", @"Tube amplifier warmth", @"flame", @[
+        effect(SGKeyDSPTube, @"Analog modelling", @"Tube amplifier warmth", @[
             slider(@"Drive", SGKeyDSPTubeDrive, @" dB"),
         ]),
     ];
@@ -385,23 +383,6 @@ static UIFont *tabular(UIFont *font) {
 
 #pragma mark - the page
 
-// The value and the chevron of a row opening a page, as Settings' own rows draw them.
-static UIView *valueAndChevron(NSString *text) {
-    UILabel *label = [UILabel new];
-    label.font = SGTitleFont();
-    label.textColor = SGGrey();
-    label.text = text;
-    [label sizeToFit];
-    UIImageView *chevron = SGChevronView();
-    CGFloat height = MAX(label.bounds.size.height, chevron.bounds.size.height);
-    UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, label.bounds.size.width + 6 + chevron.bounds.size.width, height)];
-    label.center = CGPointMake(label.bounds.size.width / 2, height / 2);
-    chevron.center = CGPointMake(box.bounds.size.width - chevron.bounds.size.width / 2, height / 2);
-    [box addSubview:label];
-    [box addSubview:chevron];
-    return box;
-}
-
 @interface SGDSPPage : SGPage
 @end
 
@@ -567,14 +548,10 @@ static UIView *valueAndChevron(NSString *text) {
     return toggle;
 }
 
-- (void)fillHead:(UITableViewCell *)cell title:(NSString *)title subtitle:(NSString *)subtitle symbol:(NSString *)symbol {
-    SGFillCell(cell, title, subtitle, nil, nil);
-    UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
-    content.image = SGTileImage(symbol);
-    content.imageToTextPadding = 14;
-    content.secondaryTextProperties.numberOfLines = 1;
-    cell.contentConfiguration = content;
-    cell.separatorInset = UIEdgeInsetsMake(0, 58, 0, 0);
+// A row with no symbol, so its line fits beside the switch or chevron.
+- (void)fillHead:(UITableViewCell *)cell title:(NSString *)title subtitle:(NSString *)subtitle {
+    SGFillCell(cell, title, subtitle.length ? subtitle : nil, nil, nil);
+    cell.separatorInset = UIEdgeInsetsMake(0, 16, 0, 0);
 }
 
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
@@ -582,24 +559,23 @@ static UIView *valueAndChevron(NSString *text) {
     if (path.section == 0 && path.row == 2) return [self valueCell:table title:@"Headphones" value:SGDSPHeadphoneSummary()];
     if (path.section == 0) {
         UITableViewCell *cell = SGDequeueCell(table, @"master");
-        [self fillHead:cell title:@"Effects" subtitle:SGDSPStatus() symbol:@"waveform"];
+        [self fillHead:cell title:@"Effects" subtitle:SGDSPStatus()];
         cell.accessoryView = [self switchOn:SGDSPSwitch(SGKeyDSP) action:@selector(masterToggled:) tag:0];
         return cell;
     }
     SGDSPEffect *e = [self effectIn:path.section];
     if (!e) {
         UITableViewCell *cell = SGDequeueCell(table, @"reset");
-        SGFillCell(cell, @"Reset all effects", nil, SGRed(), @"arrow.counterclockwise");
+        [self fillHead:cell title:@"Reset all effects" subtitle:nil];
         UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
-        content.secondaryTextProperties.color = SGRed();
+        content.textProperties.color = SGRed();
         cell.contentConfiguration = content;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-        cell.separatorInset = UIEdgeInsetsMake(0, 48, 0, 0);
         return cell;
     }
     if (path.row == 0) {
         UITableViewCell *cell = SGDequeueCell(table, @"effect");
-        [self fillHead:cell title:e.title subtitle:e.subtitle symbol:e.symbol];
+        [self fillHead:cell title:e.title subtitle:e.subtitle];
         if (e.key) cell.accessoryView = [self switchOn:SGDSPSwitch(e.key) action:@selector(effectToggled:) tag:path.section];
         return cell;
     }
@@ -635,19 +611,13 @@ static UIView *valueAndChevron(NSString *text) {
     return SGDequeueCell(table, @"row");
 }
 
-// The value on the right beside the chevron where it fits next to the title, and under the title
-// where it does not: the compressor's transforms are longer than a narrow phone has room for.
+// The value under the title, and a chevron.
 - (UITableViewCell *)valueCell:(UITableView *)table title:(NSString *)title value:(NSString *)value {
     UITableViewCell *cell = SGDequeueCell(table, @"value");
-    CGFloat card = table.bounds.size.width - table.layoutMargins.left - table.layoutMargins.right;
-    UIView *accessory = valueAndChevron(value);
-    CGFloat titleWidth = ceil([title sizeWithAttributes:@{NSFontAttributeName: SGTitleFont()}].width);
-    BOOL fits = 16 + titleWidth + 16 + accessory.bounds.size.width + 16 <= card;
-    SGFillCell(cell, title, fits ? nil : value, nil, nil);
-    cell.accessoryView = fits ? accessory : SGChevronView();
+    [self fillHead:cell title:title subtitle:value];
+    cell.accessoryView = SGChevronView();
     cell.accessibilityValue = value;
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-    cell.separatorInset = UIEdgeInsetsMake(0, 16, 0, 0);
     return cell;
 }
 
@@ -737,6 +707,7 @@ static UIView *valueAndChevron(NSString *text) {
 }
 
 // Written into the cell rather than reloaded, so the switch beside it is never swapped under a finger.
+// The status wraps, so the row's height is measured again without reloading it.
 - (void)showStatus {
     UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
     UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
@@ -744,6 +715,7 @@ static UIView *valueAndChevron(NSString *text) {
     if (!content || [content.secondaryText isEqualToString:status]) return;
     content.secondaryText = status;
     cell.contentConfiguration = content;
+    [UIView performWithoutAnimation:^{ [self.tableView performBatchUpdates:nil completion:nil]; }];
 }
 
 - (void)confirmReset {

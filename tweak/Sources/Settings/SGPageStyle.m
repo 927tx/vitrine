@@ -5,17 +5,17 @@ static UIFont *sg_spotifyFont;
 
 // The dark appearance's secondary label, fixed rather than dynamic so a view that is not set dark reads it too.
 UIColor *SGGrey(void) { return [UIColor colorWithRed:0xEB / 255.0 green:0xEB / 255.0 blue:0xF5 / 255.0 alpha:0.6]; }
-static UIColor *tertiaryGrey(void) { return [UIColor colorWithRed:0xEB / 255.0 green:0xEB / 255.0 blue:0xF5 / 255.0 alpha:0.3]; }
 
-// Settings' text styles at their Large size, made through +systemFontOfSize: so the app font of Shared/Fonts
-// follows, and grown with Dynamic Type no further than xxxLarge: some rows are laid out by hand from these
-// fonts, and the accessibility sizes would outgrow them.
+// Spotify's typeface at the sizes of its own lists, asked for by name so the app font of Shared/Fonts follows,
+// and the system font before Spotify has registered it. Grown with Dynamic Type no further than xxxLarge:
+// some rows are laid out by hand from these fonts, and the accessibility sizes would outgrow them.
 static UIFont *scaled(UIFontTextStyle style, CGFloat size, CGFloat largest) {
-    return [[UIFontMetrics metricsForTextStyle:style] scaledFontForFont:[UIFont systemFontOfSize:size] maximumPointSize:largest];
+    UIFont *font = [UIFont fontWithName:@"SpotifyMixUI-Regular" size:size] ?: [UIFont systemFontOfSize:size];
+    return [[UIFontMetrics metricsForTextStyle:style] scaledFontForFont:font maximumPointSize:largest];
 }
 
-UIFont *SGTitleFont(void) { return scaled(UIFontTextStyleBody, 17, 23); }
-UIFont *SGSubtitleFont(void) { return scaled(UIFontTextStyleFootnote, 13, 17); }
+UIFont *SGTitleFont(void) { return scaled(UIFontTextStyleBody, 13, 18); }
+UIFont *SGSubtitleFont(void) { return scaled(UIFontTextStyleFootnote, 11, 15); }
 UIFont *SGSpotifyListFont(void) { return sg_spotifyFont ?: [UIFont systemFontOfSize:13 weight:UIFontWeightBold]; }
 
 UIImageView *SGSymbolView(NSString *name, CGFloat size, UIImageSymbolWeight weight, CGFloat box) {
@@ -122,23 +122,21 @@ UIImage *SGTileImage(NSString *symbol) {
 }
 
 UIImageView *SGChevronView(void) {
-    UIImageView *chevron = SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightSemibold, 16);
-    chevron.tintColor = tertiaryGrey();
-    return chevron;
+    return SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightBold, 16);
 }
 
 const CGFloat SGSectionHeaderHeight = 38;
 const CGFloat SGSectionGap = 20;
 
-// Every page below draws Settings' own row: a 17pt white title over a 15pt grey subtitle, with an optional
-// symbol in the leading slot, 44pt high with no subtitle.
+// Every page below draws the same row: a 13pt white title over an 11pt grey subtitle in Spotify's typeface,
+// with an optional symbol in the leading slot.
 void SGFillCell(UITableViewCell *cell, NSString *title, NSString *subtitle, UIColor *color, NSString *symbolName) {
     UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
     content.text = title;
     content.secondaryText = subtitle;
     content.textProperties.font = SGTitleFont();
     content.textProperties.color = color ?: UIColor.whiteColor;
-    content.secondaryTextProperties.font = scaled(UIFontTextStyleSubheadline, 15, 21);
+    content.secondaryTextProperties.font = SGSubtitleFont();
     content.secondaryTextProperties.color = SGGrey();
     content.textToSecondaryTextVerticalPadding = 2;
     content.directionalLayoutMargins = NSDirectionalEdgeInsetsMake(11, 16, 11, 16);

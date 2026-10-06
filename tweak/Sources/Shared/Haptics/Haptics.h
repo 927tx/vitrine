@@ -106,5 +106,3 @@ SGMusicFollows SGMusicHapticsFollows(void);
 // The Vibrations page, linked from Mod Settings' main page: the preview, then a card for Controls and one for Music
 // Haptics, each opening out into its settings while it is on.
 UIViewController *SGVibrationsSettingsPage(void);
-// What the main page's Vibrations row reads out: which of the two are on.
-NSString *SGVibrationsSummary(void);

@@ -58,5 +58,3 @@ void SGSetLiveActivityEnabled(BOOL on);
 @class UIViewController;
 // The Live Activity page: its switch, which view it shows, and the lyrics' translation and size.
 UIViewController *SGLiveActivitySettingsPage(void);
-// What the root's row reads out beside its chevron: the view shown, or Off.
-NSString *SGLiveActivitySummary(void);

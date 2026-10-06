@@ -60,6 +60,8 @@
 - (instancetype)initWithTitle:(NSString *)title intro:(NSString *)intro sections:(NSArray<SGModSection *> *)sections footer:(NSString *)footer;
 // Asks every row's `visible` again, after something other than a switch on the page changed what it reads.
 - (void)refreshVisibility;
+// Rows draw their symbol on a coloured tile; off, the default, they show none. Mod Settings' main page has them.
+@property (nonatomic) BOOL tiles;
 @end
 
 // The intro of every page whose switches the hooks read at launch.

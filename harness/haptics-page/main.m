@@ -148,10 +148,10 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
             if ([key hasPrefix:@"spotifyglass."] && [key containsString:@"haptics"]) NSLog(@"[harness] stored %@ = %@", key, all[key]);
         }
         NSLog(@"[harness] the hooks read: Controls %@ at %.0f%%, Music Haptics %@ at %.0f%% following %ld, In the Background %@, iOS's Music Haptics %@; "
-              @"the main page's row reads %@, the preview says \"%@\"", SGEnabled(SGKeyControlHaptics) ? @"on" : @"off",
+              @"the preview says \"%@\"", SGEnabled(SGKeyControlHaptics) ? @"on" : @"off",
               SGHapticsStrength(SGKeyControlStrength) * 100, SGMusicHapticsOn() ? @"on" : @"off", SGHapticsStrength(SGKeyMusicStrength) * 100,
               (long)SGMusicHapticsFollows(), SGMusicHapticsInBackground() ? @"on" : @"off", SGSystemMusicHapticsOn() ? @"on" : @"off",
-              SGVibrationsSummary(), table.tableHeaderView.accessibilityHint);
+              table.tableHeaderView.accessibilityHint);
         for (NSInteger section = 0; section < table.numberOfSections; section++) {
             NSMutableArray<NSString *> *rows = [NSMutableArray array];
             for (NSInteger row = 0; row < [table numberOfRowsInSection:section]; row++) {

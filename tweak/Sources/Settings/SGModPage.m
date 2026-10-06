@@ -806,10 +806,11 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     SGFillCell(cell, row.title, row.subtitle, row.color, row.symbol);
     UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
     if (row.color) content.secondaryTextProperties.color = row.color;
-    BOOL tile = row.symbol && !row.color;
+    BOOL tile = row.symbol && !row.color && self.tiles;
     if (tile) content.image = row.tint ? SGTileImageTinted(row.symbol, row.tint) : SGTileImage(row.symbol);
+    else if (!row.color) content.image = nil;
     cell.contentConfiguration = content;
-    cell.separatorInset = UIEdgeInsetsMake(0, row.symbol ? (tile ? SGTileRowInset : 48) : 16, 0, 0);
+    cell.separatorInset = UIEdgeInsetsMake(0, tile ? SGTileRowInset : row.symbol && row.color ? 48 : 16, 0, 0);
 
     if (row.key) {
         BOOL locked = flagRowLocked(row);

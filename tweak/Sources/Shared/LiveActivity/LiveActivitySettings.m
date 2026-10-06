@@ -27,10 +27,3 @@ UIViewController *SGLiveActivitySettingsPage(void) {
                        @"How long the sound fades before a sleep timer pauses Spotify: the one set from the Timer tab, the Sleep Timer shortcut or Control Center, and Spotify's own from the player's ⋯ menu."),
     ] footer:nil];
 }
-
-NSString *SGLiveActivitySummary(void) {
-    if (!SGFlag(SGKeyLiveActivity, NO)) return @"Off";
-    NSInteger index = SGInt(SGKeyLiveActivityView, SGLiveActivityLyrics);
-    NSArray<NSString *> *names = viewNames();
-    return index >= 0 && index < (NSInteger)names.count ? names[index] : names.firstObject;
-}

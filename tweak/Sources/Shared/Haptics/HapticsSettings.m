@@ -228,8 +228,3 @@ UIViewController *SGVibrationsSettingsPage(void) {
     return page;
 }
 
-NSString *SGVibrationsSummary(void) {
-    BOOL controls = SGEnabled(SGKeyControlHaptics), music = SGMusicHapticsOn() || SGMusicHapticsInBackground();
-    if (controls && music) return @"On";
-    return controls ? @"Controls" : music ? @"Music Haptics" : @"Off";
-}

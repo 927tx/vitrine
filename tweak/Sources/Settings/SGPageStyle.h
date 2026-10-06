@@ -1,7 +1,7 @@
-// The system Settings app's look, for every page of the mod's, in its dark appearance: cards of #1C1C1E on
-// black, 17pt titles over 15pt grey subtitles, 13pt uppercase section headers and notes, a white symbol on a
-// coloured rounded square leading a row, switches in the look's accent colour. The text follows Dynamic Type
-// up to the largest size before the accessibility ones, and the app font of Shared/Fonts.
+// The look of every page of the mod's, in the dark appearance: cards of #1C1C1E on black, 13pt titles over 11pt
+// grey subtitles in Spotify's typeface, 11pt uppercase section headers and notes, a white symbol on a coloured
+// rounded square leading a row, white chevrons, switches in the look's accent colour. The text follows Dynamic
+// Type up to the largest size before the accessibility ones, and the app font of Shared/Fonts.
 #import <UIKit/UIKit.h>
 
 UIColor *SGGrey(void);   // the secondary label's grey
@@ -9,8 +9,8 @@ UIColor *SGGreen(void);
 UIColor *SGRed(void);
 UIColor *SGPageBackground(void);
 UIColor *SGCardBackground(void);
-UIFont *SGTitleFont(void);      // a row's title and value, Settings' body
-UIFont *SGSubtitleFont(void);   // section headers, footers and notes, Settings' footnote
+UIFont *SGTitleFont(void);      // a row's title and value, 13pt
+UIFont *SGSubtitleFont(void);   // subtitles, section headers, footers and notes, 11pt
 // Takes the 13pt title font off Spotify's own settings list, once, for the Mod Settings row the mod adds to it
 // (App/ModSettings.x), which reads as one of Spotify's rows; SGSpotifyListFont hands it out.
 void SGAdoptFonts(UIView *list, UIView *exclude);

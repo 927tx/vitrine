@@ -76,24 +76,19 @@ static UIViewController *modSettingsPage(void) {
         home,
     ])];
 
-    // Sing and the audio effects work on the sound, so both looks have them, each saying beside the chevron
-    // whether it is on, how far Sing's voice model has come or how many effects are on.
+    // Sing and the audio effects work on the sound, so both looks have them; Audio effects says how many are on.
     SGModRow *sing = pageRow(@"Karaoke", @"music.mic", UIColor.systemRedColor, ^UIViewController *{ return SGSingSettingsPage(); });
-    sing.value = ^NSString *{ return SGSingSummary(); };
     SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", UIColor.systemOrangeColor, ^UIViewController *{ return SGDSPSettingsPage(); });
     audioEffects.value = ^NSString *{ return SGDSPSummary(); };
     // Spatial voice is Sing's too, and shows where the iPhone reads headphone motion, as on Sing's page.
     SGModRow *spatial = pageRow(@"Spatial voice", @"person.wave.2", UIColor.systemIndigoColor, ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
-    spatial.value = ^NSString *{ return SGSingSpatial() ? @"On" : @"Off"; };
     spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
-    // Vibrations hook Spotify's own controls and its audio, so they answer under either look; the row says which are on.
+    // Vibrations hook Spotify's own controls and its audio, so they answer under either look.
     SGModRow *vibrations = pageRow(@"Vibrations", @"iphone.radiowaves.left.and.right", UIColor.systemPinkColor, ^UIViewController *{ return SGVibrationsSettingsPage(); });
-    vibrations.value = ^NSString *{ return SGVibrationsSummary(); };
     NSMutableArray<SGModRow *> *features = [NSMutableArray arrayWithObjects:sing, spatial, audioEffects, vibrations, nil];
     // The Live Activity works under both looks, where ActivityKit's card does.
     if (@available(iOS 17.0, *)) {
         SGModRow *liveActivity = pageRow(@"Live Activity", @"platter.filled.top.iphone", UIColor.systemTealColor, ^UIViewController *{ return SGLiveActivitySettingsPage(); });
-        liveActivity.value = ^NSString *{ return SGLiveActivitySummary(); };
         [features addObject:liveActivity];
     }
     [features addObjectsFromArray:@[
@@ -115,7 +110,9 @@ static UIViewController *modSettingsPage(void) {
         ]),
         SGSection(nil, @[mod]),
     ]];
-    return [[SGModPage alloc] initWithTitle:@"Vitrine" intro:nil sections:sections footer:nil];
+    SGModPage *page = [[SGModPage alloc] initWithTitle:@"Vitrine" intro:nil sections:sections footer:nil];
+    page.tiles = YES;
+    return page;
 }
 
 #pragma mark - row in the settings list and the side drawer
