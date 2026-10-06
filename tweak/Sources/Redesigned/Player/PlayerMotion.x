@@ -13,12 +13,18 @@
 // Spotify built again, gets it.
 //
 // The clip holds still when the moving field does (SGRField.m): out of a window, with the app not in front,
-// while the player opens or closes, under Reduce Motion and in Low Power Mode. While a clip is showing, the
-// Fluid field under it is held still too, and once the clip has faded in it is hidden (the field's covered):
-// the field's colour is what shows above the clip on the pull that dismisses.
+// while the player opens or closes, under Reduce Motion and in Low Power Mode, and while the song is paused.
+// While a clip is showing, the Fluid field under it is held still too, and once the clip has faded in it is
+// hidden (the field's covered): the field's colour is what shows above the clip on the pull that dismisses.
 //
 // The clip and the cover cross over: the clip fades in from its first frame (the poster, under the video
-// until the video has decoded one) as the cover fades out, and fades out as the cover comes back.
+// until the video has decoded one) as the cover fades out, and fades out as the cover comes back. A clip
+// that has drawn no frame of its own after kGiveUp seconds on screen is given up, and the cover comes back.
+// On a skip the last clip stays a moment (kHandOver), so a clip already in the store (the next track's is
+// fetched ahead, SGMotionFollower) crosses over it with no cover between.
+//
+// Spotify's music video (Switch to video) draws in one of three of its units, each told by its video surface
+// as the video comes and goes: while one shows it, the clip goes and the cover comes back, as for Fluid.
 #import <AVFoundation/AVFoundation.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
@@ -36,9 +42,15 @@ static const CGFloat kCanvasAspect = 1.5;
 // The blur starts at the seam, or this share of the screen down where that is higher, so it is under the
 // controls whatever the clip's shape; it is whole kBlurRamp points below its start.
 static const CGFloat kBlurByControls = 0.6, kBlurRamp = 96;
+// Seconds a clip may be on screen in front without drawing a frame before it is given up.
+static const NSTimeInterval kGiveUp = 5;
+// Seconds the last track's clip stays on a skip for the next one's to come in over it.
+static const NSTimeInterval kHandOver = 0.4;
 
-@interface SGRPlayerMotionView : UIView
+@interface SGRPlayerMotionView : UIView <SGPlayerStateObserver>
 @property (nonatomic) CGFloat screenHeight;
+// Runs when the clip has drawn nothing kGiveUp seconds after it was first on screen in front.
+@property (nonatomic, copy) void (^gaveUp)(void);
 - (void)playFile:(NSURL *)file poster:(UIImage *)poster;
 - (void)appear:(BOOL)animated then:(void (^)(void))done;
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated;
@@ -54,6 +66,7 @@ static const CGFloat kBlurByControls = 0.6, kBlurRamp = 96;
     CALayer *_foot;
     UIVisualEffectView *_seamBlur, *_lyricsBlur;
     CGFloat _aspect;
+    BOOL _timing;   // the give-up's count is running
 }
 
 // What fades is the effect views' effect, never their alpha or an ancestor's: UIKit draws a blur under a
@@ -104,7 +117,12 @@ static UIBlurEffect *blurEffect(void) {
         [center addObserver:self selector:@selector(updateMotionSoon) name:name object:nil];
     }
     SGRObservePlayerTransition(self, ^(id owner) { [owner updateMotion]; }, ^(id owner) { [owner updateMotion]; });
+    SGAddPlayerStateObserver(self);
     return self;
+}
+
+- (void)playerStateDidChange:(SPTPlayerState *)state {
+    [self updateMotion];
 }
 
 - (void)dealloc {
@@ -196,9 +214,23 @@ static UIBlurEffect *blurEffect(void) {
 // A locked phone keeps the player in its window, so being in front counts as much as being in one.
 - (void)updateMotion {
     BOOL front = UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
-    BOOL may = self.window && front && !SGRPlayerIsTransitioning() && !SGRReduceMotion() && !NSProcessInfo.processInfo.lowPowerModeEnabled;
+    BOOL may = self.window && front && !SGRPlayerIsTransitioning() && !SGRReduceMotion() && !NSProcessInfo.processInfo.lowPowerModeEnabled
+        && !SGPlayerState().isPaused;
     if (may) [_player play];
     else [_player pause];
+    // A paused player still draws the clip's first frame, so the count runs whenever it is on screen in front.
+    if (_player && self.window && front && !_timing && !_clip.readyForDisplay) {
+        _timing = YES;
+        __weak SGRPlayerMotionView *weakSelf = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kGiveUp * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            SGRPlayerMotionView *view = weakSelf;
+            if (!view) return;
+            view->_timing = NO;
+            // Taken off screen meanwhile, the count starts again when it is back.
+            BOOL shown = view.window && UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
+            if (shown && !view->_clip.readyForDisplay && view.gaveUp) view.gaveUp();
+        });
+    }
 }
 
 - (void)didMoveToWindow {
@@ -209,7 +241,9 @@ static UIBlurEffect *blurEffect(void) {
 @end
 
 static SGRPlayerMotionView *sg_motion;
-static NSString *sg_track;
+static NSString *sg_track;   // the track playing
+static NSString *sg_shown;   // the track sg_motion is the clip of
+static NSUInteger sg_begun;   // counts the walks begun, so a poster read for an earlier one is dropped
 // The clip sg_motion plays and its poster, for the Player page's showcase (SGRPlayerMotionPreview).
 static NSURL *sg_motionFile;
 static UIImage *sg_motionPoster;
@@ -316,10 +350,20 @@ UIView *SGRPlayerMotionPreview(void) {
     return preview;
 }
 
+static SGMotionFollower *sg_follower;
+
+// Spotify's units that are showing its music video, held weakly: one that goes without saying so lets go.
+static NSHashTable *sg_videos;
+
+static BOOL videoShowing(void) {
+    return sg_videos.allObjects.count > 0;
+}
+
 // The clip fades out over the cover coming back where the player is on screen, and goes at once where not.
 static void clear(BOOL animated) {
     SGRPlayerMotionView *old = sg_motion;
     sg_motion = nil;
+    sg_shown = nil;
     sg_motionFile = nil;
     sg_motionPoster = nil;
     // Uncovered before the clip starts to fade, so the field is there under it.
@@ -333,10 +377,19 @@ static void clear(BOOL animated) {
 
 static void show(NSString *track, NSURL *file) {
     if (!file || ![track isEqualToString:sg_track]) return;
+    NSUInteger begun = sg_begun;
     SGMotionPoster(file, ^(UIImage *poster) {
-        if (!poster || poster.size.width <= 0 || ![track isEqualToString:sg_track]) return;
+        // A walk begun while the poster was read (switched off, Spotify's video) has the say.
+        if (!poster || poster.size.width <= 0 || begun != sg_begun) return;
         clear(YES);
         sg_motion = [[SGRPlayerMotionView alloc] initWithFrame:CGRectZero];
+        sg_shown = track;
+        SGRPlayerMotionView *motion = sg_motion;
+        motion.gaveUp = ^{
+            if (sg_motion != motion) return;
+            SGLog(@"redesign player: animated artwork %@ drew nothing in %.0f s, given up", file.lastPathComponent, kGiveUp);
+            clear(YES);
+        };
         [sg_motion playFile:file poster:poster];
         sg_motionFile = file;
         sg_motionPoster = poster;
@@ -344,7 +397,6 @@ static void show(NSString *track, NSURL *file) {
         holdField();
         [sg_motion setBlurred:SGRPlayerLyricsOpen() animated:NO];
         BOOL animated = sg_motion.window != nil;
-        SGRPlayerMotionView *motion = sg_motion;
         [motion appear:animated then:^{
             if (sg_motion == motion) cover(YES);
         }];
@@ -357,7 +409,35 @@ void SGRPlayerMotionLyricsChanged(void) {
     [sg_motion setBlurred:SGRPlayerLyricsOpen() animated:sg_motion.window != nil];
 }
 
-static SGMotionFollower *sg_follower;
+static void videoSurface(id unit, BOOL attached) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        BOOL was = videoShowing();
+        if (attached) [sg_videos addObject:unit];
+        else [sg_videos removeObject:unit];
+        if (videoShowing() == was) return;
+        SGLog(@"redesign player: Spotify's video %@", was ? @"gone, the clip looked up again" : @"showing, the clip away");
+        [sg_follower restart];
+    });
+}
+
+// A skip on screen leaves the last clip a moment for the next one's to cross over, and the same track
+// walked again (its Canvas came late) keeps its clip until the new one does. Otherwise the clip goes at
+// once: off screen, for Spotify's video, and when the background is not Animated.
+static BOOL beginTrack(NSString *track) {
+    sg_track = track;
+    sg_begun++;
+    // Read on every track, since the ⋯ menu switches it.
+    BOOL wanted = SGRPlayerBackground() == SGRPlayerBackgroundAnimated && !videoShowing();
+    if (wanted && [track isEqualToString:sg_shown]) return YES;
+    if (!wanted || !sg_motion.window) {
+        clear(YES);
+        return wanted;
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kHandOver * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if ([track isEqualToString:sg_track] && sg_motion && ![track isEqualToString:sg_shown]) clear(YES);
+    });
+    return YES;
+}
 
 #pragma mark - the ⋯ menu's switch (Shared/Player/SpeedPitch.h)
 
@@ -382,17 +462,51 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
     [sg_follower restart];
 }
 
+%group SGRVideoSurfaces
+%hook _TtC28NowPlaying_ContentLayersImpl24HorizontalVideoViewModel
+- (void)videoSurfaceDidAttachVideo:(id)surface {
+    %orig;
+    videoSurface(self, YES);
+}
+- (void)videoSurfaceDidDetachVideo:(id)surface {
+    %orig;
+    videoSurface(self, NO);
+}
+%end
+
+%hook _TtC28NowPlaying_ContentLayersImpl31VerticalVideoCellImplementation
+- (void)videoSurfaceDidAttachVideo:(id)surface {
+    %orig;
+    videoSurface(self, YES);
+}
+- (void)videoSurfaceDidDetachVideo:(id)surface {
+    %orig;
+    videoSurface(self, NO);
+}
+%end
+
+%hook _TtC22NowPlaying_ElementsKit14VideoElementUI
+- (void)videoSurfaceDidAttachVideo:(id)surface {
+    %orig;
+    videoSurface(self, YES);
+}
+- (void)videoSurfaceDidDetachVideo:(id)surface {
+    %orig;
+    videoSurface(self, NO);
+}
+%end
+%end
+
 %ctor {
     if (!SGRedesignedUI()) return;
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
     if (background != SGRPlayerBackgroundFluid && background != SGRPlayerBackgroundAnimated) return;
+    sg_videos = [NSHashTable weakObjectsHashTable];
     sg_follower = [[SGMotionFollower alloc] initWithBegin:^BOOL(NSString *uri, SPTPlayerState *state) {
-        sg_track = uri;
-        clear(YES);
-        // Read on every track, since the ⋯ menu switches it.
-        return SGRPlayerBackground() == SGRPlayerBackgroundAnimated;
+        return beginTrack(uri);
     } found:^(NSString *uri, NSURL *file) {
         if (file) show(uri, file);
         else clear(YES);
     }];
+    %init(SGRVideoSurfaces);
 }

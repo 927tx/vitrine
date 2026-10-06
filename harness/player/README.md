@@ -59,8 +59,11 @@ come late, out of order, or not at all.
   out, the lyrics open and close, the background is built again, and the ⋯ menu's switch goes off, on, and
   off with the player out of its window. Each step is checked (the clip on the field, the cover hidden, the
   poster under the video and the Fluid field held under it, the foot and the blur, the thumbnail, the clip
-  and the cover crossing over half way through the switch) and the log ends with
-  `motion checks: n of 11 right -- PASS` or `FAIL`.
+  and the cover crossing over half way through the switch). Then the song pauses and plays (the clip's rate
+  0, then 1), a mock of Spotify's video unit attaches and detaches its video (the clip goes and comes back),
+  a track comes with no Canvas and then again with one (the clip comes in late), and a skip to a track whose
+  clip is in the store keeps the last clip until the new one is over it, the cover hidden throughout. The log
+  ends with `motion checks: n of 20 right -- PASS` or `FAIL`.
 
 - `settings` opens the redesign's Player page (`PlayerSettings.m`, with the real `Settings/` framework) over the
   player at 3 s, with the clip of `motion` in. It checks the card leads the page with the four backgrounds'

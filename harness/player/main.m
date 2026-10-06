@@ -24,6 +24,7 @@
 //              Animated again, the note under it changing and the rows under the header holding still;
 //              each step checked, the log ends with settings checks n of m right -- PASS or FAIL
 // HARNESS_VOLUME=0 leaves out the volume row the phone has (trees/clean/player/01.txt has none).
+#import <AVFoundation/AVFoundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import "Shared/Lyrics/Lyrics.h"
@@ -185,6 +186,13 @@ static NSString *colorName(UIImage *image) {
 
 @interface _TtC21NowPlaying_ScrollImpl27NPVBackgroundViewController : UIViewController @end
 @implementation _TtC21NowPlaying_ScrollImpl27NPVBackgroundViewController @end
+
+// One of the units Spotify shows its music video in (Switch to video); PlayerMotion.x hooks its video surface.
+@interface _TtC22NowPlaying_ElementsKit14VideoElementUI : NSObject @end
+@implementation _TtC22NowPlaying_ElementsKit14VideoElementUI
+- (void)videoSurfaceDidAttachVideo:(id)surface {}
+- (void)videoSurfaceDidDetachVideo:(id)surface {}
+@end
 
 @interface _TtC18NowPlaying_BarImpl27NowPlayingBarViewController : UIViewController @end
 @implementation _TtC18NowPlaying_BarImpl27NowPlayingBarViewController @end
@@ -905,7 +913,59 @@ static BOOL fieldCovered(void) {
         [self expect:!self->_covers.layer.mask step:@"switched off with the player closed" detail:self->_covers.layer.mask ? @"cover still hidden" : @"cover back"];
         [self->_list addSubview:self->_host];
     });
-    after(15.7, ^{
+    after(15.7, ^{ SGPlayerMenuSetAnimatedArtwork(YES); });
+    // The song paused and played again: the clip holds its frame, then moves on.
+    after(17.2, ^{
+        AVPlayer *player = [motionView() valueForKey:@"_player"];
+        AVPlayerLayer *clip = [motionView() valueForKey:@"_clip"];
+        [self expect:player.rate > 0 && clip.readyForDisplay step:@"playing" detail:[NSString stringWithFormat:@"clip at rate %.1f, %@", player.rate,
+              clip.readyForDisplay ? @"drawn" : @"not drawn"]];
+        SGRHarnessSetTrack(@"spotify:track:harnessA", imageURI(@"aaaa"), YES);
+        AVPlayer *paused = [motionView() valueForKey:@"_player"];
+        [self expect:motionView() && paused.rate == 0 step:@"paused" detail:[NSString stringWithFormat:@"clip %@ at rate %.1f",
+              motionView() ? @"there" : @"gone", paused.rate]];
+        SGRHarnessSetTrack(@"spotify:track:harnessA", imageURI(@"aaaa"), NO);
+        [self expect:paused.rate > 0 step:@"played again" detail:[NSString stringWithFormat:@"rate %.1f", paused.rate]];
+    });
+    // Spotify's music video comes and goes: the clip goes for it, and comes back after.
+    __block id video = nil;
+    after(17.5, ^{
+        video = [NSClassFromString(@"_TtC22NowPlaying_ElementsKit14VideoElementUI") new];
+        [video videoSurfaceDidAttachVideo:nil];
+    });
+    after(18.5, ^{
+        [self expect:!SGRPlayerMotionShowing() step:@"Spotify's video showing" detail:SGRPlayerMotionShowing() ? @"the clip stayed" : @"the clip went"];
+        [video videoSurfaceDidDetachVideo:nil];
+    });
+    after(19.5, ^{
+        [self expect:SGRPlayerMotionShowing() && self->_covers.layer.mask step:@"Spotify's video gone"
+              detail:SGRPlayerMotionShowing() ? @"the clip back" : @"no clip"];
+        // A track whose first state names no Canvas, as on a skip before Spotify's extended metadata.
+        unsetenv("HARNESS_CANVAS");
+        SGRHarnessSetTrack(@"spotify:track:harnessB", imageURI(@"bbbb"), NO);
+    });
+    after(20.5, ^{
+        [self expect:!SGRPlayerMotionShowing() step:@"a track with no Canvas yet" detail:SGRPlayerMotionShowing() ? @"a clip left" : @"no clip"];
+        setenv("HARNESS_CANVAS", "https://canvas.harness/clip.mp4", 1);
+        SGRHarnessSetTrack(@"spotify:track:harnessB", imageURI(@"bbbb"), NO);
+    });
+    // A skip to a track whose clip is in the store: the clip stays for the next one to cross over it.
+    __block UIView *before = nil;
+    after(21.5, ^{
+        [self expect:SGRPlayerMotionShowing() step:@"its Canvas came late" detail:SGRPlayerMotionShowing() ? @"the clip in" : @"no clip"];
+        before = motionView();
+        SGRHarnessSetTrack(@"spotify:track:harnessC", imageURI(@"cccc"), NO);
+    });
+    after(21.6, ^{
+        [self expect:SGRPlayerMotionShowing() && self->_covers.layer.mask step:@"skipped, the clip kept a moment"
+              detail:SGRPlayerMotionShowing() ? @"a clip in" : @"the cover back"];
+    });
+    after(22.3, ^{
+        CALayer *mask = self->_covers.layer.mask;
+        [self expect:SGRPlayerMotionShowing() && motionView() != before && mask && mask.opacity == 0 step:@"the next clip over the last"
+              detail:[NSString stringWithFormat:@"%@, cover %@", motionView() != before ? @"a new clip" : @"the same clip", mask && mask.opacity == 0 ? @"still hidden" : @"back"]];
+    });
+    after(23, ^{
         NSLog(@"[harness] motion checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
               self->_failures ? @"FAIL" : @"PASS");
     });

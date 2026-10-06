@@ -354,7 +354,10 @@ Redesigned:
                   cross over as one comes and the other goes, the clip from its poster frame before the video has
                   decoded one, and the Fluid field under a clip holds still and, once the clip has faded in, is hidden
                   (SGRArtworkField's covered); the menu switches it between Animated
-                  and Fluid without a restart. Checked in the simulator against harness/player/ (`motion`)
+                  and Fluid without a restart. The clip holds its frame while the song is paused, goes while
+                  Spotify's music video shows, is given up when it has drawn nothing in 5 s on screen, and on a skip
+                  stays a moment for the next track's to cross over it. Checked in the simulator against
+                  harness/player/ (`motion`)
     Lyrics/       the full screen lyrics page on glass with Apple Music style lyrics over it, always on (SGRKaraokeView,
                   which the player shows in itself too, Player/PlayerLyrics.x): lines sung over each other lit together,
                   the stack moving on once the first is sung out; an instrumental break of 7 s or more held by three dots
