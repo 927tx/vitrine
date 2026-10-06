@@ -429,7 +429,8 @@ follows the head through AirPods, or sways gently without them and holds still u
 saying which, then the switch), the voice model's download, Runs on (GPU, GPU
 and Neural Engine, Neural Engine) and Ignore heat warnings, all applying straight away. Player: Gestures, AirPods gestures, Blocked
 artists (with the count on the row) and Lock screen widget (Moving artwork, Lyrics or Every song, and the
-lyrics' style, Still or Animated), which work with either look;
+lyrics' style, Still or Animated, and Spotify's like and dislike buttons' flag; its podcast, audiobook and artwork
+flags stay in All flags), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
