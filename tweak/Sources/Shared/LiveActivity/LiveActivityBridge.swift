@@ -36,7 +36,12 @@ public final class SGLiveActivityBridge: NSObject {
     private struct Pending: Sendable {
         var changes: [Change] = []
         var sending = false
+        // When the change being sent went out. One ActivityKit never answers would otherwise hold every
+        // later change behind it and freeze the card; past kStuckAfter a new sender takes over.
+        var sentAt: Date?
     }
+
+    private static let kStuckAfter: TimeInterval = 5
 
     private static let pending = OSAllocatedUnfairLock(initialState: Pending())
 
@@ -46,8 +51,10 @@ public final class SGLiveActivityBridge: NSObject {
                 pending.changes.removeLast()
             }
             pending.changes.append(change)
-            if pending.sending { return false }
+            if pending.sending, let at = pending.sentAt, Date().timeIntervalSince(at) < kStuckAfter { return false }
+            if pending.sending { log.notice("[spotifyglass] live activity: an update has not landed in \(kStuckAfter, privacy: .public) s, sending on past it") }
             pending.sending = true
+            pending.sentAt = nil
             return true
         }
         if start { Task { await send() } }
@@ -57,8 +64,10 @@ public final class SGLiveActivityBridge: NSObject {
         while let change = pending.withLock({ pending -> Change? in
             if pending.changes.isEmpty {
                 pending.sending = false
+                pending.sentAt = nil
                 return nil
             }
+            pending.sentAt = Date()
             return pending.changes.removeFirst()
         }) {
             switch change {

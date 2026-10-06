@@ -18,7 +18,8 @@
 // before the last one ended: something new was played.
 //
 // The model is held only while the mic is on, and loaded on a queue of its own. From the thermal state
-// Serious on, the engine is held and plays dry, unless Ignore heat warnings is on.
+// At Critical the engine is held and plays dry, unless Ignore heat warnings is on. Serious is where a
+// charging iPhone sits for hours, and iOS itself only throttles hard at Critical.
 //
 // Spatial voice listens to Shared/HeadGestures' motion (the app's one CMHeadphoneMotionManager) while Sing is
 // on and Spotify plays, and hands the engine the head's yaw off a front that follows where the head points over
@@ -473,7 +474,7 @@ static void watch(void) {
 #pragma mark - the heat
 
 static void readHeat(void) {
-    BOOL hot = NSProcessInfo.processInfo.thermalState >= NSProcessInfoThermalStateSerious;
+    BOOL hot = NSProcessInfo.processInfo.thermalState >= NSProcessInfoThermalStateCritical;
     if (hot == sg_hot) return;
     sg_hot = hot;
     SGLog(@"sing: the iPhone is %@%@", hot ? @"hot" : @"cool again", hot && SGHidden(SGKeySingIgnoreHeat) ? @", and heat warnings are ignored" : @"");
