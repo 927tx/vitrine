@@ -37,5 +37,45 @@ sign() {  # sign [bundle id]
 }
 
 if [ -n "$APP_ID" ] && [ "$APP_ID" != "*" ]; then sign "$APP_ID"; else sign; fi
+# The paired iPhone's UDID; its state reads "connected" over USB and "available (paired)" over Wi-Fi.
+phone() { xcrun devicectl list devices 2>/dev/null | awk '/physical/ && /iPhone/ && (/connected/ || /available/) { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-F]+-[0-9A-F]+$/) { print $i; exit } }'; }
+
+# An install waits on the app while it runs, so a copy already on the phone is quit first.
+quit_app() {
+  [ -n "$APP_ID" ] && [ "$APP_ID" != "*" ] || return 0
+  local udid apps procs pid
+  udid="$(phone)"; [ -n "$udid" ] || return 0
+  apps="$(mktemp)"; procs="$(mktemp)"
+  xcrun devicectl device info apps --device "$udid" --bundle-id "$APP_ID" --json-output "$apps" >/dev/null 2>&1 || true
+  xcrun devicectl device info processes --device "$udid" --json-output "$procs" >/dev/null 2>&1 || true
+  pid="$(python3 - "$apps" "$procs" <<'PY' 2>/dev/null || true
+import json, sys
+apps = json.load(open(sys.argv[1]))["result"]["apps"]
+if apps:
+    for p in json.load(open(sys.argv[2]))["result"]["runningProcesses"]:
+        if p.get("executable", "").startswith(apps[0]["url"]):
+            print(p["processIdentifier"])
+            break
+PY
+)"
+  rm -f "$apps" "$procs"
+  [ -n "$pid" ] || return 0
+  echo "==> quitting the running app ($pid)"
+  xcrun devicectl device process terminate --device "$udid" --pid "$pid" >/dev/null 2>&1 || true
+}
+
+quit_app
 echo "==> installing $SIGNED"
-ideviceinstaller ${WIFI:+-n} install "$SIGNED" 2>&1 | tail -3
+# USB through libimobiledevice when a cable is in, given three minutes, since it can stall for good partway;
+# otherwise, or after a stall, Xcode's devicectl, which reaches a paired phone over USB or Wi-Fi.
+limited() { if command -v timeout >/dev/null; then timeout 180 "$@"; else "$@"; fi; }
+usb=; { [ -n "$(idevice_id -l)" ] || [ -n "${WIFI:-}" ]; } && usb=1
+if [ -n "$usb" ] && out="$(limited ideviceinstaller ${WIFI:+-n} install "$SIGNED" 2>&1)"; then
+  printf '%s\n' "$out" | tail -3
+else
+  if [ -n "$usb" ]; then echo "==> ideviceinstaller stalled or failed, using devicectl"; fi
+  UDID="$(phone)"
+  [ -n "$UDID" ] || { echo "no iPhone over USB or the network" >&2; exit 1; }
+  echo "==> installing through devicectl to $UDID"
+  xcrun devicectl device install app --device "$UDID" "$SIGNED" 2>&1 | grep -E "installationURL|error|Error" | tail -3
+fi
