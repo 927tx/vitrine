@@ -17,7 +17,7 @@
     tweak/Sources/Redesigned/   the redesign, running only while Redesigned UI is on
     tweak/Sources/App/          what brings the layers together: Mod Settings' root and composed pages, the Mod page,
                                 backup and signing, the welcome tour
-    tweak/Sources/Diagnostics/  screen dumps, the tree server and the main thread hang sampler of FLEX builds
+    tweak/Sources/Diagnostics/  screen dumps, the tree server, the phone driver and the main thread hang sampler of FLEX builds
     extension/LiveActivity/     the Live Activity widget, a WidgetKit extension of its own
     extension/AppGroups/        a dylib loaded by Spotify and its home screen widget that moves Spotify's App Groups
                                 into a group the re-signed IPA has; without it the widget stays a placeholder
@@ -513,6 +513,46 @@ and Live Activity. The root page in `App/ModSettings.x` links the Appearance pag
                     # (SCREENS="playlist artist" for some); every snapshot says whether the mod was at stock
     make log        # stream [spotifyglass] log lines from the phone
     make flags      # regenerate the flag table from the IPA
+
+## Diagnostics
+
+A build with FLEX in it (`make build`, `make install FLEX=1`) runs `Diagnostics/`: the tree server, the hang
+sampler, and the phone driver, which lets an agent on the Mac work the app without anyone touching the phone.
+The server listens on the phone's loopback only, 127.0.0.1:8085, which the Mac reaches through iproxy over
+USB and nothing on Wi-Fi reaches. `GET /tree` answers with the visible screen's view tree, as `make trees`
+records it. The driver adds `GET /<command>?<params>`, each answering JSON with `ok` and either what happened
+or an `error`. A command needs an `X-Phone-Driver` header, which a web page on the phone cannot send to the
+loopback without a CORS preflight the server never grants (`curl -H 'X-Phone-Driver: 1'`). It is compiled only with `SG_DRIVER=1`, which `scripts/pipeline.sh` sets for the builds that
+carry FLEX; `make release` and the release workflow's `.deb` leave it out, and it starts only when FLEX is
+there.
+
+`scripts/phone.py` is the client. It uses whatever already answers on 127.0.0.1:8085 or starts iproxy and
+leaves it running:
+
+    scripts/phone.py tree | state | log [--since N]
+    scripts/phone.py find --class UILabel
+    scripts/phone.py tap --id X | --label X | --text X | --class C [--index N] | --at X,Y
+    scripts/phone.py longpress --id X [--duration 1]
+    scripts/phone.py swipe --from X,Y --to X,Y [--duration 0.2] [--drag 1]
+    scripts/phone.py scroll [--id X] --by 0,400
+    scripts/phone.py type "text"
+    scripts/phone.py player.open | player.close | player.more | play | pause | next | seek 42
+    scripts/phone.py menu.pick "Sleep timer"
+    scripts/phone.py tab 0 | tab Search
+    scripts/phone.py settings.open | settings.page "Appearance"
+    scripts/phone.py wait --id X [--gone 1] | --menu 1 | --log "system menu: the player's menu is up" [--timeout 3]
+    scripts/phone.py screenshot out.png
+
+Views are addressed as the tree prints them: `id=` is the accessibility identifier, `a11y=` the accessibility
+label, the quoted text a label's, and a class with an index counts that class's views in the tree's order.
+Points are screen points, the frames `find` prints. Touches are made as a finger's (`harness/tabbar/touch.m`'s
+way: a UITouch and the IOHIDEvent gesture recognizers read, through `-[UIApplication sendEvent:]`), so
+controls get their control events, recognizers recognize, and a button whose menu is its primary action opens
+it on the touch down. `menu.pick` taps a row of the system's menu, not of Spotify's own sheet (tap that by
+`--text`). `log` reads the app's last 2000 `SGLog` lines from memory, so no device log capture is needed;
+a log wait looks from the start of the last command that did something. Everything runs on the main thread
+through `dispatch_async` and a semaphore with a timeout, waited on from the server's thread only. Checked in
+the simulator by harness/driver/.
 
 ## Mod Settings
 

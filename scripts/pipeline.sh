@@ -83,7 +83,8 @@ if ! xcrun -sdk iphoneos --find clang >/dev/null 2>&1; then
          TARGET_STRIP=strip TARGET_LIPO=lipo TARGET_CODESIGN_ALLOCATE=codesign_allocate TARGET_LIBTOOL=libtool
 fi
 # Theos builds its Swift support tools only at MAKELEVEL 0, and `make release` hands this script MAKELEVEL 1.
-env -u MAKELEVEL gmake -C "$ROOT/tweak" clean package >/dev/null
+# A build with FLEX carries the phone driver too (tweak/Makefile, SG_DRIVER); --no-flex leaves it out.
+env -u MAKELEVEL gmake -C "$ROOT/tweak" clean package SG_DRIVER="$WITH_FLEX" >/dev/null
 TWEAK_DEB="$(ls -t "$ROOT"/tweak/packages/*.deb | head -1)"
 echo "    $TWEAK_DEB"
 

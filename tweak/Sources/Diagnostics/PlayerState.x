@@ -87,9 +87,16 @@ static void report(SPTPlayerState *state) {
     if (track) SGLogLong(@"player track metadata", track.metadata.description);
 }
 
+static __weak id sg_player;
+
+id SGDiagnosticsPlayer(void) {
+    return sg_player;
+}
+
 %hook SPTEsperantoPlayer
 - (id)state {
     id state = %orig;
+    sg_player = self;
     if (SGIsDebugBuild() && [state isKindOfClass:NSClassFromString(@"SPTPlayerState")]) report(state);
     return state;
 }
