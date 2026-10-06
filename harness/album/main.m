@@ -215,6 +215,7 @@ static NSString *trailingLabel(UIView *root) {
     NSMutableArray<_TtC12Element_List18CollectionViewCell *> *_footerCells;
     UIView *_listView;
     CGFloat _tracksBottom;
+    UIView *_baseCard, *_greyCard;
 }
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)options {
@@ -442,6 +443,10 @@ static NSString *trailingLabel(UIView *root) {
                 UIView *card = box(content, UIView.class, CGRectMake(16 + i * 161, 0, 153, height), @"Components.UI.ContentCardAlbum");
                 card.backgroundColor = [UIColor colorWithWhite:0.12 alpha:1];
                 card.layer.cornerRadius = 4;
+                // A card's caption backing as the device paints it: the base surface, on its layer.
+                if (i == 0) card.layer.backgroundColor = [UIColor colorWithRed:0x12 / 255.0 green:0x12 / 255.0 blue:0x12 / 255.0 alpha:1].CGColor;
+                if (i == 0 && !_baseCard) _baseCard = card;
+                if (i == 1 && !_greyCard) _greyCard = card;
             }
         }
         [_footerCells addObject:cell];
@@ -477,6 +482,9 @@ static NSString *trailingLabel(UIView *root) {
         NSLog(@"[harness] the episode page's paint: %@ %@ %@, and the card inside a cell %@",
               episodePaints[0].backgroundColor ?: @"clear", episodePaints[1].backgroundColor ?: @"clear",
               episodePaints[2].backgroundColor ?: @"clear", card.backgroundColor ?: @"clear");
+        // The base-surface album card cleared, the one painted grey left alone.
+        NSLog(@"[harness] album cards: base surface a=%.0f, grey a=%.2f",
+              CGColorGetAlpha(self->_baseCard.layer.backgroundColor), CGColorGetAlpha(self->_greyCard.layer.backgroundColor));
     });
 
     // the sticky navigation bar, its gradient hidden until the page scrolls

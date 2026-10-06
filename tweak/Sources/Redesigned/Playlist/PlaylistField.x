@@ -76,12 +76,18 @@ static SGRArtworkField *fieldIn(UIView *page) {
 %end
 
 // The list paints itself the base surface from its own pass rather than through a layer that the repaint
-// hook would hear about, so it is cleared where it is laid out.
+// hook would hear about, so it is cleared where it is laid out. So is the recommendations heading at the
+// bottom of some playlists (This Is ...): Spotify mounts it as a plain UICollectionViewCell straight into the
+// list, outside visibleCells, where nothing else clears it and it sat on a black strip. Only the plain class:
+// the track cells are subclasses, which PlaylistRows.x already clears.
 %hook _TtC35ListUXPlatform_FreeTierPlaylistImpl32FTPTouchCancellingCollectionView
 - (void)layoutSubviews {
     %orig;
     UIScrollView *list = (UIScrollView *)self;
     if (list.backgroundColor && SGIsBaseSurface(list.backgroundColor.CGColor)) list.backgroundColor = UIColor.clearColor;
+    for (UIView *sub in list.subviews) {
+        if ([sub isMemberOfClass:UICollectionViewCell.class]) SGRClearCellPaint(sub);
+    }
 }
 %end
 

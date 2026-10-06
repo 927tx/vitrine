@@ -55,3 +55,6 @@ out, as on the phone.
 was handed leaves the window and a new one, in a cell the redesign never hears about, takes its place. The sheet's
 log line has to read "Mix (rebuilt)" and the fired pill has to be "still on screen: yes". Before the sheet looked
 again, it fired the old row's Mix ("still on screen: no").
+
+The extender paint line at 3 s also covers a recommendations heading mounted the way This Is playlists have it,
+a plain UICollectionViewCell straight in the list: "plain heading a=0" once the list's pass has cleared it.

@@ -121,6 +121,18 @@ static SGRArtworkField *fieldIn(UIView *page) {
 }
 %end
 
+// An album card of a discovery section switched back on (More by, You might also like) paints the base surface
+// behind its caption, a black box on the field. Only the card's own paint goes: its artwork, badges and
+// placeholder are views of their own. Spotify paints it before the card is attached, so no colour hook hears it;
+// it is cleared on the pass of the cell it is in, which a card has to itself when it is reused.
+static void clearCards(UIView *cell) {
+    SGForEachView(cell, ^(UIView *v) {
+        if (![v.accessibilityIdentifier isEqualToString:@"Components.UI.ContentCardAlbum"]) return;
+        CGColorRef color = v.layer.backgroundColor;
+        if (color && SGIsBaseSurface(color)) v.backgroundColor = UIColor.clearColor;
+    });
+}
+
 // Every cell of the list paints the base surface too, and the repaint hook misses it: a cell is painted
 // before it is inside the page, and a reused one brings its old paint with it. On the episode page the
 // Episode Transcript row, the empty section under it and the rule under that sat on black bands (device,
@@ -130,6 +142,7 @@ static SGRArtworkField *fieldIn(UIView *page) {
     %orig;
     UIView *cell = (UIView *)self;
     if (isPageCell(cell)) SGRClearCellPaint(cell);
+    if (SGRAlbumPageOf(cell)) clearCards(cell);
 }
 %end
 

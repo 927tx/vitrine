@@ -59,3 +59,9 @@ identifier and in a mock of the Encore object behind it (`currentState`, `progre
 None, waiting, downloading (held at 50%), downloaded, shuffle on, removed with shuffle off, error, each held a
 few seconds and announced with a `[harness] state:` line to take a screenshot on. Nothing in it lays anything
 out, as on the phone.
+
+The track rows carry Spotify's explicit badge on some of them and two guests the header does not explain (one named
+in the title with no "feat.", one not at all). At 2.5 s the log says, row by row, whether its artist line was
+dropped, how far the title moved and where the badge was drawn against the end of the title's text; at 4 s the first
+row is prepared for reuse and has to come back as Spotify drew it, then be dropped again by its next pass. At 3 s
+the log also says the first card of each carousel, painted the base surface, was cleared and the grey one was not.

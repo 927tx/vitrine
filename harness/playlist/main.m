@@ -404,6 +404,13 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
     label(headingPaint, CGRectMake(16, 37, W - 32, 16), @"Based on the songs of this playlist", 11,
           [UIColor colorWithWhite:0.7 alpha:1], @"subtitle");
 
+    // Spotify mounts the recommendations heading of some playlists (This Is ...) as a plain UICollectionViewCell
+    // straight into the list, outside visibleCells.
+    UIView *plainHeading = box(list, UICollectionViewCell.class, CGRectMake(0, extenderTop + 180, W, 52), nil);
+    UIView *plainHeadingPaint = box(plainHeading, UIView.class, plainHeading.bounds, nil);
+    plainHeadingPaint.backgroundColor = UIColor.blackColor;
+    label(plainHeadingPaint, CGRectMake(16, 16, W - 32, 21), @"Recommended", 17, UIColor.whiteColor, @"title");
+
     UIView *extenderRow = box(list, _TtC35ListUXPlatform_FreeTierPlaylistImpl25ElementCollectionViewCell.class,
                               CGRectMake(0, extenderTop + 68, W, 64), nil);
     UIView *extenderPaint = box(extenderRow, UIView.class, extenderRow.bounds, @"PlaylistExtender.Row");
@@ -496,8 +503,8 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
         CGFloat (^alpha)(UIView *) = ^(UIView *v) {
             return v.layer.backgroundColor ? CGColorGetAlpha(v.layer.backgroundColor) : 0;
         };
-        NSLog(@"[harness] extender paint: heading a=%.0f row-badge a=%.0f card a=%.0f refresh a=%.0f",
-              alpha(headingPaint), alpha(badge), alpha(card), alpha(refreshPaint));
+        NSLog(@"[harness] extender paint: heading a=%.0f row-badge a=%.0f card a=%.0f refresh a=%.0f plain heading a=%.0f",
+              alpha(headingPaint), alpha(badge), alpha(card), alpha(refreshPaint), alpha(plainHeadingPaint));
     });
 
     if ([NSProcessInfo.processInfo.arguments containsObject:@"liked"]) {
