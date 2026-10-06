@@ -129,11 +129,12 @@ static dispatch_queue_t loadQueue(void) {
     return queue;
 }
 
+// The Neural Engine unless changed: on an iPhone 15 Pro the GPU never finished its first load of this model.
 static MLComputeUnits computeUnits(void) {
-    switch (SGInt(SGKeySingComputeUnits, 0)) {
+    switch (SGInt(SGKeySingComputeUnits, 2)) {
+        case 0: return MLComputeUnitsCPUAndGPU;
         case 1: return MLComputeUnitsAll;
-        case 2: return MLComputeUnitsCPUAndNeuralEngine;
-        default: return MLComputeUnitsCPUAndGPU;
+        default: return MLComputeUnitsCPUAndNeuralEngine;
     }
 }
 
@@ -144,7 +145,17 @@ static void loadModel(void) {
     sg_loadError = nil;
     NSUInteger generation = sg_loadGeneration;
     MLComputeUnits units = computeUnits();
-    SGLog(@"sing: loading the voice model");
+    SGLog(@"sing: loading the voice model on the %@", SGSingComputeUnitNames()[(NSUInteger)MIN(MAX(SGInt(SGKeySingComputeUnits, 2), 0), 2)]);
+    // A load that takes long says so, so a stall reads apart from a slow first compile.
+    __block void (^still)(int) = nil;
+    still = ^(int seconds) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            if (!sg_loading || generation != sg_loadGeneration) { still = nil; return; }
+            SGLog(@"sing: still loading the voice model, %d s", seconds + 30);
+            still(seconds + 30);
+        });
+    };
+    still(0);
     dispatch_async(loadQueue(), ^{
         CFAbsoluteTime began = CFAbsoluteTimeGetCurrent();
         MLModelConfiguration *configuration = [MLModelConfiguration new];

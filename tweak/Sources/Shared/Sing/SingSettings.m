@@ -126,7 +126,7 @@ UIViewController *SGSingSettingsPage(void) {
     spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
     __block __weak SGModPage *page;
     SGModRow *model = SGStatActionRow(@"Voice model", @"Mel-Band RoFormer, run on the iPhone", ^NSString *{ return modelValue(); }, ^{ modelTapped(page); });
-    SGModRow *units = SGChoiceRow(@"Runs on", @"Read as the model loads", SGKeySingComputeUnits, SGSingComputeUnitNames(), 0);
+    SGModRow *units = SGChoiceRow(@"Runs on", @"Read as the model loads", SGKeySingComputeUnits, SGSingComputeUnitNames(), 2);
     units.chosen = ^(NSInteger index) { SGSingComputeUnitsChanged(); };
     SGModRow *heat = SGOptionRow(@"Ignore heat warnings", @"Keeps Sing going on a hot iPhone, which then gets hotter", SGKeySingIgnoreHeat);
     heat.changed = ^(BOOL on) { SGSetSingIgnoresHeat(on); };

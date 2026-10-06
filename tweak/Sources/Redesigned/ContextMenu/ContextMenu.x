@@ -625,10 +625,14 @@ BOOL SGPlayerMenuReplaced(UIViewController *menu) {
     if (press.state != UIGestureRecognizerStateBegan) return;
     sg_claimButton = press.view;
     sg_claimAt = CACurrentMediaTime();
+    static int logged;
+    if (logged++ < 3) SGLog(@"system menu: ⋯ pressed (%@)", NSStringFromClass(press.view.class));
 }
 - (void)touchedDown:(UIView *)control {
     sg_claimButton = control;
     sg_claimAt = CACurrentMediaTime();
+    static int logged;
+    if (logged++ < 3) SGLog(@"system menu: ⋯ touched down (%@)", NSStringFromClass(control.class));
 }
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)recognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other {
     return YES;
@@ -643,6 +647,9 @@ void SGRSystemMenuWatch(UIView *button, SGRMenuItems items, SGRMenuKind kind) {
     static SGRMenuTapWatcher *watcher;
     if (!watcher) watcher = [SGRMenuTapWatcher new];
     objc_setAssociatedObject(button, &kWatchedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    static int logged;
+    if (logged++ < 4) SGLog(@"system menu: watching a ⋯ (%@, %@ touches, in %@)", NSStringFromClass(button.class),
+                            button.userInteractionEnabled ? @"takes" : @"takes no", NSStringFromClass(button.superview.class));
     // An Encore button may read its touches through a gesture recognizer rather than as a control, so both
     // are watched.
     if ([button isKindOfClass:UIControl.class]) [(UIControl *)button addTarget:watcher action:@selector(touchedDown:) forControlEvents:UIControlEventTouchDown];
@@ -673,6 +680,11 @@ static SGRMenuAnchor *anchorIn(UIView *host) {
 }
 
 // Whether this sheet is a watched ⋯'s, and if so its session, with the sheet's presentation now the menu's.
+static void whyNot(NSString *reason) {
+    static int logged;
+    if (logged++ < 8) SGLog(@"system menu: not taken over: %@", reason);
+}
+
 static SGRMenuSession *takeOver(UIViewController *presented) {
     if (!sheetIn(presented)) return nil;
     UIView *button = nil;
@@ -682,7 +694,10 @@ static SGRMenuSession *takeOver(UIViewController *presented) {
     } else {
         button = SGRPinnedMoreRecentButton();
     }
-    if (!button.window) return nil;
+    if (!button.window) {
+        whyNot(button ? @"the claimed ⋯ is off screen" : sg_claimButton ? [NSString stringWithFormat:@"the claim is %.1f s old", CACurrentMediaTime() - sg_claimAt] : @"no ⋯ was claimed");
+        return nil;
+    }
     static BOOL canPresent, checked;
     if (!checked) {
         checked = YES;
@@ -722,6 +737,8 @@ static SGRMenuSession *takeOver(UIViewController *presented) {
 // taken over here instead, from the same claim, and its menu opened once it has appeared.
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
+    static int logged;
+    if (logged++ < 3) SGLog(@"system menu: a ⋯ sheet will appear (%@ session)", sessionFor((UIViewController *)self) ? @"with a" : @"without a");
     SGRMenuSession *session = sessionFor((UIViewController *)self);
     if (!session && (session = takeOver((UIViewController *)self))) {
         static int logged;
