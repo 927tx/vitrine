@@ -43,7 +43,9 @@ void SGRNavbarForgetTab(void);
 // now playing card coming down between them. On unless switched off; read as each scroll goes.
 #define SGRKeyNavbarMinimize @"spotifyglass.redesign.navbar.minimize"
 BOOL SGRTabBarMinimized(void);
-// TabBar.x lays both bars out for it, the now playing bar in the same animation; `animated` NO is a cut.
+// TabBar.x lays both bars out for it, the now playing bar in the same animation, at once; asked for inside an
+// animation, on the main queue's next turn (SGRTabBarMinimized changes then too). `animated` NO is a cut, made
+// at once.
 void SGRSetTabBarMinimized(BOOL minimized, BOOL animated);
 // The room between the minimized bar's two tabs, `height` high and centred on them, in `host`'s
 // coordinates: where the now playing card goes. CGRectNull while the bar is not minimized or not on screen.
@@ -51,6 +53,8 @@ CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height);
 
 // A tab's glyph as the glass bar draws it, white, filled when `active` (TabBar.x), for the Tab bar page.
 UIImage *SGRNavbarGlyph(NSDictionary *entry, BOOL active);
+// Lets a laid out bar's titles shrink a little before UIKit cuts them short (TabBar.x), for the page's preview too.
+void SGRShrinkTabTitles(UIView *bar);
 
 UIViewController *SGRNavbarSettingsPage(void);   // the tab editor, in Mod Settings
 UIViewController *SGRNavbarEditorPage(void);     // the tab editor alone, for the welcome tour

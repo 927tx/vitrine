@@ -17,6 +17,8 @@ const NSTimeInterval SGRCrossfade = 0.35;
 
 // A layout spring settles in about this long without overshooting; a press gives a little back.
 static const NSTimeInterval kLayoutDuration = 0.45, kPressDuration = 0.32;
+// The tab bar's minimize, in the 0.3 to 0.4 s Apple gives a repositioning spring.
+static const NSTimeInterval kBarDuration = 0.34;
 static const CGFloat kPressDamping = 0.62;
 // A response lands within the press feedback's budget, on a curve that is most of the way there at once.
 static const NSTimeInterval kRespondDuration = 0.2;
@@ -89,7 +91,7 @@ BOOL SGRIncreaseContrast(void) {
 
 void SGRAnimate(SGRMotion motion, void (^animations)(void), void (^completion)(BOOL finished)) {
     if (!animations) return;
-    if ((motion == SGRMotionLayout || motion == SGRMotionPress) && SGRReduceMotion()) {
+    if ((motion == SGRMotionLayout || motion == SGRMotionPress || motion == SGRMotionBar) && SGRReduceMotion()) {
         [UIView performWithoutAnimation:animations];
         if (completion) completion(YES);
         return;
@@ -98,6 +100,9 @@ void SGRAnimate(SGRMotion motion, void (^animations)(void), void (^completion)(B
     switch (motion) {
         case SGRMotionLayout:
             [UIView animateWithDuration:kLayoutDuration delay:0 usingSpringWithDamping:1 initialSpringVelocity:0 options:options animations:animations completion:completion];
+            break;
+        case SGRMotionBar:
+            [UIView animateWithDuration:kBarDuration delay:0 usingSpringWithDamping:1 initialSpringVelocity:0 options:options animations:animations completion:completion];
             break;
         case SGRMotionPress:
             [UIView animateWithDuration:kPressDuration delay:0 usingSpringWithDamping:kPressDamping initialSpringVelocity:0 options:options animations:animations completion:completion];

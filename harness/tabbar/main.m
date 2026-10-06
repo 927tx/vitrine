@@ -234,12 +234,19 @@ static UIView *item(Class cls, NSString *title, NSString *symbol, BOOL active) {
     UIView *compact = [_TtC23NavigationUI_TabBarImpl17TabBarCompactView new];
     compact.translatesAutoresizingMaskIntoConstraints = NO;
     [self.bar addSubview:compact];
-    UIStackView *row = [[UIStackView alloc] initWithArrangedSubviews:@[
+    // `five` adds a fifth tab, `long` gives two tabs long names, as tabs of the user's own can have.
+    NSArray<NSString *> *args = NSProcessInfo.processInfo.arguments;
+    BOOL longNames = [args containsObject:@"long"];
+    NSMutableArray<UIView *> *tabs = [NSMutableArray arrayWithArray:@[
         item(_TtC23NavigationUI_TabBarImpl21TabBarItemElementView.class, @"Home", @"house.fill", YES),
         item(_TtC23NavigationUI_TabBarImpl21TabBarItemElementView.class, @"Search", @"magnifyingglass", NO),
-        item(_TtC23NavigationUI_TabBarImpl21TabBarItemElementView.class, @"Your Library", @"books.vertical", NO),
+        item(_TtC23NavigationUI_TabBarImpl21TabBarItemElementView.class, longNames ? @"Your Library and Downloads" : @"Your Library", @"books.vertical", NO),
         item(_TtC25CreateMenu_TabBarItemImpl24CreateMenuTabBarItemView.class, @"Create", @"plus", NO),
     ]];
+    if ([args containsObject:@"five"]) {
+        [tabs addObject:item(_TtC23NavigationUI_TabBarImpl21TabBarItemElementView.class, longNames ? @"Discover Weekly" : @"Liked Songs", @"heart", NO)];
+    }
+    UIStackView *row = [[UIStackView alloc] initWithArrangedSubviews:tabs];
     row.distribution = UIStackViewDistributionFillEqually;
     row.accessibilityIdentifier = @"tabs-container-view-identifier";
     row.translatesAutoresizingMaskIntoConstraints = NO;
@@ -375,6 +382,10 @@ static UIView *item(Class cls, NSString *title, NSString *symbol, BOOL active) {
 
 extern CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius);
 extern void SGRSetTabBarMinimized(BOOL minimized, BOOL animated);
+extern BOOL SGRTabBarMinimized(void);
+// touch.m: a finger's touches, through UIKit's own recognizers.
+extern void SGHarnessTap(UIWindow *window, CGPoint point);
+extern void SGHarnessDrag(UIWindow *window, CGPoint from, CGPoint to, NSTimeInterval seconds);
 
 static UIView *platterIn(UIView *root) {
     // UIKit._UITabBarItemPlatterView on iOS 27; BarTransition.x looks for the same suffix.
@@ -482,6 +493,179 @@ static void report(SGHarnessChrome *chrome, NSString *moment) {
     }
 }
 
+// Every title the glass bars show, and whether UIKit cut it short: the width its text needs at the
+// smallest size the label may shrink to, against the width it was given.
+static void reportNames(SGHarnessChrome *chrome, NSString *moment) {
+    NSMutableString *out = [NSMutableString stringWithFormat:@"[harness] %@ names", moment];
+    NSUInteger cut = 0;
+    for (UITabBar *bar in systemBarsIn(chrome.tabs.bar)) {
+        if (bar.hidden) continue;
+        [out appendFormat:@" | bar %.0f wide:", bar.bounds.size.width];
+        NSMutableArray<UIView *> *walk = [NSMutableArray arrayWithObject:bar];
+        while (walk.count) {
+            UIView *v = walk.firstObject;
+            [walk removeObjectAtIndex:0];
+            [walk addObjectsFromArray:v.subviews];
+            if (![v isKindOfClass:UILabel.class] || !v.window) continue;
+            BOOL shown = YES;
+            for (UIView *up = v; up && up != bar; up = up.superview) shown &= !up.hidden && up.alpha > 0.01;
+            if (!shown) continue;
+            UILabel *label = (UILabel *)v;
+            if (!label.text.length) continue;
+            CGFloat need = [label.text sizeWithAttributes:@{NSFontAttributeName: label.font}].width;
+            CGFloat scale = label.adjustsFontSizeToFitWidth && label.minimumScaleFactor > 0 ? label.minimumScaleFactor : 1;
+            BOOL isCut = need * scale > label.bounds.size.width + 1;
+            cut += isCut;
+            if ([NSProcessInfo.processInfo.arguments containsObject:@"tree"]) {
+                NSMutableString *chain = [NSMutableString string];
+                for (UIView *up = label; up && up != bar; up = up.superview) [chain appendFormat:@" < %@%@", NSStringFromClass(up.class), NSStringFromCGRect(up.frame)];
+                NSLog(@"[harness] %@ label%@", moment, chain);
+            }
+            [out appendFormat:@" \"%@\" %.0f/%.0f@%.1fpt%@", label.text, label.bounds.size.width, ceil(need), label.font.pointSize, isCut ? @" CUT" : @""];
+        }
+    }
+    [out appendFormat:@" | %lu cut", (unsigned long)cut];
+    NSLog(@"%@", out);
+}
+
+// Whether the bar and the card agree: minimized, the platter is the 62 pt circle 21 pt in and the card is in
+// its row; expanded, the platter is the whole bar's and the card stands above it. With what the screen shows
+// (the presentation layers) and how many animations are still on the bar, its items and the card.
+static void check(SGHarnessChrome *chrome, NSString *moment) {
+    UIWindow *window = chrome.view.window;
+    UITabBar *bar = systemBarIn(chrome.tabs.bar);
+    UIView *platter = platterIn(bar);
+    CGRect circle = [platter convertRect:platter.bounds toView:window];
+    CGRect card = SGRNowPlayingCardFrameIn(window, NULL);
+    BOOL minimized = SGRTabBarMinimized();
+    BOOL leads = fabs(circle.size.width - 62) < 1 && fabs(circle.origin.x - 21) < 1;
+    BOOL docked = CGRectGetMinY(card) > CGRectGetMinY(circle) - 1;
+    UIView *moved = chrome.npb.subviews.firstObject;
+    CALayer *shown = platter.layer.presentationLayer, *shownCard = moved.layer.presentationLayer;
+    CGRect shownCircle = shown ? [shown convertRect:shown.bounds toLayer:window.layer] : CGRectNull;
+    __block NSUInteger running = 0;
+    SGForEachView(bar, ^(UIView *v) { running += v.layer.animationKeys.count; });
+    SGForEachView(moved, ^(UIView *v) { running += v.layer.animationKeys.count; });
+    BOOL inStep = minimized == leads && minimized == docked;
+    NSLog(@"[harness] %@ check: %@ | circle %@ (shown %@) | card %@ (shown moved %.0f) | %lu animations | %@", moment,
+          minimized ? @"minimized" : @"expanded", NSStringFromCGRect(circle), NSStringFromCGRect(shownCircle), NSStringFromCGRect(card),
+          shownCard ? shownCard.transform.m42 : 0, (unsigned long)running, inStep ? @"IN STEP" : @"OUT OF STEP");
+}
+
+// The list from its top, `drag` points up (a scroll down) or down (a scroll back up), let go moving.
+static void fling(SGHarnessChrome *chrome, CGFloat drag) {
+    UIWindow *window = chrome.view.window;
+    CGFloat from = drag > 0 ? 600 : 300;
+    SGHarnessDrag(window, CGPointMake(200, from), CGPointMake(200, from - drag), 0.12);
+}
+
+// What the screen shows of a view: its presentation layer's frame in the window's.
+static CGRect shownFrame(UIView *view, UIWindow *window) {
+    if (!view.window) return CGRectNull;
+    CALayer *layer = view.layer.presentationLayer ?: view.layer, *top = window.layer.presentationLayer ?: window.layer;
+    return [layer convertRect:layer.bounds toLayer:top];
+}
+
+static UIView *firstOf(UIView *root, BOOL (^match)(UIView *)) {
+    if (match(root)) return root;
+    for (UIView *sub in root.subviews) {
+        UIView *found = firstOf(sub, match);
+        if (found) return found;
+    }
+    return nil;
+}
+
+// `motion`: the presentation frames of what moves, sampled every frame across a stretch: the main bar's platter, its
+// leading glyph, the split bar's platter and the card's glass. Each stretch logs the largest change from one frame to
+// the next (x, y, width or height), when it was, and how many times the view under watch was a new one. A spring
+// moves these some 20 pt a frame at most; more is a reversal snapping to the old target, or a view made anew
+// somewhere else.
+static NSString *const kWatched[4] = {@"platter", @"glyph", @"split platter", @"card"};
+
+@interface SGHarnessSampler : NSObject {
+@public
+    CGRect last[4];
+    CGFloat worst[4];
+    NSTimeInterval worstAt[4];
+    NSUInteger replaced[4];
+}
+@property (nonatomic, weak) SGHarnessChrome *chrome;
+@property (nonatomic, copy) NSString *moment;
+@property (nonatomic, strong) CADisplayLink *link;
+@property (nonatomic) NSTimeInterval start, lastTick;
+@property (nonatomic) NSUInteger frames;
+@property (nonatomic, strong) NSMutableArray *views;
+@end
+
+@implementation SGHarnessSampler
+
+- (NSArray *)watched {
+    NSArray<UITabBar *> *bars = systemBarsIn(self.chrome.tabs.bar);
+    UITabBar *main = bars.firstObject, *apart = bars.count > 1 && !bars[1].hidden ? bars[1] : nil;
+    UIWindow *window = self.chrome.view.window;
+    __block UIView *glyph = nil;
+    __block CGFloat leftmost = CGFLOAT_MAX;
+    SGForEachView(main, ^(UIView *v) {
+        if (![v isKindOfClass:UIImageView.class] || !((UIImageView *)v).image || v.bounds.size.width < 10 || v.bounds.size.width > 40) return;
+        for (UIView *up = v; up && up != main; up = up.superview) if (up.hidden || up.alpha < 0.01) return;
+        CGFloat x = CGRectGetMinX(shownFrame(v, window));
+        if (x < leftmost) { leftmost = x; glyph = v; }
+    });
+    UIView *card = firstOf(self.chrome.npb.subviews.firstObject, ^BOOL(UIView *v) {
+        return [v isKindOfClass:UIVisualEffectView.class] && ((UIVisualEffectView *)v).effect && v.bounds.size.height > 40;
+    });
+    return @[platterIn(main) ?: NSNull.null, glyph ?: NSNull.null, (apart ? platterIn(apart) : nil) ?: NSNull.null, card ?: NSNull.null];
+}
+
+- (void)begin:(NSString *)moment {
+    self.moment = moment;
+    for (int i = 0; i < 4; i++) { last[i] = CGRectNull; worst[i] = 0; replaced[i] = 0; }
+    self.views = [NSMutableArray arrayWithArray:@[NSNull.null, NSNull.null, NSNull.null, NSNull.null]];
+    self.frames = 0;
+    self.lastTick = 0;
+    self.start = CACurrentMediaTime();
+    self.link = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick)];
+    self.link.preferredFrameRateRange = CAFrameRateRangeMake(60, 60, 60);
+    [self.link addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+}
+
+- (void)tick {
+    NSArray *now = [self watched];
+    UIWindow *window = self.chrome.view.window;
+    self.frames++;
+    // A frame the simulator skipped counts as that many: the step is per 1/60 s.
+    NSTimeInterval time = CACurrentMediaTime();
+    CGFloat elapsed = self.lastTick > 0 ? MAX(1, round((time - self.lastTick) * 60)) : 1;
+    self.lastTick = time;
+    NSMutableString *line = [NSMutableString stringWithFormat:@"[harness] %@ %.3f", self.moment, time - self.start];
+    for (int i = 0; i < 4; i++) {
+        UIView *v = now[i] == NSNull.null ? nil : now[i];
+        CGRect frame = v ? shownFrame(v, window) : CGRectNull;
+        if (v && self.views[i] != NSNull.null && self.views[i] != v) replaced[i]++;
+        self.views[i] = v ?: NSNull.null;
+        if (!CGRectIsNull(frame) && !CGRectIsNull(last[i])) {
+            CGFloat step = MAX(MAX(fabs(frame.origin.x - last[i].origin.x), fabs(frame.origin.y - last[i].origin.y)),
+                               MAX(fabs(frame.size.width - last[i].size.width), fabs(frame.size.height - last[i].size.height))) / elapsed;
+            if (step > worst[i]) { worst[i] = step; worstAt[i] = time - self.start; }
+        }
+        last[i] = frame;
+        if (!CGRectIsNull(frame)) [line appendFormat:@" | %@ x %.1f y %.1f w %.1f", kWatched[i], frame.origin.x, frame.origin.y, frame.size.width];
+    }
+    // `timeline` logs every sample.
+    if ([NSProcessInfo.processInfo.arguments containsObject:@"timeline"]) NSLog(@"%@", line);
+}
+
+- (void)end {
+    [self.link invalidate];
+    NSMutableString *out = [NSMutableString stringWithFormat:@"[harness] %@ motion over %lu frames:", self.moment, (unsigned long)self.frames];
+    for (int i = 0; i < 4; i++) {
+        if (CGRectIsNull(last[i]) && !worst[i]) continue;
+        [out appendFormat:@" | %@ largest step %.1f pt at %.2f s, made anew %lu times", kWatched[i], worst[i], worstAt[i], (unsigned long)replaced[i]];
+    }
+    NSLog(@"%@", out);
+}
+@end
+
 #pragma mark - the app
 
 // Before every %ctor, so the redesign's gate reads on.
@@ -530,6 +714,150 @@ static void after(double seconds, dispatch_block_t block) {
         after(1.0, ^{ SGRSetTabBarMinimized(YES, YES); });
         after(3.5, ^{ SGRSetTabBarMinimized(NO, YES); });
         after(5.0, ^{ report(chrome, @"expanded again"); });
+    }
+    // `tap`: the bar minimized at 1 s, then what a finger on the leading circle lands on, and that tap played.
+    if ([mode isEqualToString:@"tap"]) {
+        after(1.0, ^{ SGRSetTabBarMinimized(YES, YES); });
+        after(2.5, ^{
+            report(chrome, @"minimized");
+            UITabBar *bar = systemBarIn(chrome.tabs.bar);
+            UIView *platter = platterIn(bar);
+            UIWindow *window = chrome.view.window;
+            CGRect circle = [platter convertRect:platter.bounds toView:window];
+            UIView *hit = [window hitTest:CGPointMake(CGRectGetMidX(circle), CGRectGetMidY(circle)) withEvent:nil];
+            NSLog(@"[harness] touch on the leading circle %@ lands on %@, on the glass bar: %d", NSStringFromCGRect(circle),
+                  NSStringFromClass(hit.class), [hit isDescendantOfView:bar]);
+            for (UIView *v = hit; v && v != window; v = v.superview) {
+                for (UIGestureRecognizer *r in v.gestureRecognizers) NSLog(@"[harness]   recognizer %@ on %@", NSStringFromClass(r.class), NSStringFromClass(v.class));
+                if ([v isKindOfClass:UIControl.class]) NSLog(@"[harness]   control %@", NSStringFromClass(v.class));
+            }
+            // With `split`, the trailing circle keeps its own touches too.
+            for (UITabBar *other in systemBarsIn(chrome.tabs.bar)) {
+                UIView *otherPlatter = other == bar || other.hidden ? nil : platterIn(other);
+                if (!otherPlatter) continue;
+                CGRect trailing = [otherPlatter convertRect:otherPlatter.bounds toView:window];
+                UIView *otherHit = [window hitTest:CGPointMake(CGRectGetMidX(trailing), CGRectGetMidY(trailing)) withEvent:nil];
+                NSLog(@"[harness] touch on the trailing circle %@ lands on %@, on its glass bar: %d", NSStringFromCGRect(trailing),
+                      NSStringFromClass(otherHit.class), [otherHit isDescendantOfView:other]);
+            }
+            SGHarnessTap(window, CGPointMake(CGRectGetMidX(circle), CGRectGetMidY(circle)));
+        });
+        after(3.5, ^{ report(chrome, @"after the tap"); });
+        after(3.6, ^{ reportSelection(chrome, @"after the tap"); });
+        // It stays expanded until the list is scrolled down again.
+        after(5.0, ^{ report(chrome, @"a while after the tap"); });
+    }
+    // `turns`: real flings on the list, from its top: one down that minimizes the bar, one back up that turns it
+    // half way, then down again half way through that, and a finger stopping the list as the bar minimizes.
+    // Every check at rest should be IN STEP with no animations left.
+    if ([mode isEqualToString:@"turns"]) {
+        UITableView *list = (UITableView *)chrome.tabs.childViewControllers.firstObject.view;
+        after(0.7, ^{ [list setContentOffset:CGPointMake(0, -list.adjustedContentInset.top) animated:NO]; });
+        after(1.0, ^{ fling(chrome, 250); });
+        after(1.3, ^{ check(chrome, @"minimizing"); });
+        after(2.4, ^{ check(chrome, @"minimized"); });
+        // Room both ways again after the report at 2.5 takes the list to its end.
+        after(2.7, ^{ [list setContentOffset:CGPointMake(0, 300) animated:NO]; });
+        after(3.0, ^{ fling(chrome, -150); });
+        after(3.25, ^{ fling(chrome, 250); });
+        after(5.0, ^{ check(chrome, @"after turning back half way"); });
+        after(5.5, ^{ fling(chrome, -150); });
+        after(5.75, ^{ SGHarnessTap(chrome.view.window, CGPointMake(200, 400)); });
+        after(7.0, ^{ check(chrome, @"after a finger stopped the list"); });
+        after(7.5, ^{ fling(chrome, 250); });
+        after(7.65, ^{ fling(chrome, -150); });
+        after(7.8, ^{ fling(chrome, 250); });
+        after(7.95, ^{ fling(chrome, -150); });
+        after(9.5, ^{ check(chrome, @"after four quick turns"); });
+    }
+    // `motion`: a minimize and an expand, each turned back 0.15 s in, and four turns 0.1 s apart, sampled every
+    // frame (SGHarnessSampler). No largest step should be much over a spring's, nothing should be made anew while it
+    // moves, names should be whole mid-expand, and every check IN STEP.
+    if ([mode isEqualToString:@"motion"]) {
+        static SGHarnessSampler *sampler;
+        sampler = [SGHarnessSampler new];
+        sampler.chrome = chrome;
+        // Each stretch lasts 1 s and the next starts 0.3 s after it; turns are timed from the stretch's start,
+        // since dispatch_after may run a block up to a tenth of its delay late, which at 3 s swallowed a turn
+        // 0.15 s after another. The first turn of each goes the other way from where the bar is.
+        NSArray *stretches = @[
+            @[@"minimize", @[@0]],
+            @[@"expand", @[@0]],
+            @[@"minimize turned back", @[@0, @0.15]],
+            @[@"minimize again", @[@0]],
+            @[@"expand turned back", @[@0, @0.15]],
+            @[@"four quick turns", @[@0, @0.1, @0.2, @0.3]],
+        ];
+        static void (^run)(NSUInteger);
+        run = ^(NSUInteger index) {
+            if (index >= stretches.count) {
+                reportNames(chrome, @"after the turns");
+                return;
+            }
+            NSString *moment = stretches[index][0];
+            NSArray<NSNumber *> *turns = stretches[index][1];
+            BOOL first = !SGRTabBarMinimized();
+            [sampler begin:moment];
+            for (NSUInteger i = 0; i < turns.count; i++) {
+                BOOL minimize = i % 2 == 0 ? first : !first;
+                after(turns[i].doubleValue, ^{ SGRSetTabBarMinimized(minimize, YES); });
+            }
+            after(0.15, ^{
+                if (!first) reportNames(chrome, [moment stringByAppendingString:@", 0.15 s in"]);
+            });
+            after(1.0, ^{
+                [sampler end];
+                check(chrome, moment);
+                reportNames(chrome, [moment stringByAppendingString:@", at rest"]);
+                after(0.3, ^{ run(index + 1); });
+            });
+        };
+        after(1.0, ^{ run(0); });
+    }
+    // `nested`: the bar minimized from inside someone else's animation: a property animator scrubbed by hand and
+    // left paused a third of the way, as a header that follows the scroll keeps one (at 1 s), and a plain
+    // animation block (at 4 s, expanding). Each check at rest should be IN STEP with no animations left.
+    if ([mode isEqualToString:@"nested"]) {
+        static UIViewPropertyAnimator *scrub;
+        after(1.0, ^{
+            UIView *page = chrome.tabs.childViewControllers.firstObject.view;
+            scrub = [[UIViewPropertyAnimator alloc] initWithDuration:1 curve:UIViewAnimationCurveLinear animations:^{
+                page.alpha = 0.9;
+                SGRSetTabBarMinimized(YES, YES);
+            }];
+            scrub.fractionComplete = 0.33;
+        });
+        after(2.4, ^{ check(chrome, @"minimized in a paused animator"); });
+        after(4.0, ^{
+            [UIView animateWithDuration:3 animations:^{ SGRSetTabBarMinimized(NO, YES); }];
+        });
+        after(4.4, ^{ check(chrome, @"expanding in a slow animation block"); });
+        after(5.6, ^{ check(chrome, @"expanded in a slow animation block"); });
+    }
+    // `names`: the titles at rest, after a minimize and expand, after scrolls that turn the bar back before
+    // it settles, and mid-expand; `split`, `five` and `long` change the bar. Every report should say 0 cut.
+    if ([mode isEqualToString:@"names"]) {
+        after(1.0, ^{ reportNames(chrome, @"at rest"); });
+        after(1.2, ^{ SGRSetTabBarMinimized(YES, YES); });
+        after(2.4, ^{
+            SGRSetTabBarMinimized(NO, YES);
+            reportNames(chrome, @"expanding");
+        });
+        after(2.55, ^{ reportNames(chrome, @"mid-expand"); });
+        after(4.0, ^{ reportNames(chrome, @"expanded"); });
+        after(4.2, ^{ SGRSetTabBarMinimized(YES, YES); });
+        after(4.3, ^{ SGRSetTabBarMinimized(NO, YES); });
+        after(4.4, ^{ SGRSetTabBarMinimized(YES, YES); });
+        after(4.5, ^{ SGRSetTabBarMinimized(NO, YES); });
+        after(6.0, ^{ reportNames(chrome, @"after quick turns"); });
+        after(6.2, ^{ SGRSetTabBarMinimized(YES, NO); });
+        after(6.4, ^{ SGRSetTabBarMinimized(NO, NO); });
+        after(7.0, ^{ reportNames(chrome, @"after a cut"); });
+        after(7.2, ^{
+            [chrome.tabs.bar setNeedsLayout];
+            [chrome.tabs.bar layoutIfNeeded];
+        });
+        after(7.5, ^{ reportNames(chrome, @"after Spotify lays out"); });
     }
     // `lit`: Library stands in for a tab of the mod's own whose page is up at 2 s, while Spotify still paints
     // Home white: the glass bar selects Library. Home picked at 3.5 s takes the light back.

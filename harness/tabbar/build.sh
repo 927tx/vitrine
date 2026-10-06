@@ -14,13 +14,13 @@ SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
 xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-arc -g -O0 \
     -I"$SRC" -I"$SRC/Redesigned/Navbar" -I"$SRC/Redesigned/NowPlayingBar" -I"$SRC/Shared/Navigation" -I"$OUT/gen" -isysroot "$SDK" \
     -Wno-deprecated-declarations \
-    "$(dirname "$0")/main.m" "$(dirname "$0")/stubs.m" \
+    "$(dirname "$0")/main.m" "$(dirname "$0")/stubs.m" "$(dirname "$0")/touch.m" \
     "$OUT"/gen/*.m \
     "$SRC"/Core/SGLog.m "$SRC"/Core/SGPrefs.m "$SRC"/Core/SGViewTree.m "$SRC"/Core/SGGlass.m \
     "$SRC"/Core/SGBackdrop.m "$SRC"/Core/SGFlagForce.m "$SRC"/Core/SGUIMode.m \
     "$SRC"/Redesigned/Kit/SGRTokens.m "$SRC"/Redesigned/Kit/SGRGlass.m \
     "$SRC"/Redesigned/Navbar/NavbarLayout.m "$SRC"/Shared/Navigation/TabIcons.m \
-    -framework UIKit -framework QuartzCore -framework CoreGraphics -framework Foundation \
+    -framework UIKit -framework IOKit -framework QuartzCore -framework CoreGraphics -framework Foundation \
     -o "$OUT/TabBarHarness.app/TabBarHarness"
 
 # iOS 27 ends an app without a scene delegate at launch, so the scene is named here.

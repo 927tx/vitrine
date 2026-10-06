@@ -233,6 +233,10 @@ static NSArray<UITabBarItem *> *itemsFor(NSArray<NSDictionary *> *entries, BOOL 
     }
     _main.frame = main;
     _apart.frame = apart;
+    for (UITabBar *bar in @[_main, _apart]) {
+        [bar layoutIfNeeded];
+        SGRShrinkTabTitles(bar);
+    }
 }
 
 @end

@@ -12,11 +12,16 @@ __weak UIView *sgr_artistRoot = nil;
 
 void SGRComposeTabBar(UIView *tabBar) {}
 
-// With `split` among the launch words, Search is a split tab, which TabBar.x stands on a bar of its own.
+// With `split` among the launch words, Search is a split tab, which TabBar.x stands on a bar of its own;
+// with `split2`, Create is one too.
 BOOL SGRTabIsApart(UIView *item) {
-    if (![NSProcessInfo.processInfo.arguments containsObject:@"split"]) return NO;
+    NSArray<NSString *> *args = NSProcessInfo.processInfo.arguments;
+    BOOL two = [args containsObject:@"split2"];
+    if (![args containsObject:@"split"] && !two) return NO;
     for (UIView *sub in item.subviews) {
-        if ([sub isKindOfClass:UILabel.class] && [((UILabel *)sub).text isEqualToString:@"Search"]) return YES;
+        if (![sub isKindOfClass:UILabel.class]) continue;
+        NSString *text = ((UILabel *)sub).text;
+        if ([text isEqualToString:@"Search"] || (two && [text isEqualToString:@"Create"])) return YES;
     }
     return NO;
 }

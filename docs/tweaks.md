@@ -359,8 +359,13 @@ Redesigned:
                   minimizes the bar to two circles, the first or current tab and the last, with the now playing card
                   between them, and a scroll back up, its top, another tab or the player brings it back
                   (TabBarMinimize.x, MinimizeStep.h; the Player page's Apple Music style). Spotify's container is no
-                  UITabBarController, so UIKit's tabBarMinimizeBehavior and bottomAccessory cannot do it. Laid out on
-                  the Mac against harness/tabbar/ (`mini`), the scroll's steps checked by harness/tabbar/minimize-check.c
+                  UITabBarController, so UIKit's tabBarMinimizeBehavior and bottomAccessory cannot do it. The bars,
+                  their circles and the card move as one, on one spring of their own (SGRMotionBar, 0.34 s, no
+                  overshoot; at once under Reduce Motion), from what is on screen, so a change turned back half way
+                  carries on from there. Laid out on
+                  the Mac against harness/tabbar/ (`mini`; a tap on the leading circle `tap`, real flings that turn
+                  the bar half way `turns`, a minimize from inside Spotify's own animations `nested`, every frame of
+                  the move sampled `motion`), the scroll's steps checked by harness/tabbar/minimize-check.c
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
                   (BarConnect.x, its own key and its own row on the Player page, apart from the native look's). In a Jam the
                   glass stays on the track and Spotify's Jam strip gets a pane of its own above it (harness/tabbar/, jam)

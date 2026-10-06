@@ -1,5 +1,7 @@
 // What minimizes the glass bar and what brings it back (TabBar.x draws it): a page scrolled down by a
-// finger or the fling after it, and scrolled back up or to its top (MinimizeStep.h); another tab (TabBar.x);
+// finger or the fling after it, and scrolled back up or to its top (MinimizeStep.h). After the bar changes some
+// other way (a tap on its circle, a tab, the player), only a new touch minimizes it again: the fling still
+// running would otherwise undo the tap at once; another tab (TabBar.x);
 // and the full screen player opening or closing, which takes Spotify's pictures of the bars to move with it
 // and would have moved the card from the tab bar's row back up to its place above the bar.
 //
@@ -13,6 +15,7 @@
 static Class sg_containerClass;
 static __weak UIScrollView *sg_page, *sg_other;
 static SGRMinimizeTrack sg_track;
+static BOOL sg_waitForTouch;
 
 static BOOL inContainer(UIView *view) {
     for (UIResponder *r = view.nextResponder; r; r = r.nextResponder) if ([r isKindOfClass:sg_containerClass]) return YES;
@@ -31,11 +34,16 @@ static void scrolled(UIScrollView *scrollView) {
         sg_track = (SGRMinimizeTrack){offset, SGRTabBarMinimized()};
     }
     // The bar changed some other way (a tab, the player): the scroll counts from here.
-    if (sg_track.minimized != SGRTabBarMinimized()) sg_track = (SGRMinimizeTrack){offset, SGRTabBarMinimized()};
+    if (sg_track.minimized != SGRTabBarMinimized()) {
+        sg_track = (SGRMinimizeTrack){offset, SGRTabBarMinimized()};
+        sg_waitForTouch = YES;
+    }
+    if (scrollView.isTracking) sg_waitForTouch = NO;
     UIEdgeInsets inset = scrollView.adjustedContentInset;
     CGFloat top = -inset.top, bottom = scrollView.contentSize.height + inset.bottom - scrollView.bounds.size.height;
     BOOL minimized = SGRMinimizeStep(&sg_track, offset, top, bottom);
     if (minimized == SGRTabBarMinimized() || (minimized && !SGEnabled(SGRKeyNavbarMinimize))) return;
+    if (minimized && sg_waitForTouch) return;
     SGRSetTabBarMinimized(minimized, YES);
 }
 
