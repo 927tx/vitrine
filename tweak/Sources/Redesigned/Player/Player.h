@@ -6,7 +6,8 @@
 // come to the player itself, the way the Music app shows them, when the lyrics glyph is tapped.
 //
 //     PlayerField.x      the switch's flags and rows, the field in the background plane, the cover it reads
-//     PlayerArtwork.x    the cover's corners, shadow and paused shrink, the lyric preview under it hidden
+//     PlayerArtwork.x    the cover's corners, shadow and paused shrink, the lyric preview under it gone and
+//                        its room the cover's
 //     PlayerHeader.x     glass behind the close and more buttons
 //     PlayerControls.x   previous, play and next as bare glyphs, monospaced times
 //     PlayerFooter.x     share gone, lyrics, Connect and queue as one row of three glyphs
