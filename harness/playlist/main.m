@@ -244,6 +244,28 @@ static NSString *trailingLabel(UIView *root) {
     return @"no header";
 }
 
+// Where the redesign's header drew the creator's picture and name, or that it drew none.
+static NSString *creatorPictureState(UIView *root) {
+    NSMutableArray<UIView *> *stack = [NSMutableArray arrayWithObject:root];
+    while (stack.count) {
+        UIView *v = stack.lastObject;
+        [stack removeLastObject];
+        if ([NSStringFromClass(v.class) isEqualToString:@"SGRHeaderInfo"]) {
+            UIImageView *picture = nil;
+            UILabel *name = nil;
+            for (UIView *sub in v.subviews) {
+                if ([sub isKindOfClass:UIImageView.class] && !sub.hidden && ((UIImageView *)sub).image) picture = (UIImageView *)sub;
+                if ([sub isKindOfClass:UILabel.class] && [((UILabel *)sub).text isEqualToString:@"The Weeknd"]) name = (UILabel *)sub;
+            }
+            if (!picture) return [NSString stringWithFormat:@"none, name at %@", NSStringFromCGRect(name.frame)];
+            return [NSString stringWithFormat:@"drawn at %@ radius %.0f, name at %@", NSStringFromCGRect(picture.frame),
+                    picture.layer.cornerRadius, NSStringFromCGRect(name.frame)];
+        }
+        [stack addObjectsFromArray:v.subviews];
+    }
+    return @"no header";
+}
+
 // Liked Songs (trees/continuous/1.txt, 2026-09-18): the same page with no cover, a 238pt header, a column of
 // only the title and the count (the count in a stack of its own, 314pt of label and a 56pt spacer), no add or
 // more in the row, the play button 80x48 with its 48pt disc at x=16, and LiquidGlass.gradientContainer, the
@@ -608,7 +630,19 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
     UIView *face = box(creator, _TtCE13Encore_FaceKitO16EncoreFoundation6Encore12FacepileView.class, CGRectMake(0, 5, 24, 24), nil);
     face.backgroundColor = [UIColor colorWithWhite:0.8 alpha:1];
     face.layer.cornerRadius = 12;
+    // The owner's picture, in an image view inside the facepile, landing at 1.5 s after the header has laid out.
+    UIImageView *facePicture = [[UIImageView alloc] initWithFrame:face.bounds];
+    [face addSubview:facePicture];
     label(creator, CGRectMake(32, 9, 77, 16), @"The Weeknd", 13, UIColor.whiteColor, @"Encore.Label");
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        facePicture.image = [[[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(48, 48)] imageWithActions:^(UIGraphicsImageRendererContext *c) {
+            [UIColor.orangeColor setFill];
+            UIRectFill(CGRectMake(0, 0, 48, 48));
+        }];
+    });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        NSLog(@"[harness] owner picture: %@", creatorPictureState(page.view));
+    });
     box(creatorRow, UIView.class, CGRectMake(109.67, 0, columnWidth - 109.67, 34), nil);
 
     UIView *lengthRow = box(column, UIView.class, CGRectMake(0, 107, columnWidth, 15.33), nil);

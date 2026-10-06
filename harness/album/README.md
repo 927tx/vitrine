@@ -65,3 +65,10 @@ in the title with no "feat.", one not at all). At 2.5 s the log says, row by row
 dropped, how far the title moved and where the badge was drawn against the end of the title's text; at 4 s the first
 row is prepared for reuse and has to come back as Spotify drew it, then be dropped again by its next pass. At 3 s
 the log also says the first card of each carousel, painted the base surface, was cleared and the grey one was not.
+
+The artist row's picture (an `Encore.ImageView`) gets its image at 1.5 s, after the header has laid out. At 2.2 s the
+log says where the redesign drew it: a round picture a line high just before the name, the two centred together
+(`{{139, 368}, {21, 21}}` and the name at `{{168, 368}, {96, 21}}` on an iPhone 17 Pro).
+
+`stubs.m` also stands in for `SGRegisterCustomFont`, which `Shared/Fonts/Fonts.x` calls and which lives in a file
+that pulls in the settings rows.

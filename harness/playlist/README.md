@@ -64,3 +64,7 @@ again, it fired the old row's Mix ("still on screen: no").
 
 The extender paint line at 3 s also covers a recommendations heading mounted the way This Is playlists have it,
 a plain UICollectionViewCell straight in the list: "plain heading a=0" once the list's pass has cleared it.
+
+The owner's picture is an image view inside the creator button's facepile, filled at 1.5 s, after the header has
+laid out. At 2.2 s the log line "owner picture" says where the redesign drew it: round, a line high, just before
+the name, the two centred together. "none" means the late image was missed.

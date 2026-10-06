@@ -270,9 +270,32 @@ static NSString *trailingLabel(UIView *root) {
     UIView *parentElement = box(_titleStack, UIView.class, CGRectMake(0, 33.33, 96, 24), nil);
     UIView *parentRow = box(parentElement, MockEncoreButton.class, parentElement.bounds, @"CreativeWorkPlatform.Components.UI.ParentRow");
     parentRow.accessibilityLabel = @"The Weeknd";
-    UIView *avatar = box(parentRow, UIView.class, CGRectMake(0, 0, 24, 24), @"Encore.ImageView");
+    UIImageView *avatar = (UIImageView *)box(parentRow, UIImageView.class, CGRectMake(0, 0, 24, 24), @"Encore.ImageView");
     avatar.backgroundColor = [UIColor colorWithWhite:0.8 alpha:1];
     avatar.layer.cornerRadius = 12;
+    // The artist's picture lands at 1.5 s, after the header has laid out; at 2.2 s the log says where the
+    // redesign drew it.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        avatar.image = [[[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(48, 48)] imageWithActions:^(UIGraphicsImageRendererContext *c) {
+            [UIColor.orangeColor setFill];
+            UIRectFill(CGRectMake(0, 0, 48, 48));
+        }];
+    });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        UIView *info = nil;
+        for (UIView *v = avatar; v && !info; v = v.superview) {
+            for (UIView *sub in v.subviews) {
+                if ([NSStringFromClass(sub.class) isEqualToString:@"SGRHeaderInfo"]) info = sub;
+            }
+        }
+        UIView *picture = nil, *name = nil;
+        for (UIView *sub in info.subviews) {
+            if ([sub isKindOfClass:UIImageView.class] && !sub.hidden && ((UIImageView *)sub).image) picture = sub;
+            if ([sub isKindOfClass:UILabel.class] && [((UILabel *)sub).text isEqualToString:@"The Weeknd"]) name = sub;
+        }
+        NSLog(@"[harness] artist picture: %@, name at %@", picture ? NSStringFromCGRect(picture.frame) : @"none",
+              NSStringFromCGRect(name.frame));
+    });
     label(parentRow, CGRectMake(32, 4.33, 72, 15.33), @"The Weeknd", 11, UIColor.whiteColor, @"Encore.Label");
 
     UIView *bottomGroup = box(outer, UIView.class, CGRectMake(0, 329.33, W, 71.33), nil);

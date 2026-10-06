@@ -27,6 +27,11 @@ extern const CGFloat SGRHeaderInfoTitleRise;  // 56, of the content over the pic
 // The line keeps its colour: it is the page's one piece of secondary text, not a link to be tinted. nil
 // leaves it as text.
 - (void)showCreatorLink:(UIView *)control;
+// The picture of whoever made it -- the album's artist, the playlist's owner -- drawn round, a line high, before
+// the creator's name, the two centred together, as Spotify's own facepile sat beside the name. `source` is the
+// image view Spotify draws it in (SGRCreatorPicture), followed as Spotify fills it, so a picture that lands
+// after the page has laid out still shows. With no picture in it, or nil, the name stands alone.
+- (void)showCreatorPicture:(UIImageView *)source;
 // For a trailing control that shows its state only as a word (the artist's Follow): SGRMirrorButton's
 // readState and its two symbols. Set before the first -showShuffle:...; -trailingStateChanged redraws it.
 @property (nonatomic, copy) BOOL (^trailingState)(BOOL *on);
@@ -44,3 +49,9 @@ extern const CGFloat SGRHeaderInfoTitleRise;  // 56, of the content over the pic
 // The height the content wants at `width`, from the top of the title to the bottom of the description.
 - (CGFloat)contentHeightForWidth:(CGFloat)width;
 @end
+
+// The image view of the leading face on Spotify's creator line `root` -- the playlist header's collaborators
+// button, which carries a facepile, or the album header's artist row, which carries an Encore.ImageView: the
+// square image view nearest the leading edge, so a badge after the name is not taken for it. nil when there is
+// none yet.
+UIImageView *SGRCreatorPicture(UIView *root);

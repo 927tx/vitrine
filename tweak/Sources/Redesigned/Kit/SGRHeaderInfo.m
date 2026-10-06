@@ -33,10 +33,32 @@ static BOOL setText(UILabel *label, NSString *text) {
 
 // The most a title picture takes: a share of the text's width, and a height near three lines of the title.
 static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
+// Between the creator's picture and the name.
+static const CGFloat kPictureGap = 8;
+
+// A face is at least this wide, and square give or take a point.
+static const CGFloat kMinFace = 16;
+
+UIImageView *SGRCreatorPicture(UIView *root) {
+    if (!root) return nil;
+    // The faces of a facepile overlap, the leading one first to the eye.
+    BOOL rtl = root.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+    __block UIImageView *found = nil;
+    __block CGFloat edge = 0;
+    SGForEachView(root, ^(UIView *v) {
+        CGSize size = v.bounds.size;
+        if (![v isKindOfClass:UIImageView.class] || size.width < kMinFace || fabs(size.width - size.height) > 1) return;
+        CGFloat x = [v convertPoint:CGPointMake(rtl ? size.width : 0, 0) toView:root].x;
+        if (!found || (rtl ? x > edge : x < edge)) found = (UIImageView *)v, edge = x;
+    });
+    return found;
+}
 
 @implementation SGRHeaderInfo {
     UILabel *_title, *_creator, *_length, *_about;
     UIImageView *_logo;
+    UIImageView *_picture;   // the creator's, round, before the name
+    __weak UIImageView *_pictureSource;
     UIImage *_titleImage;   // what the title's place is laid out for; the logo keeps its picture while it fades out
     SGRMirrorButton *_shuffle, *_trailing;
     SGRPlayCapsule *_play;
@@ -54,6 +76,11 @@ static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
                         SGRTertiary(), 1, NSTextAlignmentCenter);
     _about = infoLabel(self, SGRFont(UIFontTextStyleFootnote, UIFontWeightRegular, UIContentSizeCategoryExtraLarge),
                        SGRSecondary(), 2, NSTextAlignmentNatural);
+    _picture = [UIImageView new];
+    _picture.contentMode = UIViewContentModeScaleAspectFill;
+    _picture.clipsToBounds = YES;
+    _picture.hidden = YES;
+    [self addSubview:_picture];
 
     _shuffle = [[SGRMirrorButton alloc] initWithFrame:CGRectZero];
     _shuffle.fallbackGlyph = [UIImage systemImageNamed:@"shuffle"];
@@ -162,14 +189,37 @@ static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
     SGRActivate(_creatorLink);
 }
 
-// The creator line takes a touch only where its text is; everything else of the view is the page's.
+- (void)showCreatorPicture:(UIImageView *)source {
+    if (source != _pictureSource) {
+        _pictureSource = source;
+        __weak SGRHeaderInfo *weakSelf = self;
+        if (source) SGRObserveImage(source, ^(UIImageView *view) {
+            SGRHeaderInfo *info = weakSelf;
+            if (info && view == info->_pictureSource) [info sgr_takePicture:view.image];
+        });
+    }
+    [self sgr_takePicture:source.image];
+}
+
+// The picture fades in where it lands with the page on screen; the name makes room for it in the same move.
+- (void)sgr_takePicture:(UIImage *)image {
+    if (image == _picture.image) return;
+    BOOL appears = image && !_picture.image;
+    _picture.image = image;
+    _picture.hidden = image == nil;
+    [self setNeedsLayout];
+    if (!appears || !self.window) return;
+    _picture.alpha = 0;
+    SGRAnimate(SGRMotionFade, ^{ self->_picture.alpha = 1; }, nil);
+    SGRAnimate(SGRMotionLayout, ^{ [self layoutIfNeeded]; }, nil);
+}
+
+// The creator line takes a touch only where its text and its picture are; everything else of the view is the
+// page's. The label is laid out at the text's own width (-layoutSubviews).
 - (UIView *)sgr_creatorHit:(CGPoint)point {
     if (!_creator.userInteractionEnabled || _creator.hidden) return nil;
-    CGSize text = [_creator sizeThatFits:CGSizeMake(_creator.bounds.size.width, CGFLOAT_MAX)];
-    CGRect frame = _creator.frame;
-    CGRect word = CGRectInset(CGRectMake(round(CGRectGetMidX(frame) - text.width / 2), frame.origin.y,
-                                         MIN(text.width, frame.size.width), frame.size.height), -8, -6);
-    return CGRectContainsPoint(word, point) ? _creator : nil;
+    CGRect line = _picture.hidden ? _creator.frame : CGRectUnion(_creator.frame, _picture.frame);
+    return CGRectContainsPoint(CGRectInset(line, -8, -6), point) ? _creator : nil;
 }
 
 - (void)showShuffle:(UIView *)shuffle play:(UIView *)play trailing:(UIView *)trailing
@@ -229,6 +279,8 @@ static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
     [super layoutSubviews];
     CGFloat width = self.bounds.size.width, text = MAX(0, width - 2 * kSide);
     CGFloat y = round(self.bounds.size.height - SGRHeaderInfoBottom - [self contentHeightForWidth:width]);
+    // No name, no picture: it belongs to the line.
+    _picture.hidden = !_picture.image || _creator.hidden;
 
     UILabel *previous = nil;
     for (UILabel *label in @[_title, _creator, _length]) {
@@ -237,6 +289,18 @@ static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
         CGSize size = [self sgr_sizeOf:label width:text];
         CGFloat height = ceil(size.height);
         label.frame = CGRectMake(kSide, y, text, height);
+        // The name at its own width, so a tap beside it is the page's (-sgr_creatorHit:), and before it the
+        // picture, a line high so the line keeps its height, the two centred together. The picture leads, so it
+        // is on the right in a right-to-left language.
+        if (label == _creator) {
+            CGFloat picture = _picture.hidden ? 0 : height + kPictureGap;
+            CGFloat named = MIN(ceil(size.width), MAX(0, text - picture));
+            CGFloat x = round((width - picture - named) / 2);
+            BOOL rtl = self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+            _picture.frame = CGRectMake(rtl ? x + named + kPictureGap : x, y, height, height);
+            _picture.layer.cornerRadius = height / 2;
+            label.frame = CGRectMake(rtl ? x : x + picture, y, named, height);
+        }
         if (label == _title && _titleImage) {
             _logo.frame = CGRectMake(round((width - size.width) / 2), y, size.width, height);
             _logo.accessibilityLabel = _title.text;
