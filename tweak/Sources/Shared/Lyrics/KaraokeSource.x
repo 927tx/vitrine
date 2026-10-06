@@ -12,6 +12,8 @@
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/LyricsSources/LyricsSources.h"
 #import "Headers/SPTPlayer.h"
+#import <mach-o/dyld.h>
+#import <objc/runtime.h>
 
 static const NSUInteger kKeptTracks = 40;
 static const NSUInteger kSeenTracks = 200;
@@ -190,10 +192,65 @@ static void askAgainLater(NSString *trackID) {
     });
 }
 
-// Main queue only. NO, asking nothing, before any request of Spotify's has shown the headers.
+// Whether a loaded image has this file name; EeveeSpotify's Reincarnated fork also loads EeveeSwiftProtobuf.
+static BOOL imageLoaded(NSString *wanted) {
+    for (uint32_t i = 0; i < _dyld_image_count(); i++) {
+        const char *image = _dyld_get_image_name(i);
+        if (image && [@(image).lastPathComponent caseInsensitiveCompare:wanted] == NSOrderedSame) return YES;
+    }
+    return NO;
+}
+
+// Only loaded code counts, never a file's name: an IPA can keep EeveeSpotify's icons
+// (EeveeSpotifyAnime@2x.png) after its dylib is gone. EeveeSpotify ships as EeveeSpotify.dylib, but an
+// IPA builder can rename it (EeveeSpotify-6.6.dylib) or wrap it as EeveeSpotify.framework, so its Swift
+// settings page, which every fork keeps under the module EeveeSpotify, counts as well. It may load after
+// the mod, so a NO is asked again, though only once more images have loaded, and a YES is kept.
+BOOL SGEeveeSpotifyInjected(void) {
+    static BOOL found;
+    static uint32_t looked;
+    uint32_t images = _dyld_image_count();
+    if (found || images == looked) return found;
+    looked = images;
+    if (imageLoaded(@"EeveeSpotify.dylib") || objc_getClass("_TtC12EeveeSpotify27EeveeSettingsViewController")) {
+        found = YES;
+        SGLog(@"lyrics: EeveeSpotify is injected");
+    }
+    return found;
+}
+
+// Whether EeveeSpotify answers Spotify's lyrics, read from its own settings in the standard defaults.
+// It decides at launch and asks for a restart to change, so the first answer is kept. Anything not
+// known to turn its lyrics off counts as on, a missing key and an unknown version included.
+static BOOL eeveeLyricsOn(void) {
+    static BOOL on;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+        id source = [defaults objectForKey:@"lyricsSource"];      // 4 is "Do not replace lyrics"
+        id patch = [defaults objectForKey:@"patchType"];          // Reincarnated: 0 not set, 1 off, 2 on
+        BOOL sourceOff = [source isKindOfClass:NSNumber.class] && [source integerValue] == 4;
+        BOOL unpatched = imageLoaded(@"EeveeSwiftProtobuf") && [patch isKindOfClass:NSNumber.class]
+                      && ([patch integerValue] == 0 || [patch integerValue] == 1);
+        on = !(getenv("EEVEE_DISABLE_ALL") || sourceOff || unpatched);
+        SGLog(@"lyrics: EeveeSpotify's lyrics are %@ (lyricsSource %@, patchType %@)", on ? @"on" : @"off", source, patch);
+    });
+    return on;
+}
+
+BOOL SGLyricsStandAsideForEevee(void) {
+    return SGEeveeSpotifyInjected() && eeveeLyricsOn() && !SGHidden(SGKeyLyricsBesideEevee);
+}
+
+BOOL SGEeveeLyricsOn(void) {
+    return SGEeveeSpotifyInjected() && eeveeLyricsOn();
+}
+
+// Main queue only. NO, asking nothing, before any request of Spotify's has shown the headers, and with
+// EeveeSpotify injected, whose lyrics answer the request: a second asker beside it froze Spotify after launch.
 static BOOL requestFromSpotify(NSString *trackID) {
     NSDictionary<NSString *, NSString *> *headers = sg_spclientHeaders;
-    if (!headers) return NO;
+    if (!headers || SGLyricsStandAsideForEevee()) return NO;
     [sg_requested addObject:trackID];
     [sg_asking addObject:trackID];
     [sg_looking addObject:trackID];

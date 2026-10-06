@@ -21,6 +21,12 @@ SGModSection *SGLyricsSourcesSection(BOOL namingSource) {
     NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObjects:sources, imported,
         SGOptionRow(@"Lyrics for every track", @"Even where Spotify has none", SGKeyLyricsAllTracks), SGSpicyLyricsKeyRow(), nil];
     if (namingSource) [rows addObject:SGOptionRow(@"Show source", nil, SGKeyLyricsCredit)];
+    if (SGEeveeLyricsOn()) {
+        [rows addObject:SGOptionRow(@"Use these sources anyway", @"Only if EeveeSpotify's lyrics are really off", SGKeyLyricsBesideEevee)];
+        return SGNotedSection(@"Sources", rows, @"EeveeSpotify's lyrics are on, so it answers Spotify's lyrics and these sources stay "
+                                                @"off: both answering froze Spotify after launch. Turn its lyrics off in its own "
+                                                @"settings to use these.");
+    }
     return SGSection(@"Sources", rows);
 }
 

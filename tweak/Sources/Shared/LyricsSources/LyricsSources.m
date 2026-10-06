@@ -199,8 +199,10 @@ void SGLyricsSetOrder(NSArray<NSString *> *keys) {
     [NSUserDefaults.standardUserDefaults setObject:keys ?: @[] forKey:SGKeyLyricsProviders];
 }
 
+// With EeveeSpotify injected, its own lyrics answer Spotify's requests and the mod's stand aside: two
+// tweaks holding and answering the same request froze Spotify after launch.
 BOOL SGLyricsEnabled(void) {
-    return SGLyricsOrder().count > 0;
+    return SGLyricsOrder().count > 0 && !SGLyricsStandAsideForEevee();
 }
 
 #pragma mark - what is known about the track

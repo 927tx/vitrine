@@ -117,6 +117,17 @@ void SGKaraokeRequestLyrics(NSString *trackID);
 // Asks Spotify's JSON lyrics for the track once, and keeps its lines only if they are more finely
 // timed than the ones kept: the lyrics view was left with plain text, and Spotify may have it timed.
 void SGKaraokeAskSpotifyForTiming(NSString *trackID);
+// Whether EeveeSpotify is injected alongside the mod.
+BOOL SGEeveeSpotifyInjected(void);
+// EeveeSpotify is injected and answers Spotify's lyrics, by its own settings (lyricsSource, and
+// patchType in its Reincarnated fork). Both answering the same request froze Spotify after launch, so
+// then the mod's sources and its own requests for Spotify's lyrics stand aside (LyricsSources'
+// SGLyricsEnabled, SGKaraokeRequestLyrics). Its settings are read once, as it reads them at launch.
+BOOL SGEeveeLyricsOn(void);
+// The Lyrics page's "Use these sources anyway", for an EeveeSpotify whose settings read wrong.
+#define SGKeyLyricsBesideEevee @"spotifyglass.lyrics.besideEevee"
+// SGEeveeLyricsOn, unless the user asked for the mod's sources beside it.
+BOOL SGLyricsStandAsideForEevee(void);
 // The base62 id, a local file's lyrics key (Shared/LocalFiles), nil before the player reported.
 NSString *SGKaraokePlayingTrack(void);
 NSInteger SGKaraokePositionMs(void);     // negative when unknown
