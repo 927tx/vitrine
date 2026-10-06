@@ -443,6 +443,8 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
 
 - (void)showRow:(SGModRow *)row {
     _row = row;
+    _slider.enabled = YES;   // a row waiting on a switch turns it off again (showWaiting)
+    _slider.userInteractionEnabled = YES;
     NSInteger count = row.step > 0 ? (NSInteger)lround((row.maximum - row.minimum) / row.step) : 0;
     _detents = count > 0 && count <= 24;
     _title.font = SGTitleFont();
@@ -498,6 +500,35 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
 
 @end
 
+#pragma mark - rows waiting on a switch
+
+// What a disabled control fades to, about the strength of the system's tertiary label.
+static const CGFloat kWaitingAlpha = 0.4;
+
+static NSArray<UIView *> *controlsIn(UITableViewCell *cell) {
+    NSMutableArray<UIView *> *views = [NSMutableArray arrayWithArray:cell.contentView.subviews];
+    if (cell.accessoryView) {
+        [views addObject:cell.accessoryView];
+        [views addObjectsFromArray:cell.accessoryView.subviews];
+    }
+    return [views filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(UIView *view, NSDictionary *bindings) {
+        return [view isKindOfClass:UIControl.class];
+    }]];
+}
+
+// A row waiting on a switch reads dimmed, the way a control that is off does, and its own switch, slider or
+// button takes no touch, so a tap lands on the row and nudges the switch it waits on instead (-nudgeAt:).
+static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTitle) {
+    cell.contentView.alpha = waiting ? kWaitingAlpha : 1;
+    cell.accessoryView.alpha = waiting ? kWaitingAlpha : 1;
+    cell.accessibilityHint = waiting ? [NSString stringWithFormat:@"Turn on %@ first.", switchTitle] : nil;
+    if (!waiting) return;
+    for (UIControl *control in controlsIn(cell)) {
+        control.enabled = NO;
+        control.userInteractionEnabled = NO;
+    }
+}
+
 #pragma mark - the page
 
 @implementation SGModPage {
@@ -507,6 +538,7 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
     UIView *_footer;
     NSTimer *_ticker;
     BOOL _live;
+    NSIndexPath *_nudgeAfterScroll;   // the switch a waiting row's tap is scrolling to
 }
 
 - (instancetype)initWithTitle:(NSString *)title intro:(NSString *)intro sections:(NSArray<SGModSection *> *)sections footer:(NSString *)footer {
@@ -568,6 +600,77 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
 
 - (void)refreshVisibility {
     [self showRowsThen:nil];
+}
+
+// The switch row a row waits on, among this page's rows.
+- (SGModRow *)switchFor:(SGModRow *)row {
+    if (!row.waitsOn) return nil;
+    for (SGModSection *s in _sections) for (SGModRow *other in s.rows) {
+        if (other != row && [other.key isEqualToString:row.waitsOn]) return other;
+    }
+    return nil;
+}
+
+- (BOOL)isWaiting:(SGModRow *)row {
+    return row.waitsOn && !SGFlag(row.waitsOn, [self switchFor:row].defaultOn);
+}
+
+- (NSIndexPath *)pathOfRow:(SGModRow *)row {
+    for (NSUInteger section = 0; section < _shown.count; section++) {
+        NSUInteger index = [_shown[section] indexOfObjectIdenticalTo:row];
+        if (index != NSNotFound) return [NSIndexPath indexPathForRow:(NSInteger)index inSection:(NSInteger)section];
+    }
+    return nil;
+}
+
+// A tap on a row waiting on a switch: the switch is brought into view if it is not, then nudged.
+- (void)nudgeSwitchFor:(SGModRow *)row {
+    NSIndexPath *path = [self pathOfRow:[self switchFor:row]];
+    if (!path) return;
+    UITableView *table = self.tableView;
+    CGRect shown = UIEdgeInsetsInsetRect(table.bounds, table.adjustedContentInset);
+    if (CGRectContainsRect(shown, [table rectForRowAtIndexPath:path])) {
+        [self nudgeAt:path];
+        return;
+    }
+    _nudgeAfterScroll = path;
+    [table scrollToRowAtIndexPath:path atScrollPosition:UITableViewScrollPositionNone animated:YES];
+}
+
+- (void)scrollViewDidEndScrollingAnimation:(UIScrollView *)scrollView {
+    NSIndexPath *path = _nudgeAfterScroll;
+    _nudgeAfterScroll = nil;
+    if (path) [self nudgeAt:path];
+}
+
+// The switch leans 6pt towards on and springs back, with a light tap, so the eye and the finger find what to
+// turn on first. Each nudge starts from wherever the last one has the switch, so taps in a row never jump it.
+// With Reduce Motion nothing moves: the switch's row lights up for a moment instead.
+- (void)nudgeAt:(NSIndexPath *)path {
+    UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:path];
+    UIView *toggle = controlsIn(cell).lastObject;
+    if (!toggle) return;
+    [[[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight] impactOccurred];
+    UIAccessibilityPostNotification(UIAccessibilityLayoutChangedNotification, toggle);
+    if (UIAccessibilityIsReduceMotionEnabled()) {
+        UIColor *card = cell.backgroundColor;
+        cell.backgroundColor = UIColor.systemGray4Color;
+        [UIView animateWithDuration:0.4 delay:0.1 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionAllowUserInteraction animations:^{
+            cell.backgroundColor = card;
+        } completion:nil];
+        return;
+    }
+    BOOL rtl = [UIView userInterfaceLayoutDirectionForSemanticContentAttribute:toggle.semanticContentAttribute] == UIUserInterfaceLayoutDirectionRightToLeft;
+    UIViewPropertyAnimator *lean = [[UIViewPropertyAnimator alloc] initWithDuration:0.12 controlPoint1:CGPointMake(0.23, 1) controlPoint2:CGPointMake(0.32, 1) animations:^{
+        toggle.transform = CGAffineTransformMakeTranslation(rtl ? -6 : 6, 0);
+    }];
+    [lean addCompletion:^(UIViewAnimatingPosition position) {
+        UIViewPropertyAnimator *back = [[UIViewPropertyAnimator alloc] initWithDuration:0.4 dampingRatio:0.35 animations:^{
+            toggle.transform = CGAffineTransformIdentity;
+        }];
+        [back startAnimation];
+    }];
+    [lean startAnimation];
 }
 
 // The row a switch or an ⓘ belongs to, by the cell it sits in: rows coming and going move the rows under
@@ -682,6 +785,7 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
         SGModSliderCell *cell = [table dequeueReusableCellWithIdentifier:@"slider"] ?: [[SGModSliderCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"slider"];
         cell.backgroundColor = SGCardBackground();
         [cell showRow:row];
+        showWaiting(cell, [self isWaiting:row], [self switchFor:row].title);
         return cell;
     }
     UITableViewCell *cell = SGDequeueCell(table, @"row");
@@ -730,11 +834,19 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
     } else if (row.action) {
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     }
+    BOOL waiting = [self isWaiting:row];
+    showWaiting(cell, waiting, [self switchFor:row].title);
+    if (waiting) cell.selectionStyle = UITableViewCellSelectionStyleNone;
     return cell;
 }
 
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path {
     SGModRow *row = [self rowAt:path];
+    if ([self isWaiting:row]) {
+        [table deselectRowAtIndexPath:path animated:NO];
+        [self nudgeSwitchFor:row];
+        return;
+    }
     if (flagRowLocked(row)) {
         [table deselectRowAtIndexPath:path animated:YES];
         [self explainLock];
@@ -822,6 +934,12 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wait * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self.tableView reloadData]; });
     };
     BOOL moved = [self showRowsThen:row.changed ? reload : nil];
+    // The rows waiting on this switch stay where they are and fade to their new state.
+    NSMutableArray<NSIndexPath *> *waiting = [NSMutableArray array];
+    for (NSIndexPath *visible in self.tableView.indexPathsForVisibleRows) {
+        if ([[self rowAt:visible].waitsOn isEqualToString:row.key]) [waiting addObject:visible];
+    }
+    if (waiting.count) [self.tableView reloadRowsAtIndexPaths:waiting withRowAnimation:UITableViewRowAnimationFade];
     if (row.changed && !moved) reload();
     if (on && row.warning) [self warn:row];
 }

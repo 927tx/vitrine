@@ -25,4 +25,8 @@ fading in under a switch (`slow`); Controls at 40%, Music Haptics at 150% then 1
 under their keys and read back by the hooks. The Audio effects page and an SGModPage without shown-while rows
 (`harness/audio-effects-page`, `push=reference`) draw the same pixels as before the slider and visibility were added.
 
+2026-10-05, iPhone 17 Pro on iOS 27.0: with `controls-off` the Strength row stays under Controls, greyed (`dump` marks
+it), `select=2.1` on it leans the Controls switch 6pt towards on and springs it back, and `toggle=2.0` brings
+Strength back to full strength without a row moving.
+
 What it does not cover: a real finger on the slider, and how any strength feels, which only a phone can tell.

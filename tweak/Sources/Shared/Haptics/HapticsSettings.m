@@ -92,7 +92,7 @@ NSArray<SGModSection *> *SGVibrationsSections(void) {
         // Felt as it is set: a tap at the new strength with each step.
         SGPlayFeedback(SGFeedbackAdd);
     });
-    controlStrength.visible = ^BOOL { return SGEnabled(SGKeyControlHaptics); };
+    controlStrength.waitsOn = SGKeyControlHaptics;
 
     // The list reads the stored index, so someone with none stored gets the one picked for them.
     if (SGInt(SGKeyMusicHapticsMode, -1) < 0) SGSetInt(SGKeyMusicHapticsMode, SGMusicHapticsModeNow());

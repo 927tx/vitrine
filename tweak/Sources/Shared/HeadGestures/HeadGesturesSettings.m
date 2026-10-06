@@ -73,7 +73,6 @@ static void forget(void (^done)(void)) {
 UIViewController *SGHeadGesturesSettingsPage(void) {
     SGModRow *toggle = SGOptionRow(@"AirPods gestures", @"Nod twice to like the song, shake your head to skip it", SGKeyHeadGestures);
     toggle.changed = ^(BOOL on) { SGHeadGesturesSettingsChanged(); };
-    BOOL (^on)(void) = ^BOOL { return SGFlag(SGKeyHeadGestures, NO); };
 
     SGModRow *sensitivity = SGSliderRow(@"Sensitivity", @"Higher counts a smaller move",
         SGHeadSensitivityMin, SGHeadSensitivityMax, SGHeadSensitivityStep,
@@ -83,17 +82,17 @@ UIViewController *SGHeadGesturesSettingsPage(void) {
             SGHeadGesturesSettingsChanged();
         },
         ^NSString *(double value) { return [NSString stringWithFormat:@"%ld%%", lround(value)]; });
-    sensitivity.visible = on;
+    sensitivity.waitsOn = SGKeyHeadGestures;
 
     // Learning and forgetting change what Forget's row reads, which no switch on the page tells it.
     __block __weak SGModPage *page;
     void (^refresh)(void) = ^{ [page refreshVisibility]; };
     SGModRow *nod = SGStatActionRow(@"Learn your nod", nil, ^NSString *{ return learnedValue(SGKeyHeadNod); }, ^{ learn(SGHeadAxisPitch, refresh); });
     SGModRow *shake = SGStatActionRow(@"Learn your shake", nil, ^NSString *{ return learnedValue(SGKeyHeadShake); }, ^{ learn(SGHeadAxisYaw, refresh); });
-    nod.visible = shake.visible = on;
     SGModRow *forgetRow = SGActionRow(@"Forget what it learned", nil, ^{ forget(refresh); });
     forgetRow.color = SGRed();
-    forgetRow.visible = ^BOOL { return on() && anythingLearned(); };
+    forgetRow.visible = ^BOOL { return anythingLearned(); };
+    nod.waitsOn = shake.waitsOn = forgetRow.waitsOn = SGKeyHeadGestures;
 
     SGModPage *shown = [[SGModPage alloc] initWithTitle:@"AirPods gestures" intro:nil sections:@[
         SGSection(nil, @[SGWithSymbol(toggle, @"airpods.pro"), sensitivity]),

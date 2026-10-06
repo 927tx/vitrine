@@ -8,8 +8,9 @@
                                 functions Spotify imports hooked by rebinding its import slots (SGRebind.h)
     tweak/Sources/Headers/      reverse-engineered Spotify classes, one header each, only the selectors used
     tweak/Sources/Settings/     the Mod Settings framework: SGPage (a page on Spotify's stack), SGModPage (sections
-                                of rows: switches, choices, sliders, links, and rows shown only while a switch
-                                is on), SGPageStyle (Spotify's list look), SGGlowSwitch
+                                of rows: switches, choices, sliders, links, rows shown only while a choice
+                                asks for them, and rows greyed out while the switch they wait on is off, a tap
+                                on one nudging that switch), SGPageStyle (Spotify's list look), SGGlowSwitch
     tweak/Sources/Shared/       what works the same with either look, see Layers below
     tweak/Sources/Native/       tweaks on Spotify's own screens, running only while Redesigned UI is off
     tweak/Sources/Redesigned/   the redesign, running only while Redesigned UI is on
@@ -442,7 +443,7 @@ chosen, and the now playing bar's device button, checked in the simulator agains
 Controls (on until switched off) and one for Music Haptics, a choice of None, Generated or Native iOS
 (left out below iOS 18) with an ⓘ saying what each does. Someone with no choice stored gets Native iOS
 when Music Haptics is on in Accessibility, else Generated if the old switch was on, else None. Controls
-opens out while its switch is on into its Strength (10 to 100%, a tap at the new strength with each step);
+has its Strength under it, greyed out while the switch is off (10 to 100%, a tap at the new strength with each step);
 Generated into its Strength (20 to 200%, 100% being how it first shipped) and Follows, Everything (a tap on
 each kick and snare and a rumble under the bass), Beat (the taps without the rumble) or Bass (the kicks'
 taps and the rumble); Native iOS into a Status row (Off in iOS, Paused, Waiting, Checking, Ready, Playing

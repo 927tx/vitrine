@@ -28,8 +28,11 @@
 @property (nonatomic, copy) NSString *info;
 // The row shows only while this answers YES, asked again whenever a switch on the page is flipped, the
 // page comes back from a choice's list or it is told to (-refreshVisibility): the row fades in or out where
-// it sits. Nil shows it always.
+// it sits. Nil shows it always. A row that only waits on a switch takes `waitsOn` instead.
 @property (nonatomic, copy) BOOL (^visible)(void);
+// The key of a switch row on the same page this row works under: while that switch is off the row stays
+// where it is, greyed out, and a tap on it nudges the switch.
+@property (nonatomic, copy) NSString *waitsOn;
 // A choice row's: a line under each name in its list, in the same order, and what runs once one is stored.
 @property (nonatomic, copy) NSArray<NSString *> *choiceNotes;
 @property (nonatomic, copy) NSString *choiceFooter;   // under a choice row's list
