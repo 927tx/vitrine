@@ -48,6 +48,10 @@ static const CGFloat kGlowRadius = 9, kGlowOpacity = 0.85;
 static const NSTimeInterval kWholeFade = 0.35;
 static const double kWholeRiseMs = 900;
 static const double kClockSnapMs = 250, kClockPull = 0.08;
+// After a tap seeks to a line, the clock holds at it until the player reports a position this near it,
+// or for this long at the most: the player takes a few frames to report a seek.
+static const double kSeekNearMs = 500;
+static const CFTimeInterval kSeekWait = 1.5;
 // Lines get views this far outside the visible part, in screen heights: half a screen above it
 // and below, and a quarter more before a view is let go. Every view held is one more for the window
 // to take in and let go when the lyrics come up; a line comes into view about once in three seconds,
@@ -1084,6 +1088,10 @@ typedef struct {
 @implementation SGRKaraokeView {
     UIScrollView *_scroll;
     BOOL _browsing;
+    // The anchor and the open break as they were when the page was taken by hand, which the stack keeps to
+    // until it follows the song again (topOfLine:).
+    CGFloat _browseAnchor;
+    NSInteger _browseBreak;
     CADisplayLink *_link;
     NSString *_track;
     NSArray<SGKaraokeLine *> *_lines;
@@ -1126,6 +1134,8 @@ typedef struct {
     double _clock;
     NSInteger _reported;
     CFTimeInterval _clockTime;
+    NSInteger _seekTo;      // the line a tap seeked to, held by the clock until the player reports it
+    CFTimeInterval _seekAt;   // when, 0 while no seek is waiting
     BOOL _sweepsEstimates;   // the Lyrics page's "Simulate word-by-word timing", read once like the credit
     BOOL _plain;             // the song has no timing at all: every line lit, nothing follows the clock
     NSDictionary<NSNumber *, NSArray<SGLyricsMeaning *> *> *_meanings;   // Genius's, by line
@@ -1199,7 +1209,7 @@ typedef struct {
         if (!CGRectContainsPoint(CGRectInset(view.frame, -_margin, -_lineGap / 2), point)) continue;
         SGKaraokeSeek(view.line.start);
         SGPlayFeedback(SGFeedbackSkip);
-        [self followSong];
+        [self glideTo:view.line.start];
         return;
     }
 }
@@ -1243,6 +1253,10 @@ typedef struct {
 // While the user browses, placement stands still and every line is sharp.
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(followSong) object:nil];
+    if (!_browsing) {
+        _browseAnchor = self.bounds.size.height * kAnchor;
+        _browseBreak = _openBreak;
+    }
     _browsing = YES;
     if (self.browsingBegan) self.browsingBegan();
     for (SGRKaraokeLineView *view in _shown.allValues) view.blur = 0;
@@ -1281,6 +1295,26 @@ typedef struct {
                         options:UIViewAnimationOptionAllowUserInteraction
                      animations:^{ self->_scroll.contentOffset = CGPointZero; } completion:nil];
     [self placeLinesAnimated:YES];
+}
+
+// A tapped line glides to the anchor at once, and the stack with it: the clock is held at the line until
+// the player reports the seek, which takes a few frames. Read before then, the position still on the line
+// being sung put the stack back on it, and the seek's arrival then jumped it over to the tapped one.
+- (void)glideTo:(NSInteger)ms {
+    _seekTo = ms;
+    _seekAt = CACurrentMediaTime();
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(followSong) object:nil];
+    if (_browsing) {
+        _browsing = NO;
+        [UIView animateWithDuration:0.7 delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:0
+                            options:UIViewAnimationOptionAllowUserInteraction
+                         animations:^{ self->_scroll.contentOffset = CGPointZero; } completion:nil];
+    }
+    if (!_tops) return;
+    NSUInteger arrangement = _arrangement;
+    [self arrangeAt:[self clockMs] glide:YES];
+    // The line sung tapped again, off a page scrolled by hand: nothing moved on, so the stack is put back.
+    if (_arrangement == arrangement) [self placeLinesAnimated:YES];
 }
 
 - (void)didMoveToWindow {
@@ -1588,9 +1622,16 @@ static BOOL hasWords(SGKaraokeLine *line) {
 
 // Where a line starts on the page, for the stack as it is arranged now: an open break holds the room
 // of one row at the anchor, and the lines from the one after it on are moved down by it.
+//
+// While the page is scrolled by hand the stack stands still, and so does what places it: the room can
+// change meanwhile (the player's controls go as a scroll starts, and the anchor moves with the height)
+// and a break can open or close, and a line made for the view then went by the new anchor while the
+// lines beside it kept the old one, the two running into each other.
 - (CGFloat)topOfLine:(NSInteger)index {
-    CGFloat top = self.bounds.size.height * kAnchor + _tops[index].doubleValue - _focusTop;
-    return _openBreak >= 0 && index >= _openBreak ? top + [self breakRoom] : top;
+    CGFloat anchor = _browsing ? _browseAnchor : self.bounds.size.height * kAnchor;
+    NSInteger openBreak = _browsing ? _browseBreak : _openBreak;
+    CGFloat top = anchor + _tops[index].doubleValue - _focusTop;
+    return openBreak >= 0 && index >= openBreak ? top + [self breakRoom] : top;
 }
 
 - (CGFloat)breakRoom {
@@ -1775,7 +1816,18 @@ static BOOL hasWords(SGKaraokeLine *line) {
 // corrections. A seek or a new track is too far off to ease and is taken at once.
 - (double)clockMs {
     NSInteger raw = SGKaraokePositionMs();
-    CFTimeInterval shown = _link.targetTimestamp;
+    CFTimeInterval shown = _link ? _link.targetTimestamp : CACurrentMediaTime();
+    if (_seekAt) {
+        // A paused player never moves, so the hold ends by the position or the time, not by motion.
+        BOOL reported = raw >= 0 && labs(raw - _seekTo) <= kSeekNearMs;
+        if (!reported && CACurrentMediaTime() - _seekAt < kSeekWait) {
+            _clock = _seekTo;
+            _reported = raw;
+            _clockTime = shown;
+            return _clock;
+        }
+        _seekAt = 0;
+    }
     BOOL running = raw != _reported;   // a paused player reports the same position every frame
     if (running) _stillSince = 0;
     else if (!_stillSince) _stillSince = shown;
@@ -1845,6 +1897,14 @@ static BOOL hasWords(SGKaraokeLine *line) {
     }
 
     double now = [self clockMs];
+    [self arrangeAt:now glide:NO];
+    for (NSUInteger i = 0; i < _sungCount; i++) [_shown[@(_sung[i])] showTime:now];
+    if (_dots.superview) [_dots showTime:now running:!_stillSince || _link.targetTimestamp - _stillSince < kStillFor at:_link.targetTimestamp];
+}
+
+// What is sung at `now` lit and the stack arranged around it; a jump of more than a couple of lines is
+// placed at once, unless it is a tapped line gliding over.
+- (void)arrangeAt:(double)now glide:(BOOL)glide {
     NSInteger sung[kMostSung], focus, openBreak;
     NSUInteger count = [self sungAt:now into:sung focus:&focus openBreak:&openBreak];
     if (focus != _focus || openBreak != _openBreak || count != _sungCount || memcmp(sung, _sung, count * sizeof(NSInteger))) {
@@ -1864,12 +1924,10 @@ static BOOL hasWords(SGKaraokeLine *line) {
         _openBreak = openBreak;
         _arrangement++;
         if (openBreak < 0) [_dots removeFromSuperview];
-        [self placeLinesAnimated:!jump];
+        [self placeLinesAnimated:glide || !jump];
     } else {
         [self showLinesInSight];   // the page may be scrolling by hand, or springing back
     }
-    for (NSUInteger i = 0; i < _sungCount; i++) [_shown[@(_sung[i])] showTime:now];
-    if (_dots.superview) [_dots showTime:now running:!_stillSince || _link.targetTimestamp - _stillSince < kStillFor at:_link.targetTimestamp];
 }
 
 // What is sung at `now`: each line from its start until it is sung out, so two voices over each

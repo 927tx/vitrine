@@ -20,8 +20,9 @@
 //                  Musixmatch's community translations come in after the lines on the phone
 //   -gemini 1      a Gemini key is set, so the menu offers Translate with Gemini (stubs.m answers it)
 //   -geminiDelay S stubs.m's Gemini answers S seconds later instead of at once
+//   -seekLag S     the player reports a seek S seconds after it is asked for (stubs.m)
 //   -check 1       asserts the view's fixes (see runChecks), prints PASS and FAIL lines and quits with the
-//                  number of failures; run it with -song duet -at 20000 -gemini 1 -geminiDelay 1
+//                  number of failures; run it with -song duet -at 20000 -gemini 1 -geminiDelay 1 -seekLag 0.4
 // and the lyrics' own settings by their keys: -spotifyglass.lyricsSimulateWords 1 (sweep line timed
 // lines on the estimate), -spotifyglass.redesign.lyricsPronunciation 1,
 // -spotifyglass.redesign.lyricsTranslation 1, -spotifyglass.redesign.lyricsTextOrder '(translation, lyrics, pronunciation)'.
@@ -220,6 +221,86 @@ static NSString *textsOf(NSArray<SGKaraokeLine *> *lines) {
     return [texts componentsJoinedByString:@" "];
 }
 
+// The tops of the line views there are, by line, as laid out (the scale a line is shown at left out).
+static NSArray<NSNumber *> *shownLines(SGRKaraokeView *karaoke) {
+    return [[[karaoke valueForKey:@"shown"] allKeys] sortedArrayUsingSelector:@selector(compare:)];
+}
+
+static CGFloat topOf(UIView *view) {
+    return view.center.y - view.bounds.size.height / 2;
+}
+
+// The smallest and the largest room between two line views one after the other.
+static void gapsBetween(SGRKaraokeView *karaoke, CGFloat *least, CGFloat *most) {
+    NSDictionary<NSNumber *, UIView *> *shown = [karaoke valueForKey:@"shown"];
+    NSArray<NSNumber *> *lines = shownLines(karaoke);
+    *least = CGFLOAT_MAX;
+    *most = -CGFLOAT_MAX;
+    for (NSUInteger i = 0; i + 1 < lines.count; i++) {
+        if (lines[i + 1].integerValue != lines[i].integerValue + 1) continue;
+        UIView *a = shown[lines[i]], *b = shown[lines[i + 1]];
+        CGFloat gap = topOf(b) - topOf(a) - a.bounds.size.height;
+        *least = MIN(*least, gap);
+        *most = MAX(*most, gap);
+    }
+}
+
+// A tap on a line three ahead, more than the song moving on: the stack is arranged around it (or around a
+// line still sung over it) from the first frame, gliding there, and stays so while the player is slow to
+// report the seek and after it has.
+static void checkGlide(SGRKaraokeView *karaoke, dispatch_block_t then) {
+    NSInteger focus = [[karaoke valueForKey:@"focus"] integerValue], target = focus + 3;
+    NSArray<SGKaraokeLine *> *lines = [karaoke valueForKey:@"lines"];
+    UIView *view = [karaoke valueForKey:@"shown"][@(target)];
+    if (!view || target >= (NSInteger)lines.count) {
+        expect(NO, @"a line three ahead of the sung one has a view to tap");
+        then();
+        return;
+    }
+    // HEAD's sources (build.sh old) seek and follow the song, as their tap did.
+    if ([karaoke respondsToSelector:NSSelectorFromString(@"glideTo:")]) {
+        ((void (*)(id, SEL, NSInteger))objc_msgSend)(karaoke, NSSelectorFromString(@"glideTo:"), lines[(NSUInteger)target].start);
+    } else {
+        SGKaraokeSeek(lines[(NSUInteger)target].start);
+        ((void (*)(id, SEL))objc_msgSend)(karaoke, NSSelectorFromString(@"followSong"));
+    }
+    NSInteger goal = [[karaoke valueForKey:@"focus"] integerValue];
+    expect(goal > focus && goal <= target && view.layer.animationKeys.count > 0,
+           [NSString stringWithFormat:@"a tapped line is arranged around at once, and glides there (line %ld to %ld for %ld)", (long)focus, (long)goal, (long)target]);
+    __block BOOL held = YES;
+    for (int i = 1; i <= 5; i++) {
+        after(i * 0.06, ^{ held = held && [[karaoke valueForKey:@"focus"] integerValue] == goal; });
+    }
+    after(0.8, ^{
+        expect(held && [[karaoke valueForKey:@"focus"] integerValue] == goal,
+               @"it stays arranged around it while the player is slow to report the seek, and after");
+        then();
+    });
+}
+
+// Scrolled by hand, the page's room grows (the controls go) and the scroll goes on up: the lines made for
+// the view meanwhile keep the room between them that the lines already there have.
+static void checkBrowse(SGRKaraokeView *karaoke, UIView *host, dispatch_block_t then) {
+    UIScrollView *scroll = [karaoke valueForKey:@"scroll"];
+    CGFloat gap = [[karaoke valueForKey:@"lineGap"] doubleValue];
+    [(id<UIScrollViewDelegate>)karaoke scrollViewWillBeginDragging:scroll];
+    CGRect frame = host.frame;
+    host.frame = CGRectMake(frame.origin.x, frame.origin.y - 150, frame.size.width, frame.size.height + 300);
+    [karaoke layoutIfNeeded];
+    scroll.contentOffset = CGPointMake(0, -700);
+    after(0.5, ^{
+        CGFloat least, most;
+        gapsBetween(karaoke, &least, &most);
+        expect(least >= gap - 1 && least < CGFLOAT_MAX, [NSString stringWithFormat:@"scrolled by hand while the room grows, no two lines run into each other (least room %.1f, most %.1f, %lu views)",
+                                                   least, most, (unsigned long)shownLines(karaoke).count]);
+        [karaoke setValue:@NO forKey:@"browsing"];
+        scroll.contentOffset = CGPointZero;
+        host.frame = frame;
+        [karaoke layoutIfNeeded];
+        after(0.6, then);   // the lines around the sung one are made again, a few a frame
+    });
+}
+
 static void runChecks(SGRKaraokeView *karaoke, UIView *host) {
     // Lines listed out of time order are estimated up to the line sung after it, and kept in time order.
     NSArray<SGKaraokeLine *> *estimated = SGKaraokeInTimeOrder(SGKaraokeEstimatedLines(@[@1000, @8000, @6000, @3000, @6000], @[@"a", @"b", @"c", @"d", @"e"]));
@@ -295,9 +376,13 @@ static void runChecks(SGRKaraokeView *karaoke, UIView *host) {
     after([NSUserDefaults.standardUserDefaults doubleForKey:@"geminiDelay"] + 0.5, ^{
         expect(!extras.configuration.showsActivityIndicator, @"once it answers the spinner is gone");
         after(0.5, ^{
-            printf("%d failed\n", sg_failures);
-            fflush(stdout);
-            exit(sg_failures);
+            checkBrowse(karaoke, host, ^{
+                checkGlide(karaoke, ^{
+                    printf("%d failed\n", sg_failures);
+                    fflush(stdout);
+                    exit(sg_failures);
+                });
+            });
         });
     });
 }

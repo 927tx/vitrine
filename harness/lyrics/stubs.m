@@ -84,4 +84,14 @@ NSInteger SGKaraokePositionMs(void) {
     return (NSInteger)at;
 }
 
-void SGKaraokeSeek(NSInteger ms) { SGHarnessStartClock(ms, sg_rate, -1, 0); }
+// -seekLag S: the player reports a seek S seconds after it is asked for, as Spotify's takes a few frames.
+void SGKaraokeSeek(NSInteger ms) {
+    double lag = [NSUserDefaults.standardUserDefaults doubleForKey:@"seekLag"];
+    if (lag <= 0) {
+        SGHarnessStartClock(ms, sg_rate, -1, 0);
+        return;
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(lag * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        SGHarnessStartClock(ms, sg_rate, -1, 0);
+    });
+}
