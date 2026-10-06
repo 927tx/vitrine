@@ -8,9 +8,10 @@
 // corners and the scale: the tilt view's own transform is left to the tilt Spotify gives it when the
 // cover is inspected. The image clips, so the shadow is a plate of the Kit's behind it.
 //
-// The scale is identity while the player opens or closes: the bar morphs into a 354pt stand-in
-// (NowPlaying_ECMKit.MaskView, 01.txt:86) and the cover under it has to match where it lands. Once
-// the transition is over a paused cover springs down.
+// A paused cover keeps its shrink while the player opens and closes: the morph flies the bar's cover to
+// the frame the cover is drawn at, transform included (SGRPlayerCoverFrameIn), so it lands at the size it
+// stays at. Holding it at full size through the transition made it land large and spring down after, or
+// grow before a close.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Shared/Haptics/Haptics.h"
@@ -29,7 +30,7 @@ static NSMapTable<UIView *, UIView *> *sg_covers;
 
 static CGFloat currentScale(void) {
     SPTPlayerState *state = SGPlayerState();
-    if (!state.isPaused || SGRPlayerIsTransitioning()) return 1;
+    if (!state.isPaused) return 1;
     return SGRReduceMotion() ? kPausedScaleReduceMotion : kPausedScale;
 }
 
@@ -90,6 +91,10 @@ CGRect SGRPlayerCoverFrameIn(UIView *host) {
     UIView *cover = coverIn(tilt);
     // The cover's own transform is the paused shrink, which is what the eye sees it at.
     return cover && host ? [host convertRect:cover.bounds fromView:cover] : CGRectNull;
+}
+
+CGFloat SGRPlayerCoverScale(void) {
+    return currentScale();
 }
 
 CGRect SGRPlayerArtworkAreaIn(UIView *host) {
@@ -358,13 +363,6 @@ static SGRPlayerArtworkWatcher *sg_artworkWatcher;
     sg_covers = [NSMapTable weakToWeakObjectsMapTable];
     sg_artworkWatcher = [SGRPlayerArtworkWatcher new];
     SGAddPlayerStateObserver(sg_artworkWatcher);
-    SGRObservePlayerTransition(sg_artworkWatcher, ^(id owner) {
-        scaleEveryCover(YES);
-    }, ^(id owner) {
-        scaleEveryCover(YES);
-        static dispatch_once_t once;
-        dispatch_once(&once, ^{ SGLog(@"redesign player: transition over, cover scale %.2f", currentScale()); });
-    });
     SGRequireClasses(@[
         @"_TtC35CreativeWorkCommons_CoverArtTiltKit16CoverArtTiltView",
         @"_TtC28NowPlaying_ContentLayersImpl16CoverArtCellImpl",

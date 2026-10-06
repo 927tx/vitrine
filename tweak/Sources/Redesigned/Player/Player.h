@@ -59,6 +59,9 @@ UIView *SGRPlayerCoverList(void);
 // The cover on screen as it is drawn, its paused shrink included, in `host`'s coordinates; CGRectNull
 // when no cover has laid out.
 CGRect SGRPlayerCoverFrameIn(UIView *host);
+// The scale the cover is drawn at: 1 while playing, its shrink while paused, so a stand-in can draw its
+// corners the size the cover's are.
+CGFloat SGRPlayerCoverScale(void);
 // The band that cover sits in -- the room the player gives its artwork, between the header row and the
 // title -- in `host`'s coordinates; CGRectNull when no cover has laid out.
 CGRect SGRPlayerArtworkAreaIn(UIView *host);
