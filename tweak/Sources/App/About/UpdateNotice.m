@@ -27,9 +27,10 @@ static NSArray<SGUpdateChange *> *changesSinceThisBuild(void) {
 }
 
 // Three lines and a count: enough to know whether to care, with the whole changelog a tap away.
-static NSString *noticeBody(NSString *version) {
+static NSString *noticeBody(NSString *version, BOOL beta) {
     NSArray<SGUpdateChange *> *changes = changesSinceThisBuild();
     NSMutableString *body = [NSMutableString stringWithFormat:@"This build is %s.", SG_VERSION];
+    if (beta) [body appendString:@" This one is a beta, a test build ahead of the next release."];
     NSUInteger shown = MIN(changes.count, (NSUInteger)3);
     for (NSUInteger i = 0; i < shown; i++) [body appendFormat:@"\n\n• %@", changes[i].text];
     if (changes.count > shown) [body appendFormat:@"\n\nand %lu more in %@.", (unsigned long)(changes.count - shown), version];
@@ -61,7 +62,7 @@ static void offerWhenClear(NSInteger tries) {
     [NSUserDefaults.standardUserDefaults setObject:version forKey:kTold];
     SGUpdateRelease *release = SGUpdateNewestRelease();
     UIAlertController *sheet = [UIAlertController alertControllerWithTitle:[NSString stringWithFormat:@"%@ is out", version]
-                                                                  message:noticeBody(version)
+                                                                  message:noticeBody(version, release.prerelease)
                                                            preferredStyle:UIAlertControllerStyleAlert];
     [sheet addAction:[UIAlertAction actionWithTitle:@"What's new" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         // The sheet is still going as this runs, so the page waits for the screen it is pushed onto.

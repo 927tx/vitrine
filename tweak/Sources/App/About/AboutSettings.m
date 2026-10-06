@@ -42,6 +42,11 @@ UIViewController *SGAboutPage(void) {
     // The row reads out where the build stands and opens the changelog of everything newer than it.
     SGModRow *updates = SGPageRow(@"Updates", ^UIViewController *{ return SGUpdatePage(); });
     updates.value = ^NSString *{ return SGUpdateStatus(); };
+    // A release build can opt into betas; a beta build starts opted in. Either way a check follows at
+    // once, since the stored list only holds what counted at the last one.
+    SGModRow *betas = SGSwitchRow(@"Include betas", @"Offer test builds ahead of each release", SGKeyUpdateBetas);
+    betas.defaultOn = SGBuildIsBeta();
+    betas.changed = ^(BOOL on) { SGCheckForUpdate(YES); };
     NSMutableArray<SGModRow *> *links = [NSMutableArray array];
     if (SGRepoURL) [links addObject:withSymbol(SGLinkRow(@"GitHub", nil, SGRepoURL), @"chevron.left.forwardslash.chevron.right")];
     [links addObjectsFromArray:@[
@@ -49,7 +54,7 @@ UIViewController *SGAboutPage(void) {
         withSymbol(SGActionRow(@"Welcome tour", nil, ^{ SGShowOnboarding(); }), @"map"),
     ]];
     if (SGWhatsNewChanges().count) [links insertObject:withSymbol(SGActionRow(@"What's New", nil, ^{ SGShowWhatsNew(); }), @"sparkles") atIndex:links.count - 1];
-    NSMutableArray<SGModRow *> *build = [NSMutableArray arrayWithObjects:updates,
+    NSMutableArray<SGModRow *> *build = [NSMutableArray arrayWithObjects:updates, betas,
         SGStatRow(@"Version", ^NSString *{ return @(SG_VERSION); }),
         SGStatRow(@"Spotify", ^NSString *{ return spotify; }), nil];
     SGModRow *signedUntil = SGSigningExpiryRow();

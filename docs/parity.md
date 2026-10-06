@@ -66,6 +66,7 @@ fixed in the commits that follow `956e65c`.
 | 90, 105 | Live Activity: the cover, its colour, progress, centred and translated lyrics, and a small layout on Apple Watch and CarPlay from iOS 18 |
 | 89 | Listening stats, with Spotify's export imported |
 | 79, 98 | Apple Music red accent, one font for the whole app |
+| 17 | Beta builds update to the next beta, then the release. Mod > Include betas lets a release build opt in |
 
 ### Round 2: player, pages, lyrics, settings
 
@@ -159,7 +160,6 @@ Rebuilt from behaviour-only descriptions; each commit credits the PR's author.
 
 | # | Item | Why |
 |---|---|---|
-| 17 | Beta builds update to beta pre-releases | Update check is off until the fork has releases |
 | 19, 35, 86 | Certificate offer, Arctic Sign card, usage ping | Third-party signing upsell and upstream telemetry |
 | 91, 99, 100, 102, 131 | Plus categories, locks and offer | No paid tier |
 | 95 (Account page) | chroma.pw account | No account. The system Settings style is below |

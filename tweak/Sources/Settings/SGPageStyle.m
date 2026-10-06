@@ -225,7 +225,7 @@ UIViewController *SGTopController(void) {
 }
 
 // The fork's repo. Its links stay hidden while this is nil.
-NSString *const SGRepoURL = nil;
+NSString *const SGRepoURL = @"https://github.com/My-Name-Is-Jeff/vitrine";
 
 void SGOpenURL(NSString *url) {
     NSURL *target = url ? [NSURL URLWithString:url] : nil;

@@ -23,14 +23,26 @@ extern NSString *const SGUpdateCheckedNotification;   // on the main thread, aft
 @property (nonatomic, copy) NSString *date;      // ISO 8601, as GitHub publishes it
 @property (nonatomic, copy) NSString *url;       // the release page, where the .deb is
 @property (nonatomic, copy) NSArray<SGUpdateChange *> *changes;
+@property (nonatomic) BOOL prerelease;   // a beta, by GitHub's mark or the "-" in its version
 @end
 
-NSArray<SGUpdateRelease *> *SGUpdateReleases(void);   // newest first, empty until a check lands
+// Mod > Include betas: whether the check counts pre-releases. Unset, it is on for a beta build (a "-"
+// in SG_VERSION) and off for a release; the row rechecks when it is flipped.
+#define SGKeyUpdateBetas @"spotifyglass.update.betas"
+BOOL SGBuildIsBeta(void);
+BOOL SGUpdateIncludesBetas(void);
+
+NSArray<SGUpdateRelease *> *SGUpdateReleases(void);   // newest first that count for this build, empty until a check lands
+// GitHub's reply as the check stores it: the newest twenty that count for this build, newest first,
+// empty when none does, nil when the reply is not a list of releases.
+NSArray<NSDictionary *> *SGUpdateReleasesFrom(NSData *data);
+BOOL SGUpdateChecked(void);   // a check has landed at least once
 // The lines of a release body as Release Please writes it, also what the What's new sheet reads.
 NSArray<SGUpdateChange *> *SGUpdateChangesIn(NSString *body);
 SGUpdateRelease *SGUpdateNewestRelease(void);
 NSString *SGUpdateVersion(void);  // nil unless GitHub has a release newer than this build
 BOOL SGUpdateIsNewer(NSString *version);   // whether that release is newer than the build running
+BOOL SGVersionIsNewer(NSString *candidate, NSString *current);   // semantic versions, pre-releases included
 NSString *SGUpdateStatus(void);
 void SGCheckForUpdate(BOOL force);
 UIViewController *SGUpdatePage(void);   // UpdatePage.m: the state and the changelog

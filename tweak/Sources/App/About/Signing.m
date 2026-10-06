@@ -70,7 +70,7 @@ static void showFix(void) {
         UIPasteboard.generalPasteboard.string = appID;
     }]];
     if (SGRepoURL) [sheet addAction:[UIAlertAction actionWithTitle:@"Read more" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        SGOpenURL([SGRepoURL stringByAppendingString:@"#signing-it-yourself"]);
+        SGOpenURL([SGRepoURL stringByAppendingString:@"#signing"]);
     }]];
     [sheet addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
     [top presentViewController:sheet animated:YES completion:nil];

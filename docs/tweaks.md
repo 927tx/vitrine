@@ -399,15 +399,17 @@ App:
     ModSettings.x  the root page and the rows that open it from Spotify's settings and the side drawer
     Pages.m        Redesigned UI's switch, the Appearance, Vibrations, Player and Lyrics pages, which Tab bar page opens
     About/         the update check against the repo's GitHub Releases, the Updates page it fills (the state, and
-                   the changelog of every release newer than the build, a line per commit) and the sheet a newer
+                   the changelog of every release newer than the build, a line per commit), betas counted only
+                   while Mod > Include betas is on (unset, on for a beta build), and the sheet a newer
                    release brings up on its own a few seconds after Spotify opens, once per release; backup, the
-                   signing warning and the Mod page with the reset
+                   signing warning, the date the provisioning profile runs out (on the Mod page, and at the top of
+                   Mod Settings for a free Apple ID's week) and the Mod page with the reset
     Onboarding/    the welcome page over Home on the first launch, opening on the logo in glass, with Redesigned UI;
                    on the first launch of a new version instead, What's new (WhatsNew.m), this version's section of
                    CHANGELOG.md, which scripts/whats-new.sh writes into a gitignored header at each make (a section
                    that came over from upstream is left out, so a build without its own has no sheet). The Mod
                    page offers both again. Environment.m says once per install state, a few seconds in, when
-                   EeveeSpotify is injected too (a dyld image named so) or Spotify is not the version the mod is
+                   EeveeSpotify is injected too (a dyld image named so, or its settings page's Swift class) or Spotify is not the version the mod is
                    made for (SGSpotifyMadeFor), and when a redesign below iOS 26 did not start; the first two stay
                    as red rows at the top of Mod Settings. Laid out on the simulator by harness/onboarding/
 

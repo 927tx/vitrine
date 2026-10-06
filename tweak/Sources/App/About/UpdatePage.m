@@ -112,7 +112,9 @@ static NSArray<SGUpdateRelease *> *releasesToShow(void) {
 
 - (NSString *)introText {
     SGUpdateRelease *newest = SGUpdateNewestRelease();
-    if (!newest) return [NSString stringWithFormat:@"This build is %s. Nothing has been asked of GitHub yet.", SG_VERSION];
+    if (!newest) return SGUpdateChecked()
+        ? [NSString stringWithFormat:@"This build is %s. GitHub has no newer release.", SG_VERSION]
+        : [NSString stringWithFormat:@"This build is %s. Nothing has been asked of GitHub yet.", SG_VERSION];
     NSString *date = longDate(newest.date);
     NSString *when = date.length ? [@" came out on " stringByAppendingString:date] : @" is out";
     if (SGUpdateVersion())
@@ -134,7 +136,8 @@ static NSArray<SGUpdateRelease *> *releasesToShow(void) {
     SGUpdateRelease *newest = SGUpdateNewestRelease();
     if (SGUpdateVersion() && newest.url.length)
         [top addObject:linkRow([@"Get " stringByAppendingString:newest.version],
-                               @"The release on GitHub, where its .deb is", @"arrow.down.circle", newest.url)];
+                               newest.prerelease ? @"A beta, on GitHub with its .deb" : @"The release on GitHub, where its .deb is",
+                               @"arrow.down.circle", newest.url)];
     if (SGRepoURL) [top addObject:linkRow(@"All releases", @"Every version, this one and the ones before it",
                            @"clock.arrow.circlepath", [SGRepoURL stringByAppendingString:@"/releases"])];
     [groups addObject:group(nil, top)];
