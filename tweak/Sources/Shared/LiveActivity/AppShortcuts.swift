@@ -23,9 +23,9 @@ struct SGAppShortcuts: AppShortcutsProvider {
             "Previous track in \(.applicationName)",
         ], shortTitle: "Previous Track", systemImageName: "backward")
         AppShortcut(intent: SGSingIntent(), phrases: [
-            "\(\.$mode) Sing in \(.applicationName)",
+            "\(\.$mode) Karaoke in \(.applicationName)",
             "Sing along in \(.applicationName)",
-        ], shortTitle: "Sing", systemImageName: "music.mic")
+        ], shortTitle: "Karaoke", systemImageName: "music.mic")
         AppShortcut(intent: SGSleepTimerIntent(), phrases: [
             "Set a sleep timer in \(.applicationName)",
             "Sleep timer \(\.$length) in \(.applicationName)",

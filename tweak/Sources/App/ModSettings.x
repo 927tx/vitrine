@@ -78,7 +78,7 @@ static UIViewController *modSettingsPage(void) {
 
     // Sing and the audio effects work on the sound, so both looks have them, each saying beside the chevron
     // whether it is on, how far Sing's voice model has come or how many effects are on.
-    SGModRow *sing = pageRow(@"Sing", @"music.mic", UIColor.systemRedColor, ^UIViewController *{ return SGSingSettingsPage(); });
+    SGModRow *sing = pageRow(@"Karaoke", @"music.mic", UIColor.systemRedColor, ^UIViewController *{ return SGSingSettingsPage(); });
     sing.value = ^NSString *{ return SGSingSummary(); };
     SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", UIColor.systemOrangeColor, ^UIViewController *{ return SGDSPSettingsPage(); });
     audioEffects.value = ^NSString *{ return SGDSPSummary(); };

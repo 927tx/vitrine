@@ -23,7 +23,7 @@ NSString *SGSingStatusText(void) {
 NSString *SGSingStatusDetail(void) {
     SGSingState state = SGSingCurrentState();
     return state == SGSingStateFailed ? @"The voice model did not load in 120 s, so that load was given up. Switch Sing off and on again to try again."
-         : state == SGSingStateSinging ? @"Sing runs on the GPU while Spotify is open, and on the CPU in the background." : nil;
+         : state == SGSingStateSinging ? @"Karaoke runs on the GPU while Spotify is open, and on the CPU in the background." : nil;
 }
 NSString *SGSingMissing(void) { return nil; }
 BOOL SGSingOn(void) { return SGHidden(SGKeySing); }

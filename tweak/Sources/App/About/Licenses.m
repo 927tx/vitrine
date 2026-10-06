@@ -38,7 +38,7 @@ UIViewController *SGLicensesPage(void) {
     // Not shipped: the Headphones page downloads its results when asked, but they are AutoEq's work all the same.
     SGModRow *autoEq = SGLinkRow(@"AutoEq", @"Headphone corrections · MIT License", @"https://github.com/jaakkopasanen/AutoEq");
     // Sing's voice model is downloaded rather than built in, and its NOTICE travels with it here all the same.
-    SGModRow *voice = SGLinkRow(@"Sing's voice model", @"Mel-Band RoFormer · MIT License", @"https://huggingface.co/My-Name-Is-Jeff/vitrine-sing");
+    SGModRow *voice = SGLinkRow(@"Karaoke's voice model", @"Mel-Band RoFormer · MIT License", @"https://huggingface.co/My-Name-Is-Jeff/vitrine-sing");
     return [[SGModPage alloc] initWithTitle:@"Licenses" intro:@"The mod's own license, and the code from others it includes." sections:@[
         SGSection(nil, @[mod]),
         SGNotedSection(nil, @[eevee], @"By whoeevee (whoeevee/EeveeSpotify), under the GNU General Public License v3.0, as Vitrine is.\n\n"

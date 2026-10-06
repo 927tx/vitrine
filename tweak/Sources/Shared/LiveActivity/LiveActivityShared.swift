@@ -160,7 +160,7 @@ enum SGSleepTimerLength: String, AppEnum {
 enum SGSingMode: String, AppEnum {
     case toggle, on, off
 
-    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Sing"
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Karaoke"
     static let caseDisplayRepresentations: [SGSingMode: DisplayRepresentation] = [
         .toggle: "Toggle",
         .on: "Turn On",
@@ -221,10 +221,10 @@ struct SGPreviousTrackIntent: AudioPlaybackIntent {
 
 @available(iOS 17.0, *)
 struct SGSingIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Sing"
+    static let title: LocalizedStringResource = "Karaoke"
     static let description = IntentDescription("Turns the vocals down in Spotify so you can sing along, or brings them back.")
 
-    @Parameter(title: "Sing", default: .toggle)
+    @Parameter(title: "Karaoke", default: .toggle)
     var mode: SGSingMode
 
     init() {}
@@ -234,7 +234,7 @@ struct SGSingIntent: LiveActivityIntent {
     }
 
     static var parameterSummary: some ParameterSummary {
-        Summary("\(\.$mode) Sing")
+        Summary("\(\.$mode) Karaoke")
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {

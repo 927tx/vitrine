@@ -151,11 +151,11 @@ static BOOL sg_sangThisTrack;     // the vocals were down at some point of the t
 static BOOL readRefusal(void) {
     NSString *refused = nil;
     for (AVAudioSessionPortDescription *port in AVAudioSession.sharedInstance.currentRoute.outputs) {
-        if ([port.portType isEqualToString:AVAudioSessionPortAirPlay]) refused = @"Sing does not run over AirPlay, whose delay changes as it plays, so the song plays as it is.";
+        if ([port.portType isEqualToString:AVAudioSessionPortAirPlay]) refused = @"Karaoke does not run over AirPlay, whose delay changes as it plays, so the song plays as it is.";
     }
     NSString *uri = SGURIString(SGPlayerState().track.URI);
     if (!refused && uri && ![uri hasPrefix:@"spotify:track:"] && ![uri hasPrefix:@"spotify:local:"]) {
-        refused = @"Sing turns down the vocals of songs, and what plays now is not one, so it plays as it is.";
+        refused = @"Karaoke turns down the vocals of songs, and what plays now is not one, so it plays as it is.";
     }
     if (refused == sg_refused || [refused isEqualToString:sg_refused]) return NO;
     sg_refused = refused;
@@ -289,7 +289,7 @@ static void apply(void) {
     if (on && !engine) {
         engine = SGSingEngineCreate();
         if (!engine) {
-            sg_setupError = @"Sing could not set aside memory for the song.";
+            sg_setupError = @"Karaoke could not set aside memory for the song.";
             return;
         }
         SGSingEngineSetLevel(engine, SGSingLevel());
@@ -402,9 +402,9 @@ void SGSetSingIgnoresHeat(BOOL ignores) {
 }
 
 NSString *SGSingMissing(void) {
-    if (!SGSingOSSupported()) return [NSString stringWithFormat:@"Sing needs iOS 18, the first its voice model runs on. This iPhone has iOS %@.", UIDevice.currentDevice.systemVersion];
-    if (!SGSingDeviceSupported()) return @"Sing needs an iPhone with 6 GB of memory or more, which the voice model was built for. This one has less.";
-    if (SGSingModelCurrentState() != SGSingModelReady) return [NSString stringWithFormat:@"Sing needs its voice model, which is downloaded from Mod Settings > Sing (%@).", SGSingModelSizeText()];
+    if (!SGSingOSSupported()) return [NSString stringWithFormat:@"Karaoke needs iOS 18, the first its voice model runs on. This iPhone has iOS %@.", UIDevice.currentDevice.systemVersion];
+    if (!SGSingDeviceSupported()) return @"Karaoke needs an iPhone with 6 GB of memory or more, which the voice model was built for. This one has less.";
+    if (SGSingModelCurrentState() != SGSingModelReady) return [NSString stringWithFormat:@"Karaoke needs its voice model, which is downloaded from Mod Settings > Karaoke (%@).", SGSingModelSizeText()];
     return nil;
 }
 
@@ -462,16 +462,16 @@ static NSString *runsOnNote(void) {
     MLComputeUnits units = SGSingLoaderFastUnits();
     NSString *name = SGSingUnitsName(units);
     if (units == MLComputeUnitsCPUOnly) {
-        return runsOn() == 0 ? @"The GPU did not load on this iOS before, so Sing runs on the CPU alone. Choosing GPU under Runs on tries it again."
-                             : @"Sing runs on the CPU alone, as Runs on says.";
+        return runsOn() == 0 ? @"The GPU did not load on this iOS before, so Karaoke runs on the CPU alone. Choosing GPU under Runs on tries it again."
+                             : @"Karaoke runs on the CPU alone, as Runs on says.";
     }
     switch (SGSingLoaderFastState()) {
-        case SGSingFastNone: return [NSString stringWithFormat:@"Sing runs on the CPU; a copy for the %@ loads once Spotify is open.", name];
-        case SGSingFastLoading: return [NSString stringWithFormat:@"Sing runs on the CPU while a copy for the %@ loads.", name];
-        case SGSingFastReady: return [NSString stringWithFormat:@"Sing runs on the %@ while Spotify is open, and on the CPU in the background.", name];
-        case SGSingFastSkipped: return [NSString stringWithFormat:@"Too little memory is left for a copy on the %@, so Sing runs on the CPU alone.", name];
-        case SGSingFastFailed: return [NSString stringWithFormat:@"The %@ could not load the voice model, so Sing runs on the CPU alone.", name];
-        case SGSingFastTimedOut: return [NSString stringWithFormat:@"The %@ did not load the voice model in %.0f minutes, so Sing runs on the CPU alone.", name, SGSingLoaderFastDeadline / 60];
+        case SGSingFastNone: return [NSString stringWithFormat:@"Karaoke runs on the CPU; a copy for the %@ loads once Spotify is open.", name];
+        case SGSingFastLoading: return [NSString stringWithFormat:@"Karaoke runs on the CPU while a copy for the %@ loads.", name];
+        case SGSingFastReady: return [NSString stringWithFormat:@"Karaoke runs on the %@ while Spotify is open, and on the CPU in the background.", name];
+        case SGSingFastSkipped: return [NSString stringWithFormat:@"Too little memory is left for a copy on the %@, so Karaoke runs on the CPU alone.", name];
+        case SGSingFastFailed: return [NSString stringWithFormat:@"The %@ could not load the voice model, so Karaoke runs on the CPU alone.", name];
+        case SGSingFastTimedOut: return [NSString stringWithFormat:@"The %@ did not load the voice model in %.0f minutes, so Karaoke runs on the CPU alone.", name, SGSingLoaderFastDeadline / 60];
     }
     return nil;
 }
@@ -485,25 +485,25 @@ NSString *SGSingStatusDetail(void) {
             if (SGSingModelWaitingForNetwork()) {
                 if (!SGSingModelOverCellular()) {
                     return [NSString stringWithFormat:@"The voice model's download waits for Wi-Fi, as %@ is a lot of a cellular plan, and carries on from %.0f%% once "
-                                                      @"the iPhone is on Wi-Fi. The Voice model row on the Sing page can let it use cellular.",
+                                                      @"the iPhone is on Wi-Fi. The Voice model row on the Karaoke page can let it use cellular.",
                             SGSingModelSizeText(), SGSingModelProgress() * 100];
                 }
                 return [NSString stringWithFormat:@"The iPhone is offline. The voice model's download carries on from %.0f%% of %@ once it is online again.",
                         SGSingModelProgress() * 100, SGSingModelSizeText()];
             }
-            return [NSString stringWithFormat:@"The voice model is coming in, %.0f%% of %@. Sing starts once it is checked.", SGSingModelProgress() * 100, SGSingModelSizeText()];
+            return [NSString stringWithFormat:@"The voice model is coming in, %.0f%% of %@. Karaoke starts once it is checked.", SGSingModelProgress() * 100, SGSingModelSizeText()];
         case SGSingStateWaiting:
             if (sg_resting) {
-                return @"The vocals are as sung and Spatial voice is off, so the song plays as it is and the voice model rests. Sing starts again "
-                       @"when the level moves, Spatial voice goes on, or the Sing page opens.";
+                return @"The vocals are as sung and Spatial voice is off, so the song plays as it is and the voice model rests. Karaoke starts again "
+                       @"when the level moves, Spatial voice goes on, or the Karaoke page opens.";
             }
-            return [NSString stringWithFormat:@"The voice model is ready, and Sing starts once Spotify plays a song. %@", runsOnNote()];
+            return [NSString stringWithFormat:@"The voice model is ready, and Karaoke starts once Spotify plays a song. %@", runsOnNote()];
         case SGSingStatePreparing:
             if (SGSingLoaderCurrentState() == SGSingLoaderIdle) return @"The voice model loads once Spotify is open.";
-            return [NSString stringWithFormat:@"Core ML prepares the voice model for this iPhone's CPU, %.0f s so far, then Sing starts. The first time, that can take a minute.",
+            return [NSString stringWithFormat:@"Core ML prepares the voice model for this iPhone's CPU, %.0f s so far, then Karaoke starts. The first time, that can take a minute.",
                     SGSingLoaderSeconds()];
         case SGSingStateBuffering:
-            return @"Sing listens a few seconds ahead of what plays, so the vocals are separated before you hear them. Until then the song plays as it is.";
+            return @"Karaoke listens a few seconds ahead of what plays, so the vocals are separated before you hear them. Until then the song plays as it is.";
         case SGSingStateSinging:
             return runsOnNote();
         case SGSingStateBehind: {
@@ -513,16 +513,16 @@ NSString *SGSingStatusDetail(void) {
                     ms / 1000, runsOnNote()];
         }
         case SGSingStateHot:
-            return @"The iPhone is hot, so Sing has let go of the voice model and the song plays as it is. Sing loads it again once the iPhone cools. "
-                   @"Ignore heat warnings keeps Sing going.";
+            return @"The iPhone is hot, so Karaoke has let go of the voice model and the song plays as it is. Karaoke loads it again once the iPhone cools. "
+                   @"Ignore heat warnings keeps Karaoke going.";
         case SGSingStateFailed: {
             SGSingEngine *engine = atomic_load(&sg_engine);
             if (sg_stopped ?: sg_refused) return sg_stopped ?: sg_refused;
             NSString *error = SGSingLoaderError() ?: (engine ? SGSingEngineError(engine) : sg_setupError);
-            if (SGSingLoaderError()) return [error stringByAppendingString:@" Switch Sing off and on again to try again."];
+            if (SGSingLoaderError()) return [error stringByAppendingString:@" Switch Karaoke off and on again to try again."];
             if (error) return error;
             if (!sg_outputReachable) return @"Spotify's output could not be reached.";
-            if (!atomic_load(&sg_staged) && !SGPlayerSpeedAllowed()) return @"Spotify's output could not be taken over, so Sing cannot reach its sound.";
+            if (!atomic_load(&sg_staged) && !SGPlayerSpeedAllowed()) return @"Spotify's output could not be taken over, so Karaoke cannot reach its sound.";
             return @"Spotify's output is not 44.1 kHz stereo, which the voice model needs, so the song plays as it is.";
         }
         default:
@@ -709,9 +709,9 @@ static void tick(void) {
     if (engine && SGSingOn() && !sg_stopped && SGSingEngineGaveUp(engine)) {
         BOOL forGood = ++sg_giveUps >= kGiveUpsKept;
         sg_stopKind = forGood ? SGSingStopForGood : SGSingStopBehind;
-        sg_stopped = forGood ? [NSString stringWithFormat:@"Sing could not keep up on this iPhone %d times in a row, so it stopped and songs play as they are. "
-                                                          @"Switch Sing off and on, or choose another Runs on, to try again.", sg_giveUps]
-                             : @"Sing could not keep up with this song on this iPhone, so it plays as it is. Sing tries again with the next song.";
+        sg_stopped = forGood ? [NSString stringWithFormat:@"Karaoke could not keep up on this iPhone %d times in a row, so it stopped and songs play as they are. "
+                                                          @"Switch Karaoke off and on, or choose another Runs on, to try again.", sg_giveUps]
+                             : @"Karaoke could not keep up with this song on this iPhone, so it plays as it is. Karaoke tries again with the next song.";
         SGLog(@"sing: stopped, the vocals fell short for 8 s, %d in a row%@; %@", sg_giveUps, forGood ? @", so until switched off and on" : @"",
               SGSingStatusDetail());
         apply();
@@ -934,8 +934,8 @@ static void readHeat(void) {
             // Over a stop for falling behind, which would load the model again with the next track whatever the memory.
             if (!SGSingOn() || (sg_stopped && sg_stopKind != SGSingStopBehind)) return;
             sg_stopKind = SGSingStopMemory;
-            sg_stopped = @"Sing stopped to free memory, so the song plays as it is. It loads the voice model again with the next song if there is room, "
-                         @"or switch Sing off and on.";
+            sg_stopped = @"Karaoke stopped to free memory, so the song plays as it is. It loads the voice model again with the next song if there is room, "
+                         @"or switch Karaoke off and on.";
             apply();
             announce();
         }];

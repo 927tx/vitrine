@@ -28,7 +28,7 @@ struct Harness {
             _ = try await SGSingIntent(.on).perform()
             check(false, "sing:on should fail")
         } catch let error as SGShortcutError {
-            check(error.message == "Sing needs its voice model." && SGHarnessPosts == 1, "a failure is thrown at once with its message")
+            check(error.message == "Karaoke needs its voice model." && SGHarnessPosts == 1, "a failure is thrown at once with its message")
             check(String(localized: error.localizedStringResource) == error.message, "the message reads out as it is")
         } catch {
             check(false, "sing threw \(error)")

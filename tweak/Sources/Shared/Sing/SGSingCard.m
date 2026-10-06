@@ -286,7 +286,7 @@ static CGFloat height(float rms) {
         _shown = SGShownTrackNow();
     }
     NSString *title = _shown.title ?: @"Not Playing";
-    NSString *artist = _shown ? _shown.artist ?: @"" : @"Play a song to hear Sing";
+    NSString *artist = _shown ? _shown.artist ?: @"" : @"Play a song to hear Karaoke";
     _title.text = title;
     _artist.text = artist;
     SGSingState state = SGSingCurrentState();
@@ -316,8 +316,8 @@ static CGFloat height(float rms) {
     if (_stops.selectedSegmentIndex != stop) _stops.selectedSegmentIndex = stop;
 
     _song.accessibilityLabel = _shown.artist.length ? [NSString stringWithFormat:@"%@, %@", title, artist] : title;
-    _song.accessibilityValue = [NSString stringWithFormat:@"Sing: %@. Vocals: %@", SGSingStatusText(), SGSingLevelText(level)];
-    _song.accessibilityHint = SGSingStatusDetail() ? @"Double-tap for more about Sing's state." : nil;
+    _song.accessibilityValue = [NSString stringWithFormat:@"Karaoke: %@. Vocals: %@", SGSingStatusText(), SGSingLevelText(level)];
+    _song.accessibilityHint = SGSingStatusDetail() ? @"Double-tap for more about Karaoke's state." : nil;
     _song.accessibilityTraits = SGSingStatusDetail() ? UIAccessibilityTraitButton : UIAccessibilityTraitStaticText;
     _song.accessibilityFrameInContainerSpace = CGRectMake(0, 0, CGRectGetMinX(_column.frame), CGRectGetMinY(_play.frame));
 }
@@ -431,7 +431,7 @@ static CGFloat height(float rms) {
 - (void)explainState {
     NSString *detail = SGSingStatusDetail();
     if (!detail) return;
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Sing" message:detail preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Karaoke" message:detail preferredStyle:UIAlertControllerStyleAlert];
     if (SGSingCurrentState() == SGSingStateFailed) {
         [alert addAction:[UIAlertAction actionWithTitle:@"Try again" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
             SGSetSingOn(NO);

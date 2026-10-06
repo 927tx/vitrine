@@ -28,12 +28,12 @@ struct SGSingControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "spotifyglass.control.sing") {
             ControlWidgetButton(action: SGSingIntent(.toggle)) {
-                Label("Sing", systemImage: "music.mic")
-                    .controlWidgetActionHint("Turn Sing On or Off")
+                Label("Karaoke", systemImage: "music.mic")
+                    .controlWidgetActionHint("Turn Karaoke On or Off")
             }
             .tint(green)
         }
-        .displayName("Sing")
+        .displayName("Karaoke")
         .description("Turns the vocals down in Spotify so you can sing along, or brings them back.")
     }
 }

@@ -374,7 +374,7 @@ static void runShortcut(NSString *action, NSMutableDictionary *reply) API_AVAILA
             reply[@"failed"] = missing;
         } else {
             if (on != SGSingOn()) SGSetSingOn(on);
-            reply[@"said"] = on ? @"Sing is on." : @"Sing is off.";
+            reply[@"said"] = on ? @"Karaoke is on." : @"Karaoke is off.";
         }
     } else if (!title.length) {
         SGLog(@"shortcut: %@ waits for the player", action);

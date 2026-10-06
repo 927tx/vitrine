@@ -169,7 +169,7 @@ static void startCPU(void) {
             sg_state = SGSingLoaderReady;
         } else {
             sg_state = SGSingLoaderFailed;
-            sg_error = model ? @"Sing could not set aside memory for the voice model."
+            sg_error = model ? @"Karaoke could not set aside memory for the voice model."
                              : [NSString stringWithFormat:@"The voice model did not load: %@", error.localizedDescription ?: @"Core ML gave no reason."];
         }
         changed();

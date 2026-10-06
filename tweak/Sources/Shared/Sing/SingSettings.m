@@ -73,7 +73,7 @@ static void modelTapped(UITableViewController *page) {
             ask(@"Stop the download?", @"What has come in is kept, so the next download carries on from it.", @"Stop", YES, ^{ SGSingCancelModelDownload(); });
             break;
         case SGSingModelReady:
-            ask(@"Delete the voice model?", [NSString stringWithFormat:@"It frees %@. Sing needs it again to turn the vocals down.", SGSingModelSizeText()],
+            ask(@"Delete the voice model?", [NSString stringWithFormat:@"It frees %@. Karaoke needs it again to turn the vocals down.", SGSingModelSizeText()],
                 @"Delete", YES, ^{
                     SGSetSingOn(NO);
                     SGSingDeleteModel();
@@ -119,7 +119,7 @@ UIViewController *SGSpatialVoiceSettingsPage(void) {
     };
     SGSpatialVoicePage *made = [[SGSpatialVoicePage alloc] initWithTitle:@"Spatial voice" intro:nil sections:@[
         SGNotedSection(nil, @[spatial],
-                       @"Sing's voice keeps its place in front of you as you turn your head, while the rest of the song turns with "
+                       @"The singer's voice keeps its place in front of you as you turn your head, while the rest of the song turns with "
                        @"you; stay turned, and it comes round in front again. It follows your head through headphones that "
                        @"track it: AirPods Pro, AirPods 3 or later, AirPods Max, and asks for Motion & Fitness the first time. "
                        @"While iOS's own Spatialize Stereo is on, which already holds the whole song in place, the voice is left to it."),
@@ -155,9 +155,9 @@ UIViewController *SGSpatialVoiceSettingsPage(void) {
 @end
 
 UIViewController *SGSingSettingsPage(void) {
-    SGModRow *sing = SGOptionRow(@"Sing", nil, SGKeySing);
+    SGModRow *sing = SGOptionRow(@"Karaoke", nil, SGKeySing);
     sing.changed = ^(BOOL on) { SGSetSingOn(on); };
-    SGModRow *heat = SGOptionRow(@"Ignore heat warnings", @"Keeps Sing going on a hot iPhone, which then gets hotter", SGKeySingIgnoreHeat);
+    SGModRow *heat = SGOptionRow(@"Ignore heat warnings", @"Keeps Karaoke going on a hot iPhone, which then gets hotter", SGKeySingIgnoreHeat);
     heat.changed = ^(BOOL on) { SGSetSingIgnoresHeat(on); };
     __block __weak SGModPage *page;
     SGModRow *model = SGStatActionRow(@"Voice model", nil, ^NSString *{ return modelValue(); }, ^{ modelTapped(page); });
@@ -165,7 +165,7 @@ UIViewController *SGSingSettingsPage(void) {
         BOOL partial = SGSingModelCurrentState() != SGSingModelReady;
         ask(partial ? @"Remove the paused download?" : @"Remove the voice model?",
             partial ? [NSString stringWithFormat:@"It frees %@. A new download starts from the beginning.", bytes(SGSingModelPausedBytes())]
-                    : [NSString stringWithFormat:@"It frees %@. Sing needs it again to turn the vocals down.", SGSingModelSizeText()],
+                    : [NSString stringWithFormat:@"It frees %@. Karaoke needs it again to turn the vocals down.", SGSingModelSizeText()],
             @"Remove", YES, ^{
                 SGSetSingOn(NO);
                 SGSingDeleteModel();
@@ -182,14 +182,14 @@ UIViewController *SGSingSettingsPage(void) {
     SGModRow *units = SGChoiceRow(@"Runs on", nil, SGKeySingComputeUnits, SGSingComputeUnitNames(), 0);
     units.choiceNotes = @[@"The GPU, unless it did not load on this iOS before", @"Slower, and the least memory", @"Tried every time, even after it did not load",
                           @"Experimental: slower than the CPU on a Mac", @"Experimental"];
-    units.choiceFooter = @"Sing loads the voice model on the CPU first and starts with it. A second copy then loads for the windows "
+    units.choiceFooter = @"Karaoke loads the voice model on the CPU first and starts with it. A second copy then loads for the windows "
                          @"played while Spotify is open; in the background they run on the CPU.";
     units.chosen = ^(NSInteger index) { SGSingComputeUnitsChanged(); };
-    SGSingPage *made = [[SGSingPage alloc] initWithTitle:@"Sing" intro:nil sections:@[
+    SGSingPage *made = [[SGSingPage alloc] initWithTitle:@"Karaoke" intro:nil sections:@[
         SGSection(nil, @[sing, heat, model, remove]),
         SGSection(nil, @[spatial]),
         SGNotedSection(@"Advanced", @[units],
-                       @"Sing turns a song's vocals down to sing over, or the rest down to hear the vocals alone, with a voice model that "
+                       @"Karaoke turns a song's vocals down to sing over, or the rest down to hear the vocals alone, with a voice model that "
                        @"runs only on this iPhone: no audio leaves it. It listens a few seconds ahead of what plays, so the vocals change a "
                        @"few seconds after a song starts or after a seek."),
     ] footer:nil];

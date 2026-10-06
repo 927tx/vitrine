@@ -26,7 +26,7 @@ NSString *SGSingStatusText(void) {
 }
 
 NSString *SGSingStatusDetail(void) { return SGSingStatusText(); }
-NSString *SGSingMissing(void) { return @"Sing needs iOS 18, the first its voice model runs on."; }
+NSString *SGSingMissing(void) { return @"Karaoke needs iOS 18, the first its voice model runs on."; }
 BOOL SGSingOn(void) { return SGSingCurrentState() >= SGSingStatePreparing; }
 
 void SGSetSingOn(BOOL on) {

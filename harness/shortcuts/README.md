@@ -5,7 +5,7 @@ for real in the simulator against `observer.m`, a stand-in for `LiveActivity.x`'
 registered the same way:
 
 - Like with the player not up for three posts: asked again every 250 ms and done on the fourth.
-- Sing on refused: thrown at once, the message read out as the observer wrote it.
+- Karaoke on refused: thrown at once, the message read out as the observer wrote it.
 - Sleep timer, Next and Play or pause: each answered on the first post.
 - Sleep timer at End of album: posted as `timer:album`, the Live Activity's own action.
 - Previous never answered: given up after 32 posts, about 8 s, with "Spotify isn't ready yet".

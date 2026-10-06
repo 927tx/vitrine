@@ -209,7 +209,7 @@ static BOOL predict(MLModel *model, MLDictionaryFeatureProvider *features, float
     id<MLFeatureProvider> result = [model predictionFromFeatures:features error:error];
     MLMultiArray *output = [result featureValueForName:kOutput].multiArrayValue;
     if (output && readOutput(output, into)) return YES;
-    if (error && !*error) *error = [NSError errorWithDomain:@"SGSing" code:1 userInfo:@{NSLocalizedDescriptionKey: @"The model answered in a shape Sing does not read"}];
+    if (error && !*error) *error = [NSError errorWithDomain:@"SGSing" code:1 userInfo:@{NSLocalizedDescriptionKey: @"The model answered in a shape Karaoke does not read"}];
     return NO;
 }
 

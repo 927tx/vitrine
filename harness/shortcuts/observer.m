@@ -19,7 +19,7 @@ void SGHarnessObserve(NSInteger waitPosts) {
         static NSInteger total;
         // The player not up for the first posts: no answer, as runShortcut gives none without a track.
         if (++total <= waitPosts ||[action isEqualToString:@"previous"]) return;
-        if ([action isEqualToString:@"sing:on"]) reply[@"failed"] = @"Sing needs its voice model.";
+        if ([action isEqualToString:@"sing:on"]) reply[@"failed"] = @"Karaoke needs its voice model.";
         else reply[@"said"] = [action isEqualToString:@"like"] ? @"Added Song to Liked Songs." : @"";
     }];
 }

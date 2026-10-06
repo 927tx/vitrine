@@ -52,7 +52,7 @@ static char kButtonGlassKey, kPanelGlassKey;
     // VoiceOver has the mic itself as one adjustable button: the slider shows only for a held finger and
     // goes again on a timer, which a swipe up or down never holds open.
     self.isAccessibilityElement = YES;
-    self.accessibilityLabel = @"Sing";
+    self.accessibilityLabel = @"Karaoke";
     self.accessibilityHint = @"Turns the vocals down";
     self.accessibilityTraits = UIAccessibilityTraitButton | UIAccessibilityTraitAdjustable;
 
@@ -218,7 +218,7 @@ static char kButtonGlassKey, kPanelGlassKey;
 #pragma mark - the tap
 
 static void tell(NSString *message, NSString *action, void (^then)(void)) {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Sing" message:message preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Karaoke" message:message preferredStyle:UIAlertControllerStyleAlert];
     // Over the player, which is dark whatever the system's appearance.
     alert.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     if (action) [alert addAction:[UIAlertAction actionWithTitle:action style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) { then(); }]];
@@ -232,7 +232,7 @@ static void tell(NSString *message, NSString *action, void (^then)(void)) {
             tell(SGSingMissing(), nil, nil);
             return;
         case SGSingStateNoModel:
-            tell([NSString stringWithFormat:@"Sing turns the vocals down with a voice model that runs on this iPhone. Download it now (%@)? It is best over Wi-Fi.%@",
+            tell([NSString stringWithFormat:@"Karaoke turns the vocals down with a voice model that runs on this iPhone. Download it now (%@)? It is best over Wi-Fi.%@",
                   SGSingModelSizeText(), SGSingModelError() ? [NSString stringWithFormat:@"\n\nThe last try failed: %@", SGSingModelError()] : @""],
                  @"Download", ^{
                      SGSingDownloadModel();
@@ -244,7 +244,7 @@ static void tell(NSString *message, NSString *action, void (^then)(void)) {
             tell(SGSingStatusDetail(), @"Stop the download", ^{ SGSingCancelModelDownload(); });
             return;
         case SGSingStateFailed:
-            tell(SGSingStatusDetail(), @"Turn Sing off", ^{ SGSetSingOn(NO); });
+            tell(SGSingStatusDetail(), @"Turn Karaoke off", ^{ SGSetSingOn(NO); });
             return;
         default:
             SGSetSingOn(!SGSingOn());

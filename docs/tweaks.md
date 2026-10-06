@@ -174,7 +174,7 @@ Shared:
                   per unit (its own mixer, sample time, largest slice and formats; AudioOutputUnitStop and
                   AudioComponentInstanceDispose rebound too, a disposed unit forgotten after its render in progress)
                   and names one the music's (SGPlayerMusicOutput), the one Spotify started or connected last, or
-                  one with sound when that one has had none for a second; speed and pitch, Sing's stage, the audio
+                  one with sound when that one has had none for a second; speed and pitch, Karaoke's stage, the audio
                   effects and Music Haptics follow it (SGPlayerWatchMusicOutput), and the other plays as Spotify
                   made it. A connection whose formats the callback cannot take (not float with a buffer per channel,
                   more than two channels, or a mixer at another rate than the unit) gets Spotify's own connection
@@ -228,8 +228,8 @@ Shared:
                   never touched. Checked on the Mac by `harness/audio-effects/build.sh route`.
                   Tested on the Mac against harness/audio-effects/ and harness/autoeq/, the hook in the simulator
                   against its sim/, the page against harness/audio-effects-page/
-    Sing/         Sing, a song's vocals turned down while it plays (Sing.h lists its files): the voice model (Mel-Band
-                  RoFormer, MIT, from Hugging Face) downloaded and checked file by file over Wi-Fi unless cellular is allowed,
+    Sing/         Karaoke (Sing in the code and its keys), a song's vocals turned down while it plays (Sing.h lists
+                  its files): the voice model (Mel-Band RoFormer, MIT, from Hugging Face) downloaded and checked file by file over Wi-Fi unless cellular is allowed,
                   a stop keeping what came in for the next download to carry on from; loaded only while Spotify is active
                   (SGSingLoader.m), a CPU copy first and warmed, then a faster one beside it for the foreground, each load
                   with a deadline and kept a minute after the mic goes off; the STFT around it on Accelerate,
@@ -244,7 +244,7 @@ Shared:
                   standing aside), the engine plays the lead it holds on as it is, dry, the clock still corrected, so no
                   part of the song is skipped; it lets it go at a pause, where Sing.x seeks Spotify back to what was
                   heard, or with a seek, a skip or the output stopping, and builds one only when it separates. From the
-                  thermal state Serious up Sing is held and lets the model go,
+                  thermal state Serious up Karaoke is held and lets the model go,
                   unless Ignore heat warnings is on, and runs again at Fair. Spatial
                   voice holds the separated vocals in front as the head turns: HeadGestures' motion gives the yaw off a
                   front that follows the head over 20 s, and the render thread pans the vocals' middle at equal power,
@@ -284,7 +284,7 @@ Shared:
                   what landed, with Redo last; the threshold kept is the one that fires on all five but one at least, the nod
                   stored before the shakes begin, so Cancel keeps it. Forget shows only while something is learned.
                   The one CMHeadphoneMotionManager is lent to other features
-                  (SGHeadMotionListen: Sing's spatial voice), and runs for them with the switch off, the detector then
+                  (SGHeadMotionListen: Karaoke's spatial voice), and runs for them with the switch off, the detector then
                   unfed. The detector is
                   tested on the Mac against harness/head-gestures/, the hook and the page in the simulator against its sim/
     LiveActivity/ a Live Activity on the lock screen and in the Dynamic Island in one of three views, the line being
@@ -303,12 +303,12 @@ Shared:
                   while suspended, Spotify cannot end it, so each state goes stale a minute on (an unchanged card is
                   sent again every 20 s) and a launch ends any left over before it starts a new one. The same folder
                   gives Siri, the Shortcuts app and the Action button Like This Song, Play or Pause, Next and Previous
-                  Track, Sing and Sleep Timer (AppShortcuts.swift lists them as Spotify's App Shortcuts), and iOS 18
-                  controls for Control Center and the lock screen of Like, Sing and the sleep timer
-                  (extension/LiveActivity/Controls.swift), buttons, as the extension cannot read Sing's state. Each is
+                  Track, Karaoke and Sleep Timer (AppShortcuts.swift lists them as Spotify's App Shortcuts), and iOS 18
+                  controls for Control Center and the lock screen of Like, Karaoke and the sleep timer
+                  (extension/LiveActivity/Controls.swift), buttons, as the extension cannot read Karaoke's state. Each is
                   a LiveActivityIntent or AudioPlaybackIntent, so it runs inside Spotify, launched in the background
                   when needed, and LiveActivity.x answers it with the activity on or off, Like through
-                  HeadGestures.x's collection platform and Sing through SGSetSingOn; the sleep timer (15 min, 30 min,
+                  HeadGestures.x's collection platform and Karaoke through SGSetSingOn; the sleep timer (15 min, 30 min,
                   1 hour, End of track, End of album or Off) is the card's own, Player/SleepTimer.m, which keeps its
                   own clock with the activity off. The intent asks again for 8 s while the player is not up,
                   then tells Siri to open Spotify. Checked in the simulator against harness/shortcuts/
@@ -525,7 +525,7 @@ setting by the part of Spotify it changes, so a part's glass, its hide switches 
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
 they change. Its main page groups the rows by what they are, in cards with no headings as Settings has its own,
 under the signing and environment warnings: Redesigned UI, Appearance and Tab bar; Player, Lyrics and Albums &
-artists (Home & Library in the native look); Sing, Spatial voice (where the iPhone reads headphone motion), Audio
+artists (Home & Library in the native look); Karaoke, Spatial voice (where the iPhone reads headphone motion), Audio
 effects, Vibrations, Live Activity, AirPods gestures and Listening stats; Lock screen and Premium, ads & privacy; Labs and All flags; Mod. It is checked in the simulator
 against harness/mod-settings/. The Appearance page has, in the native look, AMOLED (the redesign is always black), then the stored look's Accent colour
 preset, a pull-down of Spotify, Apple Music and Custom read off the colour stored (a colour set before the presets
@@ -540,17 +540,17 @@ it changes, and flipping it offers to restart Spotify. The pages show only what 
 after flipping the switch already shows what the restart will bring, and the main page swaps Home & Library and
 Albums & artists as it is flipped. Tab bar: the tab editor of the stored look, each with
 its own list of tabs. Lyrics, on the main page of its own: in the redesign a live preview of the lyrics first, with the presets of their look
-under it and their sliders in a sheet (Text size, Line spacing, Blur, Glow, Wave), applying at once; then Sing, then the ordered list of lyrics sources,
+under it and their sliders in a sheet (Text size, Line spacing, Blur, Glow, Wave), applying at once; then Karaoke, then the ordered list of lyrics sources,
 lyrics for every track, naming the source in the redesign, the lock screen, and glass lyrics in the native look; in
 the redesign also which of the lyrics, their pronunciation and their translation is set largest, Romanised lyrics
-(applied at once), and the translation's language. Sing, under either look, on the main page and as Lyrics' first row, the row reading out On,
-Off or how far the voice model's download has come, kept up to date while the page shows: Sing's switch, which turns
-the mic on and off at once, a card at its top (SGSingCard.m: the song, what Sing is doing, a tap saying more, the vocals
+(applied at once), and the translation's language. Karaoke, under either look, on the main page and as Lyrics' first row, the row reading out On,
+Off or how far the voice model's download has come, kept up to date while the page shows: Karaoke's switch, which turns
+the mic on and off at once, a card at its top (SGSingCard.m: the song, what Karaoke is doing, a tap saying more, the vocals
 and the rest traced live from the engine's loudness, still under Reduce Motion, play and pause, and a tall Vocals slider
 from gone through as sung to the vocals alone, with Sing along, Original and Vocals only under it), Spatial voice
 (where the iPhone reads headphone motion; a page of its own, reading out On or Off, with a live preview at its top that
 follows the head through AirPods, or sways gently without them and holds still under Reduce Motion, a line under it
-saying which, then the switch; its row is on the main page too, under Sing's), the voice model's download (Paused and
+saying which, then the switch; its row is on the main page too, under Karaoke's), the voice model's download (Paused and
 Checking among its states) and its removal, Ignore heat warnings, and under Advanced Runs on (Automatic, CPU only, GPU,
 Neural Engine, GPU and Neural Engine: the faster copy's), all applying straight away. Lock screen, on the main
 page under either look, opens the lock screen widget's page, titled Lock screen (Moving artwork, Lyrics or Every song, and the lyrics' style,

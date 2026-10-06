@@ -264,7 +264,7 @@ static BOOL sg_checking;            // the weights' checksum is being read
     SGLog(@"sing: %@ came in, %ld, %lld bytes", file.path, (long)status, size);
     if (!answered || size != file.size || ![hash isEqualToString:@(file.sha256)]) {
         self.error = !answered ? [NSString stringWithFormat:@"The server answered %ld for %@", (long)status, file.path]
-                                 : [NSString stringWithFormat:@"%@ is not the file Sing expects (%lld bytes%@)", file.path, size, hash ? @", another checksum" : @""];
+                                 : [NSString stringWithFormat:@"%@ is not the file Karaoke expects (%lld bytes%@)", file.path, size, hash ? @", another checksum" : @""];
         return;
     }
     NSURL *target = [stagingFolder() URLByAppendingPathComponent:file.path];
