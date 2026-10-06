@@ -1,0 +1,49 @@
+// What Mod Settings' main page links to and reads, stood in for: every page is an empty page of its own
+// name, the values beside the chevrons are what a fresh install reads, and the update and signing checks do
+// nothing.
+#import <UIKit/UIKit.h>
+#import "Core/SGCore.h"
+#import "Settings/SGModPage.h"
+
+extern BOOL SGHarnessWarning;
+
+static UIViewController *blank(NSString *title) {
+    return [[SGModPage alloc] initWithTitle:title intro:nil sections:@[] footer:nil];
+}
+
+#define PAGE(name) UIViewController *name(void) { return blank(@#name); }
+PAGE(SGAboutPage) PAGE(SGAdsSettingsPage) PAGE(SGAllFlagsPage) PAGE(SGArtistBlockSettingsPage) PAGE(SGDSPSettingsPage)
+PAGE(SGGesturesSettingsPage) PAGE(SGHeadGesturesSettingsPage) PAGE(SGHomeSettingsPage) PAGE(SGLabsPage)
+PAGE(SGListeningStatsPage) PAGE(SGLiveActivitySettingsPage) PAGE(SGLockScreenWidgetPage) PAGE(SGNavbarSettingsPage)
+PAGE(SGNowPlayingBarSettingsPage) PAGE(SGQueueSettingsPage) PAGE(SGRAlbumSettingsPage) PAGE(SGRNavbarSettingsPage)
+PAGE(SGSingSettingsPage) PAGE(SGSpatialVoiceSettingsPage) PAGE(SGVibrationsSettingsPage)
+UIViewController *SGRPlayerSettingsPage(NSArray *more) { return blank(@"SGRPlayerSettingsPage"); }
+UIViewController *SGRLyricsSettingsPage(NSString *title, NSString *intro, NSArray<SGModSection *> *sections) { return blank(title); }
+
+#define ROW(name) SGModRow *name(void) { return SGPageRow(@#name, ^UIViewController *{ return nil; }); }
+ROW(SGAppIconRow) ROW(SGGeminiKeyRow) ROW(SGGlassLyricsRow) ROW(SGLockScreenLyricsRow) ROW(SGLyricsMeaningsRow)
+ROW(SGLyricsTranslationLanguageRow) ROW(SGLyricsWordTimingRow) ROW(SGRLyricsTextSizesRow)
+NSArray<SGModRow *> *SGAppFontRows(void) { return @[]; }
+NSArray<SGModRow *> *SGNativeAppearanceRows(void) { return @[]; }
+NSArray<SGModRow *> *SGRAppearanceRows(void) { return @[]; }
+SGModSection *SGLyricsSourcesSection(BOOL namingSource) { return SGSection(nil, @[]); }
+NSArray<SGModSection *> *SGNativePlayerScreenSections(void) { return @[]; }
+NSArray<NSDictionary *> *SGBlockedArtists(void) { return @[]; }
+
+NSString *SGDSPSummary(void) { return @"Off"; }
+NSString *SGSingSummary(void) { return @"Off"; }
+NSString *SGLiveActivitySummary(void) { return @"Off"; }
+NSString *SGVibrationsSummary(void) { return @"Controls"; }
+// An iPhone that reads headphone motion, with Spatial voice off.
+BOOL SGSingSpatialAvailable(void) { return YES; }
+BOOL SGSingSpatial(void) { return NO; }
+
+void SGCheckForUpdate(BOOL force) {}
+void SGWatchForUpdates(void) {}
+void SGCheckSigningOnce(void) {}
+SGModRow *SGSigningWarningRow(void) { return nil; }
+// Environment.m's red row, as a phone with EeveeSpotify injected too shows it.
+NSArray<SGModRow *> *SGEnvironmentWarningRows(void) {
+    if (!SGHarnessWarning) return @[];
+    return @[SGWarningRow(@"EeveeSpotify is injected too", @"Tap to see what that changes", ^{})];
+}

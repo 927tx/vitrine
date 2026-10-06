@@ -1,11 +1,13 @@
-// Settings: a Mod Settings row at the end of Spotify's settings list opens the mod's own page: the
-// Appearance page with Redesigned UI, then a page per part of Spotify, each holding what that part
-// offers in the stored look (App/Pages.m: Navbar, Player, and Home & Library for the native look), Audio
-// effects (Shared/AudioEffects, in either look and applying straight away), Premium, ads & privacy
-// and Labs, All flags, a searchable list of every flag with an override per flag, and Mod, the
-// build, its updates and links. The same row leads the side drawer's list (trees/test6.txt), above
-// Your plan, so the page is a tap from Home, and holding Home on the tab bar opens it too. The tweaks read the switches when they run, so a change
-// shows after Spotify restarts; the tab editor on the Navbar page applies as soon as the bar lays
+// Settings: a Mod Settings row at the end of Spotify's settings list opens the mod's own page, its rows
+// grouped by what they are as the system Settings app groups its own, in cards with no headings: what the
+// app looks like (Redesigned UI's switch, Appearance, Tab bar), the screens a page of its own changes
+// (Player, Lyrics, and Albums & artists or, in the native look, Home & Library), the features that work
+// under either look (Sing, Spatial voice, Audio effects, Vibrations, Live Activity, AirPods gestures, Listening stats),
+// the system's side (Lock screen; Premium, ads & privacy), the advanced pages (Labs, All flags, a
+// searchable list of every flag with an override per flag) and Mod, the build, its updates and links. The
+// same row leads the side drawer's list (trees/test6.txt), above Your plan, so the page is a tap from
+// Home, and holding Home on the tab bar opens it too. The tweaks read the switches when they run, so a
+// change shows after Spotify restarts; the tab editor on the Tab bar page applies as soon as the bar lays
 // out again.
 //
 // Tree (trees/settings.txt): SettingsListViewController.view > SettingsListCollectionView of
@@ -22,7 +24,10 @@
 #import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/LiveActivity/LiveActivity.h"
 #import "Shared/ListeningStats/ListeningStats.h"
+#import "Shared/HeadGestures/HeadGestures.h"
+#import "Shared/Player/PlayerSettings.h"
 #import "Shared/Sing/Sing.h"
+#import "Shared/Haptics/Haptics.h"
 #import "App/About/About.h"
 #import "App/Onboarding/Onboarding.h"
 #import "Redesigned/Album/Album.h"
@@ -46,44 +51,67 @@ static UIViewController *modSettingsPage(void) {
     NSMutableArray<SGModRow *> *warnings = [NSMutableArray arrayWithArray:SGEnvironmentWarningRows()];
     if (signing) [warnings insertObject:signing atIndex:0];
     if (warnings.count) [sections addObject:SGSection(nil, warnings)];
-    // Appearance opens a page of its own, on a card of its own, so the parts below stay one tap from the top.
-    [sections addObject:SGSection(nil, @[pageRow(@"Appearance", @"paintpalette", UIColor.systemBlueColor, ^UIViewController *{ return SGAppearancePage(); })])];
-    SGModRow *mod = pageRow(@"Mod", @"info.circle", UIColor.systemGrayColor, ^UIViewController *{ return SGAboutPage(); });
-    mod.value = ^NSString *{ return @(SG_VERSION); };
-    // The audio effects work on the sound, so both looks have them, with what they are doing beside the chevron.
-    SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", UIColor.systemOrangeColor, ^UIViewController *{ return SGDSPSettingsPage(); });
-    audioEffects.value = ^NSString *{ return SGDSPSummary(); };
-    // Sing works on the sound, so both looks have it, saying beside the chevron whether it is on or how far its
-    // voice model has come.
-    SGModRow *sing = pageRow(@"Sing", @"music.mic", UIColor.systemRedColor, ^UIViewController *{ return SGSingSettingsPage(); });
-    sing.value = ^NSString *{ return SGSingSummary(); };
-    // Home & Library holds only the native look's switches, so the redesign has no such page; the
-    // Live Activity works under both, and only where ActivityKit's card does.
-    NSMutableArray<SGModRow *> *parts = [NSMutableArray arrayWithArray:@[
-        pageRow(@"Navbar", @"dock.rectangle", UIColor.systemIndigoColor, ^UIViewController *{ return SGNavbarPage(); }),
+
+    // The rows of one look are asked again as Redesigned UI is flipped, so the page shows what the restart brings.
+    BOOL (^redesigned)(void) = ^BOOL { return SGRedesignedUIStored(); };
+    BOOL (^native)(void) = ^BOOL { return !SGRedesignedUIStored(); };
+
+    [sections addObject:SGSection(nil, @[
+        SGRedesignedUIRow(),
+        pageRow(@"Appearance", @"paintpalette", UIColor.systemBlueColor, ^UIViewController *{ return SGAppearancePage(); }),
+        pageRow(@"Tab bar", @"dock.rectangle", UIColor.systemIndigoColor, ^UIViewController *{ return SGNavbarPage(); }),
+    ])];
+
+    // Home & Library holds only the native look's switches; the redesign has its album and artist pages instead.
+    SGModRow *albums = pageRow(@"Albums & artists", @"square.stack", UIColor.systemCyanColor, ^UIViewController *{ return SGRAlbumSettingsPage(); });
+    albums.visible = redesigned;
+    SGModRow *home = pageRow(@"Home & Library", @"house", UIColor.systemCyanColor, ^UIViewController *{ return SGHomeSettingsPage(); });
+    home.visible = native;
+    [sections addObject:SGSection(nil, @[
         pageRow(@"Player", @"play.circle", UIColor.systemPinkColor, ^UIViewController *{ return SGPlayerSettingsPage(); }),
         pageRow(@"Lyrics", @"quote.bubble", UIColor.systemPurpleColor, ^UIViewController *{ return SGLyricsSettingsPage(); }),
-        sing,
-        audioEffects,
-    ]];
+        albums,
+        home,
+    ])];
+
+    // Sing and the audio effects work on the sound, so both looks have them, each saying beside the chevron
+    // whether it is on, how far Sing's voice model has come or how many effects are on.
+    SGModRow *sing = pageRow(@"Sing", @"music.mic", UIColor.systemRedColor, ^UIViewController *{ return SGSingSettingsPage(); });
+    sing.value = ^NSString *{ return SGSingSummary(); };
+    SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", UIColor.systemOrangeColor, ^UIViewController *{ return SGDSPSettingsPage(); });
+    audioEffects.value = ^NSString *{ return SGDSPSummary(); };
+    // Spatial voice is Sing's too, and shows where the iPhone reads headphone motion, as on Sing's page.
+    SGModRow *spatial = pageRow(@"Spatial voice", @"person.wave.2", UIColor.systemIndigoColor, ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
+    spatial.value = ^NSString *{ return SGSingSpatial() ? @"On" : @"Off"; };
+    spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
+    // Vibrations hook Spotify's own controls and its audio, so they answer under either look; the row says which are on.
+    SGModRow *vibrations = pageRow(@"Vibrations", @"iphone.radiowaves.left.and.right", UIColor.systemPinkColor, ^UIViewController *{ return SGVibrationsSettingsPage(); });
+    vibrations.value = ^NSString *{ return SGVibrationsSummary(); };
+    NSMutableArray<SGModRow *> *features = [NSMutableArray arrayWithObjects:sing, spatial, audioEffects, vibrations, nil];
+    // The Live Activity works under both looks, where ActivityKit's card does.
     if (@available(iOS 17.0, *)) {
         SGModRow *liveActivity = pageRow(@"Live Activity", @"platter.filled.top.iphone", UIColor.systemTealColor, ^UIViewController *{ return SGLiveActivitySettingsPage(); });
         liveActivity.value = ^NSString *{ return SGLiveActivitySummary(); };
-        [parts addObject:liveActivity];
+        [features addObject:liveActivity];
     }
-    [parts addObject:pageRow(@"Listening stats", @"chart.bar", UIColor.systemGreenColor, ^UIViewController *{ return SGListeningStatsPage(); })];
-    if (!SGRedesignedUIStored()) [parts addObject:pageRow(@"Home & Library", @"house", UIColor.systemCyanColor, ^UIViewController *{ return SGHomeSettingsPage(); })];
-    else [parts addObject:pageRow(@"Albums & artists", @"square.stack", UIColor.systemCyanColor, ^UIViewController *{ return SGRAlbumSettingsPage(); })];
+    [features addObjectsFromArray:@[
+        pageRow(@"AirPods gestures", @"airpods.pro", UIColor.systemGrayColor, ^UIViewController *{ return SGHeadGesturesSettingsPage(); }),
+        pageRow(@"Listening stats", @"chart.bar", UIColor.systemGreenColor, ^UIViewController *{ return SGListeningStatsPage(); }),
+    ]];
+    [sections addObject:SGSection(nil, features)];
+
+    SGModRow *mod = pageRow(@"Mod", @"info.circle", UIColor.systemGrayColor, ^UIViewController *{ return SGAboutPage(); });
+    mod.value = ^NSString *{ return @(SG_VERSION); };
     [sections addObjectsFromArray:@[
-        SGSection(nil, parts),
         SGSection(nil, @[
+            pageRow(@"Lock screen", @"lock", UIColor.systemGrayColor, ^UIViewController *{ return SGLockScreenWidgetPage(); }),
             pageRow(@"Premium, ads & privacy", @"crown", UIColor.systemBlueColor, ^UIViewController *{ return SGAdsSettingsPage(); }),
-            pageRow(@"Labs", @"testtube.2", UIColor.systemMintColor, ^UIViewController *{ return SGLabsPage(); }),
         ]),
         SGSection(nil, @[
+            pageRow(@"Labs", @"testtube.2", UIColor.systemMintColor, ^UIViewController *{ return SGLabsPage(); }),
             pageRow(@"All flags", @"flag", UIColor.systemGrayColor, ^UIViewController *{ return SGAllFlagsPage(); }),
-            mod,
         ]),
+        SGSection(nil, @[mod]),
     ]];
     return [[SGModPage alloc] initWithTitle:@"Vitrine" intro:nil sections:sections footer:nil];
 }

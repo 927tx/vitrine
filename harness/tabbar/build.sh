@@ -5,20 +5,21 @@ SRC=${SRC:-$(cd "$(dirname "$0")/../../tweak/Sources" && pwd)}
 OUT=$(dirname "$0")/build
 rm -rf "$OUT"; mkdir -p "$OUT/gen" "$OUT/TabBarHarness.app"
 
-for f in Redesigned/Navbar/TabBar.x Redesigned/Navbar/TabBarMinimize.x Redesigned/NowPlayingBar/NowPlayingBar.x; do
+for f in Shared/Navigation/Links.x Redesigned/Navbar/TabBar.x Redesigned/Navbar/TabBarMinimize.x Redesigned/NowPlayingBar/NowPlayingBar.x; do
     name=$(basename "$f" .x)
     "$THEOS/bin/logos.pl" -c generator=internal "$SRC/$f" > "$OUT/gen/$name.m"
 done
 
 SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
 xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-arc -g -O0 \
-    -I"$SRC" -I"$SRC/Redesigned/Navbar" -I"$SRC/Redesigned/NowPlayingBar" -I"$OUT/gen" -isysroot "$SDK" \
+    -I"$SRC" -I"$SRC/Redesigned/Navbar" -I"$SRC/Redesigned/NowPlayingBar" -I"$SRC/Shared/Navigation" -I"$OUT/gen" -isysroot "$SDK" \
     -Wno-deprecated-declarations \
     "$(dirname "$0")/main.m" "$(dirname "$0")/stubs.m" \
     "$OUT"/gen/*.m \
     "$SRC"/Core/SGLog.m "$SRC"/Core/SGPrefs.m "$SRC"/Core/SGViewTree.m "$SRC"/Core/SGGlass.m \
     "$SRC"/Core/SGBackdrop.m "$SRC"/Core/SGFlagForce.m "$SRC"/Core/SGUIMode.m \
     "$SRC"/Redesigned/Kit/SGRTokens.m "$SRC"/Redesigned/Kit/SGRGlass.m \
+    "$SRC"/Redesigned/Navbar/NavbarLayout.m "$SRC"/Shared/Navigation/TabIcons.m \
     -framework UIKit -framework QuartzCore -framework CoreGraphics -framework Foundation \
     -o "$OUT/TabBarHarness.app/TabBarHarness"
 

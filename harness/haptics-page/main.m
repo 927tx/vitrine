@@ -1,4 +1,4 @@
-// Mod Settings > Player > Vibrations (Shared/Haptics/HapticsSettings.m), its preview (SGVibrationsPreview.m) and
+// Mod Settings > Vibrations (Shared/Haptics/HapticsSettings.m), its preview (SGVibrationsPreview.m) and
 // its cards, with the real Settings/ framework and SGFeedback.m behind them and stubs.m for Music Haptics' engine. The launch line sets the switches up and then plays actions, one every 0.7 s from 1 s
 // in; screenshot after.
 //

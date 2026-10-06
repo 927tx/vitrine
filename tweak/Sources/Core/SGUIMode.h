@@ -1,5 +1,5 @@
 // Which of the two looks runs: Spotify's own screens with the mod's tweaks on them (Native/), or the
-// redesign (Redesigned/), picked by Redesigned UI in Appearance. What does not draw on Spotify's
+// redesign (Redesigned/), picked by Redesigned UI at the top of Mod Settings. What does not draw on Spotify's
 // screens (Shared/) runs under both. The switch is read once, the first time anything asks, so the
 // hooks, the flags and the pages see one answer for the whole launch and a change waits for the restart.
 //

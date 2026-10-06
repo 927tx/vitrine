@@ -92,7 +92,7 @@ static void modelTapped(UITableViewController *page) {
 
 @end
 
-static UIViewController *spatialPage(void) {
+UIViewController *SGSpatialVoiceSettingsPage(void) {
     SGModRow *spatial = SGOptionRow(@"Spatial voice", nil, SGKeySingSpatial);
     __block __weak SGSpatialVoicePage *page;
     spatial.changed = ^(BOOL on) {
@@ -119,7 +119,7 @@ UIViewController *SGSingSettingsPage(void) {
     });
     SGModRow *level = SGSliderRow(@"Vocals", @"From gone, through the song as sung, to the vocals alone", 0, 2, 0.05,
         ^double { return SGSingLevel(); }, ^(double value) { SGSetSingLevel((float)value); }, ^NSString *(double value) { return SGSingLevelText(value); });
-    SGModRow *spatial = SGPageRow(@"Spatial voice", ^UIViewController *{ return spatialPage(); });
+    SGModRow *spatial = SGPageRow(@"Spatial voice", ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
     spatial.subtitle = @"With AirPods, the voice stays in front of you as you turn your head";
     spatial.value = ^NSString *{ return SGSingSpatial() ? @"On" : @"Off"; };
     // Facts about the iPhone, which do not change while the page shows.

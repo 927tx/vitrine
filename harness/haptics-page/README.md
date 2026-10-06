@@ -1,6 +1,6 @@
 # Vibrations settings harness
 
-Mod Settings > Player > Vibrations (`tweak/Sources/Shared/Haptics/HapticsSettings.m`), its preview
+Mod Settings > Vibrations (`tweak/Sources/Shared/Haptics/HapticsSettings.m`), its preview
 (`SGVibrationsPreview.m`) and its cards: the real Settings/ framework (its slider row and its rows shown while a
 switch is on), the real control taps (`SGFeedback.m`, which the simulator plays silently), and `stubs.m` for Music
 Haptics' engine, which logs each call with the strength and the Follows choice the hook would read, and keeps

@@ -39,7 +39,7 @@ static SGProblem version(void) {
 
 static SGProblem fellBack(void) {
     return @[@"The redesign did not start",
-             [NSString stringWithFormat:@"Spotify did not get going with the redesign on iOS %@, so it is back in Legacy and Redesigned UI is off. Appearance can turn it on again.",
+             [NSString stringWithFormat:@"Spotify did not get going with the redesign on iOS %@, so it is back in Legacy and Redesigned UI is off. Mod Settings can turn it on again.",
                  UIDevice.currentDevice.systemVersion]];
 }
 

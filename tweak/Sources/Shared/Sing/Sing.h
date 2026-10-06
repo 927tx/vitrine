@@ -77,6 +77,8 @@ void SGSetSingSpatial(BOOL on);
 // Reads the switch and the motion's permission again.
 - (void)refresh;
 @end
+// Spatial voice's page, its preview and its switch: under Sing's page, and on Mod Settings' main page under Sing.
+UIViewController *SGSpatialVoiceSettingsPage(void);
 // Loads the model again on the compute units now stored, if it is loaded.
 void SGSingComputeUnitsChanged(void);
 // What the main page's Sing row reads out: On, Off, or how far the model has come.

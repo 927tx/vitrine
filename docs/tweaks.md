@@ -38,7 +38,7 @@ recorded trees: both are read out of Spotify's own binary and belong to whoever 
 
 ## Layers
 
-The mod has two looks, picked by Redesigned UI in Appearance: Spotify's own screens with the mod's
+The mod has two looks, picked by Redesigned UI at the top of Mod Settings: Spotify's own screens with the mod's
 tweaks on them, or the redesign, which starts from a clean sheet. What does not draw on Spotify's
 screens works under both. So the sources are four layers, each a directory of features:
 
@@ -380,7 +380,7 @@ Redesigned:
 App:
 
     ModSettings.x  the root page and the rows that open it from Spotify's settings and the side drawer
-    Pages.m        the Appearance page with Redesigned UI, the Player and Lyrics pages, which Navbar page opens
+    Pages.m        Redesigned UI's switch, the Appearance, Vibrations, Player and Lyrics pages, which Tab bar page opens
     About/         the update check against the repo's GitHub Releases, the Updates page it fills (the state, and
                    the changelog of every release newer than the build, a line per commit) and the sheet a newer
                    release brings up on its own a few seconds after Spotify opens, once per release; backup, the
@@ -424,18 +424,22 @@ Spotify behind a symbol on a tile of its own colour, grey chevrons and footnote 
 page. It sorts every
 setting by the part of Spotify it changes, so a part's glass, its hide switches and its flags sit on
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
-they change. It opens on the Appearance row, on a card of its own under the signing warning, which opens the Appearance
-page: Redesigned UI, then in the native look AMOLED (the redesign is always black), then the stored look's Accent colour
+they change. Its main page groups the rows by what they are, in cards with no headings as Settings has its own,
+under the signing and environment warnings: Redesigned UI, Appearance and Tab bar; Player, Lyrics and Albums &
+artists (Home & Library in the native look); Sing, Spatial voice (where the iPhone reads headphone motion), Audio
+effects, Vibrations, Live Activity, AirPods gestures and Listening stats; Lock screen and Premium, ads & privacy; Labs and All flags; Mod. It is checked in the simulator
+against harness/mod-settings/. The Appearance page has, in the native look, AMOLED (the redesign is always black), then the stored look's Accent colour
 preset, a pull-down of Spotify, Apple Music and Custom read off the colour stored (a colour set before the presets
 existed reads as Custom, Apple Music's red as Apple Music), and Accent colour, the hex and a swatch of the colour in
 effect, which opens the system picker in a sheet that stores only from its checkmark, as Custom. The custom colour is
 kept aside while a preset is in place, so Custom brings it back. Last come the Font, under either look and on any
 iOS, below 26 too, with Custom font among its choices (a .ttf or .otf imported from Files by the row under it,
 copied to Application Support/Vitrine/Font and registered again at each launch, Spotify's font coming back when the
-file is gone), and the App icon. Everything on the page applies after a restart. Redesigned UI is the one switch between the two looks (see Layers): it glows
-(Settings/SGGlowSwitch), its ⓘ says what it changes, and flipping it offers to restart Spotify.
-The pages show only what the stored look has: a page opened after flipping the switch already shows
-what the restart will bring. Then a card of parts. Navbar: the tab editor of the stored look, each with
+file is gone), and the App icon. Everything on the page applies after a restart. Redesigned UI, the main page's
+first row, is the one switch between the two looks (see Layers): it glows (Settings/SGGlowSwitch), its ⓘ says what
+it changes, and flipping it offers to restart Spotify. The pages show only what the stored look has: a page opened
+after flipping the switch already shows what the restart will bring, and the main page swaps Home & Library and
+Albums & artists as it is flipped. Tab bar: the tab editor of the stored look, each with
 its own list of tabs. Lyrics, on the main page of its own: in the redesign a live preview of the lyrics first, with the presets of their look
 under it and their sliders in a sheet (Text size, Line spacing, Blur, Glow, Wave), applying at once; then Sing, then the ordered list of lyrics sources,
 lyrics for every track, naming the source in the redesign, the lock screen, and glass lyrics in the native look; in
@@ -445,11 +449,11 @@ Off or how far the voice model's download has come, kept up to date while the pa
 the mic on and off at once, its Status (a tap says more), the Vocals slider (gone, as sung, the vocals alone), Spatial voice
 (where the iPhone reads headphone motion; a page of its own, reading out On or Off, with a live preview at its top that
 follows the head through AirPods, or sways gently without them and holds still under Reduce Motion, a line under it
-saying which, then the switch), the voice model's download, Runs on (GPU, GPU
-and Neural Engine, Neural Engine) and Ignore heat warnings, all applying straight away. Player: Gestures, AirPods gestures, Vibrations (which
-of the two are on read out on the row), Blocked artists (with the count on the row) and Lock screen widget (Moving artwork, Lyrics or Every song, and the
-lyrics' style, Still or Animated, and Spotify's like and dislike buttons' flag; its podcast, audiobook and artwork
-flags stay in All flags), which work with either look;
+saying which, then the switch; its row is on the main page too, under Sing's), the voice model's download, Runs on (GPU, GPU
+and Neural Engine, Neural Engine) and Ignore heat warnings, all applying straight away. Lock screen, on the main
+page under either look, opens the lock screen widget's page, titled Lock screen (Moving artwork, Lyrics or Every song, and the lyrics' style,
+Still or Animated, and Spotify's like and dislike buttons' flag; its podcast, audiobook and artwork flags stay in
+All flags). Player: Gestures and Blocked artists (with the count on the row), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
@@ -460,7 +464,7 @@ with a note on what the one picked does, Artwork sources and Download in Low Dat
 and Mini player: Apple Music style (the tab bar's minimize on scroll), Device button (the now playing bar keeps
 Spotify's device button in that minimized row, off by default) and the device button hidden on the full bar,
 checked in the simulator against harness/player/ (`settings`). Vibrations, a page of its own under either
-look, leads with a preview (Shared/Haptics/SGVibrationsPreview.m): rings of dots that a tap sends a crest across, out
+look opened from the main page (the row reads out which of the two are on), leads with a preview (Shared/Haptics/SGVibrationsPreview.m): rings of dots that a tap sends a crest across, out
 from the middle in the accent colour, higher and further the stronger the Strength, while the first of Controls and
 Generated that is on plays its own tap through its own path (Controls' add tap, or one kick of Generated's with its
 rumble unless it follows Beat), the line under it naming which, or saying why there is none. While the page shows,

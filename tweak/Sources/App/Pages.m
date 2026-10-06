@@ -8,7 +8,6 @@
 #import "Pages.h"
 #import "Shared/ArtistBlock/ArtistBlock.h"
 #import "Shared/Gestures/Gestures.h"
-#import "Shared/HeadGestures/HeadGestures.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/LyricsMeanings/Meanings.h"
 #import "Shared/Player/PlayerSettings.h"
@@ -17,7 +16,6 @@
 #import "Native/Navbar/Navbar.h"
 #import "Native/NowPlayingBar/NowPlayingBar.h"
 #import "Native/Player/NowPlaying.h"
-#import "Shared/Haptics/Haptics.h"
 #import "Shared/LiveActivity/LiveActivity.h"
 #import "Redesigned/Lyrics/LyricsText.h"
 #import "Redesigned/Lyrics/LyricsLook.h"
@@ -76,25 +74,25 @@ static SGModRow *untestedRow(void) {
     return SGWithTile(row, @"sparkles", UIColor.systemPurpleColor);
 }
 
-// Redesigned UI, then the stored look's own rows, then the
-// font and the app icon, which work under either look on any iOS.
+SGModRow *SGRedesignedUIRow(void) {
+    if (!SGRedesignAvailable()) return untestedRow();
+    SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
+    redesign.glows = YES;
+    redesign.info = SGRedesignedUIInfo;
+    redesign.changed = ^(BOOL on) {
+        SGSetRedesignedUI(on);
+        offerRestart(on);
+    };
+    return SGWithTile(redesign, @"sparkles", UIColor.systemPurpleColor);
+}
+
+// The stored look's own rows, then the font and the app icon, which work under either look on any iOS.
+// Redesigned UI itself leads Mod Settings' main page.
 UIViewController *SGAppearancePage(void) {
-    SGModRow *look = untestedRow();
-    if (SGRedesignAvailable()) {
-        SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
-        redesign.glows = YES;
-        redesign.info = SGRedesignedUIInfo;
-        redesign.changed = ^(BOOL on) {
-            SGSetRedesignedUI(on);
-            offerRestart(on);
-        };
-        look = SGWithTile(redesign, @"sparkles", UIColor.systemPurpleColor);
-    }
     NSMutableArray<SGModRow *> *everywhere = [NSMutableArray arrayWithArray:SGAppFontRows()];
     SGModRow *icon = SGAppIconRow();
     if (icon) [everywhere addObject:icon];
     return [[SGModPage alloc] initWithTitle:@"Appearance" intro:SGRestartNote sections:@[
-        SGSection(nil, @[look]),
         SGSection(nil, SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()),
         SGSection(nil, everywhere),
     ] footer:nil];
@@ -135,31 +133,27 @@ UIViewController *SGPlayerSettingsPage(void) {
     blocked.value = ^NSString *{
         return SGFlag(SGKeyArtistBlock, NO) ? @(SGBlockedArtists().count).stringValue : @"Off";
     };
-    // Vibrations hook Spotify's own controls and its audio, so they answer under either look.
-    SGModRow *vibrations = SGPageRow(@"Vibrations", ^UIViewController *{ return SGVibrationsSettingsPage(); });
-    vibrations.value = ^NSString *{ return SGVibrationsSummary(); };
     BOOL native = !SGRedesignedUIStored();
 
+    // AirPods gestures, the lock screen widget and Vibrations have rows of their own on Mod Settings' main page.
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGSection(nil, @[
         SGWithTile(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap", UIColor.systemBlueColor),
-        SGWithTile(SGPageRow(@"AirPods gestures", ^UIViewController *{ return SGHeadGesturesSettingsPage(); }), @"airpods.pro", UIColor.systemGrayColor),
-        SGWithTile(vibrations, @"iphone.radiowaves.left.and.right", UIColor.systemOrangeColor),
         SGWithTile(blocked, @"person.crop.circle.badge.xmark", UIColor.systemRedColor),
     ])];
-    NSMutableArray<SGModRow *> *pages = [NSMutableArray array];
     if (native) {
-        [pages addObject:SGWithTile(SGPageRow(@"Now playing bar", ^UIViewController *{ return SGNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled", UIColor.systemPinkColor)];
-        [pages addObject:SGWithTile(SGPageRow(@"Queue & devices", ^UIViewController *{ return SGQueueSettingsPage(); }), @"text.line.first.and.arrowtriangle.forward", UIColor.systemIndigoColor)];
+        [sections addObject:SGSection(nil, @[
+            SGWithTile(SGPageRow(@"Now playing bar", ^UIViewController *{ return SGNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled", UIColor.systemPinkColor),
+            SGWithTile(SGPageRow(@"Queue & devices", ^UIViewController *{ return SGQueueSettingsPage(); }), @"text.line.first.and.arrowtriangle.forward", UIColor.systemIndigoColor),
+        ])];
+        [sections addObjectsFromArray:SGNativePlayerScreenSections()];
     }
-    [pages addObject:SGWithTile(SGPageRow(@"Lock screen widget", ^UIViewController *{ return SGLockScreenWidgetPage(); }), @"lock", UIColor.systemGrayColor)];
-    [sections addObject:SGSection(nil, pages)];
-    if (native) [sections addObjectsFromArray:SGNativePlayerScreenSections()];
     // Switch to video is the same chip of Spotify's player under either look.
     [sections addObject:SGSection(native ? nil : @"Hide on the player", @[
         SGHideRow(@"Switch to video", @"The chip over the title of a song with a music video", SGKeyHideVideoSwitch),
     ])];
 
-    // The redesign's page leads with a showcase of its player, the background and device button rows under it.
+    // The redesign's page leads with a card of its player and the background's control, the background's
+    // rows and the Mini player section under it.
     if (!native) return SGRPlayerSettingsPage(sections);
     return [[SGModPage alloc] initWithTitle:@"Player" intro:SGRestartNote sections:sections footer:nil];
 }

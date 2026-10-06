@@ -5,7 +5,7 @@ A Theos tweak (Objective-C + Logos) injected into the decrypted Spotify iOS app.
 
 ## Two looks, never both
 
-**Redesigned UI** (Mod Settings → Appearance) picks one of two looks, read once at launch:
+**Redesigned UI** (the first row of Mod Settings) picks one of two looks, read once at launch:
 
 - **Native**: Spotify's own screens with the mod's tweaks on them (hide switches, glass header buttons,
   Home gradient, AMOLED switch, accent colour...).
