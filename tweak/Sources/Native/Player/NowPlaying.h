@@ -1,5 +1,6 @@
 // The native look's player: Spotify's full screen player with the artwork background and glass header
-// buttons (Player.x), the glass lyrics card (LyricsCard.x), the gestures' hookup (PlayerGestures.x) and the parts of it to hide (PlayerDeclutter.x). The glass
+// buttons (Player.x), the glass lyrics card (LyricsCard.x), the gestures' hookup (PlayerGestures.x), the parts of it to hide (PlayerDeclutter.x)
+// and its pull held off while the progress bar is scrubbed (PlayerScrub.x). The glass
 // lyrics page is Native/Lyrics/LyricsPage.x's and shares SGKeyLyricsCard ("Glass lyrics").
 #import <UIKit/UIKit.h>
 
