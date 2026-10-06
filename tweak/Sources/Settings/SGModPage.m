@@ -301,12 +301,17 @@ SGModRow *SGWithTile(SGModRow *row, NSString *symbol, UIColor *color) {
 
 // What a page row carrying a value shows on the right: the value, then the chevron, the same
 // distance apart as Spotify's own rows keep them.
+// A value never takes more than this much of the row, so a long one ends in "…" and leaves the title its room.
+static const CGFloat kValueMaxWidth = 170;
+
 static UIView *valueAndChevron(NSString *text) {
     UILabel *label = [UILabel new];
     label.font = SGTitleFont();
     label.textColor = SGGrey();
     label.text = text;
+    label.lineBreakMode = NSLineBreakByTruncatingTail;
     [label sizeToFit];
+    if (label.bounds.size.width > kValueMaxWidth) label.bounds = CGRectMake(0, 0, kValueMaxWidth, label.bounds.size.height);
     UIImageView *chevron = SGChevronView();
     CGFloat height = MAX(label.bounds.size.height, chevron.bounds.size.height);
     UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, label.bounds.size.width + 6 + chevron.bounds.size.width, height)];

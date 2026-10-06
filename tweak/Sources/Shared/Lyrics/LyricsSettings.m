@@ -9,9 +9,11 @@
 SGModSection *SGLyricsSourcesSection(BOOL namingSource) {
     SGModRow *sources = SGPageRow(@"Sources", ^UIViewController *{ return SGLyricsSourcesPage(); });
     sources.value = ^NSString *{
-        NSMutableArray<NSString *> *names = [NSMutableArray array];
-        for (NSString *key in SGLyricsOrder()) [names addObject:SGLyricsProviderFor(key).name];
-        return names.count ? [names componentsJoinedByString:@", "] : @"Off";
+        // The first one asked and how many follow it, short enough to sit beside the title.
+        NSArray<NSString *> *order = SGLyricsOrder();
+        if (!order.count) return @"Off";
+        NSString *first = SGLyricsProviderFor(order.firstObject).name;
+        return order.count == 1 ? first : [NSString stringWithFormat:@"%@ +%lu", first, (unsigned long)order.count - 1];
     };
     SGModRow *imported = SGPageRow(@"Imported LRC files", ^UIViewController *{ return SGImportedLRCPage(); });
     imported.value = ^NSString *{
