@@ -283,9 +283,10 @@ static UIFont *tabular(UIFont *font) {
     CGFloat width = self.contentView.bounds.size.width, side = 16;
     [_value sizeToFit];
     CGFloat valueWidth = MAX(_value.bounds.size.width, 44);
-    _value.frame = CGRectMake(width - side - valueWidth, 12, valueWidth, 18);
-    _title.frame = CGRectMake(side, 12, CGRectGetMinX(_value.frame) - side - 8, 18);
-    _slider.frame = CGRectMake(side, 36, width - 2 * side, 28);
+    CGFloat line = ceil(_title.font.lineHeight);   // as tall as Dynamic Type makes the title
+    _value.frame = CGRectMake(width - side - valueWidth, 12, valueWidth, line);
+    _title.frame = CGRectMake(side, 12, CGRectGetMinX(_value.frame) - side - 8, line);
+    _slider.frame = CGRectMake(side, 12 + line + 6, width - 2 * side, 28);
 }
 
 - (void)moved {
@@ -391,7 +392,7 @@ static UIView *valueAndChevron(NSString *text) {
     label.textColor = SGGrey();
     label.text = text;
     [label sizeToFit];
-    UIImageView *chevron = SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightSemibold, 16);
+    UIImageView *chevron = SGChevronView();
     CGFloat height = MAX(label.bounds.size.height, chevron.bounds.size.height);
     UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, label.bounds.size.width + 6 + chevron.bounds.size.width, height)];
     label.center = CGPointMake(label.bounds.size.width / 2, height / 2);
@@ -552,7 +553,7 @@ static UIView *valueAndChevron(NSString *text) {
     // The heads, the values and the errors size themselves; a nil row would read as a slider.
     SGDSPRow *row = [self rowAt:path];
     if (!row) return UITableViewAutomaticDimension;
-    if (row.kind == SGDSPRowSlider) return 74;
+    if (row.kind == SGDSPRowSlider) return 12 + ceil(SGTitleFont().lineHeight) + 6 + 28 + 10;
     if (row.kind == SGDSPRowCurve) return [SGDSPCurveView heightForKey:row.key];
     return UITableViewAutomaticDimension;
 }
@@ -643,7 +644,7 @@ static UIView *valueAndChevron(NSString *text) {
     CGFloat titleWidth = ceil([title sizeWithAttributes:@{NSFontAttributeName: SGTitleFont()}].width);
     BOOL fits = 16 + titleWidth + 16 + accessory.bounds.size.width + 16 <= card;
     SGFillCell(cell, title, fits ? nil : value, nil, nil);
-    cell.accessoryView = fits ? accessory : SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightSemibold, 16);
+    cell.accessoryView = fits ? accessory : SGChevronView();
     cell.accessibilityValue = value;
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     cell.separatorInset = UIEdgeInsetsMake(0, 16, 0, 0);

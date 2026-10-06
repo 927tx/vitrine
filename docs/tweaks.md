@@ -10,7 +10,7 @@
     tweak/Sources/Settings/     the Mod Settings framework: SGPage (a page on Spotify's stack), SGModPage (sections
                                 of rows: switches, choices, sliders, links, rows shown only while a choice
                                 asks for them, and rows greyed out while the switch they wait on is off, a tap
-                                on one nudging that switch), SGPageStyle (Spotify's list look), SGGlowSwitch
+                                on one nudging that switch), SGPageStyle (the system Settings look), SGGlowSwitch
     tweak/Sources/Shared/       what works the same with either look, see Layers below
     tweak/Sources/Native/       tweaks on Spotify's own screens, running only while Redesigned UI is off
     tweak/Sources/Redesigned/   the redesign, running only while Redesigned UI is on
@@ -403,7 +403,10 @@ and Live Activity. The root page in `App/ModSettings.x` links the Appearance pag
 ## Mod Settings
 
 Mod Settings, opened by holding Home on the tab bar or from the first row of the side drawer and the
-last row of Spotify's Settings, sorts every
+last row of Spotify's Settings, looks like the system Settings app in its dark appearance under either look:
+cards of #1C1C1E on black, 17pt rows that follow Dynamic Type up to xxxLarge and the app font, each part of
+Spotify behind a symbol on a tile of its own colour, grey chevrons and footnote headers. It has no account
+page. It sorts every
 setting by the part of Spotify it changes, so a part's glass, its hide switches and its flags sit on
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
 they change. It opens on the Appearance row, on a card of its own under the signing warning, which opens the Appearance

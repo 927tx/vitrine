@@ -37,10 +37,10 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
     SGModRow *blocked = SGPageRow(@"Blocked artists", none);
     blocked.value = ^NSString *{ return @"Off"; };
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithArray:@[
-        SGSection(nil, @[SGWithSymbol(SGPageRow(@"Gestures", none), @"hand.tap"), SGWithSymbol(SGPageRow(@"Lyrics", none), @"quote.bubble"),
-                         SGWithSymbol(blocked, @"person.crop.circle.badge.xmark")]),
-        SGSection(nil, @[SGWithSymbol(SGPageRow(@"Now playing", none), @"rectangle.bottomthird.inset.filled"),
-                         SGWithSymbol(SGPageRow(@"Lock screen widget", none), @"lock")]),
+        SGSection(nil, @[SGWithTile(SGPageRow(@"Gestures", none), @"hand.tap", UIColor.systemBlueColor), SGWithTile(SGPageRow(@"Lyrics", none), @"quote.bubble", UIColor.systemPurpleColor),
+                         SGWithTile(blocked, @"person.crop.circle.badge.xmark", UIColor.systemRedColor)]),
+        SGSection(nil, @[SGWithTile(SGPageRow(@"Now playing", none), @"rectangle.bottomthird.inset.filled", UIColor.systemPinkColor),
+                         SGWithTile(SGPageRow(@"Lock screen widget", none), @"lock", UIColor.systemGrayColor)]),
     ]];
     [sections addObjectsFromArray:SGVibrationsSections()];
     return [[SGModPage alloc] initWithTitle:@"Player" intro:@"Changes apply after you restart Spotify. Gestures, Blocked artists and Vibrations apply straight away."

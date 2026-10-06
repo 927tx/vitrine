@@ -294,6 +294,11 @@ SGModRow *SGWithSymbol(SGModRow *row, NSString *symbol) {
     return row;
 }
 
+SGModRow *SGWithTile(SGModRow *row, NSString *symbol, UIColor *color) {
+    row.tint = color;
+    return SGWithSymbol(row, symbol);
+}
+
 // What a page row carrying a value shows on the right: the value, then the chevron, the same
 // distance apart as Spotify's own rows keep them.
 static UIView *valueAndChevron(NSString *text) {
@@ -302,7 +307,7 @@ static UIView *valueAndChevron(NSString *text) {
     label.textColor = SGGrey();
     label.text = text;
     [label sizeToFit];
-    UIImageView *chevron = SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightSemibold, 16);
+    UIImageView *chevron = SGChevronView();
     CGFloat height = MAX(label.bounds.size.height, chevron.bounds.size.height);
     UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, label.bounds.size.width + 6 + chevron.bounds.size.width, height)];
     label.center = CGPointMake(label.bounds.size.width / 2, height / 2);
@@ -414,10 +419,14 @@ static UIFont *tabular(UIFont *font) {
     BOOL _detents;   // few enough steps that the thumb jumps between them as it is dragged
 }
 
-static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kSliderGap = 6, kSliderHeight = 28, kSliderBottom = 10;
+static const CGFloat kSliderTop = 12, kSliderGap = 6, kSliderHeight = 28, kSliderBottom = 10;
+
+// The lines are as tall as Dynamic Type makes the fonts.
+static CGFloat titleLine(void) { return ceil(SGTitleFont().lineHeight); }
+static CGFloat subtitleLine(void) { return ceil(SGSubtitleFont().lineHeight); }
 
 + (CGFloat)heightFor:(SGModRow *)row {
-    return kSliderTop + kSliderLine + (row.subtitle ? kSliderSubtitle : 0) + kSliderGap + kSliderHeight + kSliderBottom;
+    return kSliderTop + titleLine() + (row.subtitle ? subtitleLine() : 0) + kSliderGap + kSliderHeight + kSliderBottom;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)identifier {
@@ -475,12 +484,12 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
     CGFloat width = self.contentView.bounds.size.width, side = 16, y = kSliderTop;
     [_value sizeToFit];
     CGFloat valueWidth = MAX(_value.bounds.size.width, 44);
-    _value.frame = CGRectMake(width - side - valueWidth, y, valueWidth, kSliderLine);
-    _title.frame = CGRectMake(side, y, CGRectGetMinX(_value.frame) - side - 8, kSliderLine);
-    y += kSliderLine;
+    _value.frame = CGRectMake(width - side - valueWidth, y, valueWidth, titleLine());
+    _title.frame = CGRectMake(side, y, CGRectGetMinX(_value.frame) - side - 8, titleLine());
+    y += titleLine();
     if (_row.subtitle) {
-        _subtitle.frame = CGRectMake(side, y, width - 2 * side, kSliderSubtitle);
-        y += kSliderSubtitle;
+        _subtitle.frame = CGRectMake(side, y, width - 2 * side, subtitleLine());
+        y += subtitleLine();
     }
     _slider.frame = CGRectMake(side, y + kSliderGap, width - 2 * side, kSliderHeight);
 }
@@ -793,9 +802,9 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
     if (row.color) content.secondaryTextProperties.color = row.color;
     BOOL tile = row.symbol && !row.color;
-    if (tile) content.image = SGTileImage(row.symbol);
+    if (tile) content.image = row.tint ? SGTileImageTinted(row.symbol, row.tint) : SGTileImage(row.symbol);
     cell.contentConfiguration = content;
-    cell.separatorInset = UIEdgeInsetsMake(0, row.symbol ? (tile ? 58 : 48) : 16, 0, 0);
+    cell.separatorInset = UIEdgeInsetsMake(0, row.symbol ? (tile ? SGTileRowInset : 48) : 16, 0, 0);
 
     if (row.key) {
         BOOL locked = flagRowLocked(row);
@@ -823,7 +832,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
         cell.accessoryView = row.info ? [self infoButtonBeside:toggle] : toggle;
         cell.selectionStyle = locked ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
     } else if (row.page) {
-        UIView *link = row.value ? valueAndChevron(row.value()) : SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightSemibold, 16);
+        UIView *link = row.value ? valueAndChevron(row.value()) : SGChevronView();
         cell.accessoryView = row.info ? [self infoButtonBeside:link] : link;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else if (row.menu) {

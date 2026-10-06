@@ -22,6 +22,7 @@
 @property (nonatomic, copy) void (^changed)(BOOL on);   // after the switch is stored; the page reloads
 @property (nonatomic, strong) UIColor *color;   // title, subtitle and symbol, for a warning row
 @property (nonatomic, copy) NSString *symbol;
+@property (nonatomic, strong) UIColor *tint;   // the square under the symbol, grey when nil (SGWithTile)
 // A switch row that changes the whole app draws SGGlowSwitch instead of a UISwitch.
 @property (nonatomic) BOOL glows;
 // An ⓘ button beside the row's switch, whose tap reads this out under the row's title.
@@ -97,5 +98,7 @@ SGModRow *SGLinkRow(NSString *title, NSString *subtitle, NSString *url);
 SGModRow *SGStatActionRow(NSString *title, NSString *subtitle, NSString *(^value)(void), void (^action)(void));
 SGModSection *SGSection(NSString *title, NSArray<SGModRow *> *rows);
 SGModSection *SGNotedSection(NSString *title, NSArray<SGModRow *> *rows, NSString *footer);
-// Gives a row its leading symbol, drawn on a tile unless the row has a colour of its own.
+// Gives a row its leading symbol, drawn on a grey tile unless the row has a colour of its own.
 SGModRow *SGWithSymbol(SGModRow *row, NSString *symbol);
+// The same on a tile of `color`, the way Settings colours the icon of each of its rows.
+SGModRow *SGWithTile(SGModRow *row, NSString *symbol, UIColor *color);

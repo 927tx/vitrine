@@ -30,8 +30,9 @@
 static const CGFloat kRowHeight = 56;
 static char kRowKey, kInsetKey;
 
-static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^page)(void)) {
-    return SGWithSymbol(SGPageRow(title, page), symbol);
+// Each part of Spotify on a tile of its own colour, as Settings lists its own, so a row is found by its colour.
+static SGModRow *pageRow(NSString *title, NSString *symbol, UIColor *color, UIViewController *(^page)(void)) {
+    return SGWithTile(SGPageRow(title, page), symbol, color);
 }
 
 static UIViewController *modSettingsPage(void) {
@@ -43,41 +44,41 @@ static UIViewController *modSettingsPage(void) {
     SGModRow *signing = SGSigningWarningRow();
     if (signing) [sections addObject:SGSection(nil, @[signing])];
     // Appearance opens a page of its own, on a card of its own, so the parts below stay one tap from the top.
-    [sections addObject:SGSection(nil, @[pageRow(@"Appearance", @"paintpalette", ^UIViewController *{ return SGAppearancePage(); })])];
-    SGModRow *mod = pageRow(@"Mod", @"info.circle", ^UIViewController *{ return SGAboutPage(); });
+    [sections addObject:SGSection(nil, @[pageRow(@"Appearance", @"paintpalette", UIColor.systemBlueColor, ^UIViewController *{ return SGAppearancePage(); })])];
+    SGModRow *mod = pageRow(@"Mod", @"info.circle", UIColor.systemGrayColor, ^UIViewController *{ return SGAboutPage(); });
     mod.value = ^NSString *{ return @(SG_VERSION); };
     // The audio effects work on the sound, so both looks have them, with what they are doing beside the chevron.
-    SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", ^UIViewController *{ return SGDSPSettingsPage(); });
+    SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", UIColor.systemOrangeColor, ^UIViewController *{ return SGDSPSettingsPage(); });
     audioEffects.value = ^NSString *{ return SGDSPSummary(); };
     // Sing works on the sound, so both looks have it, saying beside the chevron whether it is on or how far its
     // voice model has come.
-    SGModRow *sing = pageRow(@"Sing", @"music.mic", ^UIViewController *{ return SGSingSettingsPage(); });
+    SGModRow *sing = pageRow(@"Sing", @"music.mic", UIColor.systemRedColor, ^UIViewController *{ return SGSingSettingsPage(); });
     sing.value = ^NSString *{ return SGSingSummary(); };
     // Home & Library holds only the native look's switches, so the redesign has no such page; the
     // Live Activity works under both, and only where ActivityKit's card does.
     NSMutableArray<SGModRow *> *parts = [NSMutableArray arrayWithArray:@[
-        pageRow(@"Navbar", @"dock.rectangle", ^UIViewController *{ return SGNavbarPage(); }),
-        pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
-        pageRow(@"Lyrics", @"quote.bubble", ^UIViewController *{ return SGLyricsSettingsPage(); }),
+        pageRow(@"Navbar", @"dock.rectangle", UIColor.systemIndigoColor, ^UIViewController *{ return SGNavbarPage(); }),
+        pageRow(@"Player", @"play.circle", UIColor.systemPinkColor, ^UIViewController *{ return SGPlayerSettingsPage(); }),
+        pageRow(@"Lyrics", @"quote.bubble", UIColor.systemPurpleColor, ^UIViewController *{ return SGLyricsSettingsPage(); }),
         sing,
         audioEffects,
     ]];
     if (@available(iOS 17.0, *)) {
-        SGModRow *liveActivity = pageRow(@"Live Activity", @"platter.filled.top.iphone", ^UIViewController *{ return SGLiveActivitySettingsPage(); });
+        SGModRow *liveActivity = pageRow(@"Live Activity", @"platter.filled.top.iphone", UIColor.systemTealColor, ^UIViewController *{ return SGLiveActivitySettingsPage(); });
         liveActivity.value = ^NSString *{ return SGLiveActivitySummary(); };
         [parts addObject:liveActivity];
     }
-    [parts addObject:pageRow(@"Listening stats", @"chart.bar", ^UIViewController *{ return SGListeningStatsPage(); })];
-    if (!SGRedesignedUIStored()) [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
-    else [parts addObject:pageRow(@"Albums & artists", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
+    [parts addObject:pageRow(@"Listening stats", @"chart.bar", UIColor.systemGreenColor, ^UIViewController *{ return SGListeningStatsPage(); })];
+    if (!SGRedesignedUIStored()) [parts addObject:pageRow(@"Home & Library", @"house", UIColor.systemCyanColor, ^UIViewController *{ return SGHomeSettingsPage(); })];
+    else [parts addObject:pageRow(@"Albums & artists", @"square.stack", UIColor.systemCyanColor, ^UIViewController *{ return SGRAlbumSettingsPage(); })];
     [sections addObjectsFromArray:@[
         SGSection(nil, parts),
         SGSection(nil, @[
-            pageRow(@"Premium, ads & privacy", @"crown", ^UIViewController *{ return SGAdsSettingsPage(); }),
-            pageRow(@"Labs", @"testtube.2", ^UIViewController *{ return SGLabsPage(); }),
+            pageRow(@"Premium, ads & privacy", @"crown", UIColor.systemBlueColor, ^UIViewController *{ return SGAdsSettingsPage(); }),
+            pageRow(@"Labs", @"testtube.2", UIColor.systemMintColor, ^UIViewController *{ return SGLabsPage(); }),
         ]),
         SGSection(nil, @[
-            pageRow(@"All flags", @"flag", ^UIViewController *{ return SGAllFlagsPage(); }),
+            pageRow(@"All flags", @"flag", UIColor.systemGrayColor, ^UIViewController *{ return SGAllFlagsPage(); }),
             mod,
         ]),
     ]];
@@ -112,7 +113,7 @@ static UIViewController *modSettingsPage(void) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    _title.font = SGTitleFont();
+    _title.font = SGSpotifyListFont();
     CGFloat width = self.bounds.size.width, height = self.bounds.size.height, lead = self.drawer ? 4 : 0;
     _icon.frame = CGRectMake(12 + lead, (height - 24) / 2, 24, 24);
     _title.frame = CGRectMake(48 + lead, 0, width - 96, height);

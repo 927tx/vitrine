@@ -1,11 +1,22 @@
 #import "SGPageStyle.h"
 #import "Core/SGCore.h"
 
-static UIFont *sg_titleFont, *sg_subtitleFont;
+static UIFont *sg_spotifyFont;
 
-UIColor *SGGrey(void) { return [UIColor colorWithWhite:0xB3 / 255.0 alpha:1]; }
-UIFont *SGTitleFont(void) { return sg_titleFont ?: [UIFont systemFontOfSize:13 weight:UIFontWeightBold]; }
-UIFont *SGSubtitleFont(void) { return sg_subtitleFont ?: [UIFont systemFontOfSize:11]; }
+// The dark appearance's secondary label, fixed rather than dynamic so a view that is not set dark reads it too.
+UIColor *SGGrey(void) { return [UIColor colorWithRed:0xEB / 255.0 green:0xEB / 255.0 blue:0xF5 / 255.0 alpha:0.6]; }
+static UIColor *tertiaryGrey(void) { return [UIColor colorWithRed:0xEB / 255.0 green:0xEB / 255.0 blue:0xF5 / 255.0 alpha:0.3]; }
+
+// Settings' text styles at their Large size, made through +systemFontOfSize: so the app font of Shared/Fonts
+// follows, and grown with Dynamic Type no further than xxxLarge: some rows are laid out by hand from these
+// fonts, and the accessibility sizes would outgrow them.
+static UIFont *scaled(UIFontTextStyle style, CGFloat size, CGFloat largest) {
+    return [[UIFontMetrics metricsForTextStyle:style] scaledFontForFont:[UIFont systemFontOfSize:size] maximumPointSize:largest];
+}
+
+UIFont *SGTitleFont(void) { return scaled(UIFontTextStyleBody, 17, 23); }
+UIFont *SGSubtitleFont(void) { return scaled(UIFontTextStyleFootnote, 13, 17); }
+UIFont *SGSpotifyListFont(void) { return sg_spotifyFont ?: [UIFont systemFontOfSize:13 weight:UIFontWeightBold]; }
 
 UIImageView *SGSymbolView(NSString *name, CGFloat size, UIImageSymbolWeight weight, CGFloat box) {
     UIImage *image = [UIImage systemImageNamed:name withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:size weight:weight]];
@@ -67,10 +78,8 @@ void SGInsetForBars(UITableView *table) {
     table.verticalScrollIndicatorInsets = inset;
 }
 
-// The pages follow the running look's black and accent colour, read here by their keys so the page
-// framework depends on no layer: the native look's AMOLED switch and accent (Native/Appearance), or the
-// redesign's accent (Redesigned/Kit/SGRAccent.h), which is always black.
-static NSString *const kAmoledKey = @"spotifyglass.amoled";
+// The pages follow the running look's accent colour, read here by its key so the page framework depends on no
+// layer: the native look's (Native/Appearance) or the redesign's (Redesigned/Kit/SGRAccent.h).
 static NSString *const kAccentKey = @"spotifyglass.accent";
 static NSString *const kRedesignAccentKey = @"spotifyglass.redesign.accent";
 
@@ -80,48 +89,63 @@ static UIColor *lookAccent(void) {
     return [UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0 green:((rgb >> 8) & 0xFF) / 255.0 blue:(rgb & 0xFF) / 255.0 alpha:1];
 }
 
-static BOOL lookBlack(void) {
-    return SGRedesignedUI() || SGFlag(kAmoledKey, NO);
-}
-
 UIColor *SGGreen(void) { return lookAccent() ?: [UIColor colorWithRed:0x1E / 255.0 green:0xD7 / 255.0 blue:0x60 / 255.0 alpha:1]; }
-UIColor *SGRed(void) { return [UIColor colorWithRed:0xF1 / 255.0 green:0x5E / 255.0 blue:0x6B / 255.0 alpha:1]; }
-UIColor *SGPageBackground(void) { return lookBlack() ? UIColor.blackColor : [UIColor colorWithWhite:0x12 / 255.0 alpha:1]; }
-// Spotify's own elevated grey on its dark grey; iOS's own card grey on the AMOLED black.
-UIColor *SGCardBackground(void) { return [UIColor colorWithWhite:(lookBlack() ? 0x1C : 0x2A) / 255.0 alpha:1]; }
+// The dark appearance's system red, and its grouped background and the cards on it, whichever look runs.
+UIColor *SGRed(void) { return [UIColor colorWithRed:0xFF / 255.0 green:0x45 / 255.0 blue:0x3A / 255.0 alpha:1]; }
+UIColor *SGPageBackground(void) { return UIColor.blackColor; }
+UIColor *SGCardBackground(void) { return [UIColor colorWithRed:0x1C / 255.0 green:0x1C / 255.0 blue:0x1E / 255.0 alpha:1]; }
 
-UIImage *SGTileImage(NSString *symbol) {
-    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightMedium];
+// 29pt with a 7pt continuous corner and the glyph at 16pt, the size Settings draws its own; a row's title
+// starts 13pt after it, as before the tiles grew, so the pages' own separator insets still line up.
+const CGFloat SGTileRowInset = 16 + 29 + 13;
+
+UIImage *SGTileImageTinted(NSString *symbol, UIColor *color) {
+    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium];
     UIImage *glyph = [[UIImage systemImageNamed:symbol withConfiguration:config] imageWithTintColor:UIColor.whiteColor renderingMode:UIImageRenderingModeAlwaysOriginal];
-    CGRect box = CGRectMake(0, 0, 28, 28);
+    CGRect box = CGRectMake(0, 0, 29, 29);
+    // A system colour is drawn in its dark appearance, the one the pages wear, whatever the phone's.
+    color = [color resolvedColorWithTraitCollection:[UITraitCollection traitCollectionWithUserInterfaceStyle:UIUserInterfaceStyleDark]];
     UIImage *tile = [[[UIGraphicsImageRenderer alloc] initWithSize:box.size] imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
-        [[UIColor colorWithWhite:1 alpha:0.12] setFill];
+        [color setFill];
         [[UIBezierPath bezierPathWithRoundedRect:box cornerRadius:7] fill];
+        // A wide glyph is fitted inside the square's padding rather than over its edge.
         CGSize size = glyph.size;
+        CGFloat fit = MIN(1, MIN(21 / size.width, 21 / size.height));
+        size = CGSizeMake(size.width * fit, size.height * fit);
         [glyph drawInRect:CGRectMake((box.size.width - size.width) / 2, (box.size.height - size.height) / 2, size.width, size.height)];
     }];
     return [tile imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
+UIImage *SGTileImage(NSString *symbol) {
+    return SGTileImageTinted(symbol, [UIColor colorWithRed:0x8E / 255.0 green:0x8E / 255.0 blue:0x93 / 255.0 alpha:1]);
+}
+
+UIImageView *SGChevronView(void) {
+    UIImageView *chevron = SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightSemibold, 16);
+    chevron.tintColor = tertiaryGrey();
+    return chevron;
+}
+
 const CGFloat SGSectionHeaderHeight = 38;
 const CGFloat SGSectionGap = 20;
 
-// Every page below draws Spotify's own list row: a 13pt white title over an 11pt grey subtitle,
-// with an optional symbol in the leading slot.
+// Every page below draws Settings' own row: a 17pt white title over a 15pt grey subtitle, with an optional
+// symbol in the leading slot, 44pt high with no subtitle.
 void SGFillCell(UITableViewCell *cell, NSString *title, NSString *subtitle, UIColor *color, NSString *symbolName) {
     UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
     content.text = title;
     content.secondaryText = subtitle;
     content.textProperties.font = SGTitleFont();
     content.textProperties.color = color ?: UIColor.whiteColor;
-    content.secondaryTextProperties.font = SGSubtitleFont();
+    content.secondaryTextProperties.font = scaled(UIFontTextStyleSubheadline, 15, 21);
     content.secondaryTextProperties.color = SGGrey();
-    content.textToSecondaryTextVerticalPadding = 0;
-    content.directionalLayoutMargins = NSDirectionalEdgeInsetsMake(10, 16, 10, 16);
+    content.textToSecondaryTextVerticalPadding = 2;
+    content.directionalLayoutMargins = NSDirectionalEdgeInsetsMake(11, 16, 11, 16);
     if (symbolName) {
-        content.image = [UIImage systemImageNamed:symbolName withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightRegular]];
+        content.image = [UIImage systemImageNamed:symbolName withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:17 weight:UIImageSymbolWeightRegular]];
         content.imageProperties.tintColor = color ?: UIColor.whiteColor;
-        content.imageToTextPadding = 14;
+        content.imageToTextPadding = 13;
     }
     cell.contentConfiguration = content;
     cell.backgroundColor = SGCardBackground();
@@ -134,7 +158,9 @@ UIView *SGSectionHeader(UITableView *table, NSString *title) {
     label.text = title.uppercaseString;
     label.font = SGSubtitleFont();
     label.textColor = SGGrey();
-    label.frame = CGRectMake(16, 20, table.bounds.size.width - 32, 14);
+    // On the header's foot, 7pt over the card, however tall Dynamic Type makes the line.
+    CGFloat height = ceil(label.font.lineHeight);
+    label.frame = CGRectMake(16, SGSectionHeaderHeight - 7 - height, table.bounds.size.width - 32, height);
     label.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, table.bounds.size.width, SGSectionHeaderHeight)];
     [header addSubview:label];
@@ -175,22 +201,13 @@ UITableViewCell *SGDequeueCell(UITableView *table, NSString *identifier) {
         ?: [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:identifier];
 }
 
-static CGFloat brightness(UIColor *color) {
-    CGFloat white = 0;
-    [color getWhite:&white alpha:NULL];
-    return white;
-}
-
-// Spotify's list labels carry its typeface: 13pt titles and 11pt grey subtitles.
+// Spotify's list titles carry its typeface at 13pt.
 void SGAdoptFonts(UIView *list, UIView *row) {
-    if (sg_titleFont && sg_subtitleFont) return;
+    if (sg_spotifyFont) return;
     SGForEachView(list, ^(UIView *v) {
-        if (![v isKindOfClass:UILabel.class] || SGIsInside(v, row)) return;
+        if (sg_spotifyFont || ![v isKindOfClass:UILabel.class] || SGIsInside(v, row)) return;
         UILabel *label = (UILabel *)v;
-        if (label.text.length < 2) return;
-        CGFloat size = label.font.pointSize, white = brightness(label.textColor);
-        if (size == 13 && !sg_titleFont) sg_titleFont = label.font;
-        if (size == 11 && !sg_subtitleFont && white > 0.3 && white < 0.95) sg_subtitleFont = label.font;
+        if (label.text.length >= 2 && label.font.pointSize == 13) sg_spotifyFont = label.font;
     });
 }
 

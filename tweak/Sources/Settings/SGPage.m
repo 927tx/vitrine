@@ -14,7 +14,7 @@ static BOOL sg_pagesConform;
 
 @implementation SGPage
 
-// Inset grouped cards on Spotify's dark grey, a hairline between the rows of a card.
+// Inset grouped cards on black, the way Settings draws them, a hairline between the rows of a card.
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
