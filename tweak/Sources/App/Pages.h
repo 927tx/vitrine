@@ -3,13 +3,11 @@
 // Redesigned UI switch, so a page opened after flipping it shows what the restart will bring.
 #import <UIKit/UIKit.h>
 
-@class SGModSection;
-
 // Redesigned UI, the one switch between the two looks, and what its ⓘ reads out.
 void SGSetRedesignedUI(BOOL on);
 extern NSString *const SGRedesignedUIInfo;
 
-SGModSection *SGAppearanceSection(void);   // the Appearance card at the top of Mod Settings
+UIViewController *SGAppearancePage(void);   // Redesigned UI, the accent, the font and the app icon
 UIViewController *SGPlayerSettingsPage(void);
 UIViewController *SGLyricsSettingsPage(void);   // with Sing (Shared/Sing) on it
 UIViewController *SGNavbarPage(void);       // the tab editor of whichever look is stored

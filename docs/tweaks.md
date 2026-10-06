@@ -335,7 +335,7 @@ Redesigned:
 App:
 
     ModSettings.x  the root page and the rows that open it from Spotify's settings and the side drawer
-    Pages.m        the Appearance card with Redesigned UI, the Player and Lyrics pages, which Navbar page opens
+    Pages.m        the Appearance page with Redesigned UI, the Player and Lyrics pages, which Navbar page opens
     About/         the update check against the repo's GitHub Releases, the Updates page it fills (the state, and
                    the changelog of every release newer than the build, a line per commit) and the sheet a newer
                    release brings up on its own a few seconds after Spotify opens, once per release; backup, the
@@ -349,7 +349,7 @@ which makes every unset switch read off, so a reset is stock Spotify whatever sw
 A hook reads its switch when it runs (`SGEnabled`, `SGHidden`, `SGFlag` from Core/SGPrefs.h), so a
 change shows after Spotify restarts; the tab editor on the Navbar page is the exception and applies as soon as the bar lays
 out again, as are the Home gradient's colour, strength and height, but not the switch that turns it on, and Vibrations
-and Live Activity. The root page in `App/ModSettings.x` holds the Appearance card and links the page of each part of Spotify, and only the stored look's.
+and Live Activity. The root page in `App/ModSettings.x` links the Appearance page and the page of each part of Spotify, and only the stored look's.
 
 ## Make targets
 

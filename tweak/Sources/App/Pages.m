@@ -42,7 +42,7 @@ static void offerRestart(BOOL on) {
 }
 
 // Below iOS 26 the row is not a switch: Liquid Glass is the redesign, and the system draws it from
-// that version on, so the row reads out what is missing and the card carries the native look's rows alone.
+// that version on, so the row reads out what is missing and the page carries the native look's rows alone.
 static SGModRow *unavailableRow(void) {
     SGModRow *row = SGStatActionRow(@"Redesigned UI", nil, ^NSString *{ return @"Needs iOS 26"; }, ^{
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Redesigned UI"
@@ -54,28 +54,28 @@ static SGModRow *unavailableRow(void) {
     return SGWithSymbol(row, @"sparkles");
 }
 
-SGModSection *SGAppearanceSection(void) {
-    // Fonts.x works under either look on any iOS, so the row is on the card either way.
-    SGModRow *font = SGWithSymbol(SGChoiceRow(@"Font", nil, SGKeyAppFont, SGAppFontNames(), SGAppFontSpotify), @"textformat");
-    if (!SGRedesignAvailable()) {
-        NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:unavailableRow()];
-        [rows addObjectsFromArray:SGNativeAppearanceRows()];
-        [rows addObject:font];
-        if (SGAppIconRow()) [rows addObject:SGAppIconRow()];
-        return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
+// Redesigned UI, then the stored look's own rows (below iOS 26 that is always the native look's), then the
+// font and the app icon, which work under either look on any iOS.
+UIViewController *SGAppearancePage(void) {
+    SGModRow *look = unavailableRow();
+    if (SGRedesignAvailable()) {
+        SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
+        redesign.glows = YES;
+        redesign.info = SGRedesignedUIInfo;
+        redesign.changed = ^(BOOL on) {
+            SGSetRedesignedUI(on);
+            offerRestart(on);
+        };
+        look = SGWithSymbol(redesign, @"sparkles");
     }
-    SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
-    redesign.glows = YES;
-    redesign.info = SGRedesignedUIInfo;
-    redesign.changed = ^(BOOL on) {
-        SGSetRedesignedUI(on);
-        offerRestart(on);
-    };
-    NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:SGWithSymbol(redesign, @"sparkles")];
-    [rows addObjectsFromArray:SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()];
-    [rows addObject:font];
-    if (SGAppIconRow()) [rows addObject:SGAppIconRow()];
-    return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
+    NSMutableArray<SGModRow *> *everywhere = [NSMutableArray arrayWithObject:SGWithSymbol(SGChoiceRow(@"Font", nil, SGKeyAppFont, SGAppFontNames(), SGAppFontSpotify), @"textformat")];
+    SGModRow *icon = SGAppIconRow();
+    if (icon) [everywhere addObject:icon];
+    return [[SGModPage alloc] initWithTitle:@"Appearance" intro:SGRestartNote sections:@[
+        SGSection(nil, @[look]),
+        SGSection(nil, SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()),
+        SGSection(nil, everywhere),
+    ] footer:nil];
 }
 
 UIViewController *SGNavbarPage(void) {

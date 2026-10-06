@@ -1,5 +1,5 @@
 // Settings: a Mod Settings row at the end of Spotify's settings list opens the mod's own page: the
-// Appearance card with Redesigned UI, then a page per part of Spotify, each holding what that part
+// Appearance page with Redesigned UI, then a page per part of Spotify, each holding what that part
 // offers in the stored look (App/Pages.m: Navbar, Player, and Home & Library for the native look), Audio
 // effects (Shared/AudioEffects, in either look and applying straight away), Premium, ads & privacy
 // and Labs, All flags, a searchable list of every flag with an override per flag, and Mod, the
@@ -42,6 +42,8 @@ static UIViewController *modSettingsPage(void) {
     // that no switch can put right, and it is worth reading before anything else.
     SGModRow *signing = SGSigningWarningRow();
     if (signing) [sections addObject:SGSection(nil, @[signing])];
+    // Appearance opens a page of its own, on a card of its own, so the parts below stay one tap from the top.
+    [sections addObject:SGSection(nil, @[pageRow(@"Appearance", @"paintpalette", ^UIViewController *{ return SGAppearancePage(); })])];
     SGModRow *mod = pageRow(@"Mod", @"info.circle", ^UIViewController *{ return SGAboutPage(); });
     mod.value = ^NSString *{ return @(SG_VERSION); };
     // The audio effects work on the sound, so both looks have them, with what they are doing beside the chevron.
@@ -69,7 +71,6 @@ static UIViewController *modSettingsPage(void) {
     if (!SGRedesignedUIStored()) [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
     else [parts addObject:pageRow(@"Albums & artists", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
     [sections addObjectsFromArray:@[
-        SGAppearanceSection(),
         SGSection(nil, parts),
         SGSection(nil, @[
             pageRow(@"Premium, ads & privacy", @"crown", ^UIViewController *{ return SGAdsSettingsPage(); }),
