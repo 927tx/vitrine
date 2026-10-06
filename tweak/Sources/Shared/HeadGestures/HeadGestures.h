@@ -55,6 +55,11 @@ typedef NS_ENUM(NSInteger, SGHeadCue) {
 };
 void SGHeadGesturesCue(SGHeadCue cue);
 
+// Adds the playing track to Liked Songs, never takes it out, through the collection platform kept here: the
+// nod's Like, and the Like shortcut's (Shared/LiveActivity). NO when what plays is no track or the platform
+// was not reached yet. Spotify's toast shows only with Spotify in front.
+BOOL SGLikePlayingTrack(void);
+
 // From the switch, the sensitivity, the actions and learning: listens or stops, and reads the thresholds again.
 void SGHeadGesturesSettingsChanged(void);
 // Whether this iPhone can read headphone motion at all (iOS 14 and up; the headphones are another matter).

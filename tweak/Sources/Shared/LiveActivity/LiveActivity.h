@@ -7,7 +7,12 @@
 //
 //     LiveActivity.x              polls the player, sends the activity a new state when what it shows changes
 //     LiveActivityBridge.swift    ActivityKit, which is Swift only
-//     LiveActivityShared.swift    the attributes and the taps' intents, compiled into the extension too
+//     LiveActivityShared.swift    the attributes and the taps' intents, compiled into the extension too, and
+//                                 the shortcuts' intents: Like This Song, Play or Pause, Next and Previous Track,
+//                                 Sing and Sleep Timer, for Siri, the Shortcuts app, the Action button and the
+//                                 controls (extension/LiveActivity/Controls.swift), answered by LiveActivity.x
+//                                 with the activity on or off; checked in the simulator (harness/shortcuts)
+//     AppShortcuts.swift          Spotify's App Shortcuts, tweak only
 //     LiveActivitySettings.m      its page, opened from the root of Mod Settings
 //
 // Every tap in the card runs an intent inside Spotify and takes a second or two to show on the card.
@@ -17,7 +22,7 @@
 // the clock come from Shared/Lyrics, the queue from the player's state. The switch and the view apply at
 // once: iOS lets an activity start only while the app is in front, which it is when the switch is flipped.
 //
-// The Swift names crossing into the widget (SGLyricsAttributes, the two intents, the notifications)
+// The Swift names crossing into the widget (SGLyricsAttributes, the intents and their enums, the notifications)
 // are a contract with extension/LiveActivity and with the App Intents metadata merged into Spotify:
 // ActivityKit and App Intents pair the two processes by type name, so a change here is a change there.
 // Threading: main thread only.

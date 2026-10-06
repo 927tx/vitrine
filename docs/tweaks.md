@@ -283,7 +283,16 @@ Shared:
                   by the attributes' type in LiveActivityShared.swift, compiled into both. It starts only with Spotify
                   in front; its settings apply at once. It ends when Spotify is swiped away while running; killed
                   while suspended, Spotify cannot end it, so each state goes stale a minute on (an unchanged card is
-                  sent again every 20 s) and a launch ends any left over before it starts a new one
+                  sent again every 20 s) and a launch ends any left over before it starts a new one. The same folder
+                  gives Siri, the Shortcuts app and the Action button Like This Song, Play or Pause, Next and Previous
+                  Track, Sing and Sleep Timer (AppShortcuts.swift lists them as Spotify's App Shortcuts), and iOS 18
+                  controls for Control Center and the lock screen of Like, Sing and the sleep timer
+                  (extension/LiveActivity/Controls.swift), buttons, as the extension cannot read Sing's state. Each is
+                  a LiveActivityIntent or AudioPlaybackIntent, so it runs inside Spotify, launched in the background
+                  when needed, and LiveActivity.x answers it with the activity on or off, Like through
+                  HeadGestures.x's collection platform and Sing through SGSetSingOn; a sleep timer set with the
+                  activity off keeps a clock of its own. The intent asks again for 8 s while the player is not up,
+                  then tells Siri to open Spotify. Checked in the simulator against harness/shortcuts/
 
     ListeningStats/ listening stats kept on the phone (ListeningStats.h lists its files): each music track timed while
                   it plays through PlayerState's observer and written to a text log in Application Support once it ran 30 s

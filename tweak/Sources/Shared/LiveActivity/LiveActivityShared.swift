@@ -111,3 +111,155 @@ struct SGLiveActivityActionIntent: LiveActivityIntent {
         return .result()
     }
 }
+
+// The shortcuts: Siri, the Shortcuts app and the Action button run these, as do the controls in Control
+// Center and on the lock screen (extension/LiveActivity). A LiveActivityIntent or an AudioPlaybackIntent
+// is performed in the app's process wherever it is run from, so each lands in Spotify, launched in the
+// background when it is not running, where LiveActivity.x acts on SGShortcutNotification. Its observer
+// runs on the main thread inside the post and writes what it did into the reply: "said", a line for Siri,
+// or "failed", why it could not. No answer at all means Spotify's player is not up yet, which a launch in
+// the background takes a moment for, so the intent asks again.
+let SGShortcutNotification = Notification.Name("SGShortcut")
+
+struct SGShortcutError: Error, CustomLocalizedStringResourceConvertible {
+    let message: String
+    var localizedStringResource: LocalizedStringResource { "\(message)" }
+}
+
+// What Spotify answered `action` with: one of SGLiveActivityActionIntent's actions, like, or sing:MODE.
+@MainActor
+private func askSpotify(_ action: String) async throws -> String {
+    // ponytail: 8 s of asking, untimed on a phone; raise it if a launch in the background takes longer.
+    for _ in 0..<32 {
+        let reply = NSMutableDictionary()
+        NotificationCenter.default.post(name: SGShortcutNotification, object: action, userInfo: ["reply": reply])
+        if let failed = reply["failed"] as? String { throw SGShortcutError(message: failed) }
+        if let said = reply["said"] as? String { return said }
+        try await Task.sleep(nanoseconds: 250_000_000)
+    }
+    throw SGShortcutError(message: "Spotify isn't ready yet. Open it and try again.")
+}
+
+@available(iOS 16.0, *)
+enum SGSleepTimerLength: String, AppEnum {
+    // The raw values are the timer action's, timer:VALUE.
+    case fifteen = "15", thirty = "30", hour = "60", endOfTrack = "track", off = "cancel"
+
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Sleep Timer"
+    static let caseDisplayRepresentations: [SGSleepTimerLength: DisplayRepresentation] = [
+        .fifteen: "15 Minutes",
+        .thirty: "30 Minutes",
+        .hour: "1 Hour",
+        .endOfTrack: "End of Track",
+        .off: "Off",
+    ]
+}
+
+@available(iOS 16.0, *)
+enum SGSingMode: String, AppEnum {
+    case toggle, on, off
+
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Sing"
+    static let caseDisplayRepresentations: [SGSingMode: DisplayRepresentation] = [
+        .toggle: "Toggle",
+        .on: "Turn On",
+        .off: "Turn Off",
+    ]
+}
+
+@available(iOS 17.0, *)
+struct SGLikeIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Like This Song"
+    static let description = IntentDescription("Adds the song playing in Spotify to Liked Songs.")
+
+    init() {}
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        .result(dialog: "\(try await askSpotify("like"))")
+    }
+}
+
+@available(iOS 17.0, *)
+struct SGPlayPauseIntent: AudioPlaybackIntent {
+    static let title: LocalizedStringResource = "Play or Pause"
+    static let description = IntentDescription("Pauses Spotify, or plays it when it is paused.")
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        _ = try await askSpotify("toggle")
+        return .result()
+    }
+}
+
+@available(iOS 17.0, *)
+struct SGNextTrackIntent: AudioPlaybackIntent {
+    static let title: LocalizedStringResource = "Next Track"
+    static let description = IntentDescription("Skips to the next track in Spotify.")
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        _ = try await askSpotify("next")
+        return .result()
+    }
+}
+
+@available(iOS 17.0, *)
+struct SGPreviousTrackIntent: AudioPlaybackIntent {
+    static let title: LocalizedStringResource = "Previous Track"
+    static let description = IntentDescription("Goes back a track in Spotify, or to the start of this one.")
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        _ = try await askSpotify("previous")
+        return .result()
+    }
+}
+
+@available(iOS 17.0, *)
+struct SGSingIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Sing"
+    static let description = IntentDescription("Turns the vocals down in Spotify so you can sing along, or brings them back.")
+
+    @Parameter(title: "Sing", default: .toggle)
+    var mode: SGSingMode
+
+    init() {}
+
+    init(_ mode: SGSingMode) {
+        self.mode = mode
+    }
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("\(\.$mode) Sing")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        .result(dialog: "\(try await askSpotify("sing:\(mode.rawValue)"))")
+    }
+}
+
+@available(iOS 17.0, *)
+struct SGSleepTimerIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Sleep Timer"
+    static let description = IntentDescription("Pauses Spotify after a while or at the end of the track, or turns the timer off.")
+
+    @Parameter(title: "Length")
+    var length: SGSleepTimerLength
+
+    init() {}
+
+    init(_ length: SGSleepTimerLength) {
+        self.length = length
+    }
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Set the sleep timer to \(\.$length)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        .result(dialog: "\(try await askSpotify("timer:\(length.rawValue)"))")
+    }
+}

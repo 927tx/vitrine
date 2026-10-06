@@ -4,6 +4,10 @@
 // playing in the background, so the timer keeps running there too. The sleep timer is
 // Shared/Player/SleepTimer's, which keeps its own time; the card only sets it and shows it.
 // The activity is started only while the app is in front, the one place ActivityKit allows it.
+//
+// The shortcuts (LiveActivityShared.swift's SGShortcutNotification) are answered here too, with the
+// activity on or off: the control menu's actions, the like, Sing, and the same sleep timer, whose own clock
+// runs whether anything here ticks or not.
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <MediaPlayer/MediaPlayer.h>
@@ -12,6 +16,8 @@
 #import "Shared/Player/SleepTimer.h"
 #import "Headers/SPTPlayer.h"
 #import "Shared/Lyrics/Lyrics.h"
+#import "Shared/HeadGestures/HeadGestures.h"
+#import "Shared/Sing/Sing.h"
 #import "LiveActivity.h"
 
 API_AVAILABLE(ios(17.0))
@@ -341,6 +347,58 @@ static void runAction(NSString *action) {
     SGLog(@"live activity: %@ -> %@", action, result);
 }
 
+// What a shortcut set the sleep timer to, for Siri to say.
+static NSString *sleepTimerText(void) {
+    switch (SGSleepTimerCurrentMode()) {
+        case SGSleepTimerEndOfTrack: return @"Spotify will pause at the end of this track.";
+        case SGSleepTimerEndOfAlbum: return @"Spotify will pause at the end of this album or playlist.";
+        case SGSleepTimerAtTime: {
+            NSInteger minutes = lround(SGSleepTimerEnd().timeIntervalSinceNow / 60);
+            return [NSString stringWithFormat:@"Spotify will pause in %ld minutes.", (long)minutes];
+        }
+        default: return @"The sleep timer is off.";
+    }
+}
+
+// A shortcut's action, LiveActivityShared.swift's SGShortcutNotification: done, and answered in `reply`
+// with "said" or "failed"; left unanswered while the player has no track, which a launch in the background
+// takes a moment to load, and the intent asks again.
+static void runShortcut(NSString *action, NSMutableDictionary *reply) API_AVAILABLE(ios(17.0)) {
+    id<SPTPlayer> player = SGKaraokePlayer();
+    NSString *title = player.state.track.trackTitle;
+    if ([action hasPrefix:@"sing:"]) {
+        NSString *mode = [action substringFromIndex:5];
+        BOOL on = [mode isEqualToString:@"toggle"] ? !SGSingOn() : [mode isEqualToString:@"on"];
+        NSString *missing = on ? SGSingMissing() : nil;
+        if (missing) {
+            reply[@"failed"] = missing;
+        } else {
+            if (on != SGSingOn()) SGSetSingOn(on);
+            reply[@"said"] = on ? @"Sing is on." : @"Sing is off.";
+        }
+    } else if (!title.length) {
+        SGLog(@"shortcut: %@ waits for the player", action);
+        return;
+    } else if ([action isEqualToString:@"like"]) {
+        // The like reads the shared player state and the collection platform, which a launch in the background
+        // can reach after the player has a track: only what is surely no track fails, the rest waits.
+        NSString *uri = SGURIString(SGPlayerState().track.URI);
+        if (SGLikePlayingTrack()) {
+            reply[@"said"] = [NSString stringWithFormat:@"Added %@ to Liked Songs.", title];
+        } else if (uri.length && ![uri hasPrefix:@"spotify:track:"]) {
+            reply[@"failed"] = @"What's playing can't be added to Liked Songs.";
+        } else {
+            SGLog(@"shortcut: like waits for the player state and the collection platform");
+            return;
+        }
+    } else {
+        runAction(action);
+        if (sg_timer) tick();
+        reply[@"said"] = [action hasPrefix:@"timer:"] ? sleepTimerText() : @"";
+    }
+    SGLog(@"shortcut: %@ -> %@", action, reply);
+}
+
 void SGSetLiveActivityEnabled(BOOL on) {
     if (@available(iOS 17.0, *)) {
         [sg_timer invalidate];
@@ -386,6 +444,12 @@ void SGSetLiveActivityEnabled(BOOL on) {
         SGMigrateKey(SGKeyLiveActivityWas, SGKeyLiveActivity);
         SGMigrateKey(SGKeyLiveActivityViewWas, SGKeyLiveActivityView);
         BOOL on = SGFlag(SGKeyLiveActivity, NO);
+        // Answered inside the post, which the intent makes on the main thread, so the reply is there when it returns.
+        [NSNotificationCenter.defaultCenter addObserverForName:@"SGShortcut" object:nil queue:nil usingBlock:^(NSNotification *note) {
+            NSMutableDictionary *reply = note.userInfo[@"reply"];
+            if (!NSThread.isMainThread || ![note.object isKindOfClass:NSString.class] || ![reply isKindOfClass:NSMutableDictionary.class]) return;
+            runShortcut(note.object, reply);
+        }];
         // One left from the launch before is ended, on or off: Spotify may have been killed under it, so it
         // shows a moment long gone. On, a fresh one starts once it is: until then the first ticks update
         // the leftover, which is harmless, an update after the end being ignored.

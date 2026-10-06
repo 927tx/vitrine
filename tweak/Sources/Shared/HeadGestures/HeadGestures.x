@@ -178,7 +178,7 @@ void SGSetHeadGestureAction(SGHeadGesture gesture, SGHeadAction action) {
     SGHeadGesturesSettingsChanged();
 }
 
-static BOOL like(void) {
+BOOL SGLikePlayingTrack(void) {
     NSString *uri = SGURIString(SGPlayerState().track.URI);
     id platform = sg_platform;
     // Only a track: an episode is saved another way, and an ad is nothing to save.
@@ -196,7 +196,7 @@ static BOOL like(void) {
 
 // Whether it was sent: the player answers later, if at all.
 static BOOL perform(SGHeadAction action) {
-    if (action == SGHeadActionLike) return like();
+    if (action == SGHeadActionLike) return SGLikePlayingTrack();
     id<SPTPlayer> player = SGKaraokePlayer();
     SPTPlayerState *state = [player respondsToSelector:@selector(state)] ? player.state : nil;
     if (!state) {
