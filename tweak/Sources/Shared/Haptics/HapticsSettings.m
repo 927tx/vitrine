@@ -1,20 +1,26 @@
-// The Vibrations page, under either look (App/Pages.m links it from the Player page): the preview at the
+// The Vibrations page, under either look (App/ModSettings.x links it from the main page): the preview at the
 // top (SGVibrationsPreview.m), then a card per kind, the way the Audio effects page has one per effect.
-// Controls is a switch that opens out into its strength. Music Haptics is a choice of which plays, None,
-// Generated or Native iOS, since the two never play at once: Generated opens out into its strength and what
-// it follows (a choice that also says whether the rumble plays, rather than a switch of its own that one
-// choice would leave with nothing to do), Native into what iOS's own is doing. Each strength's slider plays
-// a tap at the new strength with each step, and the preview ripples with it.
+// Controls is a switch with its strength under it. Music Haptics is two switches in one card that work together:
+// Music Haptics itself, the mod's own from the sound while Spotify is in front, with its strength and what it
+// follows (a choice that also says whether the rumble plays, rather than a switch of its own that one choice would
+// leave with nothing to do) under it; and In the Background, which names the song to iOS's own Music Haptics, with
+// what iOS's own is doing under it, or, while Music Haptics is off in Settings > Accessibility, a row saying so.
+// The rows under a switch stay where they are, greyed, while it is off. Each strength's slider plays a tap at the
+// new strength with each step, and the preview ripples with it.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Haptics.h"
 #import "SGVibrationsPreview.h"
 
-static NSString *const kMusicHapticsInfo = @"Generated: the iPhone taps along with the drums and rumbles under the bass of whatever Spotify is playing, worked out from the sound as it plays. It follows the sound this iPhone plays while Spotify is open: iOS plays no haptics for an app in the background, and a song playing on another device through Connect has no sound here to follow.\n\nNative iOS: iOS plays Apple Music's own haptic track for the song, in the background and on the lock screen too, for songs Apple Music has one for. It needs iOS 18 and Music Haptics on in Settings > Accessibility, and stays quiet for podcasts and songs Apple has none for.\n\nNone: no Music Haptics. Controls is separate.";
+static NSString *const kMusicInfo = @"The iPhone taps along with the drums and rumbles under the bass, worked out from the sound as Spotify plays it. Only while Spotify is open: iOS stops an app's own haptics in the background, and a song playing on another device through Connect has no sound here to follow.\n\nWith In the Background on too, iOS plays its own haptic track for the songs it has one for, and this waits, so the two never double up.";
 
-NSNotificationName const SGMusicHapticsModeChangedNotification = @"SGMusicHapticsModeChangedNotification";
+static NSString *const kBackgroundInfo = @"Keeps the vibrations going on the lock screen and in other apps, where iOS stops Spotify's own. The mod tells iOS which recording is playing, by its ISRC code from Apple Music's catalog (no sound leaves the phone), and iOS's own Music Haptics, the one Apple Music uses, plays Apple's haptic track for it.\n\nIt needs Settings > Accessibility > Music Haptics on, and only songs Apple has a haptic track for vibrate. While Spotify is open, Music Haptics above plays the others, if it is on.";
+
+NSNotificationName const SGMusicHapticsSwitchesChangedNotification = @"SGMusicHapticsSwitchesChangedNotification";
+NSNotificationName const SGSystemMusicHapticsChangedNotification = @"SGSystemMusicHapticsChangedNotification";
 
 static NSString *sg_status;
+static BOOL sg_systemOff;
 
 NSString *SGMusicHapticsStatus(void) {
     return sg_status ?: @"Waiting";
@@ -24,28 +30,39 @@ void SGSetMusicHapticsStatus(NSString *status) {
     sg_status = [status copy];
 }
 
-static BOOL nativeAvailable(void) {
+BOOL SGSystemMusicHapticsOn(void) {
+    return !sg_systemOff;
+}
+
+void SGSetSystemMusicHapticsOn(BOOL on) {
+    if (sg_systemOff == !on) return;
+    sg_systemOff = !on;
+    [NSNotificationCenter.defaultCenter postNotificationName:SGSystemMusicHapticsChangedNotification object:nil];
+}
+
+static BOOL backgroundAvailable(void) {
     if (@available(iOS 18.0, *)) return YES;
     return NO;
 }
 
-SGMusicHapticsMode SGMusicHapticsModeNow(void) {
-    NSInteger mode = SGInt(SGKeyMusicHapticsMode, -1);
-    if (mode < SGMusicHapticsOff || mode > SGMusicHapticsNative) mode = SGFlag(SGKeyMusicHaptics, NO) ? SGMusicHapticsGenerated : SGMusicHapticsOff;
-    if (mode == SGMusicHapticsNative && !nativeAvailable()) mode = SGMusicHapticsOff;
-    return (SGMusicHapticsMode)mode;
+BOOL SGMusicHapticsOn(void) {
+    return SGFlag(SGKeyMusicHaptics, NO);
 }
 
-// In SGMusicHapticsMode's order, Native iOS left out where iOS has none.
-static NSArray<NSString *> *modeNames(void) {
-    NSArray<NSString *> *names = @[@"None", @"Generated", @"Native iOS"];
-    return nativeAvailable() ? names : [names subarrayWithRange:NSMakeRange(0, 2)];
+BOOL SGMusicHapticsInBackground(void) {
+    return backgroundAvailable() && SGFlag(SGKeyMusicHapticsBackground, NO);
 }
 
-static NSArray<NSString *> *modeNotes(void) {
-    return @[@"No Music Haptics",
-             @"The mod's own, from the sound, while Spotify is open",
-             @"Apple Music's haptic track, in the background too"];
+void SGMigrateMusicHaptics(void) {
+    // The redesign's old key first: SGMigrateKey leaves it where it is once the new one exists.
+    SGMigrateKey(SGKeyMusicHapticsWas, SGKeyMusicHaptics);
+    NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+    if (![store objectForKey:SGKeyMusicHapticsMode]) return;
+    NSInteger mode = SGInt(SGKeyMusicHapticsMode, 0);
+    SGSetEnabled(SGKeyMusicHaptics, mode == 1);
+    SGSetEnabled(SGKeyMusicHapticsBackground, mode == 2);
+    [store removeObjectForKey:SGKeyMusicHapticsMode];
+    SGLog(@"music haptics: the choice %ld is now Music Haptics %@, In the Background %@", (long)mode, mode == 1 ? @"on" : @"off", mode == 2 ? @"on" : @"off");
 }
 
 static NSArray<NSString *> *followsNames(void) {
@@ -88,8 +105,10 @@ static SGModRow *strengthRow(NSString *key, void (^changed)(void)) {
         ^NSString *(double value) { return [NSString stringWithFormat:@"%ld%%", lround(value)]; });
 }
 
-// The cards, `preview` told when something it reads out changes and shown the slider's taps.
-static NSArray<SGModSection *> *sections(SGVibrationsPreview *preview) {
+// The cards, `preview` told when something it reads out changes and shown the slider's taps, `explain` run by a
+// tap on the row that says iOS's Music Haptics is off.
+static NSArray<SGModSection *> *sections(SGVibrationsPreview *preview, void (^explain)(void)) {
+    SGMigrateMusicHaptics();
     __weak SGVibrationsPreview *weakPreview = preview;
     SGModRow *controls = SGSwitchRow(@"Controls", nil, SGKeyControlHaptics);
     controls.changed = ^(BOOL on) { [weakPreview reload]; };
@@ -100,33 +119,38 @@ static NSArray<SGModSection *> *sections(SGVibrationsPreview *preview) {
     });
     controlStrength.waitsOn = SGKeyControlHaptics;
 
-    // The list reads the stored index, so someone with none stored gets the one picked for them.
-    if (SGInt(SGKeyMusicHapticsMode, -1) < 0) SGSetInt(SGKeyMusicHapticsMode, SGMusicHapticsModeNow());
-    SGModRow *music = SGChoiceRow(@"Music Haptics", nil, SGKeyMusicHapticsMode, modeNames(), SGMusicHapticsOff);
-    music.info = kMusicHapticsInfo;
-    music.choiceNotes = modeNotes();
-    music.chosen = ^(NSInteger index) {
-        [NSNotificationCenter.defaultCenter postNotificationName:SGMusicHapticsModeChangedNotification object:nil];
+    void (^switched)(BOOL) = ^(BOOL on) {
+        [NSNotificationCenter.defaultCenter postNotificationName:SGMusicHapticsSwitchesChangedNotification object:nil];
         [weakPreview reload];
     };
-    BOOL (^generated)(void) = ^BOOL { return SGMusicHapticsModeNow() == SGMusicHapticsGenerated; };
+    SGModRow *music = SGOptionRow(@"Music Haptics", nil, SGKeyMusicHaptics);
+    music.info = kMusicInfo;
+    music.changed = switched;
     SGModRow *musicStrength = strengthRow(SGKeyMusicStrength, ^{
         // As Controls' Strength: a kick at the new strength with each step, and its ripple.
         SGMusicHapticsSettingsChanged();
         SGMusicHapticsPreview();
         [weakPreview rippleAt:SGHapticsStrength(SGKeyMusicStrength) / 2];
     });
-    musicStrength.visible = generated;
+    musicStrength.waitsOn = SGKeyMusicHaptics;
     SGModRow *follows = SGChoiceRow(@"Follows", nil, SGKeyMusicFollows, followsNames(), SGMusicFollowsEverything);
     follows.choiceNotes = followsNotes();
     follows.chosen = ^(NSInteger index) { SGMusicHapticsSettingsChanged(); };
-    follows.visible = generated;
+    follows.waitsOn = SGKeyMusicHaptics;
+
+    SGModRow *background = SGOptionRow(@"In the Background", nil, SGKeyMusicHapticsBackground);
+    background.info = kBackgroundInfo;
+    background.changed = switched;
+    background.visible = ^BOOL { return backgroundAvailable(); };
+    // What iOS's own is doing, or, while it is off in Accessibility, a row saying where to turn it on.
     SGModRow *status = SGStatRow(@"Status", ^NSString *{ return SGMusicHapticsStatus(); });
-    status.visible = ^BOOL { return SGMusicHapticsModeNow() == SGMusicHapticsNative; };
+    status.visible = ^BOOL { return SGMusicHapticsInBackground() && SGSystemMusicHapticsOn(); };
+    SGModRow *systemOff = SGActionRow(@"Music Haptics is off in iOS", @"Tap to turn it on in Settings", explain);
+    systemOff.visible = ^BOOL { return SGMusicHapticsInBackground() && !SGSystemMusicHapticsOn(); };
 
     return @[
         SGSection(nil, @[SGWithSymbol(controls, @"hand.tap"), controlStrength]),
-        SGSection(nil, @[SGWithSymbol(music, @"waveform"), musicStrength, follows, status]),
+        SGSection(nil, @[SGWithSymbol(music, @"waveform"), musicStrength, follows, background, status, systemOff]),
     ];
 }
 
@@ -141,6 +165,12 @@ static NSArray<SGModSection *> *sections(SGVibrationsPreview *preview) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.tableView.tableHeaderView = self.preview;
+    // Music Haptics turned on or off in Accessibility while the page is open, or before coming back to it.
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(systemMusicHapticsChanged:) name:SGSystemMusicHapticsChangedNotification object:nil];
+}
+
+- (void)systemMusicHapticsChanged:(NSNotification *)note {
+    [self refreshVisibility];
 }
 
 // The header keeps the height it is given, so it is sized here and handed back to the table only when that
@@ -171,17 +201,35 @@ static NSArray<SGModSection *> *sections(SGVibrationsPreview *preview) {
     self.preview.listening = NO;
 }
 
+// The row under In the Background that says iOS's Music Haptics is off: what it needs, and the way there.
+- (void)explainBackground {
+    // iOS opens no Settings page but an app's own from a third-party app (App-prefs: links fail on iOS 27), so the
+    // message gives the path from there.
+    NSString *message = @"In the Background needs iOS's Music Haptics. Settings opens on Spotify's page: go back to Settings, then Accessibility > Music Haptics, and turn it on.";
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Turn On Music Haptics" message:message preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Not Now" style:UIAlertActionStyleCancel handler:nil]];
+    UIAlertAction *open = [UIAlertAction actionWithTitle:@"Open Settings" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [UIApplication.sharedApplication openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString] options:@{} completionHandler:nil];
+    }];
+    [alert addAction:open];
+    alert.preferredAction = open;
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 @end
 
 UIViewController *SGVibrationsSettingsPage(void) {
     SGVibrationsPreview *preview = [SGVibrationsPreview new];
-    SGVibrationsPage *page = [[SGVibrationsPage alloc] initWithTitle:@"Vibrations" intro:nil sections:sections(preview) footer:nil];
+    __block __weak SGVibrationsPage *weakPage;
+    NSArray<SGModSection *> *cards = sections(preview, ^{ [weakPage explainBackground]; });
+    SGVibrationsPage *page = [[SGVibrationsPage alloc] initWithTitle:@"Vibrations" intro:nil sections:cards footer:nil];
     page.preview = preview;
+    weakPage = page;
     return page;
 }
 
 NSString *SGVibrationsSummary(void) {
-    BOOL controls = SGEnabled(SGKeyControlHaptics), music = SGMusicHapticsModeNow() != SGMusicHapticsOff;
+    BOOL controls = SGEnabled(SGKeyControlHaptics), music = SGMusicHapticsOn() || SGMusicHapticsInBackground();
     if (controls && music) return @"On";
     return controls ? @"Controls" : music ? @"Music Haptics" : @"Off";
 }

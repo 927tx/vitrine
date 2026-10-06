@@ -12,8 +12,9 @@ the preview's watcher for `pulse` to hand a tap of the music's to.
     xcrun simctl io <udid> screenshot shot.png
 
 Other agents use the simulator too: make a device of your own (`xcrun simctl create`) and address it by UDID.
-Every launch clears the `spotifyglass.redesign.haptics` keys first unless `keep` is on the line; `main.m` lists the
-setup words (`controls-off`, `music`, `follows=<n>`, `slow`) and the actions, played one every 0.7 s from 1 s in:
+Every launch clears the `spotifyglass.*haptics*` keys first unless `keep` is on the line; `main.m` lists the
+setup words (`controls-off`, `music`, `background`, `mode=<n>`, `ios-off`, `follows=<n>`, `slow`) and the actions,
+played one every 0.7 s from 1 s in:
 flipping a switch, dragging a slider and letting go, VoiceOver's swipe on one, the ⓘ, a tap on a row (the Follows
 row, then a name in its list), and `dump`, which logs the stored keys, what the hooks read and the rows shown:
 
@@ -38,7 +39,7 @@ Strength back to full strength without a row moving.
 What it does not cover: a real finger on the slider, and how any strength feels, which only a phone can tell.
 
 2026-10-06, iPhone 17 Pro on iOS 27.0: the page opens on the preview, its line reading Tap to feel Controls, Tap to
-feel Music Haptics (`controls-off music`), the Native iOS note (`controls-off native`) or what to turn on
+feel Music Haptics (`controls-off music`), the Native iOS note (`controls-off native`, now `controls-off background`) or what to turn on
 (`controls-off`), and Tap to feel Controls again once `toggle=0.0` turns Controls on; with `slow tap`, six shots
 1.3 s apart show the middle dipping and one lit ring travelling out to the edge and the field settling back to
 rest; with Reduce Motion on (`simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool
@@ -48,3 +49,15 @@ wraps under accessibility-medium text and the cards move down under it.
 
 Not covered here: how the taps feel, whether the preview kick reaches a running engine on a phone, and the
 music's pulses with real music playing (`pulse` stands in for them).
+
+2026-10-06, iPhone 17 Pro on iOS 27.0, the two switches: with nothing stored both read off, Strength and Follows
+greyed under Music Haptics and In the Background below them. `mode=0`, `mode=1`, `mode=2` and `mode=7`, each with
+`expect=` and `dump`, move the old choice to off/off, on/off, off/on and off/off and leave it unstored. `background`
+shows Status under In the Background; with `ios-off` the row "Music Haptics is off in iOS" takes its place, `ios=on`
+and `ios=off` swap them while the page shows, and `select=1.4 alert` opens In the Background's ⓘ from it. `toggle=1.0`
+and `toggle=1.3` post the switches' change (the stub logs what the engines read), the preview line follows (Tap to
+feel Music Haptics, or "In the Background is played by iOS" when it is the only one on) and the main page's row reads
+Music Haptics with either on.
+
+    xcrun simctl launch --console-pty <udid> com.vojta.hapticspageharness mode=2 expect=off,on dump
+    xcrun simctl launch --console-pty <udid> com.vojta.hapticspageharness music background ios-off dump ios=on dump select=1.4 alert

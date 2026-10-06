@@ -1,6 +1,6 @@
 # Music Haptics harness
 
-Two halves: the analyzer on the Mac, and the hook in the simulator. Beside them, `track.m` checks Native iOS's
+Two halves: the analyzer on the Mac, and the hook in the simulator. Beside them, `track.m` checks In the Background's
 pure steps on the Mac (`./build.sh && build/track`): the ISRC check, hand-built TRACK_V4 replies and Apple's
 catalog songs matched or turned down.
 
@@ -55,6 +55,13 @@ back at the next, then a 16-bit interleaved client. The app has harness/scene.m'
 
 `./build-sim.sh before <dir>` builds the same against an older `MusicHaptics.x`, `Haptics.h` and analyzer put in
 `<dir>`, running only the format steps. Use a device of your own (`xcrun simctl create`), by UDID.
+
+2026-10-06, iPhone 17 Pro on iOS 27.0, the two switches: every step passes. Before the audio, the old choice moves
+for each thing that could be stored (choices 0, 1, 2 and 7 beside an old switch, the old switch alone, the redesign's
+old key alone, nothing), run twice each. Then Music Haptics off plays nothing and on plays again; In the Background
+on beside it changes nothing until `SGMusicHapticsSetSystemCovers(YES)` (what SystemMusicHaptics.x sends while it asks
+about the song and while iOS has a track), which stops every tap and the rumble, flipping Music Haptics off and on
+under it too; NO (iOS has none for the next song) brings them back; In the Background alone plays nothing.
 
 2026-10-05, iPhone 17 Pro on iOS 27.0: every step passes, the stand-down and its return too.
 

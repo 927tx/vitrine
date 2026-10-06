@@ -19,15 +19,17 @@
 // The Vibrations page's preview asks for one kick, which the same thread plays at once through the same
 // engine and strength, and while the page shows, each tap played is handed back to it for its rings.
 //
-// The rebinding and the notify are in place under either look, so the choice works at once; with
-// anything but Generated chosen the notify returns straight away. Nothing listens while Spotify is not the
-// active app, since iOS plays no haptics for an app in the background. Sound that is not Spotify's own
-// output (Connect, AirPlay to another device, video) never passes the unit, and plays no haptics.
-// The choice is read again every time listening could start, not kept from launch, so with Native iOS
-// chosen (SystemMusicHaptics.x) this one stays quiet whatever order the two came up in.
+// The rebinding and the notify are in place under either look, so the switch works at once; with it
+// off the notify returns straight away. Nothing listens while Spotify is not the active app, since iOS
+// plays no haptics for an app in the background. Sound that is not Spotify's own output (Connect,
+// AirPlay to another device, video) never passes the unit, and plays no haptics.
+// Nothing listens either while In the Background (SystemMusicHaptics.x) is finding out whether iOS has a
+// haptic track for the song, or has one named: iOS plays it in front of Spotify as well as behind it, so
+// the two would double up. The switch is read again every time listening could start, not kept from
+// launch, so this one is right whatever order the two came up in.
 //
 // Threading: the notify runs on the render thread and only touches atomics, the analyzer and the
-// ring; the Core Haptics objects belong to the player thread; the choice, its settings and the app's
+// ring; the Core Haptics objects belong to the player thread; the switches, the settings and the app's
 // state are set on the main thread.
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -64,7 +66,7 @@ enum { kRingSize = 1024, kMonoFrames = 4096 };
 
 #pragma mark - shared between the threads
 
-static atomic_bool sg_active, sg_listening;
+static atomic_bool sg_active, sg_systemCovers, sg_listening;
 static atomic_uint sg_generation;
 static atomic_uint_fast64_t sg_latencyBits;
 static atomic_uint sg_lastFrames;
@@ -535,7 +537,7 @@ static void readLatency(void) {
 }
 
 static void updateListening(void) {
-    BOOL listening = SGMusicHapticsModeNow() == SGMusicHapticsGenerated && atomic_load(&sg_active);
+    BOOL listening = SGMusicHapticsOn() && atomic_load(&sg_active) && !atomic_load(&sg_systemCovers);
     if (atomic_exchange(&sg_listening, listening) == listening) return;
     if (listening) {
         atomic_fetch_add(&sg_generation, 1);
@@ -551,6 +553,12 @@ static void updateListening(void) {
         });
     }
     dispatch_semaphore_signal(sg_wake);
+}
+
+void SGMusicHapticsSetSystemCovers(BOOL covers) {
+    if (atomic_exchange(&sg_systemCovers, covers) == covers || !sg_wake) return;
+    if (SGMusicHapticsOn()) SGLog(@"music haptics: %@", covers ? @"iOS's own has this song, standing down" : @"iOS's own has none for this song, playing along");
+    updateListening();
 }
 
 static void readSettings(void) {
@@ -577,7 +585,7 @@ void SGMusicHapticsWatchTaps(void (^watcher)(float intensity)) {
 }
 
 %ctor {
-    SGMigrateKey(SGKeyMusicHapticsWas, SGKeyMusicHaptics);
+    SGMigrateMusicHaptics();
     SGMigrateKey(SGKeyMusicStrengthWas, SGKeyMusicStrength);
     SGMigrateKey(SGKeyMusicFollowsWas, SGKeyMusicFollows);
     mach_timebase_info_data_t timebase;
@@ -590,7 +598,7 @@ void SGMusicHapticsWatchTaps(void (^watcher)(float intensity)) {
     sg_wake = dispatch_semaphore_create(0);
     readSettings();
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
-    [center addObserverForName:SGMusicHapticsModeChangedNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+    [center addObserverForName:SGMusicHapticsSwitchesChangedNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
         updateListening();
     }];
     [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {

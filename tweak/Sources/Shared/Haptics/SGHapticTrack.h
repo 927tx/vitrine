@@ -1,4 +1,4 @@
-// The pure steps of Native iOS Music Haptics (SystemMusicHaptics.x), Foundation only so the Mac harness
+// The pure steps of Music Haptics In the Background (SystemMusicHaptics.x), Foundation only so the Mac harness
 // (harness/haptics/track.m) runs them as the tweak does.
 //
 // Spotify's ISRC comes from its own metadata, asked as the app asks it: a BatchedEntityRequest to spclient's

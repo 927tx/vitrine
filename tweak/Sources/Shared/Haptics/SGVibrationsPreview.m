@@ -30,25 +30,21 @@ static const CGFloat kPulse = 0.32;
 typedef NS_ENUM(NSInteger, Feature) {
     FeatureControls,
     FeatureMusic,
-    FeatureNative,   // iOS plays Music Haptics itself: nothing to play from here
+    FeatureNative,   // only In the Background: iOS plays it, nothing to play from here
     FeatureNone,
 };
 
 static Feature featureNow(void) {
     if (SGEnabled(SGKeyControlHaptics)) return FeatureControls;
-    switch (SGMusicHapticsModeNow()) {
-        case SGMusicHapticsGenerated: return FeatureMusic;
-        case SGMusicHapticsNative: return FeatureNative;
-        case SGMusicHapticsOff: return FeatureNone;
-    }
-    return FeatureNone;
+    if (SGMusicHapticsOn()) return FeatureMusic;
+    return SGMusicHapticsInBackground() ? FeatureNative : FeatureNone;
 }
 
 static NSString *captionFor(Feature feature) {
     switch (feature) {
         case FeatureControls: return @"Tap to feel Controls";
         case FeatureMusic: return @"Tap to feel Music Haptics";
-        case FeatureNative: return @"Native iOS plays on its own. Turn on Controls to feel a tap";
+        case FeatureNative: return @"In the Background is played by iOS. Turn on Controls or Music Haptics to feel a tap";
         case FeatureNone: return @"Turn on Controls or Music Haptics to feel a tap";
     }
     return nil;

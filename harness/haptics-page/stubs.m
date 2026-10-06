@@ -1,12 +1,12 @@
-// Music Haptics' side of Haptics.h (MusicHaptics.x in the tweak), which the page calls as its choice and its
+// Music Haptics' side of Haptics.h (MusicHaptics.x in the tweak), which the page calls as its switches and its
 // settings change and its preview is tapped: each is logged with what the hooks would read at that moment.
 // The preview's watcher is kept, for the harness's pulse to hand a tap to.
 #import "Core/SGCore.h"
 #import "Shared/Haptics/Haptics.h"
 
-__attribute__((constructor)) static void sg_logModeChanges(void) {
-    [NSNotificationCenter.defaultCenter addObserverForName:SGMusicHapticsModeChangedNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
-        NSLog(@"[harness] Music Haptics plays %@", @[@"None", @"Generated", @"Native iOS"][SGMusicHapticsModeNow()]);
+__attribute__((constructor)) static void sg_logSwitches(void) {
+    [NSNotificationCenter.defaultCenter addObserverForName:SGMusicHapticsSwitchesChangedNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+        NSLog(@"[harness] the engines read Music Haptics %@, In the Background %@", SGMusicHapticsOn() ? @"on" : @"off", SGMusicHapticsInBackground() ? @"on" : @"off");
     }];
 }
 

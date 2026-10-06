@@ -1,4 +1,4 @@
-// Music Haptics > Native iOS: iOS's own Music Haptics for Spotify. The system plays Apple Music's haptic track
+// Music Haptics > In the Background: iOS's own Music Haptics for Spotify. The system plays Apple Music's haptic track
 // for a recording, in the background and on the lock screen too, for an app that declares
 // MusicHapticsSupported (plist/liquid-glass.plist) and names the recording in its now playing info. Spotify
 // names none, so the mod adds one to Spotify's info (Shared/Player/NowPlayingExtras.h), exactly one:
@@ -12,11 +12,22 @@
 //      cannot find showed "Music Haptics unavailable" over the matched song playing (iOS 27.2).
 //   3. Failing a song, the ISRC itself, and iOS asked whether it has a haptic track for it.
 //
-// A new track or a new choice takes the old identifier off at once, before anything is asked, and every
+// A new track or a flipped switch takes the old identifier off at once, before anything is asked, and every
 // answer carries the revision it was asked under, so one for an earlier track is dropped. Nothing is
-// published while Music Haptics is off in Settings > Accessibility, or with another choice than Native iOS.
+// published while Music Haptics is off in Settings > Accessibility, or with In the Background off.
 // iOS repeats its notifications as the now playing info changes; only a change in whether it is on or
 // paused is acted on, since sending the info again on each would feed back into the system service.
+//
+// The handover to the mod's own (MusicHaptics.x): iOS plays the haptic track of the now playing song
+// whether the app is in front or not (MAMusicHapticsManager reports its status per now playing song, with no
+// foreground or background to it), so the mod's own stands down for the song entirely, from the moment the
+// track is asked about (Checking) through an identifier with a haptic track named (Ready), paused from
+// Control Center or not. It plays again once the answer is that iOS has none (Unavailable), or with nothing
+// asked (Waiting: In the Background off, iOS's switch off, nothing playing). Ready is taken on the catalog's
+// word or iOS's availability check, not the status observer's report that iOS plays it, since when that
+// observer fires for an app's song is unproven: waiting on it could leave both playing.
+// ponytail: quiet while Checking means a song with no haptic track gets the mod's own only once the lookup
+// answers, a moment with the ISRC kept, up to kSpotifyTries * kSpotifyRetryAfter when Spotify does not answer.
 //
 // ponytail: the identifier rides on Spotify's info by title, as NowPlayingExtras matches it, so a next track
 // with the same title can carry the last one's for the moment before the player reports it. Matching by the
@@ -148,6 +159,8 @@ API_AVAILABLE(ios(18.0))
 
 - (void)setPhase:(SGNativePhase)phase {
     _phase = phase;
+    // follow: leaves Waiting only with In the Background on, iOS's switch on and a track playing.
+    SGMusicHapticsSetSystemCovers(phase == SGNativeChecking || phase == SGNativeReady);
     [self showStatus];
 }
 
@@ -169,7 +182,7 @@ API_AVAILABLE(ios(18.0))
     if (logged++ < 3) SGLog(@"music haptics: %@ named for iOS's Music Haptics", extras.allValues.firstObject);
 }
 
-// `again` follows the same track anew: the choice, or iOS's switch, changed.
+// `again` follows the same track anew: a switch, or iOS's, changed.
 - (void)follow:(SPTPlayerState *)state again:(BOOL)again {
     NSString *track = SGURIString(state.track.URI);
     if (!again && (track == _track || [track isEqualToString:_track])) return;
@@ -180,7 +193,7 @@ API_AVAILABLE(ios(18.0))
     _observedActive = NO;
     // Off before anything is asked, so no answer can arrive while the last track's is still named.
     SGNowPlayingSetExtras(@"haptics", nil, nil);
-    if (SGMusicHapticsModeNow() != SGMusicHapticsNative || !_enabled || !track) {
+    if (!SGMusicHapticsInBackground() || !_enabled || !track) {
         self.phase = SGNativeWaiting;
         return;
     }
@@ -248,6 +261,7 @@ API_AVAILABLE(ios(18.0))
     _known = YES;
     _enabled = enabled;
     _active = active;
+    SGSetSystemMusicHapticsOn(enabled);
     SGLog(@"music haptics: iOS's Music Haptics %@, %@", enabled ? @"on" : @"off", active ? @"active" : @"paused");
     [self observe];
     if (first || enabled != wasEnabled) [self follow:SGPlayerState() again:YES];
@@ -256,22 +270,9 @@ API_AVAILABLE(ios(18.0))
 
 @end
 
-// For someone with no choice stored: Native iOS when iOS's Music Haptics is on, as the mod named songs to it
-// before there was a choice, else what the old switch says. A reset leaves it unpicked, which reads None.
-static void pickMode(void) {
-    // MusicHaptics.x's constructor moves this too, but may run after this one.
-    SGMigrateKey(SGKeyMusicHapticsWas, SGKeyMusicHaptics);
-    if (SGInt(SGKeyMusicHapticsMode, -1) >= 0 || [NSUserDefaults.standardUserDefaults boolForKey:SGKeyStock]) return;
-    SGMusicHapticsMode mode = SGMusicHapticsModeNow();
-    if (@available(iOS 18.0, *)) {
-        if (systemEnabled(MAMusicHapticsManager.sharedManager)) mode = SGMusicHapticsNative;
-    }
-    SGSetInt(SGKeyMusicHapticsMode, mode);
-    SGLog(@"music haptics: picked %ld for the choice", (long)mode);
-}
-
 %ctor {
-    pickMode();
+    // MusicHaptics.x's constructor moves it too, but may run after this one.
+    SGMigrateMusicHaptics();
     if (@available(iOS 18.0, *)) {
         sg_isrcs = [NSCache new];
         sg_isrcs.countLimit = kKeptISRCs;
@@ -286,7 +287,11 @@ static void pickMode(void) {
         id name = enabledName ? (__bridge id)*(void **)enabledName : nil;
         if ([name isKindOfClass:NSString.class]) [center addObserverForName:name object:nil queue:NSOperationQueue.mainQueue usingBlock:changed];
         [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:changed];
-        [center addObserverForName:SGMusicHapticsModeChangedNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+        // Only In the Background's own flip: Music Haptics' would take iOS's identifier off for nothing.
+        __block BOOL background = SGMusicHapticsInBackground();
+        [center addObserverForName:SGMusicHapticsSwitchesChangedNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+            if (SGMusicHapticsInBackground() == background) return;
+            background = !background;
             [native follow:SGPlayerState() again:YES];
         }];
         dispatch_async(dispatch_get_main_queue(), ^{ [native systemChanged]; });

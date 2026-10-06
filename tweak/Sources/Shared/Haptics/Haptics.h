@@ -1,13 +1,14 @@
-// Vibrations (Mod Settings > Player > Vibrations), under either look: the Taptic Engine answering
+// Vibrations (Mod Settings > Vibrations), under either look: the Taptic Engine answering
 // what a finger does to playback (Controls), and playing along with the music (Music Haptics).
 //
 //     SGFeedback.m         which tap each kind of control gets, played while Controls is on
 //     ControlHaptics.x     the player's and the now playing bar's controls, the scrubber, the cover swipes, the gestures
 //     MusicHaptics.x       Spotify's audio output listened to, and Core Haptics played along with it
 //     SGMusicAnalyzer.m    the listening: taps and a rumble out of the samples
-//     SystemMusicHaptics.x iOS's own Music Haptics given the song's Apple Music id or ISRC (Native iOS)
+//     SystemMusicHaptics.x iOS's own Music Haptics given the song's Apple Music id or ISRC (In the Background)
 //     SGHapticTrack.m      the pure steps behind it: Spotify's extended metadata asked and read, Apple's songs matched
-//     HapticsSettings.m    the Vibrations page: its cards, with each one's strength, what Music Haptics plays and follows
+//     HapticsSettings.m    the Vibrations page: its cards, each one's strength, what Music Haptics follows, its two
+//                          switches, and the move to them from the one choice of before
 //     SGVibrationsPreview.m the rings at the top of the page, which ripple and play the first feature on when tapped
 //
 // Everything on them applies at once, without a restart. Everything hooked is Spotify's own (its controls
@@ -18,9 +19,12 @@
 #import <UIKit/UIKit.h>
 
 #define SGKeyControlHaptics @"spotifyglass.haptics.controls"
-// The Music Haptics switch of before the choice below; read once to pick the choice for someone who had it.
+// Music Haptics, the mod's own, worked out from the sound while Spotify is in front. Off until switched on.
 #define SGKeyMusicHaptics @"spotifyglass.haptics.music"
-// Which Music Haptics plays, an SGMusicHapticsMode.
+// In the Background: the song named to iOS's own Music Haptics, which plays on the lock screen and in other apps
+// too. Off until switched on.
+#define SGKeyMusicHapticsBackground @"spotifyglass.haptics.music.background"
+// The one choice of before the two switches, None 0, Generated 1 or Native iOS 2; SGMigrateMusicHaptics moves it.
 #define SGKeyMusicHapticsMode @"spotifyglass.haptics.music.mode"
 // How hard the taps are, a percentage within the range below; 100 is the feel each shipped with.
 #define SGKeyControlStrength @"spotifyglass.haptics.controls.strength"
@@ -48,13 +52,6 @@ typedef NS_ENUM(NSInteger, SGMusicFollows) {
     SGMusicFollowsBass,         // a tap on each kick, and the rumble
 };
 
-// Stored as the index into the settings' list, which leaves the last one out below iOS 18.
-typedef NS_ENUM(NSInteger, SGMusicHapticsMode) {
-    SGMusicHapticsOff,
-    SGMusicHapticsGenerated,   // the mod's, worked out from the sound (MusicHaptics.x)
-    SGMusicHapticsNative,      // iOS's own, iOS 18 and later (SystemMusicHaptics.x)
-};
-
 typedef NS_ENUM(NSInteger, SGFeedback) {
     SGFeedbackPlay,      // playback starts
     SGFeedbackPause,     // playback stops
@@ -72,22 +69,35 @@ void SGPlayFeedback(SGFeedback feedback);
 // Wakes the Taptic Engine for feedback about to follow quickly (a finger on the scrubber).
 void SGPrepareFeedback(SGFeedback feedback);
 
-// Which Music Haptics plays. Native reads Off below iOS 18; nothing stored yet reads the old switch, on as
-// Generated. Main thread.
-SGMusicHapticsMode SGMusicHapticsModeNow(void);
-// Posted on the main thread when the choice changes; both engines take it up at once.
-extern NSNotificationName const SGMusicHapticsModeChangedNotification;
+// The two Music Haptics switches. Both may be on: while iOS plays its haptic track for the song (In the
+// Background), the mod's own stays quiet; while Spotify is in front and iOS has none, the mod's own plays.
+// In the Background reads off below iOS 18, which has no Music Haptics. Main thread.
+BOOL SGMusicHapticsOn(void);
+BOOL SGMusicHapticsInBackground(void);
+// The choice of before moved to the switches, once: Generated turns Music Haptics on, Native iOS In the
+// Background, None neither. Each reader of the switches calls it first, since none can know it runs first.
+void SGMigrateMusicHaptics(void);
+// Posted on the main thread when either switch flips; both engines take it up at once.
+extern NSNotificationName const SGMusicHapticsSwitchesChangedNotification;
+// From SystemMusicHaptics.x: YES while it finds out whether iOS has a haptic track for the song and while iOS
+// has one named, so the mod's own stays quiet and the two never play at once. Main thread.
+void SGMusicHapticsSetSystemCovers(BOOL covers);
 // From its strength and its choice of what to follow: reads them again, for the next tap.
 void SGMusicHapticsSettingsChanged(void);
-// One kick of Generated's at its strength, with the rumble under it unless it follows the beat alone, played
-// at once: the Vibrations preview's tap. Nothing while Generated is not listening.
+// One kick of the mod's own at its strength, with the rumble under it unless it follows the beat alone, played
+// at once: the Vibrations preview's tap. Nothing while the mod's own is not listening.
 void SGMusicHapticsPreview(void);
-// Each tap Generated plays from now on is handed to `watcher` on the main thread as it is felt, with its
+// Each tap the mod's own plays from now on is handed to `watcher` on the main thread as it is felt, with its
 // intensity before the strength, 0 to 1; nil stops it. Main thread.
 void SGMusicHapticsWatchTaps(void (^watcher)(float intensity));
 // What iOS's own Music Haptics is doing, for the settings to read out: SystemMusicHaptics.x sets it. Main thread.
 NSString *SGMusicHapticsStatus(void);
 void SGSetMusicHapticsStatus(NSString *status);
+// Whether Music Haptics is on in Settings > Accessibility, as SystemMusicHaptics.x last read it, YES until it has.
+// A change posts SGSystemMusicHapticsChangedNotification, for the page to show or hide its note. Main thread.
+BOOL SGSystemMusicHapticsOn(void);
+void SGSetSystemMusicHapticsOn(BOOL on);
+extern NSNotificationName const SGSystemMusicHapticsChangedNotification;
 
 // A strength key's percentage as a factor, 1 for 100%, kept within its range.
 double SGHapticsStrength(NSString *key);

@@ -6,8 +6,12 @@
 //     xcrun simctl launch <udid> com.vojta.hapticspageharness [setup...] [action...]
 //
 // Setup: keep (the stored settings stay; otherwise every haptics key is cleared first),
-// controls-off (Controls switched off), music (Music Haptics on Generated), native (on Native iOS), follows=<n>, slow (animations at a twentieth
-// of their speed).
+// controls-off (Controls switched off), music (Music Haptics switched on), background (In the Background switched on),
+// mode=<n> (the one choice of before stored, None 0, Generated 1, Native iOS 2, for the page to move to the switches),
+// ios-off (Music Haptics off in Settings > Accessibility, as SystemMusicHaptics.x would report it), follows=<n>,
+// slow (animations at a twentieth of their speed).
+// More actions: ios=on|off (iOS's switch changing while the page shows), expect=<music>,<background> (on or off
+// each: what the switches read, logged as ok or FAILED).
 // Actions: toggle=<section>.<row> (that row's switch flipped the way a tap does), slide=<section>.<row>:<value>
 // (that slider dragged there and let go), tap (the preview tapped, as VoiceOver's double tap does it),
 // pulse=<intensity> (a tap of Music Haptics' handed to the preview, as the engine does while the page shows), swipe=<section>.<row>:<n> (VoiceOver's swipe up on it, n times, down
@@ -44,8 +48,10 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
     NSMutableArray<NSString *> *actions = [NSMutableArray array];
     for (NSString *arg in [args subarrayWithRange:NSMakeRange(1, args.count - 1)]) {
         if ([arg isEqualToString:@"controls-off"]) SGSetEnabled(SGKeyControlHaptics, NO);
-        else if ([arg isEqualToString:@"music"]) SGSetInt(SGKeyMusicHapticsMode, SGMusicHapticsGenerated);
-        else if ([arg isEqualToString:@"native"]) SGSetInt(SGKeyMusicHapticsMode, SGMusicHapticsNative);
+        else if ([arg isEqualToString:@"music"]) SGSetEnabled(SGKeyMusicHaptics, YES);
+        else if ([arg isEqualToString:@"background"]) SGSetEnabled(SGKeyMusicHapticsBackground, YES);
+        else if ([arg hasPrefix:@"mode="]) SGSetInt(SGKeyMusicHapticsMode, [arg substringFromIndex:5].integerValue);
+        else if ([arg isEqualToString:@"ios-off"]) SGSetSystemMusicHapticsOn(NO);
         else if ([arg hasPrefix:@"follows="]) SGSetInt(SGKeyMusicFollows, [arg substringFromIndex:8].integerValue);
         else if (![@[@"keep", @"slow"] containsObject:arg]) [actions addObject:arg];
     }
@@ -126,14 +132,26 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
     } else if ([verb isEqualToString:@"bottom"]) {
         CGFloat max = MAX(-table.adjustedContentInset.top, table.contentSize.height - table.bounds.size.height + table.adjustedContentInset.bottom);
         [table setContentOffset:CGPointMake(0, max) animated:NO];
+    } else if ([verb isEqualToString:@"ios"]) {
+        SGSetSystemMusicHapticsOn([value isEqualToString:@"on"]);
+    } else if ([verb isEqualToString:@"expect"]) {
+        NSString *got = [NSString stringWithFormat:@"%@,%@", SGMusicHapticsOn() ? @"on" : @"off", SGMusicHapticsInBackground() ? @"on" : @"off"];
+        NSLog(@"[harness] %@ Music Haptics, In the Background read %@ (want %@), the old choice %@", [got isEqualToString:value] ? @"  ok  " : @"FAILED",
+              got, value, [NSUserDefaults.standardUserDefaults objectForKey:SGKeyMusicHapticsMode] ? @"still stored" : @"gone");
+    } else if ([verb isEqualToString:@"alert"]) {
+        UIAlertController *alert = (UIAlertController *)self.nav.topViewController.presentedViewController;
+        NSLog(@"[harness] on top: %@", [alert isKindOfClass:UIAlertController.class]
+              ? [NSString stringWithFormat:@"\"%@\": %@", alert.title, [alert.message substringToIndex:MIN(70, alert.message.length)]] : @"no alert");
     } else if ([verb isEqualToString:@"dump"]) {
         NSDictionary *all = NSUserDefaults.standardUserDefaults.dictionaryRepresentation;
         for (NSString *key in [all.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
             if ([key hasPrefix:@"spotifyglass."] && [key containsString:@"haptics"]) NSLog(@"[harness] stored %@ = %@", key, all[key]);
         }
-        NSLog(@"[harness] the hooks read: Controls %@ at %.0f%%, Music Haptics %@ at %.0f%% following %ld", SGEnabled(SGKeyControlHaptics) ? @"on" : @"off",
-              SGHapticsStrength(SGKeyControlStrength) * 100, @[@"None", @"Generated", @"Native iOS"][SGMusicHapticsModeNow()],
-              SGHapticsStrength(SGKeyMusicStrength) * 100, (long)SGMusicHapticsFollows());
+        NSLog(@"[harness] the hooks read: Controls %@ at %.0f%%, Music Haptics %@ at %.0f%% following %ld, In the Background %@, iOS's Music Haptics %@; "
+              @"the main page's row reads %@, the preview says \"%@\"", SGEnabled(SGKeyControlHaptics) ? @"on" : @"off",
+              SGHapticsStrength(SGKeyControlStrength) * 100, SGMusicHapticsOn() ? @"on" : @"off", SGHapticsStrength(SGKeyMusicStrength) * 100,
+              (long)SGMusicHapticsFollows(), SGMusicHapticsInBackground() ? @"on" : @"off", SGSystemMusicHapticsOn() ? @"on" : @"off",
+              SGVibrationsSummary(), table.tableHeaderView.accessibilityHint);
         for (NSInteger section = 0; section < table.numberOfSections; section++) {
             NSMutableArray<NSString *> *rows = [NSMutableArray array];
             for (NSInteger row = 0; row < [table numberOfRowsInSection:section]; row++) {
