@@ -16,7 +16,7 @@ TWEAK_NAME := spotifyglass
 # is generated from the IPA by scripts/extract-flags.py.
 spotifyglass_FILES := $(shell find Sources -name '*.m' -o -name '*.x' -o -name '*.swift' | sort)
 spotifyglass_CFLAGS := -fobjc-arc -ISources -DSG_VERSION=\"$(SG_VERSION)\"
-spotifyglass_FRAMEWORKS := UIKit QuartzCore UniformTypeIdentifiers MediaPlayer CoreImage AudioToolbox AVFoundation CoreHaptics Accelerate CoreMotion CoreML
+spotifyglass_FRAMEWORKS := UIKit QuartzCore UniformTypeIdentifiers MediaPlayer CoreImage AudioToolbox AVFoundation CoreHaptics Accelerate CoreMotion CoreML CoreText
 # zlib unpacks KuGou's KRC lyrics (Shared/LyricsSources/KuGou.m).
 spotifyglass_LIBRARIES := z
 # Runtime swizzling instead of Substrate so the dylib has no extra dependency inside the IPA.

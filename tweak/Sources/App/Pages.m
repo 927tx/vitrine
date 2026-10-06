@@ -68,7 +68,7 @@ UIViewController *SGAppearancePage(void) {
         };
         look = SGWithSymbol(redesign, @"sparkles");
     }
-    NSMutableArray<SGModRow *> *everywhere = [NSMutableArray arrayWithObject:SGWithSymbol(SGChoiceRow(@"Font", nil, SGKeyAppFont, SGAppFontNames(), SGAppFontSpotify), @"textformat")];
+    NSMutableArray<SGModRow *> *everywhere = [NSMutableArray arrayWithArray:SGAppFontRows()];
     SGModRow *icon = SGAppIconRow();
     if (icon) [everywhere addObject:icon];
     return [[SGModPage alloc] initWithTitle:@"Appearance" intro:SGRestartNote sections:@[
