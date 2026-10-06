@@ -6,7 +6,8 @@ FINALPACKAGE := 1
 # stamps PACKAGE_VERSION into the .deb (control has no Version line) and reads it while common.mk
 # loads, so it is set above the include.
 SG_VERSION := $(or $(shell cat ../version.txt 2>/dev/null),0.0.0)
-PACKAGE_VERSION := $(SG_VERSION)
+# A pre-release's hyphen becomes a tilde in the .deb, so dpkg sorts 1.0.0~beta.1 before 1.0.0.
+PACKAGE_VERSION := $(subst -,~,$(SG_VERSION))
 
 include $(THEOS)/makefiles/common.mk
 
