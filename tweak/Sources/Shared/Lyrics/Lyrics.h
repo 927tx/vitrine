@@ -11,11 +11,25 @@
 // LyricsSettings.m: the Lyrics page's parts (App/Pages.m puts the page together): where lyrics come
 // from, naming the source (read by the redesign's lyrics view only), the lock screen, which
 // language a line's translation is taken in, of those the lyrics come with, and the one Musixmatch's
-// community translations are asked in (the redesign's lyrics being where translations show), and whether lines timed only by the line are swept word by word.
+// community translations are asked in (the redesign's lyrics being where translations show), whether lines timed only by the line are swept word by word, and whether lines in other alphabets show again in Latin letters.
 SGModSection *SGLyricsSourcesSection(BOOL namingSource);
 SGModRow *SGLockScreenLyricsRow(void);
 SGModRow *SGLyricsTranslationLanguageRow(void);
 SGModRow *SGLyricsWordTimingRow(void);
+SGModRow *SGLyricsRomanisedRow(void);
+
+// Shows a line written in another alphabet (Japanese, Korean, Chinese, Cyrillic, Greek, Thai, Arabic,
+// Hebrew, Devanagari...) again under itself in Latin letters, before its translation. Off by default.
+// Only the redesign's lyrics view draws it, and it applies at once: the switch posts the notification.
+#define SGKeyLyricsRomanised @"spotifyglass.lyricsRomanised"
+extern NSNotificationName const SGLyricsRomanisedDidChangeNotification;
+// Romanise.m: the text in Latin letters, offline; nil where it has no letter of another script, or
+// reads the same. `japanese` reads kanji the Japanese way, for a song SGLyricsLooksJapanese says is
+// (a line of kanji alone would read as Chinese). Safe off the main thread, and kept per text.
+NSString *SGLyricsRomanised(NSString *text, BOOL japanese);
+// Whether any of the lines has kana in it.
+@class SGKaraokeLine;
+BOOL SGLyricsLooksJapanese(NSArray<SGKaraokeLine *> *lines);
 
 // Sweeps a line timed only by the line word by word, on the estimate of when each word is sung, as if
 // the source had timed them. Off, such a line lights up whole as it starts. Off by default: the

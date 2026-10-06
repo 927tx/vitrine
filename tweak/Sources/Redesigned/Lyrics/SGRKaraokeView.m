@@ -346,7 +346,13 @@ static double heldStrength(double held) {
 @property (nonatomic, readonly) NSArray<NSNumber *> *order;   // SGRLyricsText, largest first, shown ones only
 @property (nonatomic, readonly) UIFont *lyrics, *pronunciation, *translation;   // nil for a text not shown
 @property (nonatomic, readonly) SGRKaraokeStyle *backing;   // the backing row's: smaller, its translation read with the line's
-- (instancetype)initWithSize:(CGFloat)size order:(NSArray<NSNumber *> *)order pronunciation:(BOOL)pronunciation translation:(BOOL)translation;
+// The line again in Latin letters (Shared/Lyrics' romanised lyrics), at the pronunciation's place in the
+// order, since it is one (the second place's while that is the first); nil while the Lyrics page has
+// it off. A backing row has none.
+@property (nonatomic, readonly) UIFont *romanised;
+@property (nonatomic) BOOL japanese;   // the song has kana, so its kanji are read the Japanese way
+- (instancetype)initWithSize:(CGFloat)size order:(NSArray<NSNumber *> *)order pronunciation:(BOOL)pronunciation translation:(BOOL)translation
+                   romanised:(BOOL)romanised;
 @end
 
 // The second and third place's sizes, as shares of the first: Apple Music's 20 and 16 under its 30.
@@ -354,9 +360,12 @@ static const CGFloat kSecondShare = 0.67, kThirdShare = 0.54;
 
 @implementation SGRKaraokeStyle
 
-- (instancetype)initWithSize:(CGFloat)size order:(NSArray<NSNumber *> *)order pronunciation:(BOOL)pronunciation translation:(BOOL)translation {
+- (instancetype)initWithSize:(CGFloat)size order:(NSArray<NSNumber *> *)order pronunciation:(BOOL)pronunciation translation:(BOOL)translation
+                   romanised:(BOOL)romanised {
     if (!(self = [super init])) return nil;
     CGFloat sizes[3] = {size, round(size * kSecondShare), round(size * kThirdShare)};
+    NSUInteger spoken = [order indexOfObject:@(SGRLyricsTextPronunciation)];
+    if (romanised) _romanised = [UIFont systemFontOfSize:spoken > 0 && spoken < 3 ? sizes[spoken] : sizes[1] weight:UIFontWeightSemibold];
     NSMutableArray<NSNumber *> *shown = [NSMutableArray array];
     for (NSUInteger place = 0; place < order.count && place < 3; place++) {
         SGRLyricsText text = order[place].integerValue;
@@ -404,6 +413,8 @@ static const CGFloat kPairTighten = 2, kPairGap = 4, kPartGap = 6;
 @property (nonatomic, copy) NSArray<NSValue *> *lyricFrames, *spokenFrames;
 @property (nonatomic, copy) NSArray<NSNumber *> *lyricOffsets, *spokenOffsets;
 @property (nonatomic) CGRect translation;   // CGRectNull without one
+@property (nonatomic) CGRect romanised;     // likewise
+@property (nonatomic, copy) NSString *romanisedText;
 @property (nonatomic) CGFloat backingTop;   // 0 without a backing row
 @end
 
@@ -573,15 +584,28 @@ static CGFloat layPair(NSArray<SGKaraokeWord *> *lead, UIFont *leadFont, NSArray
     return bottom;
 }
 
+// A text set as a block, wrapping as a label does, from `top`.
+static CGRect blockFrame(NSString *text, UIFont *font, CGFloat width, CGFloat top) {
+    CGRect bounds = [text boundingRectWithSize:CGSizeMake(width, CGFLOAT_MAX) options:NSStringDrawingUsesLineFragmentOrigin
+                                    attributes:@{NSFontAttributeName: font} context:nil];
+    return CGRectMake(0, top, width, ceil(bounds.size.height));
+}
+
 // The texts a line has, in the style's order, the lyrics and their pronunciation set as a pair where
-// the order has them side by side, and the backing row after the lyrics. `right` is the side a backing
+// the order has them side by side, the line in Latin letters right under the lyrics where it is not
+// already spelt out by the pronunciation, and the backing row after that. `right` is the side a backing
 // row keeps to, its line's; -1 for a line of its own, which takes its side from its voice and script.
 static SGRKaraokeLayout *layOut(SGKaraokeLine *line, CGFloat width, SGRKaraokeStyle *style, NSInteger right) {
     SGRKaraokeLayout *layout = [SGRKaraokeLayout new];
     layout.right = right >= 0 ? right : alignsRight(line);
-    layout.translation = CGRectNull;
+    layout.translation = layout.romanised = CGRectNull;
     NSArray<SGKaraokeWord *> *spoken = style.pronunciation ? line.pronunciation.words : nil;
     NSString *translation = style.translation ? line.translation : nil;
+    // A source's own pronunciation, hidden, still reads better than the transform's.
+    if (style.romanised && !spoken.count) {
+        layout.romanisedText = line.pronunciation ? SGKaraokeLineText(line.pronunciation)
+                                                  : SGLyricsRomanised(SGKaraokeLineText(line), style.japanese);
+    }
     NSMutableArray<NSNumber *> *parts = [NSMutableArray array];
     for (NSNumber *text in style.order) {
         if (text.integerValue == SGRLyricsTextPronunciation && !spoken.count) continue;
@@ -595,9 +619,7 @@ static SGRKaraokeLayout *layOut(SGKaraokeLine *line, CGFloat width, SGRKaraokeSt
         SGRLyricsText text = parts[p].integerValue;
         if (p > 0) y += kPartGap;
         if (text == SGRLyricsTextTranslation) {
-            CGRect bounds = [translation boundingRectWithSize:CGSizeMake(width, CGFLOAT_MAX) options:NSStringDrawingUsesLineFragmentOrigin
-                                                   attributes:@{NSFontAttributeName: style.translation} context:nil];
-            layout.translation = CGRectMake(0, y, width, ceil(bounds.size.height));
+            layout.translation = blockFrame(translation, style.translation, width, y);
             y = CGRectGetMaxY(layout.translation);
             continue;
         }
@@ -624,6 +646,10 @@ static SGRKaraokeLayout *layOut(SGKaraokeLine *line, CGFloat width, SGRKaraokeSt
                 layout.spokenFrames = frames;
                 layout.spokenOffsets = offsets;
             }
+        }
+        if (lyrics && layout.romanisedText.length) {
+            layout.romanised = blockFrame(layout.romanisedText, style.romanised, width, y + kPartGap);
+            y = CGRectGetMaxY(layout.romanised);
         }
         if (lyrics && right < 0 && line.backing.words.count) {
             layout.backingTop = y + kBackingGap;
@@ -765,7 +791,8 @@ static double secant(SGSweepKnot *knots, NSUInteger i) {
 @property (nonatomic, readonly) CGRect bubbleTarget;
 @end
 
-// The translation of a line being sung, brighter than a line waiting but never as bright as the words.
+// The translation and the romanised line of a line being sung, brighter than a line waiting but never
+// as bright as the words.
 static const CGFloat kTranslationLit = 0.6;
 
 @implementation SGRKaraokeLineView {
@@ -774,7 +801,7 @@ static const CGFloat kTranslationLit = 0.6;
     NSArray<SGRKaraokeWordView *> *_lyricWords;
     UIImageView *_bubble;
     CAShapeLayer *_underline;
-    UILabel *_translation;
+    UILabel *_translation, *_romanised;
     NSUInteger _generation;
     SGRKaraokeLineView *_backing;
 }
@@ -823,16 +850,8 @@ static double wholeFrom(SGKaraokeLine *run, BOOL sweepsEstimates) {
     _words = [sung.words ?: @[] arrayByAddingObjectsFromArray:spoken.words ?: @[]];
     _lyricWords = sung.words;
 
-    if (!CGRectIsNull(layout.translation)) {
-        _translation = [[UILabel alloc] initWithFrame:layout.translation];
-        _translation.numberOfLines = 0;
-        _translation.font = style.translation;
-        _translation.textColor = UIColor.whiteColor;
-        _translation.alpha = kDimAlpha;
-        _translation.textAlignment = _right ? NSTextAlignmentRight : NSTextAlignmentLeft;
-        _translation.text = line.translation;
-        [self addSubview:_translation];
-    }
+    if (!CGRectIsNull(layout.translation)) _translation = [self asideAt:layout.translation font:style.translation text:line.translation];
+    if (!CGRectIsNull(layout.romanised)) _romanised = [self asideAt:layout.romanised font:style.romanised text:layout.romanisedText];
     if (layout.backingTop > 0) {
         _backing = [[SGRKaraokeLineView alloc] initWithLine:line.backing width:width style:style.backing under:self blurred:NO
                                             sweepsEstimates:sweepsEstimates];
@@ -849,6 +868,19 @@ static double wholeFrom(SGKaraokeLine *run, BOOL sweepsEstimates) {
     CAFilter *blur = [NSClassFromString(@"CAFilter") filterWithType:@"gaussianBlur"];
     if (blur) self.layer.filters = @[blur];
     return self;
+}
+
+// A text of the line set apart from its words, dim until the line is sung.
+- (UILabel *)asideAt:(CGRect)frame font:(UIFont *)font text:(NSString *)text {
+    UILabel *label = [[UILabel alloc] initWithFrame:frame];
+    label.numberOfLines = 0;
+    label.font = font;
+    label.textColor = UIColor.whiteColor;
+    label.alpha = kDimAlpha;
+    label.textAlignment = _right ? NSTextAlignmentRight : NSTextAlignmentLeft;
+    label.text = text;
+    [self addSubview:label];
+    return label;
 }
 
 // How many line views are made in one frame: the rest follow on the next, nearest the sung line first.
@@ -875,9 +907,10 @@ static const NSUInteger kLinesPerFrame = 4;
     _active = active;
     _backing.active = active;
     NSUInteger generation = ++_generation;
-    if (_translation) {
-        [UIView animateWithDuration:active ? 0.3 : 0.5 delay:0 options:UIViewAnimationOptionBeginFromCurrentState
-                         animations:^{ self->_translation.alpha = active ? kTranslationLit : kDimAlpha; } completion:nil];
+    if (_translation || _romanised) {
+        [UIView animateWithDuration:active ? 0.3 : 0.5 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{
+            self->_translation.alpha = self->_romanised.alpha = active ? kTranslationLit : kDimAlpha;
+        } completion:nil];
     }
     if (active) {
         NSMutableArray<SGRKaraokeWordView *> *whole = [NSMutableArray array];
@@ -929,7 +962,7 @@ static const NSUInteger kLinesPerFrame = 4;
         word.lit.alpha = 1;
         [word fillTo:CGFLOAT_MAX];
     }
-    _translation.alpha = kTranslationLit;
+    _translation.alpha = _romanised.alpha = kTranslationLit;
     [_backing showPlain];
 }
 
@@ -1275,6 +1308,7 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionEndedNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(restyle) name:SGRLyricsTextDidChangeNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(restyle) name:SGLyricsRomanisedDidChangeNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(lookChanged) name:SGRLyricsLookDidChangeNotification object:nil];
     // A locked phone leaves the card in its window, so the link has to be put down by the app going
     // away rather than by the view going: see scheduleLink.
@@ -1634,9 +1668,13 @@ static BOOL hasWords(SGKaraokeLine *line) {
 
 // What a line shows besides its words: what the song has, of what the lyrics menu has switched on.
 - (SGRKaraokeStyle *)styleNow {
-    return [[SGRKaraokeStyle alloc] initWithSize:_fontSize order:SGRLyricsTextOrder()
-                                   pronunciation:_hasSpoken && SGFlag(SGRKeyLyricsPronunciation, NO)
-                                     translation:_hasTranslation && SGFlag(SGRKeyLyricsTranslation, NO)];
+    BOOL romanised = SGFlag(SGKeyLyricsRomanised, NO);
+    SGRKaraokeStyle *style = [[SGRKaraokeStyle alloc] initWithSize:_fontSize order:SGRLyricsTextOrder()
+                                                     pronunciation:_hasSpoken && SGFlag(SGRKeyLyricsPronunciation, NO)
+                                                       translation:_hasTranslation && SGFlag(SGRKeyLyricsTranslation, NO)
+                                                         romanised:romanised];
+    style.japanese = romanised && SGLyricsLooksJapanese(_lines);
+    return style;
 }
 
 // A switch of the menu or the Lyrics page's order: the song is measured again in the new style off

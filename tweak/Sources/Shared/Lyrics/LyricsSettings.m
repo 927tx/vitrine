@@ -43,6 +43,15 @@ SGModRow *SGLyricsTranslationLanguageRow(void) {
     return row;
 }
 
+// Only the redesign's lyrics view draws it, and every one there is redrawn as the switch flips.
+SGModRow *SGLyricsRomanisedRow(void) {
+    SGModRow *row = SGOptionRow(@"Romanised lyrics", @"Lines in other alphabets, again in Latin letters", SGKeyLyricsRomanised);
+    row.changed = ^(BOOL on) {
+        [NSNotificationCenter.defaultCenter postNotificationName:SGLyricsRomanisedDidChangeNotification object:nil];
+    };
+    return row;
+}
+
 // Only the redesign's lyrics view sweeps words.
 SGModRow *SGLyricsWordTimingRow(void) {
     return SGOptionRow(@"Simulate word timing", nil, SGKeyLyricsSimulateWords);

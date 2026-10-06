@@ -88,7 +88,9 @@ Shared:
     Lyrics/       the lyrics engine for the redesign's Apple Music style lyrics and the lock screen: lines read from
                   color-lyrics and the player's clock (KaraokeSource.x), words timed by estimate inside Spotify's line
                   times (KaraokeTiming.m, which splits Thai, Lao, Khmer and Burmese at the system's dictionary words), which line to name where two voices sing at once (the one that came in first,
-                  for the lock screen and the Live Activity), and the Lyrics page's parts. Lines are kept in time order
+                  for the lock screen and the Live Activity), a line in another alphabet in Latin letters, offline by Apple's
+                  transforms, kanji read the Japanese way in a song with kana (Romanise.m; checked on the simulator by
+                  harness/lyrics' -romanise), and the Lyrics page's parts. Lines are kept in time order
                   whatever order a source lists them in. With EeveeSpotify injected (SGEeveeSpotifyInjected), its lyrics
                   answer Spotify's requests and the mod's sources and its own requests stand aside
     LyricsSources/ the sources lyrics come from, asked in the order the Lyrics page puts them in and merged into the
@@ -353,7 +355,10 @@ Redesigned:
                   that breathe and fill over its length on a Core Animation timeline laid against the song's clock; and
                   a line's pronunciation (under the words it spells) and translation, switched on from a glass button in
                   the lyrics' corner that shows only for a song that has them, in the order of sizes the Lyrics page sets
-                  (LyricsText.h). A word held 0.9 s or more glows and its letters rise in a wave as the sweep reaches
+                  (LyricsText.h). With the Lyrics page's Romanised lyrics on, a line in another alphabet has the same
+                  again in Latin letters right under its words (the source's own pronunciation where it is hidden, none
+                  where it shows), before the translation, at the pronunciation's size, lit with its line but never swept.
+                  A word held 0.9 s or more glows and its letters rise in a wave as the sweep reaches
                   them. The size, the room between lines, the blur, the glow and the wave are the Lyrics page's look
                   (LyricsLook.h): five presets and a sheet of sliders, applied at once to every view, under a live
                   preview of the view playing a song of its own (LyricsLookSettings.m). Laid out on the Mac against
@@ -466,8 +471,8 @@ Albums & artists as it is flipped. Tab bar: the tab editor of the stored look, e
 its own list of tabs. Lyrics, on the main page of its own: in the redesign a live preview of the lyrics first, with the presets of their look
 under it and their sliders in a sheet (Text size, Line spacing, Blur, Glow, Wave), applying at once; then Sing, then the ordered list of lyrics sources,
 lyrics for every track, naming the source in the redesign, the lock screen, and glass lyrics in the native look; in
-the redesign also which of the lyrics, their pronunciation and their translation is set largest, and the
-translation's language. Sing, under either look, on the main page and as Lyrics' first row, the row reading out On,
+the redesign also which of the lyrics, their pronunciation and their translation is set largest, Romanised lyrics
+(applied at once), and the translation's language. Sing, under either look, on the main page and as Lyrics' first row, the row reading out On,
 Off or how far the voice model's download has come, kept up to date while the page shows: Sing's switch, which turns
 the mic on and off at once, its Status (a tap says more), the Vocals slider (gone, as sung, the vocals alone), Spatial voice
 (where the iPhone reads headphone motion; a page of its own, reading out On or Off, with a live preview at its top that

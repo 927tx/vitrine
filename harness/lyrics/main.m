@@ -4,7 +4,8 @@
 //
 // Launch arguments (the argument domain of NSUserDefaults, so a setting's key works as one too):
 //   -song NAME     fixtures/NAME.ttml, .lrc, .json (Spotify's own) or .txt (plain) in the app, or rtl,
-//                  built here (default duet)
+//                  built here (default duet); scripts (built here) is a line in each of many alphabets
+//                  and two in English, the second line of each script translated, for romanised lyrics
 //   -file PATH     a TTML or LRC file on the Mac instead
 //   -at MS         where the clock starts (default 0)
 //   -rate X        how fast it runs (default 1)
@@ -14,6 +15,8 @@
 //   -light 1       the window in light mode, for the glass's appearance
 //   -perf LABEL    logs the cost of the view's frames every 240 of them, under LABEL
 //   -dump 1        prints the lines as read, with their pronunciations and translations, and quits
+//   -romanise 1    asserts romanised lyrics' readings (Shared/Lyrics/Romanise.m), prints PASS and FAIL
+//                  lines and quits with the number of failures
 //   -openMenu S    opens the pronunciation and translation menu S seconds in, as a tap on its button would
 //   -toggleAt S    switches the pronunciation and the translation over S seconds in, as the menu would
 //   -translateIn S keeps copies of the lines S seconds in with every other one translated, as
@@ -25,7 +28,7 @@
 //                  number of failures; run it with -song duet -at 20000 -gemini 1 -geminiDelay 1 -seekLag 0.4
 // and the lyrics' own settings by their keys: -spotifyglass.lyricsSimulateWords 1 (sweep line timed
 // lines on the estimate), -spotifyglass.redesign.lyricsPronunciation 1,
-// -spotifyglass.redesign.lyricsTranslation 1, -spotifyglass.redesign.lyricsTextOrder '(translation, lyrics, pronunciation)'.
+// -spotifyglass.redesign.lyricsTranslation 1, -spotifyglass.lyricsRomanised 1, -spotifyglass.redesign.lyricsTextOrder '(translation, lyrics, pronunciation)'.
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -98,6 +101,68 @@ static NSArray<SGKaraokeLine *> *rightToLeftSongWithExtras(void) {
     return lines;
 }
 
+// A line in each of the alphabets romanised lyrics reads, among English ones, written here: every
+// other one translated, to see the order of the three; a Hebrew and an Arabic line keep their edge.
+static NSArray<SGKaraokeLine *> *scriptsSong(void) {
+    NSArray<NSArray<NSString *> *> *texts = @[
+        @[@"Hello again, my old friend", @""],
+        @[@"君の名前を 呼んでいた", @"I was calling your name"],
+        @[@"東京の 夜空に 星が 見えない", @""],
+        @[@"사랑해요 너를 영원히", @"I love you forever"],
+        @[@"我 爱 你 直到 永远", @""],
+        @[@"Привет, как дела сегодня?", @"Hi, how are you today?"],
+        @[@"Καλημέρα κόσμε", @""],
+        @[@"สวัสดี ครับ ฉัน รัก เธอ", @"Hello, I love you"],
+        @[@"नमस्ते दुनिया", @""],
+        @[@"مرحبا بالعالم", @"Hello world"],
+        @[@"שלום עולם", @""],
+        @[@"Ich möchte einen Café", @""],
+    ];
+    NSMutableArray<SGKaraokeLine *> *lines = [NSMutableArray array];
+    for (NSUInteger i = 0; i < texts.count; i++) {
+        SGKaraokeLine *line = timed(1000 + (NSInteger)i * 3500, texts[i][0], nil);
+        if (texts[i][1].length) line.translation = texts[i][1];
+        [lines addObject:line];
+    }
+    return lines;
+}
+
+#ifdef SGKeyLyricsRomanised
+// The readings Apple's transforms give, as the phone shows them. Failures are counted for the exit code.
+static int checkRomanised(void) {
+    NSArray<NSArray *> *cases = @[
+        @[@"君の名前を呼んでいた", @NO, @"kimi no namae wo yon de i ta"],   // kana: Japanese readings of its kanji
+        @[@"東京", @YES, @"toukyou"],                                       // kanji alone in a Japanese song
+        @[@"東京", @NO, @"dong jing"],                                      // ...and in a Chinese one, pinyin
+        @[@"我爱你，中国！", @NO, @"wǒ ài nǐ, zhōng guó!"],                   // tones kept, punctuation made ASCII
+        @[@"사랑해요 너를", @NO, @"salanghaeyo neoleul"],
+        @[@"Привет, как дела?", @NO, @"Privet, kak dela?"],
+        @[@"Καλημέρα κόσμε", @NO, @"Kalemera kosme"],
+        @[@"สวัสดีครับ", @NO, @"swasdi khrab"],
+        @[@"नमस्ते दुनिया", @NO, @"namaste duniya"],
+        @[@"I love 東京 tonight", @YES, @"I love toukyou tonight"],         // English words kept as they are
+        @[@"Ich möchte Café", @NO, NSNull.null],                            // Latin already: nothing to show
+        @[@"Tôi yêu em", @NO, NSNull.null],
+        @[@"♪", @NO, NSNull.null],
+        @[@"", @NO, NSNull.null],
+    ];
+    int failures = 0;
+    for (NSArray *c in cases) {
+        NSString *got = SGLyricsRomanised(c[0], [c[1] boolValue]);
+        // dong jing is checked without its tones, which ICU may mark differently between versions.
+        if ([c[2] isEqual:@"dong jing"]) got = [got stringByApplyingTransform:@"Latin-ASCII" reverse:NO];
+        BOOL ok = c[2] == NSNull.null ? got == nil : [got isEqualToString:c[2]];
+        failures += !ok;
+        printf("%s %s -> %s\n", ok ? "PASS" : "FAIL", [c[0] UTF8String], got ? got.UTF8String : "(none)");
+    }
+    BOOL japanese = SGLyricsLooksJapanese(@[timed(0, @"Hello", nil), timed(0, @"ラーメン", nil)]);
+    BOOL korean = SGLyricsLooksJapanese(@[timed(0, @"사랑해요", nil), timed(0, @"東京", nil)]);
+    failures += !japanese + korean;
+    printf("%s a song with kana reads as Japanese, one without does not\n", japanese && !korean ? "PASS" : "FAIL");
+    return failures;
+}
+#endif
+
 // [mm:ss.xx] text, as LRCLIB and Spotify's own line-synced lyrics come: timed by the line, the words
 // estimated, a ♪ or an empty line a break.
 static NSArray<SGKaraokeLine *> *linesOfLRC(NSString *lrc) {
@@ -117,6 +182,7 @@ static NSArray<SGKaraokeLine *> *linesOfLRC(NSString *lrc) {
 static NSArray<SGKaraokeLine *> *songNamed(NSString *name, NSString *file) {
     if (!file && [name isEqualToString:@"rtl"]) return rightToLeftSong();
     if (!file && [name isEqualToString:@"rtlx"]) return rightToLeftSongWithExtras();
+    if (!file && [name isEqualToString:@"scripts"]) return scriptsSong();
     NSString *path = file;
     for (NSString *type in @[@"ttml", @"lrc", @"json", @"txt"]) path = path ?: [NSBundle.mainBundle pathForResource:name ofType:type];
     NSString *text = path ? [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] : nil;
@@ -148,6 +214,10 @@ static void dump(NSArray<SGKaraokeLine *> *lines) {
             printf("                  %s %s\n", spoken == line.pronunciation ? "pr" : "bp", [words componentsJoinedByString:@" "].UTF8String);
         }
         if (line.translation) printf("                  tr %s\n", line.translation.UTF8String);
+#endif
+#ifdef SGKeyLyricsRomanised
+        NSString *romanised = SGLyricsRomanised(SGKaraokeLineText(line), SGLyricsLooksJapanese(lines));
+        if (romanised) printf("                  ro %s\n", romanised.UTF8String);
 #endif
     }
     fflush(stdout);
@@ -315,8 +385,13 @@ static void runChecks(SGRKaraokeView *karaoke, UIView *host) {
     SGKaraokeLine *line = timed(0, @"hold this", @"v1");
     line.words.lastObject.end = line.words.lastObject.start + 3000;
     line.end = line.words.lastObject.end;
+#ifdef SGKeyLyricsRomanised
+    id style = ((id (*)(id, SEL, CGFloat, NSArray *, BOOL, BOOL, BOOL))objc_msgSend)([NSClassFromString(@"SGRKaraokeStyle") alloc],
+        NSSelectorFromString(@"initWithSize:order:pronunciation:translation:romanised:"), 30, SGRLyricsTextOrder(), NO, NO, NO);
+#else
     id style = ((id (*)(id, SEL, CGFloat, NSArray *, BOOL, BOOL))objc_msgSend)([NSClassFromString(@"SGRKaraokeStyle") alloc],
         NSSelectorFromString(@"initWithSize:order:pronunciation:translation:"), 30, SGRLyricsTextOrder(), NO, NO);
+#endif
     UIView *lineView = ((id (*)(id, SEL, id, CGFloat, id, id, BOOL, BOOL))objc_msgSend)([NSClassFromString(@"SGRKaraokeLineView") alloc],
         NSSelectorFromString(@"initWithLine:width:style:under:blurred:sweepsEstimates:"), line, 300, style, nil, NO, NO);
     [karaoke.window addSubview:lineView];
@@ -407,6 +482,9 @@ static void runChecks(SGRKaraokeView *karaoke, UIView *host) {
 #ifdef SGRKeyLyricsTextOrder
     // Each launch starts from its own arguments, not from what the menu stored on the last one.
     for (NSString *key in @[SGRKeyLyricsPronunciation, SGRKeyLyricsTranslation, SGRKeyLyricsTextOrder]) [args removeObjectForKey:key];
+#endif
+#ifdef SGKeyLyricsRomanised
+    if ([args boolForKey:@"romanise"]) exit(checkRomanised());
 #endif
     NSString *song = [args stringForKey:@"song"] ?: @"duet";
     SGKaraokeKeepLines(@"harness", songNamed(song, [args stringForKey:@"file"]));
