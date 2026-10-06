@@ -39,6 +39,11 @@ BOOL SGPlayerPitchFollowsSpeed(void);
 void SGSetPlayerPitchFollowsSpeed(BOOL follows);
 // Whether the output could be reached to change its pitch.
 BOOL SGPlayerPitchAvailable(void);
+// The mod's own volume on Spotify's sound, 0 to 1, 1 when normal: the sleep timer's fade (SleepTimer.h).
+// Any thread. The sound moves to it within half a second and never in a step. It scales what the speaker
+// unit plays, in the output's own format, so a Connect device is left as it was, and it
+// does nothing when Spotify's output was never reached (AudioOutputUnitStart not rebound). Not stored.
+void SGPlayerSetGain(float gain);
 // The audio effects' reverb as the menu sets it, 0 to 100, 0 while it is off. Any amount turns the effects and
 // the reverb on with it; 0 turns the reverb off and leaves the rest of the effects as they were.
 float SGPlayerReverb(void);

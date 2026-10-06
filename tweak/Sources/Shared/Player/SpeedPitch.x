@@ -49,6 +49,9 @@
 //
 // Speed and pitch last until Spotify quits.
 //
+// The music's render notify also scales each finished buffer by the gain SGPlayerSetGain asks for (the sleep
+// timer's fade), in the chain or not.
+//
 // Threading: the render callbacks and the notify run on each unit's render thread and touch only atomics,
 // their own output's record and the units. Spotify connects, starts, stops and disposes on its audio thread;
 // the record changes under sg_outputsLock, there and on sg_outputsQueue (format changes, the silence check).
@@ -344,6 +347,41 @@ static BOOL hasSound(Format *format, AudioUnitRenderActionFlags flags, const Aud
     return NO;
 }
 
+#pragma mark - the render thread: the gain
+
+// The gain asked for (main thread writes, render thread reads) and the one the sound is at (the music's render
+// thread only). The sound moves toward the one asked for by at most the whole way in kGainSlew seconds, so a
+// fade that starts late, a timer cancelled halfway or more time added never steps.
+static const double kGainSlew = 0.5;
+static atomic_uint sg_gainBits;
+static float sg_gainNow = 1;
+
+// Scales a finished buffer, in the hardware's format, ramping each frame from where the last buffer left off.
+// Integers scale as they are, so a fixed point format needs no conversion.
+static void applyGain(Format *hardware, AudioUnitRenderActionFlags *flags, UInt32 frames, AudioBufferList *data) {
+    float target = loadFloat(&sg_gainBits);
+    if (target == 1 && sg_gainNow == 1) return;
+    UInt32 bytes = atomic_load_explicit(&hardware->bytes, memory_order_relaxed);
+    double rate = rateOf(hardware);
+    if ((bytes != 2 && bytes != 4) || rate <= 0) return;
+    float from = sg_gainNow, most = (float)(frames / (kGainSlew * rate));
+    float to = from + fmaxf(-most, fminf(target - from, most));
+    sg_gainNow = to;
+    if (*flags & kAudioUnitRenderAction_OutputIsSilence) return;
+    BOOL isFloat = (atomic_load_explicit(&hardware->flags, memory_order_relaxed) & kAudioFormatFlagIsFloat) != 0;
+    for (UInt32 b = 0; b < data->mNumberBuffers; b++) {
+        AudioBuffer *buffer = &data->mBuffers[b];
+        UInt32 channels = MAX(buffer->mNumberChannels, 1u), samples = buffer->mDataByteSize / bytes;
+        if (!buffer->mData || samples < frames * channels) continue;
+        for (UInt32 i = 0; i < frames * channels; i++) {
+            float gain = from + (to - from) * (float)(i / channels) / (float)frames;
+            if (bytes == 2) ((int16_t *)buffer->mData)[i] = (int16_t)(((int16_t *)buffer->mData)[i] * gain);
+            else if (isFloat) ((float *)buffer->mData)[i] *= gain;
+            else ((int32_t *)buffer->mData)[i] = (int32_t)(((int32_t *)buffer->mData)[i] * (double)gain);
+        }
+    }
+}
+
 // On every started output, `refCon` its Output: notes when it has sound, and shifts the pitch on the music's
 // when it is not fed by the callback.
 static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
@@ -351,7 +389,9 @@ static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const 
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
     Output *output = refCon;
     if (hasSound(&output->hardware, *flags, data)) atomic_store_explicit(&output->loudAt, mach_absolute_time(), memory_order_relaxed);
-    if (output != music() || atomic_load(&output->taken) || !atomic_load(&sg_engaged)) return noErr;
+    if (output != music()) return noErr;
+    applyGain(&output->hardware, flags, frames, data);
+    if (atomic_load(&output->taken) || !atomic_load(&sg_engaged)) return noErr;
     atomic_store(&output->busy, true);
     SGTimePitch *unit = atomic_load(&sg_inPlace);
     if (atomic_load(&sg_engaged) && output == music() && unit && SGTimePitchSampleRate(unit) == rateOf(&output->hardware)) {
@@ -851,6 +891,14 @@ BOOL SGPlayerPitchAvailable(void) {
     return sg_reachable || tapped();
 }
 
+void SGPlayerSetGain(float gain) {
+    if (!sg_reachable) {
+        static int logged;
+        if (logged++ < 1) SGLog(@"audio: Spotify's output was not reached, the gain cannot apply");
+    }
+    storeFloat(&sg_gainBits, fmaxf(0, fminf(gain, 1)));
+}
+
 AudioUnit SGPlayerMusicOutput(void) {
     Output *output = music();
     return output ? atomic_load(&output->unit) : NULL;
@@ -913,6 +961,7 @@ BOOL SGPlayerWatchMusicOutput(SGPlayerOutputWatcher watcher) {
 
 %ctor {
     storeFloat(&sg_speedBits, 1);
+    storeFloat(&sg_gainBits, 1);
     rebind();
     %init;
     SGRequireClasses(@[@"SPTPlayerState"]);

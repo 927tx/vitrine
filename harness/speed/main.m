@@ -15,6 +15,10 @@
 // sample rate, and checks that each decoder is drained at its own rate and only the music's output (the one
 // started last, or the one with sound) takes the speed, through a stop, a start, a silent decoder, a disposed
 // mixer and a disposed output. Each check prints PASS or FAIL.
+//
+// Last, the sleep timer's gain: 0.25, then 1 again. A notify of the harness's own, added after the mod's,
+// reads the loudest sample the speaker unit played over the last second of each step: 0.05 at 1, 0.0125
+// at 0.25.
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -24,9 +28,27 @@ double SGPlayerSpeed(void);
 void SGSetPlayerSpeed(double speed);
 void SGSetPlayerPitch(float semitones);
 BOOL SGPlayerSpeedAllowed(void);
+void SGPlayerSetGain(float gain);
 
 static const double kRate = 44100;
 static atomic_uint_fast64_t sg_decoded;
+// The loudest float sample the output played since the main thread last zeroed it, as its bits.
+static atomic_uint sg_peakBits;
+
+static OSStatus metered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
+                        UInt32 frames, AudioBufferList *data) {
+    if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0) return noErr;
+    uint32_t bits = atomic_load(&sg_peakBits);
+    float peak;
+    memcpy(&peak, &bits, sizeof peak);
+    for (UInt32 b = 0; b < data->mNumberBuffers; b++) {
+        const float *samples = data->mBuffers[b].mData;
+        for (UInt32 i = 0; samples && i < data->mBuffers[b].mDataByteSize / sizeof(float); i++) peak = fmaxf(peak, fabsf(samples[i]));
+    }
+    memcpy(&bits, &peak, sizeof bits);
+    atomic_store(&sg_peakBits, bits);
+    return noErr;
+}
 
 AudioUnit SGPlayerMusicOutput(void);
 
@@ -137,6 +159,7 @@ static void check(OSStatus status, const char *what) {
     for (int i = 0; i < 3; i++) check(AudioUnitSetProperty(units[i], kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &slice, sizeof slice), "slice");
     for (int i = 0; i < 3; i++) check(AudioUnitInitialize(units[i]), "initialize");
     check(AudioOutputUnitStart(output), "start");
+    check(AudioUnitAddRenderNotify(output, metered, NULL), "meter");
     _output = output;
 }
 
@@ -203,9 +226,12 @@ static void expect(NSString *what, double wantA, double wantB) {
     NSTimeInterval now = CACurrentMediaTime();
     uint64_t decoded = atomic_load(&sg_decoded);
     double content = decoded / kRate;
-    NSLog(@"[harness] %-28@ decoder drained %.2fx over the last %.1f s; content %.2f s, state position %.2f s (off %+.0f ms), state speed %.2f",
+    uint32_t bits = atomic_load(&sg_peakBits);
+    float peak;
+    memcpy(&peak, &bits, sizeof peak);
+    NSLog(@"[harness] %-28@ decoder drained %.2fx over the last %.1f s; content %.2f s, state position %.2f s (off %+.0f ms), state speed %.2f, peak %.4f",
           what, (decoded - _lastDecoded) / kRate / (now - _lastAt), now - _lastAt, content, _state.position,
-          (_state.position - content) * 1000, [_state playbackSpeed]);
+          (_state.position - content) * 1000, [_state playbackSpeed], peak);
     _lastDecoded = decoded;
     _lastAt = now;
 }
@@ -239,6 +265,8 @@ static void expect(NSString *what, double wantA, double wantB) {
         @[@12, @"0.75x", @0.75, @3],
         @[@15, @"back to normal", @1, @0],
         @[@18, @"normal, unit out", @1, @0],
+        @[@21, @"gain 0.25", @1, @0, @0.25],
+        @[@24, @"gain back to 1", @1, @0, @1],
     ];
     __block NSString *label = @"normal";
     for (NSArray *step in script) {
@@ -247,12 +275,15 @@ static void expect(NSString *what, double wantA, double wantB) {
             label = step[1];
             SGSetPlayerSpeed([step[2] doubleValue]);
             SGSetPlayerPitch([step[3] floatValue]);
+            if (step.count > 4) SGPlayerSetGain([step[4] floatValue]);
         }];
+        // The peak is read over the step's last second, past the gain's half second ramp.
+        [self after:[step[0] doubleValue] + 2 do:^{ atomic_store(&sg_peakBits, 0); }];
         // A report mid step, the way Spotify's player reports now and then.
         [self after:[step[0] doubleValue] + 1.5 do:^{ [self playerReports]; }];
     }
     if ([NSProcessInfo.processInfo.arguments containsObject:@"rate"]) [self after:7.5 do:^{ [self changeRate]; }];
-    [self after:21 do:^{
+    [self after:27 do:^{
         [self report:label];
         exit(0);
     }];

@@ -33,3 +33,7 @@ the 48 kHz mixer drained 1.92x with both chains started (both outputs pulled it)
 44.1 kHz chain not at all, then silence once the 48 kHz one stopped.
 
     xcrun simctl launch --console-pty <udid> com.vojta.speedharness two
+
+Last it sets the sleep timer's gain (`SGPlayerSetGain`) to 0.25 and back to 1, and each line reads the loudest
+sample the speaker unit played over the step's last second, through a notify the harness adds after the mod's:
+0.05 at 1, 0.0125 at 0.25.
