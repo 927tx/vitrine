@@ -3,7 +3,10 @@
 #import <UIKit/UIKit.h>
 
 extern __weak UIView *sgr_nowPlayingRoot;   // Redesigned/NowPlayingBar/NowPlayingBar.x, the bar
-extern __weak UIView *sgr_nowPlayingCard;   // the bar's painted card, learnt from the album-colour paint
+// Every view in the bar Spotify painted as a card, learnt from the album-colour paint, which goes clear. The bar
+// makes the set and picks its card from it: in a Jam Spotify also paints the Jam strip, or a view around the
+// strip and the track.
+extern NSHashTable<UIView *> *sgr_nowPlayingPainted;
 extern __weak UIView *sgr_lyricsPageRoot;   // Redesigned/Lyrics/LyricsPage.x
 // Redesigned/Playlist/PlaylistField.x, the playlist page. Only the base surface Spotify paints the page,
 // its list and its rows with goes clear here: the artwork field is underneath, and the greys of a

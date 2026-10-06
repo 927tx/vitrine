@@ -250,7 +250,8 @@ Redesigned:
                   Offline or Private Session under the bar), so the now playing bar and the pages move up with it. Laid out on
                   the Mac against harness/tabbar/
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
-                  (BarConnect.x, its own key and its own Now playing page, apart from the native look's)
+                  (BarConnect.x, its own key and its own Now playing page, apart from the native look's). In a Jam the
+                  glass stays on the track and Spotify's Jam strip gets a pane of its own above it (harness/tabbar/, jam)
     Player/       the redesigned full screen player (Player.h lists its files); its more button is handed to
                   Shared/Player's Speed and pitch, which draws in the menu it opens, and a hold on either side of the
                   cover plays at 2x until the finger lifts (PlayerArtwork.x), an octave higher while Pitch follows

@@ -38,6 +38,15 @@ half way through a slide what the screen shows of the message bar, the tab bar a
 
     xcrun simctl spawn <udid> log show --last 1m --style compact --predicate 'eventMessage CONTAINS "[harness]" OR eventMessage CONTAINS "tab bar:"'
 
+`jam` plays a Jam: a strip under the class name of Spotify's (a SwiftUI hosting view of
+`Jam_AttachmentsImpl.JamHatElement`, 44 pt) over the card, both in a view painted the album colour too,
+the bar 44 pt taller, and the strip gone again at 3.5 s. The log then lists the bar's glass panes. The
+card's glass should be the track card's (386x56), the strip's pane 36 pt above it with a 4 pt gap, and
+once the Jam is over the card's glass should still be 386x56 and the strip's pane should have no effect.
+Before the fix the card's glass was the painted view around both, cut to 80 pt, over the strip and
+the top 36 pt of the track. How Spotify really nests the strip is not known; this is one way the spec's description
+allows.
+
 Before the fix the gap was -26 pt with nothing under the bar on an iPhone SE, and with the message bar
 up on any phone: UIKit's glass bar is 83 pt, Spotify's bar was its 49 pt row with no inset under it,
 and the glass bar stood the difference above it, over the now playing bar.

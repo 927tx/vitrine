@@ -35,26 +35,69 @@
 @implementation _TtC22NowPlaying_BarPageImplP33_CCC0D2EEA6D4725EECD8965E8C38C86D20TouchPassthroughView
 @end
 
+// A Jam (`jam`): Spotify's strip, a SwiftUI hosting view of Jam_AttachmentsImpl.JamHatElement 44pt high,
+// over the card, both in a view that is painted too, and the bar 44pt taller.
+@interface _TtGC7SwiftUI14_UIHostingViewV19Jam_AttachmentsImpl13JamHatElement_ : UIView
+@end
+@implementation _TtGC7SwiftUI14_UIHostingViewV19Jam_AttachmentsImpl13JamHatElement_
+@end
+
+static BOOL sgJam;
+static __weak UIView *sgJamStrip;
+
 @interface _TtC18NowPlaying_BarImpl27NowPlayingBarViewController : UIViewController
 @end
 @implementation _TtC18NowPlaying_BarImpl27NowPlayingBarViewController
 - (void)loadView {
     self.view = [UIView new];
+    UIColor *album = [UIColor colorWithRed:0x18 / 255.0 green:0x14 / 255.0 blue:0x1C / 255.0 alpha:1];
+    UIView *host = self.view;
+    if (sgJam) {
+        host = [[UIView alloc] initWithFrame:self.view.bounds];
+        host.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        host.backgroundColor = album;
+        [self.view addSubview:host];
+    }
     // The card, 386x56 at {8,0} with the album colour, the artwork, two lines and the progress line
     // (trees/clean/home/01.txt, SPTNowPlayingBar).
     UIView *card = [UIView new];
     card.accessibilityIdentifier = @"SPTNowPlayingBar";
-    card.backgroundColor = [UIColor colorWithRed:0x18 / 255.0 green:0x14 / 255.0 blue:0x1C / 255.0 alpha:1];
+    card.backgroundColor = album;
     card.layer.cornerRadius = 8;
     card.clipsToBounds = YES;
     card.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:card];
+    [host addSubview:card];
     [NSLayoutConstraint activateConstraints:@[
-        [card.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [card.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [card.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-        [card.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [card.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
+        [card.trailingAnchor constraintEqualToAnchor:host.trailingAnchor],
+        [card.bottomAnchor constraintEqualToAnchor:host.bottomAnchor],
+        sgJam ? [card.heightAnchor constraintEqualToConstant:56] : [card.topAnchor constraintEqualToAnchor:host.topAnchor],
     ]];
+    if (sgJam) {
+        UIView *strip = [_TtGC7SwiftUI14_UIHostingViewV19Jam_AttachmentsImpl13JamHatElement_ new];
+        strip.backgroundColor = [UIColor colorWithRed:0.1 green:0.45 blue:0.3 alpha:1];
+        strip.translatesAutoresizingMaskIntoConstraints = NO;
+        [host addSubview:strip];
+        UILabel *label = [UILabel new];
+        label.text = @"Jam by Alex";
+        label.font = [UIFont boldSystemFontOfSize:13];
+        label.textColor = UIColor.whiteColor;
+        label.frame = CGRectMake(16, 12, 200, 20);
+        [strip addSubview:label];
+        UIButton *more = [UIButton systemButtonWithImage:[UIImage systemImageNamed:@"ellipsis"] target:nil action:nil];
+        more.tintColor = UIColor.whiteColor;
+        more.translatesAutoresizingMaskIntoConstraints = NO;
+        [strip addSubview:more];
+        [NSLayoutConstraint activateConstraints:@[
+            [strip.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
+            [strip.trailingAnchor constraintEqualToAnchor:host.trailingAnchor],
+            [strip.bottomAnchor constraintEqualToAnchor:card.topAnchor],
+            [strip.heightAnchor constraintEqualToConstant:44],
+            [more.trailingAnchor constraintEqualToAnchor:strip.trailingAnchor constant:-8],
+            [more.centerYAnchor constraintEqualToAnchor:strip.centerYAnchor],
+        ]];
+        sgJamStrip = strip;
+    }
     UIView *art = [[UIView alloc] initWithFrame:CGRectMake(8, 8, 40, 40)];
     art.layer.cornerRadius = 4;
     art.clipsToBounds = YES;
@@ -228,6 +271,7 @@ static UIView *item(Class cls, NSString *title, NSString *symbol, BOOL active) {
 @property (nonatomic, strong) UIView *banner;
 @property (nonatomic, strong) NSLayoutConstraint *bannerHeight;
 @property (nonatomic, strong) UIView *npb;
+@property (nonatomic, strong) NSLayoutConstraint *npbHeight;
 @end
 
 @implementation SGHarnessChrome
@@ -284,7 +328,7 @@ static UIView *item(Class cls, NSString *title, NSString *symbol, BOOL active) {
         [npb.leadingAnchor constraintEqualToAnchor:view.leadingAnchor],
         [npb.trailingAnchor constraintEqualToAnchor:view.trailingAnchor],
         [npb.bottomAnchor constraintEqualToAnchor:self.tabs.compactTabBarHeightLayoutGuide.topAnchor],
-        [npb.heightAnchor constraintEqualToConstant:64],
+        self.npbHeight = [npb.heightAnchor constraintEqualToConstant:sgJam ? 108 : 64],
         // CompactNowPlayingViewController: the content 8 pt above its own bottom (0x105345190).
         [content.view.leadingAnchor constraintEqualToAnchor:npb.leadingAnchor],
         [content.view.trailingAnchor constraintEqualToAnchor:npb.trailingAnchor],
@@ -356,6 +400,15 @@ static void report(SGHarnessChrome *chrome, NSString *moment) {
           NSStringFromCGRect(banner), NSStringFromCGRect(stockFrame), NSStringFromCGRect(systemFrame), NSStringFromCGRect(platterFrame),
           NSStringFromCGRect(card), CGRectGetMinY(platterFrame) - CGRectGetMaxY(card), chrome.tabs.additionalSafeAreaInsets.bottom,
           listEnd, CGRectGetMinY(card));
+    // The glass panes of the now playing bar, the card's and in a Jam the strip's, and the strip itself.
+    UIView *container = chrome.npb.subviews.firstObject;
+    for (UIView *sub in container.subviews) {
+        if (![sub isKindOfClass:UIVisualEffectView.class]) continue;
+        NSLog(@"[harness] %@ bar pane %@ %@", moment, NSStringFromCGRect([sub convertRect:sub.bounds toView:window]),
+              ((UIVisualEffectView *)sub).effect ? @"shown" : @"no effect");
+    }
+    UIView *strip = sgJamStrip;
+    if (strip.window) NSLog(@"[harness] %@ strip %@", moment, NSStringFromCGRect([strip convertRect:strip.bounds toView:window]));
 }
 
 #pragma mark - the app
@@ -391,6 +444,15 @@ static void after(double seconds, dispatch_block_t block) {
     // `away` one there from the start sliding away at 1.5 s, `cycle` in at 1.5 s and out at 4.5 s.
     NSArray<NSString *> *args = NSProcessInfo.processInfo.arguments;
     NSString *mode = args.count > 1 ? args[1] : @"none";
+    // `jam`: in a Jam from the start, and out of it at 3.5 s.
+    if ([mode isEqualToString:@"jam"]) {
+        after(3.5, ^{
+            [sgJamStrip removeFromSuperview];
+            chrome.npbHeight.constant = 64;
+            [chrome.view layoutIfNeeded];
+        });
+        after(4.5, ^{ report(chrome, @"left the jam"); });
+    }
     if ([mode isEqualToString:@"away"]) [chrome setBanner:YES animated:NO];
     after(0.5, ^{
         UITableView *list = (UITableView *)chrome.tabs.childViewControllers.firstObject.view;
@@ -401,7 +463,7 @@ static void after(double seconds, dispatch_block_t block) {
     if ([mode isEqualToString:@"away"]) after(1.5, ^{ [chrome setBanner:NO animated:YES]; });
     if ([mode isEqualToString:@"cycle"]) after(4.5, ^{ [chrome setBanner:NO animated:YES]; });
     // Half way through the slide, what the screen shows (the presentation layers).
-    if (![mode isEqualToString:@"none"]) after(1.5 + 0.17, ^{
+    if ([mode isEqualToString:@"shown"] || [mode isEqualToString:@"away"] || [mode isEqualToString:@"cycle"]) after(1.5 + 0.17, ^{
         CALayer *stock = chrome.tabs.bar.layer.presentationLayer, *npb = chrome.npb.layer.presentationLayer, *banner = chrome.banner.layer.presentationLayer;
         NSLog(@"[harness] mid-slide presented: banner top %.1f, tab bar top %.1f, now playing bar bottom %.1f",
               [banner convertPoint:CGPointZero toLayer:self.window.layer.presentationLayer].y,
@@ -418,5 +480,6 @@ static void after(double seconds, dispatch_block_t block) {
 @end
 
 int main(int argc, char *argv[]) {
+    sgJam = argc > 1 && strcmp(argv[1], "jam") == 0;
     @autoreleasepool { return UIApplicationMain(argc, argv, nil, NSStringFromClass(SGHarnessApp.class)); }
 }
