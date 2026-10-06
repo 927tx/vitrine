@@ -49,8 +49,11 @@ come late, out of order, or not at all.
 - `immersive` opens the lyrics and waits past the rest: only the bottom stack under the title row
   (progress bar, buttons, volume row, footer) fades, the lines grow down only, a touch where the buttons
   were lands on the lines, the thumbnail takes its own, and the lines' tap is off. Then the tap that
-  wakes them (fired in code), a scroll that hides them again and the thumbnail closing the lyrics. The
-  log ends with `immersive checks: n of 10 right -- PASS` or `FAIL`.
+  wakes them (fired in code), a scroll that hides them again and the thumbnail closing the lyrics. Then,
+  opened again, a sheet over the player keeps the controls up past the rest and they fade once it has
+  gone, Sing's mic stays with the lines and takes its own touch, and a finger held on the player (its
+  touch watcher driven in code) keeps the controls up until it lifts. The log ends with
+  `immersive checks: n of 15 right -- PASS` or `FAIL`.
 - `badge` shows the hold's 2× badge on the cover by hand, holds again while it fades out and lets go.
   The log ends with `badge checks: n of 3 right -- PASS` or `FAIL`.
 

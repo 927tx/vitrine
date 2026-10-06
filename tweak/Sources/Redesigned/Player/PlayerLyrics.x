@@ -28,6 +28,9 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Redesigned/Lyrics/SGRKaraokeView.h"
+#import "Redesigned/Lyrics/SGRSingButton.h"
+#import "Settings/SGPageStyle.h"
+#import "Shared/Sing/Sing.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/LocalFiles/LocalFiles.h"
 #import "Player.h"
@@ -60,6 +63,7 @@ static __weak UIViewController *sg_info, *sg_duration, *sg_floating;
 static __weak UIView *sg_titleElement;      // the arranged element view holding the title and the artist
 static __weak UIViewController *sg_player;  // NowPlayingViewController, whose units the controls are
 static BOOL sg_alone;                       // the lines have the player to themselves
+static BOOL sg_touching;                    // a finger is on the player, which holds the clock (SGRPlayerTouchWatcher)
 static NSTimer *sg_rest;
 static __weak UIGestureRecognizer *sg_wake; // on the player, on while alone: the tap that brings the controls back
 
@@ -130,6 +134,8 @@ static __weak UIGestureRecognizer *sg_wake; // on the player, on while alone: th
     if (!_lyrics) {
         _lyrics = [[SGRKaraokeView alloc] initWithFrame:_stage.bounds];
         _lyrics.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        // Sing's mic stays while the lines are on their own, moving down with them (setAlone).
+        _lyrics.keepsSing = YES;
     }
     if (_lyrics.superview != _stage) [_stage addSubview:_lyrics];
     _lyrics.frame = _stage.bounds;
@@ -306,7 +312,8 @@ static CGFloat thumbRadius(SGRLyricsLayout l, BOOL open) {
 // the title row stay, so the song playing is still named, and stay Spotify's and the thumbnail's to touch.
 // The lines scroll as they always do and leave the controls hidden; a tap brings them back and is not a
 // seek. A pause brings them back and keeps them; VoiceOver, a sheet over the player and the app in the
-// background keep them up. A scroll through the lines hides them at once.
+// background keep them up. A scroll through the lines hides them at once. Sing's mic stays with the lines,
+// and a touch on it is the mic's: it does not bring the controls back.
 //
 // The tap is a recognizer on the player that recognizes with any other, so the thumbnail's tap closes the
 // lyrics the same time it brings the controls back, and a button takes its own tap: UIKit gives a control
@@ -384,41 +391,95 @@ static void letLinesSeek(SGRPlayerLyricsOverlay *overlay, BOOL seek) {
 
 static void setAlone(BOOL alone, BOOL animated);
 
-static BOOL mayRest(void) {
-    SPTPlayerState *state = SGPlayerState();
+// A sheet, a menu or an alert over the player: the top controller on screen is not one the player is drawn
+// in. The queue, devices and ⋯ sheets can be presented from the player's topmost parent rather than the
+// player, which the player's own presentedViewController would miss, and Sing's explanation is an alert on
+// the top controller (SGRSingButton.m).
+static BOOL coveredBySheet(void) {
+    UIViewController *top = SGTopController();
     UIView *host = sg_host;
-    return SGEnabled(SGRKeyLyricsAutoHide) && sg_open && !sg_alone && host.window && state && !state.isPaused
-        && !UIAccessibilityIsVoiceOverRunning()
-        && UIApplication.sharedApplication.applicationState == UIApplicationStateActive
-        && !sg_player.presentedViewController;
+    if (!top.viewIfLoaded || !host || [host isDescendantOfView:top.viewIfLoaded]) return NO;
+    static NSUInteger logged;
+    if (logged++ < 3) SGLog(@"redesign player: %@ over the player keeps the controls up", NSStringFromClass(top.class));
+    return YES;
 }
 
-// The clock starts again at every touch, and stops for anything that keeps the controls up.
+// Whether the clock runs: the lines up with the controls, the song playing with the app in front, no finger
+// on the player and VoiceOver off (which keeps the controls up, and starts the clock again when it goes).
+static BOOL mayCount(void) {
+    SPTPlayerState *state = SGPlayerState();
+    UIView *host = sg_host;
+    return SGEnabled(SGRKeyLyricsAutoHide) && sg_open && !sg_alone && !sg_touching && host.window && state && !state.isPaused
+        && !UIAccessibilityIsVoiceOverRunning()
+        && UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
+}
+
+// Whether the controls may fade as it runs out: not under a sheet, nor while Sing gets ready.
+static BOOL mayRest(void) {
+    return mayCount() && !coveredBySheet() && SGSingCurrentState() != SGSingStatePreparing;
+}
+
+// The clock starts again at every touch. Run out while something keeps the controls up (a sheet, Sing getting
+// ready, lines still being measured), it starts over, so they fade once that has gone.
 static void restartRest(void) {
     [sg_rest invalidate];
     sg_rest = nil;
-    if (!mayRest()) return;
+    if (!mayCount()) return;
     sg_rest = [NSTimer scheduledTimerWithTimeInterval:kRest repeats:NO block:^(NSTimer *timer) {
         sg_rest = nil;
         if (mayRest()) setAlone(YES, YES);
+        if (!sg_alone) restartRest();
     }];
 }
 
-@interface SGRPlayerTouchWatcher : UIGestureRecognizer
+@interface SGRPlayerTouchWatcher : UIGestureRecognizer <UIGestureRecognizerDelegate>
 @end
 
-// Sees every touch on the player and takes none: it fails at once, so nothing under it loses one.
+// Sees every touch on the player and takes none. It never recognizes: it holds the clock while a finger is
+// down, so a hold on Sing's slider that runs past the rest fades nothing under it, and starts the clock once
+// the last finger lifts. Nothing can end its watch early, or a scroll or a hold that recognized would start
+// the clock under the finger.
 @implementation SGRPlayerTouchWatcher
 - (instancetype)init {
     if (!(self = [super initWithTarget:nil action:nil])) return nil;
+    self.delegate = self;
     self.cancelsTouchesInView = NO;
     self.delaysTouchesBegan = NO;
     self.delaysTouchesEnded = NO;
     return self;
 }
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)recognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other {
+    return YES;
+}
+- (BOOL)canBePreventedByGestureRecognizer:(UIGestureRecognizer *)other {
+    return NO;
+}
+- (BOOL)canPreventGestureRecognizer:(UIGestureRecognizer *)other {
+    return NO;
+}
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    if (!sg_alone) restartRest();
+    sg_touching = YES;
+    [sg_rest invalidate];
+    sg_rest = nil;
+}
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [self lifted:event];
+}
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [self lifted:event];
+}
+- (void)lifted:(UIEvent *)event {
+    for (UITouch *touch in [event touchesForGestureRecognizer:self]) {
+        if (touch.phase != UITouchPhaseEnded && touch.phase != UITouchPhaseCancelled) return;
+    }
     self.state = UIGestureRecognizerStateFailed;
+}
+// After the last finger, or the watch ended any other way.
+- (void)reset {
+    [super reset];
+    if (!sg_touching) return;
+    sg_touching = NO;
+    if (!sg_alone) restartRest();
 }
 @end
 
@@ -437,6 +498,13 @@ static void restartRest(void) {
     return self;
 }
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)recognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other {
+    return YES;
+}
+// Sing's mic and its slider stay while the lines are alone, and a touch on them is theirs alone.
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)recognizer shouldReceiveTouch:(UITouch *)touch {
+    for (UIView *v = touch.view; v; v = v.superview) {
+        if ([v isKindOfClass:SGRSingButton.class]) return NO;
+    }
     return YES;
 }
 - (void)sgr_woke {
@@ -527,7 +595,7 @@ static void setOpen(BOOL open, BOOL animated) {
         overlay.stage.transform = entering;
         // Not under VoiceOver, which keeps the controls up, nor under a sheet.
         overlay.lyrics.browsingBegan = ^{
-            if (!UIAccessibilityIsVoiceOverRunning() && !sg_player.presentedViewController) setAlone(YES, YES);
+            if (!UIAccessibilityIsVoiceOverRunning() && !coveredBySheet()) setAlone(YES, YES);
         };
         // Spotify's cover goes the moment the redesign's own takes its place: the same picture at the
         // same size with the same corners, so there is nothing to see in the swap. Coming back it waits

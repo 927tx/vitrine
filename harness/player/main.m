@@ -1225,7 +1225,51 @@ static BOOL linesSeek(SGRKaraokeView *lyrics) {
         check(@"the thumbnail closes the lyrics while alone", !SGRPlayerLyricsOpen() && lowerShown() && !wake.enabled,
               [NSString stringWithFormat:@"lyrics %@, controls %.0f", SGRPlayerLyricsOpen() ? @"up" : @"down", duration.alpha]);
     });
-    after(11, ^{
+    // A sheet over the player keeps the controls up past the rest, and the clock runs again behind it, so
+    // they fade within a rest of the sheet going.
+    after(11.5, ^{ SGRPlayerToggleLyrics(); });
+    __block UIViewController *sheet = nil;
+    after(12, ^{
+        sheet = [UIViewController new];
+        sheet.view.backgroundColor = UIColor.darkGrayColor;
+        [self.window.rootViewController presentViewController:sheet animated:NO completion:nil];
+    });
+    after(17, ^{
+        check(@"a sheet keeps the controls up", SGRPlayerLyricsOpen() && lowerShown(), [NSString stringWithFormat:@"controls %.0f", duration.alpha]);
+        [sheet dismissViewControllerAnimated:NO completion:nil];
+    });
+    after(22, ^{
+        check(@"they fade once the sheet has gone", lowerHidden(), [NSString stringWithFormat:@"controls %.0f", duration.alpha]);
+        // Sing's mic stays with the lines on their own, and takes its own touch.
+        UIView *mic = nil;
+        for (UIView *view in lines().subviews) {
+            if ([NSStringFromClass(view.class) isEqualToString:@"SGRSingButton"]) mic = view;
+        }
+        CGPoint onMic = [host convertPoint:CGPointMake(CGRectGetMidX(mic.bounds), CGRectGetMidY(mic.bounds)) fromView:mic];
+        UIView *hit = [host hitTest:onMic withEvent:nil];
+        CGRect drawn = [host convertRect:mic.bounds fromView:mic];
+        check(@"the mic stays and takes its touch", mic && ![[mic valueForKey:@"tucked"] boolValue] && mic.userInteractionEnabled && [hit isDescendantOfView:mic]
+              && CGRectGetMaxY(drawn) > CGRectGetMaxY(withControls),
+              [NSString stringWithFormat:@"mic %@ at %@, hit %@", mic ? @"there" : @"missing", NSStringFromCGRect(drawn), NSStringFromClass(hit.class)]);
+        NSLog(@"[harness] immersive: screenshot the mic alone now");
+    });
+    after(28, ^{ [wake sgr_woke]; });
+    // A finger held on the player (Sing's slider) holds the clock, and lifting it starts the clock over.
+    __block UIGestureRecognizer *watcher = nil;
+    after(28.5, ^{
+        for (UIGestureRecognizer *recognizer in host.gestureRecognizers) {
+            if ([NSStringFromClass(recognizer.class) isEqualToString:@"SGRPlayerTouchWatcher"]) watcher = recognizer;
+        }
+        [watcher touchesBegan:[NSSet set] withEvent:[UIEvent new]];
+    });
+    after(34, ^{
+        check(@"a finger held keeps the controls up", watcher && lowerShown(), [NSString stringWithFormat:@"controls %.0f", duration.alpha]);
+        [watcher reset];
+    });
+    after(39, ^{
+        check(@"lifted, the clock runs out", lowerHidden(), [NSString stringWithFormat:@"controls %.0f", duration.alpha]);
+    });
+    after(40, ^{
         NSLog(@"[harness] immersive checks: %lu of %lu right -- %@", (unsigned long)right, (unsigned long)checks, right == checks ? @"PASS" : @"FAIL");
     });
 }

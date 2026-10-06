@@ -1449,7 +1449,7 @@ typedef struct {
         _extras.alpha = hidden ? 0 : 1;
         _extrasBox.userInteractionEnabled = !hidden;
     }
-    _sing.tucked = hidden;
+    _sing.tucked = hidden && !_keepsSing;
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
