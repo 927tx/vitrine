@@ -30,6 +30,7 @@
 #import "Redesigned/Kit/SGRKit.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/PlayerState.h"
+#import "Shared/Player/SGLastTrack.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
 
@@ -352,6 +353,7 @@ static UIView *previewOf(NSURL *file, UIImage *poster) {
 // The playing track's clip the Player page looked up itself while the player had none, and its poster; the
 // file is nil while the walk is out or after it found nothing. The walk is the player's (SGMotionClipFor, at
 // the size SGMotionFollower asks for), so its file lands in the store, where the player's own walk finds it.
+// With no track playing, the track is the last one played (Shared/Player/SGLastTrack.h).
 static NSString *sg_previewTrack;
 static NSURL *sg_previewFile;
 static UIImage *sg_previewPoster;
@@ -359,8 +361,8 @@ static void (^sg_previewArrived)(void);
 
 UIView *SGRPlayerMotionPreview(void (^arrived)(void)) {
     if (sg_motionFile) return previewOf(sg_motionFile, sg_motionPoster);
-    SPTPlayerState *state = SGPlayerState();
-    NSString *track = SGURIString(state.track.URI);
+    SGShownTrack *shown = SGShownTrackNow();
+    NSString *track = shown.uri;
     if (!track) return nil;
     BOOL asked = [track isEqualToString:sg_previewTrack];
     if (asked && sg_previewFile) return previewOf(sg_previewFile, sg_previewPoster);
@@ -371,9 +373,8 @@ UIView *SGRPlayerMotionPreview(void (^arrived)(void)) {
     sg_previewTrack = track;
     sg_previewFile = nil;
     sg_previewPoster = nil;
-    NSDictionary *metadata = [state.track.metadata isKindOfClass:NSDictionary.class] ? state.track.metadata : nil;
-    SGLog(@"redesign player: the Player page looks up the clip of %@", track);
-    SGMotionClipFor(track, SGMotionCanvasIn(metadata), state.track.artistName, metadata[@"album_title"], SGMotionTall, SGMotionPixels(),
+    SGLog(@"redesign player: the Player page looks up the clip of %@%@", track, shown.current ? @"" : @", the last played");
+    SGMotionClipFor(track, shown.canvasURL, shown.artist, shown.album, SGMotionTall, SGMotionPixels(),
                     ^(NSURL *file, NSString *source) {
         if (![track isEqualToString:sg_previewTrack]) return;
         // Nothing found is not kept: the page asks again the next time it shows Animated.

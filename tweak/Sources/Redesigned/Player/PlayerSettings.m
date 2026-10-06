@@ -1,8 +1,10 @@
 // The redesign's Player page in Mod Settings (App/Pages.m opens it in place of the native look's).
 //
 // It leads with a card of the player as the now playing track shows on it: the background chosen on the
-// page edge to edge, and over its foot the cover, the title, the artist and how far the track has played.
-// The progress is where the track was when the page appeared.
+// page edge to edge, and over its foot the cover, the title and the artist (gliding when too long) and how
+// far the track has played. The progress is where the track was when the page appeared. With no track, the
+// card shows the last one played (Shared/Player/SGLastTrack.h), its cover fetched and its Canvas looked up
+// as the playing one's would be, and with none ever played, Not Playing over a gradient of the accent.
 //
 // The background is the player's own: a field of the same kind (Still, Colours, Fluid), for Animated
 // the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or, while the player has
@@ -26,6 +28,7 @@
 #import "Redesigned/Kit/SGRKit.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
+#import "Shared/Player/SGLastTrack.h"
 #import "Player.h"
 
 // The card's height as a share of its width, kept between the two bounds.
@@ -53,9 +56,10 @@ static NSArray<NSString *> *backgroundNotes(void) {
     SGRArtworkField *_field;
     UIView *_motion, *_visualiser;
     UIImageView *_cover;
-    UILabel *_title, *_artist;
+    SGMarqueeLabel *_title, *_artist;
     UIView *_progress, *_progressFill;
     CGFloat _position;
+    NSString *_artworkOf;   // the last track whose cover the card asked for
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -84,13 +88,16 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _cover.preferredSymbolConfiguration = [UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightRegular];
     [self addSubview:_cover];
 
-    _title = [UILabel new];
+    // The card reads as one image; the words glide as the player's own do.
+    _title = [SGMarqueeLabel new];
     _title.textColor = SGRPrimary();
     _title.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    _title.isAccessibilityElement = NO;
     [self addSubview:_title];
-    _artist = [UILabel new];
+    _artist = [SGMarqueeLabel new];
     _artist.textColor = SGRSecondary();
     _artist.font = [UIFont systemFontOfSize:15];
+    _artist.isAccessibilityElement = NO;
     [self addSubview:_artist];
 
     // The player's slider as it is drawn at rest: a track, and in it a fill up to where the song is.
@@ -120,26 +127,48 @@ static NSArray<NSString *> *backgroundNotes(void) {
 - (void)artworkChanged {
     NSString *identity = nil;
     UIImage *image = SGRNowPlayingArtwork(NULL, &identity);
-    if (!image) return;
-    _cover.image = image;
+    if (image) [self showArtwork:image identity:identity];
+}
+
+// The cover and the field from `image`, or from the placeholder for nil.
+- (void)showArtwork:(UIImage *)image identity:(NSString *)identity {
+    static UIImage *placeholder;
+    static UIColor *tint;
+    if (!image && (!placeholder || ![tint isEqual:SGGreen()])) {
+        tint = SGGreen();
+        placeholder = SGPlaceholderArtwork(tint);
+    }
+    _cover.image = image ?: placeholder;
     _cover.contentMode = UIViewContentModeScaleAspectFill;
-    [_field setArtwork:image identity:identity animated:self.window != nil];
+    [_field setArtwork:_cover.image identity:image ? identity : @"placeholder" animated:self.window != nil];
 }
 
 // The track, where it is and whether it plays, read again.
 - (void)reloadTrack {
     SPTPlayerState *state = SGPlayerState();
-    SPTPlayerTrack *track = state.track;
-    _title.text = track.trackTitle.length ? track.trackTitle : @"Not Playing";
-    _artist.text = track.artistName ?: @"";
-    _position = state.duration > 0 ? MIN(1, MAX(0, state.position / state.duration)) : 0;
+    SGShownTrack *shown = SGShownTrackNow();
+    _title.text = shown.title ?: @"Not Playing";
+    _artist.text = shown.artist ?: @"";
+    _position = shown.current && state.duration > 0 ? MIN(1, MAX(0, state.position / state.duration)) : 0;
     // The clip covers the field, and the hills move over it, which then holds still, as in the player.
     _field.motionHeld = state.isPaused || _motion != nil || _visualiser != nil;
-    if (SGRNowPlayingArtwork(NULL, NULL)) {
+    if (shown.current && SGRNowPlayingArtwork(NULL, NULL)) {
         [self artworkChanged];
+    } else if (!shown.current && shown.artworkURL) {
+        // The last track's cover, the placeholder until it comes.
+        NSString *uri = shown.uri;
+        if (![_artworkOf isEqualToString:uri]) [self showArtwork:nil identity:nil];
+        _artworkOf = uri;
+        __weak SGRPlayerShowcase *weakSelf = self;
+        SGShownTrackArtwork(shown, ^(UIImage *image) {
+            SGRPlayerShowcase *showcase = weakSelf;
+            SGShownTrack *now = SGShownTrackNow();
+            if (image && !now.current && [now.uri isEqualToString:uri]) [showcase showArtwork:image identity:[@"last:" stringByAppendingString:uri]];
+        });
     } else {
-        _cover.image = [UIImage systemImageNamed:@"music.note"];
-        _cover.contentMode = UIViewContentModeCenter;
+        // Nothing ever played, or the playing track's cover still coming.
+        _artworkOf = nil;
+        [self showArtwork:nil identity:nil];
     }
     [self setNeedsLayout];
 }
@@ -301,12 +330,12 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
         SGSection(nil, @[sources, lowData]),
         SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
-                       @"Apple Music style shrinks the tab bar to two tabs as a page scrolls down and puts the now "
-                       "playing bar between them; scrolling back up undoes it. There the bar keeps its cover, title "
-                       "and play button, and the device button too when it is on. Apple Music style applies at once, the device button "
-                       "the next time the bar shrinks."), nil];
+                       @"Apple Music style moves the now playing bar in between two tabs as you scroll down."), nil];
     [sections addObjectsFromArray:more];
-    SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:SGRestartNote];
+    // Fluid, Animated and Visualiser share the field (PlayerMotion.x reads the choice on every track, PlayerVisualiser.m
+    // on the field's layout); Still and Colours are a field of another kind, made once a launch (PlayerField.x).
+    NSString *footer = @"Fluid, Animated and Visualiser change with the next song. Still, Colours and Hide on the player apply after you restart Spotify.";
+    SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:footer];
     page.showcase = showcase;
     page.backgrounds = backgrounds;
     [backgrounds addTarget:page action:@selector(backgroundPicked) forControlEvents:UIControlEventValueChanged];

@@ -82,6 +82,11 @@ come late, out of order, or not at all.
   it without asking the server again. Fluid and then Animated again bring it back at once. The clip's address is
   the run's own, so the store never has it from a run before. The log ends with
   `preview checks: n of 7 right -- PASS` or `FAIL`; on the sources before the fix it read 5 of 7.
+- `card` plays nothing and opens the Player page at 1 s, then logs the card's title, artist and cover size: with
+  no track ever played, Not Playing over the accent's gradient; with `HARNESS_LAST=1`, a last track played with a
+  long title (gliding), its cover from the picture server and a Canvas of the run's own (`HARNESS_CANVAS_FILE`).
+  `HARNESS_BACKGROUND` is the background's index, Fluid if unset. For screenshots: 2026-10-06 on an iPhone 17 Pro,
+  iOS 27.0, the card read Not Playing over a dim green field, and Holocene with its cover over Fluid.
 - `visualiser` plays the Visualiser background, fed by `stubs.m`'s stand-in for the audio effects' reader: a song
   of its own at 120 beats a minute, handed over in buffers of 1024 at 48 kHz. It checks the hills stand on the
   Fluid field held still with the reader on and the link at up to 60 fps, blur behind the lyrics with the link at

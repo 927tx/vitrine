@@ -608,6 +608,8 @@ static UIViewController *unitOf(UIView *view) {
     return [next isKindOfClass:UIViewController.class] ? (UIViewController *)next : nil;
 }
 
+static UIView *firstOfClass(UIView *root, NSString *name);
+
 static void after(NSTimeInterval seconds, dispatch_block_t block) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)), dispatch_get_main_queue(), block);
 }
@@ -632,6 +634,21 @@ static void after(NSTimeInterval seconds, dispatch_block_t block) {
     UIImage *first = checks ? solid(UIColor.redColor) : _cover.image;
     [self showOnScreen:first];
     serve(imageURI(@"aaaa"), first, 0.2, NO);
+    // card: nothing plays; the Player page's card shows the last track played, or none.
+    if ([scenario() isEqualToString:@"card"]) {
+        after(1, ^{
+            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:SGRPlayerSettingsPage(@[])];
+            nav.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self.window.rootViewController presentViewController:nav animated:NO completion:nil];
+            after(2, ^{
+                UIView *card = firstOfClass(((UITableViewController *)nav.topViewController).tableView.tableHeaderView, @"SGRPlayerShowcase");
+                UIImageView *cover = [card valueForKey:@"_cover"];
+                NSLog(@"[harness] card: \"%@\", \"%@\", cover %.0fx%.0f", [[card valueForKey:@"_title"] text], [[card valueForKey:@"_artist"] text],
+                      cover.image.size.width, cover.image.size.height);
+            });
+        });
+        return;
+    }
     [self playTrack:@"spotify:track:harnessA" image:imageURI(@"aaaa")];
     // The bar lays out once as the app comes up.
     [_bar viewDidLayoutSubviews];
@@ -1587,6 +1604,22 @@ __attribute__((constructor(101))) static void sgr_harnessDefaults(void) {
         [NSUserDefaults.standardUserDefaults setInteger:0 forKey:@"spotifyglass.redesign.player.background"];
         setenv("HARNESS_CANVAS", [NSString stringWithFormat:@"https://canvas.harness/preview-%d.mp4", getpid()].UTF8String, 1);
         setenv("HARNESS_CANVAS_DELAY", "2", 1);
+        [NSURLProtocol registerClass:SGRHarnessPictureServer.class];
+    }
+    // card: HARNESS_BACKGROUND (an index, Fluid if unset), and with HARNESS_LAST=1 a last track played whose cover is
+    // the picture server's first picture; without it, no track ever played.
+    if ([scenario() isEqualToString:@"card"]) {
+        NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+        const char *background = getenv("HARNESS_BACKGROUND");
+        [store setInteger:background ? atoi(background) : 2 forKey:@"spotifyglass.redesign.player.background"];
+        if (getenv("HARNESS_LAST")) {
+            [store setObject:@{@"uri": @"spotify:track:last", @"title": @"Holocene, the Long Version Recorded Live at the Old Church",
+                               @"artist": @"Bon Iver", @"artwork": [@"https://i.scdn.co/image/" stringByAppendingString:[imageURI(@"aaaa") substringFromIndex:14]],
+                               @"canvas": [NSString stringWithFormat:@"https://canvas.harness/last-%d.mp4", getpid()]}
+                      forKey:@"spotifyglass.lastTrack"];
+        } else {
+            [store removeObjectForKey:@"spotifyglass.lastTrack"];
+        }
         [NSURLProtocol registerClass:SGRHarnessPictureServer.class];
     }
     if ([scenario() isEqualToString:@"motion"] || [scenario() isEqualToString:@"settings"]) {
