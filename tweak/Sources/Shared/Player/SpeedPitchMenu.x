@@ -528,10 +528,14 @@ static void watchMoreButton(UIView *button) {
     static SGMoreTapWatcher *watcher;
     if (!watcher) watcher = [SGMoreTapWatcher new];
     objc_setAssociatedObject(button, &kWatchedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    // An Encore button may read its touches through a gesture recognizer rather than as a control, so
-    // both are watched.
+    // A control (Spotify's ⋯ is an Encore button, a UIControl) is watched through its own events alone, from
+    // the touch down on: a recognizer on it, even one that cancels and delays nothing, took part in its touches
+    // (a ripple on the ⋯ on the phone).
     if ([button isKindOfClass:UIControl.class]) {
-        [(UIControl *)button addTarget:watcher action:@selector(tapped) forControlEvents:UIControlEventTouchUpInside | UIControlEventPrimaryActionTriggered];
+        // Touch down alone: a touch up after the ⋯ card has used the tap up would count a second time, for the
+        // next sheet (the card's Sleep timer took the block that way on the phone).
+        [(UIControl *)button addTarget:watcher action:@selector(tapped) forControlEvents:UIControlEventTouchDown];
+        return;
     }
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:watcher action:@selector(tapped)];
     tap.cancelsTouchesInView = NO;
@@ -575,6 +579,10 @@ static BOOL isPlayerMenu(UIViewController *menu) {
     SGLog(@"speed and pitch: a context menu, %@ (tapped %d, presented by %@)", ours ? @"the player's" : @"not the player's", ours,
           presenter ? NSStringFromClass(presenter.class) : @"nothing");
     return ours;
+}
+
+void SGPlayerMenuMarkPlayers(void) {
+    sg_moreTappedAt = CACurrentMediaTime();
 }
 
 BOOL SGPlayerMenuIsPlayers(UIViewController *menu) {

@@ -16,6 +16,9 @@
 // Whether a context menu sheet is the player's ⋯ card: the first to come up within a few seconds of a tap on
 // the player's more button (SpeedPitchMenu.x watches it under either look); decided once per menu.
 BOOL SGPlayerMenuIsPlayers(UIViewController *menu);
+// The next context menu sheet is the player's ⋯ card, as a tap on the ⋯ would make it: for the redesign's ⋯,
+// whose menu runs Spotify's ⋯ action from code (Redesigned/ContextMenu) and keeps the touch from the ⋯.
+void SGPlayerMenuMarkPlayers(void);
 // Whether the sheet is shown as the system menu instead, unseen under it (Redesigned/ContextMenu), whose own
 // items then stand in for the block, which stays out of it. Defined by the redesign; NO under the native look
 // and once the sheet itself is shown.

@@ -10,9 +10,9 @@ rm -rf "$OUT"; mkdir -p "$OUT/gen" "$OUT/SystemMenuHarness.app"
 SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
 xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.4-simulator -fobjc-arc -g -O0 \
     -I"$SRC" -I"$SRC/Redesigned/ContextMenu" -isysroot "$SDK" -Wno-deprecated-declarations \
-    "$(dirname "$0")/main.m" "$(dirname "$0")/../scene.m" "$OUT"/gen/*.m "$SRC"/Redesigned/Player/PlayerMenu.m \
+    "$(dirname "$0")/main.m" "$(dirname "$0")/../scene.m" "$(dirname "$0")/../tabbar/touch.m" "$OUT"/gen/*.m "$SRC"/Redesigned/Player/PlayerMenu.m \
     "$SRC"/Core/SGLog.m "$SRC"/Core/SGPrefs.m "$SRC"/Core/SGViewTree.m "$SRC"/Core/SGUIMode.m \
-    -framework UIKit -framework QuartzCore -framework CoreGraphics -framework Foundation \
+    -framework UIKit -framework IOKit -framework QuartzCore -framework CoreGraphics -framework Foundation \
     -o "$OUT/SystemMenuHarness.app/SystemMenuHarness"
 
 cat > "$OUT/SystemMenuHarness.app/Info.plist" <<'PLIST'

@@ -348,6 +348,7 @@ static void tapRow(UIViewController *menu) {
     BOOL loading = argument(@"loading"), stuck = argument(@"stuck");
     // Spotify's ⋯ card, put up by a tap on the player's more button: the tap first, as a finger lifting off it.
     void (^present)(void) = ^{
+        [player.header.more sendActionsForControlEvents:UIControlEventTouchDown];
         [player.header.more sendActionsForControlEvents:UIControlEventTouchUpInside];
         menu = [_TtC24ContextMenu_InternalImpl25ContextMenuViewController new];
         UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:menu];

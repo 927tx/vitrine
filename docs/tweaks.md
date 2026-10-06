@@ -370,15 +370,25 @@ Redesigned:
                   (BarConnect.x, its own key and its own row on the Player page, apart from the native look's). In a Jam the
                   glass stays on the track and Spotify's Jam strip gets a pane of its own above it (harness/tabbar/, jam)
     ContextMenu/  the ⋯ of the player and the ⋯ pinned over the playlist, album and artist pages open the system menu,
-                  always (ContextMenu.h): Spotify's sheet is still made, presented unanimated in a container hidden from
-                  the presented controller's viewWillAppear: on, so nothing darkens; the menu comes from an invisible
-                  button inside the ⋯ that takes touches only while it is up, opened with -performPrimaryAction (else
-                  UIContextMenuInteraction's private _presentMenuAtLocation:, checked with respondsToSelector:).
-                  Spotify's rows, read off the sheet's cells (words, glyph, greyed out), are a deferred element that
-                  waits for them as long as the menu is up; the mod's own rows in the sheet's header and footer (Sort,
-                  Mix, Edit info) come with them. A pick selects the row on the sheet once the menu is gone; a pick
-                  that leaves the sheet up, or a menu that does not come up, shows the sheet; a close with no pick
-                  dismisses it. Checked in the simulator against harness/system-menu/
+                  always (ContextMenu.h). The player's ⋯ is a pull-down button of the mod's over Spotify's: the menu
+                  opens on touch down with the quick row (Spotify's items 9, 19 and 11), the player's items and More,
+                  waiting on nothing of Spotify's (the button holds a stand-in menu from the start, since UIKit opens
+                  a button's menu on touch down only while it holds one, and the session's replaces it as the touch
+                  asks); Spotify's ⋯ action is then run from code and its sheet presented
+                  in a window of the mod's under the app's (the menu, a presentation of UIKit's from the player,
+                  leaves no room for another there), read, and used to run a pick. More shows the last complete set
+                  of rows stored for that kind of track (spotifyglass.redesign.player.menuRows.<kind>), or the
+                  system's loading row the first time, and is put right in place as the live rows come. A page's ⋯
+                  works the other way round: its tap opens Spotify's sheet, presented unanimated in a container hidden
+                  from the presented controller's viewWillAppear: on, and the menu comes from an invisible button
+                  inside the ⋯ that takes touches only while it is up, opened with -performPrimaryAction (else
+                  UIContextMenuInteraction's private _presentMenuAtLocation:). Spotify's rows, read off the sheet's
+                  cells (words, glyph, greyed out), and the mod's own rows in its header and footer (Sort, Mix, Edit
+                  info) are fired on the hidden sheet once the menu is gone, through the row's own control (scrolled
+                  to when it is below the fold); a row that pushes a page shows the sheet on that page, one that
+                  presents a sheet of its own (Sleep timer) leaves that sheet as Spotify's and the card goes unseen,
+                  and a close with no pick dismisses the hidden sheet. Checked in the simulator against
+                  harness/system-menu/
     Player/       the redesigned full screen player (Player.h lists its files); its more button opens the system
                   menu (ContextMenu/), Spotify's rows and then Playback Speed, Pitch (with Pitch follows speed),
                   Reverb and the backgrounds it can switch to (PlayerMenu.m), and a hold on either side of the

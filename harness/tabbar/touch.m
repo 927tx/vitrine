@@ -89,12 +89,17 @@ static void touchTo(UITouch *touch, CGPoint point, UITouchPhase phase) {
     deliver(touch);
 }
 
-// A tap at `point`, down and up 0.08 s apart.
-void SGHarnessTap(UIWindow *window, CGPoint point) {
+// A finger held at `point` for `seconds`, then lifted.
+void SGHarnessHold(UIWindow *window, CGPoint point, NSTimeInterval seconds) {
     UITouch *touch = touchDown(window, point);
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         touchTo(touch, point, UITouchPhaseEnded);
     });
+}
+
+// A tap at `point`, down and up 0.08 s apart.
+void SGHarnessTap(UIWindow *window, CGPoint point) {
+    SGHarnessHold(window, point, 0.08);
 }
 
 // A finger from `from` to `to` over `seconds`, a move every 1/60 s, let go while still moving: a fling.
