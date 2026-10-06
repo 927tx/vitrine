@@ -109,9 +109,27 @@ xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 -dynamiclib -fobjc-arc -O
   -install_name @rpath/SpotifyGlassAppGroups.dylib -o "$GROUPS_DYLIB" "$ROOT/extension/AppGroups/AppGroups.m"
 FILES+=("$GROUPS_DYLIB")
 
+# A key in plist/ replaces Spotify's own of that name, so the Bonjour services Connect discovery
+# (Shared/Connect) browses go in after the ones Spotify lists, and Spotify's own local network wording
+# is kept where it has one.
+OVERLAY="$ROOT/out/.overlay.plist"
+unzip -p "$IN" "${APP_DIR}Info.plist" > "$ROOT/out/.info.plist"
+python3 - "$ROOT/plist/liquid-glass.plist" "$ROOT/out/.info.plist" "$OVERLAY" <<'PY'
+import plistlib, sys
+with open(sys.argv[1], 'rb') as f: overlay = plistlib.load(f)
+with open(sys.argv[2], 'rb') as f: app = plistlib.load(f)
+services = list(app.get('NSBonjourServices', []))
+services += [s for s in overlay.get('NSBonjourServices', []) if s not in services]
+overlay['NSBonjourServices'] = services
+if app.get('NSLocalNetworkUsageDescription'): overlay.pop('NSLocalNetworkUsageDescription', None)
+with open(sys.argv[3], 'wb') as f: plistlib.dump(overlay, f)
+PY
+rm -f "$ROOT/out/.info.plist"
+
 echo "==> injecting"
 # -w drops the Watch app: its companion-app key would still name com.spotify.client and block the install.
-cyan -i "$IN" -o "$OUT" -f "${FILES[@]}" -l "$ROOT/plist/liquid-glass.plist" ${BUNDLE_ID:+-b "$BUNDLE_ID"} ${NAME:+-n "$NAME"} ${ICON:+-k "$ICON"} -w -s --overwrite
+cyan -i "$IN" -o "$OUT" -f "${FILES[@]}" -l "$OVERLAY" ${BUNDLE_ID:+-b "$BUNDLE_ID"} ${NAME:+-n "$NAME"} ${ICON:+-k "$ICON"} -w -s --overwrite
+rm -f "$OVERLAY"
 
 echo "==> loading the App Group shim in the home screen widget"
 WIDGET_BIN="${APP_DIR}PlugIns/WidgetExtension.appex/WidgetExtension"

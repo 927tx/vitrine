@@ -25,7 +25,8 @@
                                 dump-log.sh, extract-flags.py
     trees/                      recorded view trees, one per screen; the input for every new hook. trees/clean/ holds
                                 the numbered snapshots per screen of record-session.py, taken of Spotify as it came
-    plist/                      Info.plist overrides merged into the app (turns UIDesignRequiresCompatibility off)
+    plist/                      Info.plist overrides merged into the app (turns UIDesignRequiresCompatibility off; the
+                                Bonjour services are added to Spotify's own list by pipeline.sh)
     vendor/                     AutoFLEX deb; audio/, the third-party C of the audio effects (libbs2b, WDL's EEL2) and
                                 the EEL2 parser of the mod's own, built by its own Makefile into a static library the
                                 tweak links (its README names the upstream commits and the licenses)
@@ -217,6 +218,13 @@ Shared:
                   already there skipped (SGPlayLog.m), and a page of the top tracks, artists and albums of a week, a month,
                   a year and all time. Tested on the Mac against harness/listening-stats/, the page and the recorder in the
                   simulator against its sim/
+    Connect/      Connect speakers on the Wi-Fi for a build signed without the multicast entitlement (Connect.h lists
+                  its files): Bonjour, which needs only NSBonjourServices (plist/, merged with Spotify's own list by
+                  pipeline.sh) and the Local Network permission, finds and resolves _spotify-connect._tcp; Spotify's
+                  imports of sendto, sendmsg and recvfrom are rebound, a Connect query the system refused is sent by
+                  unicast to each receiver's port 5353 instead, and each answer is passed to Spotify's socket over
+                  loopback with recvfrom reporting the receiver as its source. No setting. Tested on the Mac against
+                  harness/connect/
 
 Native:
 
