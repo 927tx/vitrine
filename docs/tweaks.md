@@ -477,7 +477,10 @@ once, and the redesign is built on it (the glass navigation bar, the new player 
 player, the queue and Connect sheets, the redesigned player header, the sleep timer's options sheet):
 while Redesigned UI is on each is forced, over an override too, and their rows elsewhere show what is
 forced and take no touch. `Redesigned/Kit/SGRGlassDesign.x` holds the list; what else forces a flag
-registers in `Core/SGFlagForce.h`. A change shows after Spotify restarts.
+registers in `Core/SGFlagForce.h`. A change shows after Spotify restarts. Spotify reads most flags
+only when their feature first needs them, so 15 s after launch the log says how many stored overrides
+it has asked for and which not yet (`flags: N overrides stored, …`), and an override asked for later
+gets its own line as it is asked (`flags: Spotify asked for <flag> only now, …`).
 
 The tab editor on the Navbar page is the exception and applies as soon as the bar lays out again. It lists the tabs in the order
 the bar shows them: drag to reorder, tap to hide or show, and Add a tab puts a page of Spotify's or

@@ -1,13 +1,25 @@
-// Spotify reads every remote-config flag once at startup through the configuration provider,
-// keyed "component.property". The value handed back is Core/SGFlagForce.h's: what the redesign forces
+// Spotify reads each feature's remote-config flags once, through the configuration provider, keyed
+// "component.property": a few dozen as it starts, the rest when their feature first needs them. The value handed back is Core/SGFlagForce.h's: what the redesign forces
 // (Redesigned/Kit/SGRedesign.h), which comes before an override so one left from Spotify's own screens
 // cannot pull a redesigned one apart, then an override from the Flags page, then what the ad blocking
 // and the lyrics sources force.
+#import <mach/mach_time.h>
+#import <pthread.h>
+#import <stdatomic.h>
 #import "Core/SGCore.h"
 #import "Flags.h"
 
+// What the mod's answers cost as Spotify starts, logged once (harness/launch measures it on the Mac).
+static _Atomic uint64_t sg_reads, sg_mainReads, sg_ticks;
+static const NSTimeInterval kCountFor = 15;
+
 static id forced(NSString *key) {
-    return SGForcedFlagValue(key);
+    uint64_t start = mach_absolute_time();
+    id value = SGForcedFlagValue(key);
+    atomic_fetch_add_explicit(&sg_ticks, mach_absolute_time() - start, memory_order_relaxed);
+    atomic_fetch_add_explicit(&sg_reads, 1, memory_order_relaxed);
+    if (pthread_main_np()) atomic_fetch_add_explicit(&sg_mainReads, 1, memory_order_relaxed);
+    return value;
 }
 
 static BOOL boolFor(NSString *key, BOOL orig) {
@@ -62,4 +74,13 @@ static id enumFor(NSString *key, id orig) {
         @"_TtC22RemoteConfigurationSDK25ConfigurationProviderImpl",
         @"_TtC22RemoteConfigurationSDK35ObservableConfigurationProviderImpl",
     ]);
+    // Off the main queue, so a main thread held up at launch does not hold the report back with it.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kCountFor * NSEC_PER_SEC)), dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        mach_timebase_info_data_t base;
+        mach_timebase_info(&base);
+        double ms = (double)atomic_load(&sg_ticks) * base.numer / base.denom / 1e6;
+        SGLog(@"flags: %llu reads in the first %.0f s, %llu on the main thread, %.1f ms in the mod's answers",
+              atomic_load(&sg_reads), kCountFor, atomic_load(&sg_mainReads), ms);
+        SGLog(@"flags: %@", SGFlagOverrideReport());
+    });
 }

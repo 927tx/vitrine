@@ -46,16 +46,34 @@ static BOOL listed(NSString *key, NSString *const list[], size_t count) {
     return NO;
 }
 
+// The switches that force flags off, one bit each, so the forcer below can read them once.
+enum { kAds = 1, kVideos = 2, kUpsells = 4 };
+
+static unsigned switchesNow(void) {
+    return (SGHidden(SGKeyHideAds) ? kAds : 0) | (SGHidden(SGKeyHideSearchVideos) ? kVideos : 0)
+         | (SGHidden(SGKeyHideUpsells) ? kUpsells : 0);
+}
+
+static BOOL forcesOff(NSString *key, unsigned on) {
+    if ((on & kAds) && listed(key, adFlags, sizeof(adFlags) / sizeof(adFlags[0]))) return YES;
+    if ((on & kVideos) && [key isEqualToString:@"ios-feature-search.video_carousel_section_enabled"]) return YES;
+    return (on & kUpsells) && listed(key, upsellFlags, sizeof(upsellFlags) / sizeof(upsellFlags[0]));
+}
+
 BOOL SGAdBlockForcesFlagOff(NSString *key) {
-    if (SGHidden(SGKeyHideAds) && listed(key, adFlags, sizeof(adFlags) / sizeof(adFlags[0]))) return YES;
-    if (SGHidden(SGKeyHideSearchVideos) && [key isEqualToString:@"ios-feature-search.video_carousel_section_enabled"]) return YES;
-    return SGHidden(SGKeyHideUpsells) && listed(key, upsellFlags, sizeof(upsellFlags) / sizeof(upsellFlags[0]));
+    return forcesOff(key, switchesNow());
 }
 
 // After an override from the All flags page, and locking the rows that would turn the same flag off.
+// Spotify asks for every flag it has as it starts, so the running app's answer reads the switches once
+// rather than four defaults lookups a flag (harness/launch); the rows read them as they are stored now.
 __attribute__((constructor)) static void registerForcer(void) {
-    SGFlagForcer off = ^id(NSString *key) { return SGAdBlockForcesFlagOff(key) ? @NO : nil; };
-    SGRegisterFlagForcer(NO, off, off);
+    SGRegisterFlagForcer(NO, ^id(NSString *key) {
+        static unsigned atLaunch;
+        static dispatch_once_t once;
+        dispatch_once(&once, ^{ atLaunch = switchesNow(); });
+        return atLaunch && forcesOff(key, atLaunch) ? @NO : nil;
+    }, ^id(NSString *key) { return SGAdBlockForcesFlagOff(key) ? @NO : nil; });
 }
 
 #pragma mark - counters
