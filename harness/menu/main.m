@@ -4,7 +4,7 @@
 // neither may get the block.
 //
 //     THEOS=$HOME/theos ./build.sh && xcrun simctl install <udid> build/MenuHarness.app
-//     xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open] [animated] [sleep] [notap]
+//     xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open] [animated] [sleep] [notap] [minute]
 //
 // The plain run opens the menu at 1 s, opens the block at 3 s, moves the sliders at 5 s, checks what the
 // block says at 6 s (PASS or FAIL lines), closes the block at 7 s and checks its row at 8 s. `loading` builds the sheet the way Spotify's is (the ivars of ContextMenuViewController in
@@ -313,6 +313,46 @@ static void report(_TtC24ContextMenu_InternalImpl25ContextMenuViewController *me
           table.tableHeaderView == block ? @"header" : table.tableFooterView == block ? @"footer" : @"nowhere");
 }
 
+#pragma mark - the sleep timer's cells
+
+// Spotify's two cells that list the sleep timer's durations, under their class names (MinuteLabel.x).
+@interface _TtC24ContextMenu_InternalImpl24ContextMenuTableViewCell : UITableViewCell
+@end
+@implementation _TtC24ContextMenu_InternalImpl24ContextMenuTableViewCell
+@end
+@interface _TtC30PlaybackControl_SleepTimerImpl10OptionCell : UICollectionViewCell
+@end
+@implementation _TtC30PlaybackControl_SleepTimerImpl10OptionCell
+@end
+
+// `minute`: a label reading "1 minutes" in each cell reads "1 minute" once laid out, in the font it had; "5
+// minutes", another language's text and a label outside those cells stay as they were.
+static void checkMinute(UIWindow *window) {
+    UIFont *font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    UILabel *(^label)(UIView *, NSString *) = ^UILabel *(UIView *host, NSString *text) {
+        UILabel *made = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 200, 30)];
+        made.attributedText = [[NSAttributedString alloc] initWithString:text attributes:@{NSFontAttributeName: font}];
+        [host addSubview:made];
+        return made;
+    };
+    UIView *row = [[_TtC24ContextMenu_InternalImpl24ContextMenuTableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
+    UIView *option = [[_TtC30PlaybackControl_SleepTimerImpl10OptionCell alloc] initWithFrame:CGRectMake(0, 100, 300, 50)];
+    UIView *elsewhere = [[UIView alloc] initWithFrame:CGRectMake(0, 200, 300, 50)];
+    UILabel *inRow = label(((UITableViewCell *)row).contentView, @"1 minutes"), *five = label(((UITableViewCell *)row).contentView, @"5 minutes");
+    UILabel *inOption = label(((UICollectionViewCell *)option).contentView, @"1 minutes"), *other = label(((UICollectionViewCell *)option).contentView, @"1 minuto");
+    UILabel *outside = label(elsewhere, @"1 minutes");
+    row.frame = CGRectMake(0, 0, 300, 50);
+    for (UIView *view in @[row, option, elsewhere]) {
+        [window addSubview:view];
+        [view setNeedsLayout];
+        [view layoutIfNeeded];
+    }
+    check([inRow.text isEqualToString:@"1 minute"] && [inRow.font isEqual:font], [NSString stringWithFormat:@"the context menu row reads \"%@\" in its own font", inRow.text]);
+    check([inOption.text isEqualToString:@"1 minute"] && [inOption.font isEqual:font], [NSString stringWithFormat:@"the options cell reads \"%@\" in its own font", inOption.text]);
+    check([five.text isEqualToString:@"5 minutes"] && [other.text isEqualToString:@"1 minuto"] && [outside.text isEqualToString:@"1 minutes"],
+          [NSString stringWithFormat:@"the rest is left alone (\"%@\", \"%@\", \"%@\" outside the cells)", five.text, other.text, outside.text]);
+}
+
 #pragma mark - the run
 
 @interface SGHarnessApp : UIResponder <UIApplicationDelegate>
@@ -359,6 +399,10 @@ static void tapRow(UIViewController *menu) {
         [[CADisplayLink displayLinkWithTarget:watch selector:@selector(tick:)] addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
         [player presentViewController:navigation animated:YES completion:nil];
     };
+    if (argument(@"minute")) {
+        after(1, ^{ checkMinute(self.window); });
+        return;
+    }
     if (argument(@"sleep") || argument(@"notap")) {
         // `sleep`: the ⋯ card's Sleep timer row opens a context menu sheet of its own in the card, with no tap
         // on the more button; it must stay Spotify's. `notap`: a sheet the player puts up with no tap at all.

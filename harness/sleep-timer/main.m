@@ -7,6 +7,7 @@
 #import <Foundation/Foundation.h>
 #import "Headers/SPTPlayer.h"
 #import "Shared/Player/SleepTimer.h"
+#import "Shared/Player/PlayerState.h"
 #import "Core/SGPrefs.h"
 
 @interface SPTPlayerTrack ()
@@ -24,11 +25,20 @@
 @implementation SPTPlayerOptions
 @end
 
+@interface SPTSleepTimer ()
+@property (nonatomic, readwrite) NSUInteger type;
+@property (nonatomic, readwrite) NSDate *timestamp;
+@end
+@implementation SPTSleepTimer
+@end
+
 @interface SPTPlayerState ()
 @property (nonatomic, readwrite) SPTPlayerTrack *track;
 @property (nonatomic, readwrite) id contextURI;
 @property (nonatomic, readwrite) SPTPlayerOptions *options;
 @property (nonatomic, readwrite) BOOL isPaused;
+@property (nonatomic, readwrite) BOOL isPlaying;
+@property (nonatomic, readwrite) SPTSleepTimer *sleepTimer;
 @property (nonatomic, readwrite) double duration;
 @property (nonatomic, readwrite) NSArray *future;
 @property (nonatomic, readwrite) NSArray *reverse;
@@ -45,9 +55,18 @@
 - (id)pause:(id)options {
     self.pauses++;
     self.state.isPaused = YES;
+    self.state.isPlaying = NO;
     return nil;
 }
 @end
+
+// SpotifySleepTimer.m's player state observer, and Spotify's own Fade out flag as forced (nil for not).
+static id<SGPlayerStateObserver> sg_observer;
+void SGAddPlayerStateObserver(id<SGPlayerStateObserver> observer) { sg_observer = observer; }
+static NSNumber *sg_spotifyFadeForced;
+id SGForcedFlagValue(NSString *key) {
+    return [key isEqualToString:@"ios-feature-sleeptimer.enable_fade_out"] ? sg_spotifyFadeForced : nil;
+}
 
 static MockPlayer *sg_player;
 static NSInteger sg_positionMs = -1;
@@ -98,6 +117,14 @@ static SPTPlayerState *state(SPTPlayerTrack *playing, NSArray *future, NSArray *
     state.future = future;
     state.reverse = reverse;
     return state;
+}
+
+// Spotify's own timer as its state reports it: type 1 at `seconds` from now, 2 at the end of the track.
+static SPTSleepTimer *spotifyTimer(NSUInteger type, NSTimeInterval seconds) {
+    SPTSleepTimer *timer = [SPTSleepTimer new];
+    timer.type = type;
+    if (type == 1) timer.timestamp = [NSDate dateWithTimeIntervalSinceNow:seconds];
+    return timer;
 }
 
 static void runFor(NSTimeInterval seconds) {
@@ -276,6 +303,122 @@ int main(void) {
         CHECK(near(sg_gain, SGSleepTimerGain(15, 30)) && near(sg_gain, 0.0316f), "a time, 30 s fade, 15 s to go: 30 dB down");
         SGSetSleepTimer(SGSleepTimerOff, 0);
         CHECK(sg_gain == 1, "cancelled: full volume");
+
+        // Spotify's own timer (SpotifySleepTimer.m), read off the state; the core pauses, never the mod.
+        CHECK(sg_observer != nil, "Spotify's timer: an observer of the player's state is added at load");
+        sg_fadeChoice = @2;   // 30 s
+        NSInteger pauses = sg_player.pauses;
+        sg_player.state = state(a, @[b, c], @[], NO);
+        sg_player.state.isPlaying = YES;
+        [sg_observer playerStateDidChange:sg_player.state];
+        runFor(0.4);
+        CHECK(sg_gain == 1, "Spotify's: playing with no timer, full volume");
+        sg_player.state.sleepTimer = spotifyTimer(1, 20);
+        runFor(0.4);
+        CHECK(sg_gain < SGSleepTimerGain(20.5, 30) && sg_gain > SGSleepTimerGain(19, 30), "Spotify's, at a time 20 s on: faded as 20 s into a 30 s fade");
+        sg_player.state.sleepTimer = spotifyTimer(1, 15 * 60);
+        runFor(0.4);
+        CHECK(sg_gain == 1, "Spotify's moved 15 minutes on: the gain is back");
+        sg_player.state.sleepTimer = spotifyTimer(1, 15);
+        runFor(0.4);
+        CHECK(sg_gain < 0.1f, "Spotify's 15 s on: 30 dB down or so");
+        sg_player.state.sleepTimer = nil;
+        runFor(0.4);
+        CHECK(sg_gain == 1, "Spotify's cancelled mid fade: the gain is back at once");
+
+        sg_player.state.sleepTimer = spotifyTimer(1, 1.5);
+        runFor(0.4);
+        CHECK(sg_gain < 0.01f, "Spotify's 1.5 s on: nearly silent");
+        runFor(1.5);
+        CHECK(sg_gain < 0.002f && sg_player.pauses == pauses, "its time came: held down, and no pause from the mod");
+        sg_player.state.isPaused = YES;   // the core pauses, the expired timer still in its state
+        sg_player.state.isPlaying = NO;
+        runFor(0.4);
+        CHECK(sg_gain < 0.002f, "Spotify paused: still down while the pause lands");
+        runFor(1.2);
+        CHECK(sg_gain == 1, "a second after Spotify's pause the gain is back");
+        sg_player.state.isPaused = NO;
+        sg_player.state.isPlaying = YES;
+        [sg_observer playerStateDidChange:sg_player.state];
+        runFor(0.4);
+        CHECK(sg_gain == 1, "played again with the expired timer still reported: not faded again");
+        sg_player.state.sleepTimer = nil;
+        runFor(0.4);
+
+        sg_player.state.sleepTimer = spotifyTimer(1, 1);
+        runFor(0.5);
+        sg_player.state.sleepTimer = nil;   // dropped at its end, before the pause
+        runFor(0.4);
+        CHECK(sg_gain < 0.002f, "Spotify's dropped at its end while still playing: held down");
+        sg_player.state.isPaused = YES;
+        sg_player.state.isPlaying = NO;
+        runFor(1.6);
+        CHECK(sg_gain == 1, "then paused: the gain is back a second later");
+
+        sg_player.state = state(a, @[b, c], @[], NO);
+        sg_player.state.isPlaying = YES;
+        [sg_observer playerStateDidChange:sg_player.state];
+        sg_positionMs = 85000;
+        sg_player.state.sleepTimer = spotifyTimer(2, 0);
+        runFor(0.4);
+        CHECK(near(sg_gain, SGSleepTimerGain(15, 30)), "Spotify's end of track, 15 s left of a 30 s fade: 30 dB down");
+        sg_player.state = state(b, @[c], @[a], NO);
+        sg_player.state.isPlaying = YES;
+        sg_player.state.sleepTimer = spotifyTimer(2, 0);
+        sg_positionMs = 1000;
+        runFor(0.4);
+        CHECK(sg_gain == 1, "skipped to another track with time to go: its end is the one now, full volume");
+        sg_positionMs = 99500;
+        runFor(0.4);
+        CHECK(sg_gain < 0.002f, "half a second before that track's end: nearly silent");
+        sg_player.state = state(c, @[], @[a, b], NO);   // the next track, the timer still reported
+        sg_player.state.isPlaying = YES;
+        sg_player.state.sleepTimer = spotifyTimer(2, 0);
+        sg_positionMs = 0;
+        runFor(0.4);
+        CHECK(sg_gain < 0.002f && sg_player.pauses == pauses, "the track ended into the next: held down, no pause from the mod");
+        sg_player.state.isPaused = YES;
+        sg_player.state.isPlaying = NO;
+        runFor(1.6);
+        CHECK(sg_gain == 1, "Spotify paused: the gain is back");
+        sg_player.state.sleepTimer = nil;
+        sg_player.state.isPaused = NO;
+        sg_player.state.isPlaying = YES;
+        [sg_observer playerStateDidChange:sg_player.state];
+        runFor(0.4);
+
+        sg_player.state.duration = 20;
+        sg_positionMs = 10000;
+        sg_player.state.sleepTimer = spotifyTimer(2, 0);
+        runFor(0.4);
+        CHECK(near(sg_gain, 0.0316f), "Spotify's end of a 20 s track, halfway: the fade spans the track, 30 dB down");
+        sg_player.state.sleepTimer = nil;
+        runFor(0.4);
+
+        sg_fadeChoice = @0;   // Off
+        sg_player.state.sleepTimer = spotifyTimer(1, 5);
+        runFor(0.4);
+        CHECK(sg_gain == 1, "Spotify's with fade Off: full volume");
+        sg_fadeChoice = @2;
+        runFor(0.4);
+        CHECK(sg_gain < 0.1f, "30 s picked while it runs: faded");
+        sg_spotifyFadeForced = @YES;
+        runFor(0.4);
+        CHECK(sg_gain == 1, "Spotify's own Fade out forced on: the mod stands aside, full volume");
+        sg_spotifyFadeForced = nil;
+        sg_player.state.sleepTimer = nil;
+        runFor(0.4);
+
+        SGSetSleepTimer(SGSleepTimerAtTime, 300);
+        sg_player.state.sleepTimer = spotifyTimer(1, 10);
+        runFor(0.4);
+        CHECK(sg_gain == 1, "the mod's own timer running (300 s): it has the gain, Spotify's is not faded");
+        SGSetSleepTimer(SGSleepTimerOff, 0);
+        runFor(0.4);
+        CHECK(sg_gain < 0.1f, "the mod's own cancelled: Spotify's, 10 s on, is faded");
+        sg_player.state.sleepTimer = nil;
+        runFor(0.4);
+        CHECK(sg_gain == 1 && sg_player.pauses == pauses, "and cancelled: full volume; the mod sent no pause for Spotify's");
     }
     printf("%s\n", sg_failures ? "FAILED" : "all held");
     return sg_failures ? 1 : 0;

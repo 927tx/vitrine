@@ -13,6 +13,14 @@ answered by `main.m`): each length's curve, Off at full volume all the way, none
 read as 30 s; a change applies to a timer already running; at the end of the track or the album the fade
 spans a track shorter than it, from its start; a time fades over the last seconds before its end.
 
+`SpotifySleepTimer.m` too, Spotify's own timer as the player's state reports it (`main.m` gives the state a
+`sleepTimer` and calls the observer the file adds at load): a time fades by the choice, a later time and a
+cancel bring the gain back at once; at its time, or dropped from the state at its end, the gain stays down,
+with no pause from the mod, until Spotify's pause and comes back a second after it; the expired timer still
+reported is not faded again; End of track fades over the track's last seconds, takes a skip mid track as the
+new track's end, and holds the gain down into the next track until the pause; Off, a choice picked while it
+runs, Spotify's own Fade out forced on and the mod's own timer running each leave or bring the gain right.
+
     ./build.sh && build/sleep-timer
 
-2026-10-06: all held (52 checks). The gain itself is checked on Spotify's audio chain in harness/speed/.
+2026-10-06: all held (77 checks). The gain itself is checked on Spotify's audio chain in harness/speed/.

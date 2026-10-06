@@ -202,8 +202,13 @@ Shared:
                   having played already when it repeats. Over the last seconds (the Live Activity page's Fade out: Off,
                   10 s, 30 s, 1 minute or 2 minutes, 30 s unless picked; at the end of a track, over the whole track
                   when it is shorter) it fades the sound 60 dB through a gain of the mod's own, applied by SpeedPitch.x's notify on the music's RemoteIO unit (never the system
-                  volume), and puts the gain back a second after the pause. Tested on the Mac against
-                  harness/sleep-timer/, the gain in the simulator against harness/speed/
+                  volume), and puts the gain back a second after the pause. Spotify's own timer, from the player's
+                  ⋯ menu, fades by the same choice and gain (SpotifySleepTimer.m): the core reports it in the player's
+                  state (SPTPlayerState's sleepTimer: type 1 at a timestamp, 2 at the end of the track), checked four
+                  times a second while Spotify plays; Spotify pauses, the gain is held down from its end until that
+                  pause and back a second later, at once on a cancel or a later time. It stands aside while the mod's
+                  own timer runs and while Spotify's own Fade out flag (its DuckHandlerImpl's duck) is forced on.
+                  Tested on the Mac against harness/sleep-timer/, the gain in the simulator against harness/speed/
     AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): a render
                   notify on the music's RemoteIO unit (SGPlayerMusicOutput, Shared/Player) runs each finished buffer through the mod's own engine, re-blocked to 1024 frames one block late,
                   in place (AudioEffects.x, SGDSPEngine.m), then hands it, mixed to mono, to one reader that only

@@ -51,3 +51,6 @@ float SGSleepTimerGain(NSTimeInterval left, NSTimeInterval fade);
 // the state's tracks to come (tracks queued by hand and autoplay's don't count), or the next one already
 // played, which is repeat starting the album over.
 BOOL SGSleepTimerOnLastOfContext(SPTPlayerState *state);
+// Seconds of the playing track left, by the player's position and the track's length; -1 when either is
+// not known. Spotify's own timer's End of track fades by it too (SpotifySleepTimer.m).
+NSTimeInterval SGSleepTimerTrackLeft(SPTPlayerState *state);

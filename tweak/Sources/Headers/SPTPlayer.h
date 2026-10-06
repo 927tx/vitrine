@@ -20,8 +20,18 @@
 @property (nonatomic, readonly) BOOL repeatingTrack;
 @end
 
+// Spotify's own sleep timer as the player core reports it: es_sleep_timer.proto's oneof, which the state
+// builder maps (hasSleepTimer, then setSleepTimer:) to type 0 none, 1 at `timestamp` (the proto's ms since
+// 1970), 2 at the end of the track (Shared/Player/SpotifySleepTimer.m reads it).
+@interface SPTSleepTimer : NSObject
+@property (nonatomic, readonly) NSUInteger type;
+@property (nonatomic, readonly) NSDate *timestamp;
+@end
+
 @interface SPTPlayerState : NSObject
 @property (nonatomic, readonly) SPTPlayerTrack *track;
+// Nil while the core reports none.
+@property (nonatomic, readonly) SPTSleepTimer *sleepTimer;
 @property (nonatomic, readonly) id contextURI;
 @property (nonatomic, readonly) SPTPlayerOptions *options;
 @property (nonatomic, readonly) BOOL isPaused;

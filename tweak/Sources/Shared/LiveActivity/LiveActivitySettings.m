@@ -16,14 +16,15 @@ UIViewController *SGLiveActivitySettingsPage(void) {
     SGModRow *translation = SGOptionRow(@"Translations", @"Under the line, when the lyrics have one", SGKeyLiveActivityTranslation);
     SGModRow *size = SGChoiceRow(@"Text size", nil, SGKeyLiveActivityTextSize, @[@"Small", @"Medium", @"Large"], SGLiveActivityTextMedium);
     for (SGModRow *row in @[translation, size]) row.visible = ^BOOL { return SGInt(SGKeyLiveActivityView, SGLiveActivityLyrics) == SGLiveActivityLyrics; };
-    // The sleep timer's own: the card's Timer tab, the Sleep Timer shortcut and its control all fade by it, card on or off.
+    // The sleep timer's own: the card's Timer tab, the Sleep Timer shortcut and its control all fade by it, card on or
+    // off, and so does Spotify's own timer from the player's menu (Shared/Player/SpotifySleepTimer.m).
     NSArray<NSString *> *fades = SGSleepTimerFadeNames();
     SGModRow *fade = SGMenuRow(@"Fade out", fades, ^NSString *{ return fades[(NSUInteger)SGSleepTimerFadeChoice()]; },
                                ^(NSInteger index) { SGSetInt(SGKeySleepTimerFade, index); });
     return [[SGModPage alloc] initWithTitle:@"Live Activity" intro:nil sections:@[
         SGSection(nil, @[on, view, translation, size]),
         SGNotedSection(@"Sleep timer", @[fade],
-                       @"How long the sound fades before the sleep timer pauses Spotify, from the Timer tab, the Sleep Timer shortcut or Control Center."),
+                       @"How long the sound fades before a sleep timer pauses Spotify: the one set from the Timer tab, the Sleep Timer shortcut or Control Center, and Spotify's own from the player's ⋯ menu."),
     ] footer:nil];
 }
 

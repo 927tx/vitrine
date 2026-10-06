@@ -96,8 +96,7 @@ BOOL SGSleepTimerOnLastOfContext(SPTPlayerState *state) {
     return NO;
 }
 
-// Seconds of the track left to play, or -1 when its length or the position is not known.
-static NSTimeInterval trackLeft(SPTPlayerState *state) {
+NSTimeInterval SGSleepTimerTrackLeft(SPTPlayerState *state) {
     double duration = [state respondsToSelector:@selector(duration)] ? state.duration : 0;
     NSInteger position = SGKaraokePositionMs();
     return duration > 0 && position >= 0 ? MAX(0, duration - position / 1000.0) : -1;
@@ -122,11 +121,11 @@ static NSTimeInterval secondsLeft(SPTPlayerState *state) {
             return MAX(0, sg_end.timeIntervalSinceNow);
         case SGSleepTimerEndOfTrack:
             // On the next track already, should the length not have been known.
-            return [track isEqualToString:sg_track] ? trackLeft(state) : 0;
+            return [track isEqualToString:sg_track] ? SGSleepTimerTrackLeft(state) : 0;
         case SGSleepTimerEndOfAlbum: {
             NSString *context = SGURIString(state.contextURI);
             if (!(context == sg_context || [context isEqualToString:sg_context]) || isAutoplay(state.track)) return 0;
-            return SGSleepTimerOnLastOfContext(state) ? trackLeft(state) : -1;
+            return SGSleepTimerOnLastOfContext(state) ? SGSleepTimerTrackLeft(state) : -1;
         }
         default:
             return -1;

@@ -7,7 +7,7 @@ class name and presented from a now playing controller on a tap of the player's 
 
     THEOS=$HOME/theos ./build.sh
     xcrun simctl install <udid> build/MenuHarness.app
-    xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open] [animated] [sleep] [notap]
+    xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open] [animated] [sleep] [notap] [minute]
 
 It has a scene delegate, so it runs on the iOS 27 simulator as well as 26. The mod's own lines
 (`SGLog`) go to the unified log: `xcrun simctl spawn <udid> log stream --predicate 'eventMessage CONTAINS "[spotifyglass]"'`.
@@ -34,6 +34,9 @@ the Pitch and the row read "−3 st".
 - `sleep` opens the ⋯ card, checks it has the block, then pushes a second sheet into it with no tap, as
   the card's Sleep timer row does: `PASS` when that sheet has no block.
 - `notap` presents a sheet from the player with no tap on the more button: `PASS` when it has no block.
+- `minute` runs `MinuteLabel.x` on Spotify's two sleep timer cells, mocked under their class names: a label
+  reading "1 minutes" in each reads "1 minute" in the font it had, and "5 minutes", "1 minuto" and a label
+  outside those cells stay as they were.
 
 For the first second the block is on screen, every frame is checked for anything it draws in the
 system tint (`tint check: 0 of the block's first N frames ...`).
