@@ -13,14 +13,20 @@
 
 // The redesign is Liquid Glass, and Liquid Glass is UIGlassEffect, which the system renders and which
 // no older OS can be given. Below iOS 26 the glass calls in Core/SGGlass.m and Redesigned/Kit/SGRGlass.m
-// fall back to a blur, so the redesign does not refuse to run, it runs untested against an older UIKit
-// and hangs its layout (issue #37, iOS 17: a scene-update watchdog). So it is offered only where its
-// material exists, and below that the native look is the whole mod. Everything this answers NO to
-// leaves the switch, the tour's card and the redesign's settings pages out, whatever is stored.
+// fall back to a blur, and the redesign runs untested against an older UIKit (issue #37, iOS 17: a
+// scene-update watchdog hang). So below 26 it runs only after a warning has been accepted, which stores
+// SGKeyRedesignUntested (App/Pages.m's SGSetRedesignedUI does it), and only while it starts: a launch
+// whose main queue did not run for 15 s is followed by one in the native look, with both switches off
+// and SGRedesignFellBack() answering YES for the App layer to say so.
+#define SGKeyRedesignUntested @"spotifyglass.redesign.untested"
+
+// Whether this OS has the redesign's material: iOS 26 and up.
 BOOL SGRedesignAvailable(void);
+// The redesign was on below iOS 26, and the last launch with it did not get going: this one is native.
+BOOL SGRedesignFellBack(void);
 
 BOOL SGRedesignedUI(void);
 BOOL SGNativeUI(void);
-// The stored switch rather than the launch's, for settings pages opened after it was flipped: they
+// The stored switch rather than the launch's (below iOS 26, with the warning accepted), for settings pages opened after it was flipped: they
 // show what the restart will bring.
 BOOL SGRedesignedUIStored(void);

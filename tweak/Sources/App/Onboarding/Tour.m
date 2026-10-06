@@ -25,7 +25,7 @@ static char kPaneKey;
 }
 @end
 
-static UIButton *glassButton(NSString *title) {
+UIButton *SGOnboardingButton(NSString *title) {
     UIButtonConfiguration *config;
     if (@available(iOS 26.0, *)) config = [UIButtonConfiguration prominentGlassButtonConfiguration];
     else config = [UIButtonConfiguration filledButtonConfiguration];
@@ -45,14 +45,11 @@ static UIButton *glassButton(NSString *title) {
 // when it is the one picked.
 @interface SGLookCard : UIControl
 - (instancetype)initWithSymbol:(NSString *)symbol title:(NSString *)title subtitle:(NSString *)subtitle;
-// A look this phone cannot run: the card stays on the page, greyed and untappable, and says why.
-- (void)makeUnavailable:(NSString *)reason;
 @end
 
 @implementation SGLookCard {
     SGGlassView *_glass;
     UIImageView *_check;
-    UILabel *_line;
 }
 
 - (instancetype)initWithSymbol:(NSString *)symbol title:(NSString *)title subtitle:(NSString *)subtitle {
@@ -72,7 +69,6 @@ static UIButton *glassButton(NSString *title) {
     line.font = [UIFont systemFontOfSize:13];
     line.textColor = SGGrey();
     line.numberOfLines = 0;
-    _line = line;
     UIStackView *text = [[UIStackView alloc] initWithArrangedSubviews:@[name, line]];
     text.axis = UILayoutConstraintAxisVertical;
     text.spacing = 2;
@@ -122,33 +118,184 @@ static UIButton *glassButton(NSString *title) {
 
 - (void)setHighlighted:(BOOL)highlighted {
     [super setHighlighted:highlighted];
-    if (self.enabled) self.alpha = highlighted ? 0.6 : 1;
+    self.alpha = highlighted ? 0.6 : 1;
 }
 
-- (void)makeUnavailable:(NSString *)reason {
-    self.selected = NO;
-    self.enabled = NO;
-    self.alpha = 0.45;
-    _line.text = reason;
-    _check.image = [UIImage systemImageNamed:@"lock.fill"
-                           withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:17 weight:UIImageSymbolWeightSemibold]];
-    _check.tintColor = SGGrey();
+@end
+
+#pragma mark - the logo
+
+// Vitrine's icon in live glass: reeds of glass over a warm glow, the shop window of icons/Vitrine.png.
+// The tour opens on it, each reed flying in and landing beside the last, before the page comes in
+// under it. Glass shows and hides by its effect, never by an alpha (Redesigned/Kit/SGRGlass.h).
+@interface SGTourLogo : UIView
+// The state before the landing: the frame alone, no glass, no glow, the reeds out of place.
+- (void)prepare;
+// Plays the landing, then runs `landed` as the last reed starts to settle; under Reduce Motion the reeds
+// and the glow fade in where they are.
+- (void)landThen:(void (^)(void))landed;
+@end
+
+@implementation SGTourLogo {
+    CAGradientLayer *_glow;
+    UIView *_pane;
+    NSArray<UIVisualEffectView *> *_reeds;
+    NSArray<CAGradientLayer *> *_flutes;
+}
+
+static const NSUInteger kReeds = 5;
+
+// Clear glass, the style for what sits over something bright, so the glow keeps its light through it.
+static UIVisualEffect *reedEffect(void) {
+    Class glass = NSClassFromString(@"UIGlassEffect");
+    if ([glass respondsToSelector:@selector(effectWithStyle:)]) return [glass effectWithStyle:1];
+    return SGGlassEffect();
+}
+static const CGFloat kLogoRadius = 22;
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (!(self = [super initWithFrame:frame])) return nil;
+    self.isAccessibilityElement = YES;
+    self.accessibilityLabel = @"Vitrine";
+    self.accessibilityTraits = UIAccessibilityTraitImage;
+
+    _pane = [UIView new];
+    _pane.clipsToBounds = YES;
+    _pane.layer.cornerRadius = kLogoRadius;
+    _pane.layer.cornerCurve = kCACornerCurveContinuous;
+    _pane.layer.borderWidth = 1;
+    _pane.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.28].CGColor;
+    [self addSubview:_pane];
+
+    // The icon's palette: a light core going to Apple Music red, then violet, then the dark around it.
+    _glow = [CAGradientLayer layer];
+    _glow.type = kCAGradientLayerRadial;
+    _glow.colors = @[(id)[UIColor colorWithRed:1 green:0.93 blue:0.9 alpha:1].CGColor,
+                     (id)[UIColor colorWithRed:0.98 green:0.18 blue:0.28 alpha:1].CGColor,
+                     (id)[UIColor colorWithRed:0.55 green:0.2 blue:0.85 alpha:1].CGColor,
+                     (id)[UIColor colorWithRed:0.08 green:0.04 blue:0.1 alpha:1].CGColor];
+    _glow.locations = @[@0, @0.35, @0.7, @1];
+    _glow.startPoint = CGPointMake(0.45, 0.5);
+    _glow.endPoint = CGPointMake(1.05, 1.1);
+    [_pane.layer addSublayer:_glow];
+
+    // Each reed is a flute: shade where its curve turns away on the right, a line of light on the left.
+    NSMutableArray<UIVisualEffectView *> *reeds = [NSMutableArray array];
+    NSMutableArray<CAGradientLayer *> *flutes = [NSMutableArray array];
+    for (NSUInteger i = 0; i < kReeds; i++) {
+        UIVisualEffectView *reed = [[UIVisualEffectView alloc] initWithEffect:reedEffect()];
+        reed.userInteractionEnabled = NO;
+        reed.clipsToBounds = YES;
+        CAGradientLayer *flute = [CAGradientLayer layer];
+        flute.startPoint = CGPointMake(0, 0.5);
+        flute.endPoint = CGPointMake(1, 0.5);
+        flute.colors = @[(id)[UIColor colorWithWhite:1 alpha:0].CGColor, (id)[UIColor colorWithWhite:1 alpha:0.45].CGColor,
+                         (id)[UIColor colorWithWhite:1 alpha:0].CGColor, (id)[UIColor colorWithWhite:0 alpha:0].CGColor,
+                         (id)[UIColor colorWithWhite:0 alpha:0.35].CGColor];
+        flute.locations = @[@0.08, @0.16, @0.3, @0.6, @1];
+        [reed.contentView.layer addSublayer:flute];
+        [flutes addObject:flute];
+        [_pane addSubview:reed];
+        [reeds addObject:reed];
+    }
+    _reeds = reeds;
+    _flutes = flutes;
+    return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    _pane.frame = self.bounds;
+    // Glass draws a little past its own bounds, which clipsToBounds lets through; a mask does not.
+    CAShapeLayer *mask = [CAShapeLayer layer];
+    mask.path = [UIBezierPath bezierPathWithRoundedRect:_pane.bounds cornerRadius:kLogoRadius].CGPath;
+    _pane.layer.mask = mask;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    _glow.frame = _pane.bounds;
+    CGFloat width = self.bounds.size.width / kReeds, height = self.bounds.size.height;
+    for (NSUInteger i = 0; i < kReeds; i++) {
+        UIVisualEffectView *reed = _reeds[i];
+        // Frames are laid out under the identity transform the landing ends on.
+        CGAffineTransform transform = reed.transform;
+        reed.transform = CGAffineTransformIdentity;
+        reed.frame = CGRectMake(i * width, 0, width, height);
+        reed.transform = transform;
+        _flutes[i].frame = reed.bounds;
+    }
+    [CATransaction commit];
+}
+
+- (void)prepare {
+    BOOL reduce = UIAccessibilityIsReduceMotionEnabled();
+    _glow.opacity = 0;
+    for (NSUInteger i = 0; i < kReeds; i++) {
+        _reeds[i].effect = nil;
+        _reeds[i].contentView.alpha = 0;
+        // Alternate reeds come from above and below, the middle one from furthest, so the pane closes
+        // on itself rather than sliding in from one side.
+        CGFloat from = (i % 2 ? -1 : 1) * (28 + 10 * (CGFloat)(2 - labs((long)i - 2)));
+        if (!reduce) _reeds[i].transform = CGAffineTransformScale(CGAffineTransformMakeTranslation(0, from), 0.94, 0.94);
+    }
+}
+
+- (void)landThen:(void (^)(void))landed {
+    BOOL reduce = UIAccessibilityIsReduceMotionEnabled();
+
+    CABasicAnimation *glow = [CABasicAnimation animationWithKeyPath:@"opacity"];
+    glow.fromValue = @0;
+    glow.toValue = @1;
+    glow.duration = 0.5;
+    glow.timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.23 :1 :0.32 :1];
+    _glow.opacity = 1;
+    [_glow addAnimation:glow forKey:@"in"];
+
+    if (reduce) {
+        [UIView animateWithDuration:0.3 animations:^{
+            for (UIVisualEffectView *reed in self->_reeds) {
+                reed.effect = reedEffect();
+                reed.contentView.alpha = 1;
+            }
+        }];
+        if (landed) landed();
+        return;
+    }
+    // A landing has a little give: damping 0.8, the reeds 50 ms apart.
+    const NSTimeInterval stagger = 0.05, flight = 0.55;
+    for (NSUInteger i = 0; i < kReeds; i++) {
+        UIVisualEffectView *reed = _reeds[i];
+        UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc] initWithDuration:flight dampingRatio:0.8 animations:^{
+            reed.transform = CGAffineTransformIdentity;
+            reed.effect = reedEffect();
+            reed.contentView.alpha = 1;
+        }];
+        [animator startAnimationAfterDelay:0.1 + i * stagger];
+    }
+    if (landed) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((0.1 + (kReeds - 1) * stagger + flight * 0.5) * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), landed);
+    }
 }
 
 @end
 
 #pragma mark - the tour
 
-// One page, the one choice worth making now: the redesign or Spotify's own look. Everything else
-// waits in Mod Settings.
+// One page, the one choice worth making now: the redesign or Spotify's own look, under Vitrine's logo.
+// Everything else waits in Mod Settings.
 @interface SGOnboardingController : UIViewController
 @end
 
 @implementation SGOnboardingController {
-    UIImageView *_hero;
+    SGTourLogo *_logo;
     SGLookCard *_redesigned, *_legacy;
-    UIView *_beta;
+    UIView *_note;
+    UIImageView *_noteIcon;
+    UILabel *_noteText;
+    UIButton *_report;
     UIButton *_primary;
+    NSArray<UIView *> *_page;   // what comes in under the logo, in order
+    BOOL _landed;
 }
 
 - (instancetype)init {
@@ -158,17 +305,15 @@ static UIButton *glassButton(NSString *title) {
     return self;
 }
 
-// Under the cards while the redesign is picked: it is a beta, and a bug report is the way to help.
-- (UIView *)betaNote {
-    UIImageView *icon = SGSymbolView(@"exclamationmark.triangle.fill", 15, UIImageSymbolWeightSemibold, 22);
-    icon.tintColor = UIColor.systemYellowColor;
-    UILabel *text = [UILabel new];
-    text.text = @"The redesign is a beta. Expect lags, freezes and bugs.";
-    text.font = [UIFont systemFontOfSize:13];
-    text.textColor = SGGrey();
-    text.numberOfLines = 0;
-    [text setContentHuggingPriority:UILayoutPriorityDefaultLow - 1 forAxis:UILayoutConstraintAxisHorizontal];
-    UIStackView *line = [[UIStackView alloc] initWithArrangedSubviews:@[icon, text]];
+// Under the cards: what the picked look leaves out, or below iOS 26 what the redesign risks there.
+- (UIView *)noteView {
+    _noteIcon = SGSymbolView(@"info.circle.fill", 15, UIImageSymbolWeightSemibold, 22);
+    _noteText = [UILabel new];
+    _noteText.font = [UIFont systemFontOfSize:13];
+    _noteText.textColor = SGGrey();
+    _noteText.numberOfLines = 0;
+    [_noteText setContentHuggingPriority:UILayoutPriorityDefaultLow - 1 forAxis:UILayoutConstraintAxisHorizontal];
+    UIStackView *line = [[UIStackView alloc] initWithArrangedSubviews:@[_noteIcon, _noteText]];
     line.alignment = UIStackViewAlignmentTop;
     line.spacing = 10;
 
@@ -176,12 +321,12 @@ static UIButton *glassButton(NSString *title) {
     config.contentInsets = NSDirectionalEdgeInsetsMake(4, 32, 4, 0);
     config.baseForegroundColor = SGGreen();
     config.attributedTitle = [[NSAttributedString alloc] initWithString:@"Report a bug" attributes:@{NSFontAttributeName: [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold]}];
-    UIButton *report = [UIButton buttonWithConfiguration:config primaryAction:[UIAction actionWithHandler:^(UIAction *action) {
+    _report = [UIButton buttonWithConfiguration:config primaryAction:[UIAction actionWithHandler:^(UIAction *action) {
         SGOpenURL([SGRepoURL stringByAppendingString:@"/issues"]);
     }]];
-    report.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
+    _report.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
 
-    UIStackView *note = [[UIStackView alloc] initWithArrangedSubviews:SGRepoURL ? @[line, report] : @[line]];
+    UIStackView *note = [[UIStackView alloc] initWithArrangedSubviews:@[line, _report]];
     note.axis = UILayoutConstraintAxisVertical;
     note.alignment = UIStackViewAlignmentLeading;
     note.spacing = 2;
@@ -190,44 +335,54 @@ static UIButton *glassButton(NSString *title) {
     return note;
 }
 
+// The redesign is the look Vitrine is built around, so picking it needs no note on iOS 26. Legacy is
+// told what it goes without; below 26 the redesign is told it is untested, with the way to report it.
+- (void)updateNote {
+    BOOL untested = _redesigned.selected && !SGRedesignAvailable();
+    if (untested) {
+        _noteIcon.image = [UIImage systemImageNamed:@"exclamationmark.triangle.fill"];
+        _noteIcon.tintColor = UIColor.systemYellowColor;
+        _noteText.text = SGRedesignUntestedWarning();
+    } else {
+        _noteIcon.image = [UIImage systemImageNamed:@"info.circle.fill"];
+        _noteIcon.tintColor = SGGrey();
+        _noteText.text = @"Apple Music style lyrics, the redesigned player and the glass tab bar come with the redesign only.";
+    }
+    _report.hidden = !untested || !SGRepoURL;
+    _note.hidden = _redesigned.selected && !untested;
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor colorWithWhite:0 alpha:0.85];
 
-    SGGlassView *halo = [SGGlassView new];
-    halo.capsule = YES;
-    halo.translatesAutoresizingMaskIntoConstraints = NO;
-    _hero = SGSymbolView(@"music.note", 34, UIImageSymbolWeightMedium, 88);
-    _hero.translatesAutoresizingMaskIntoConstraints = NO;
-    [halo addSubview:_hero];
-    // The column stretches its children to its width; the halo keeps its square inside a strip.
+    _logo = [SGTourLogo new];
+    _logo.translatesAutoresizingMaskIntoConstraints = NO;
+    // The column stretches its children to its width; the logo keeps its square inside a strip.
     UIView *strip = [UIView new];
-    [strip addSubview:halo];
+    [strip addSubview:_logo];
 
     BOOL glass = SGRedesignAvailable();
     UILabel *heading = [UILabel new];
-    heading.text = glass ? @"Pick your look." : @"Your look.";
+    heading.text = @"Pick your look.";
     heading.font = [UIFont systemFontOfSize:30 weight:UIFontWeightBold];
     heading.textColor = UIColor.whiteColor;
     heading.numberOfLines = 0;
 
-    _redesigned = [[SGLookCard alloc] initWithSymbol:@"sparkles" title:@"Redesigned" subtitle:@"Looks like Apple Music. Better lyrics, Live Activity."];
+    NSString *redesign = glass ? @"Looks like Apple Music. Better lyrics, Live Activity."
+                               : [NSString stringWithFormat:@"Looks like Apple Music. Untested on iOS %@.", UIDevice.currentDevice.systemVersion];
+    _redesigned = [[SGLookCard alloc] initWithSymbol:@"sparkles" title:@"Redesigned" subtitle:redesign];
     _legacy = [[SGLookCard alloc] initWithSymbol:@"slider.horizontal.3" title:@"Legacy" subtitle:@"More options, still looks like Spotify."];
     for (SGLookCard *card in @[_redesigned, _legacy]) [card addTarget:self action:@selector(picked:) forControlEvents:UIControlEventTouchUpInside];
-    // The first launch offers the redesign; the tour again from the Mod page shows the stored look.
-    BOOL redesign = glass && (SGFlag(SGKeyOnboardingSeen, NO) ? SGRedesignedUIStored() : YES);
-    _redesigned.selected = redesign;
-    _legacy.selected = !redesign;
-    // Liquid Glass is drawn by iOS 26 and by nothing before it, so on an older phone the card stays
-    // on the page to say so and the legacy look is the only one left.
-    if (!glass) {
-        [_redesigned makeUnavailable:[NSString stringWithFormat:@"Needs iOS 26. This phone runs iOS %@.", UIDevice.currentDevice.systemVersion]];
-        _legacy.enabled = NO;
-    }
-    _beta = [self betaNote];
-    _beta.hidden = !redesign;
+    // The first launch offers the redesign where it is at home; below iOS 26 it waits to be asked for.
+    // The tour again from the Mod page shows the stored look.
+    BOOL redesigned = SGFlag(SGKeyOnboardingSeen, NO) ? SGRedesignedUIStored() : glass;
+    _redesigned.selected = redesigned;
+    _legacy.selected = !redesigned;
+    _note = [self noteView];
+    [self updateNote];
 
-    UIStackView *column = [[UIStackView alloc] initWithArrangedSubviews:@[strip, heading, _redesigned, _legacy, _beta]];
+    UIStackView *column = [[UIStackView alloc] initWithArrangedSubviews:@[strip, heading, _redesigned, _legacy, _note]];
     column.axis = UILayoutConstraintAxisVertical;
     column.spacing = 12;
     [column setCustomSpacing:28 afterView:strip];
@@ -241,7 +396,7 @@ static UIButton *glassButton(NSString *title) {
     [scroll addSubview:column];
     [self.view addSubview:scroll];
 
-    _primary = glassButton(@"Start listening");
+    _primary = SGOnboardingButton(@"Start listening");
     [_primary addTarget:self action:@selector(finish) forControlEvents:UIControlEventTouchUpInside];
     UILabel *footer = [UILabel new];
     footer.text = @"Hold Home to open settings.";
@@ -264,13 +419,11 @@ static UIButton *glassButton(NSString *title) {
         [column.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:kMargin],
         [column.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-kMargin],
         [column.widthAnchor constraintEqualToAnchor:frame.widthAnchor constant:-2 * kMargin],
-        [halo.leadingAnchor constraintEqualToAnchor:strip.leadingAnchor],
-        [halo.topAnchor constraintEqualToAnchor:strip.topAnchor],
-        [halo.bottomAnchor constraintEqualToAnchor:strip.bottomAnchor],
-        [halo.widthAnchor constraintEqualToConstant:88],
-        [halo.heightAnchor constraintEqualToConstant:88],
-        [_hero.centerXAnchor constraintEqualToAnchor:halo.centerXAnchor],
-        [_hero.centerYAnchor constraintEqualToAnchor:halo.centerYAnchor],
+        [_logo.leadingAnchor constraintEqualToAnchor:strip.leadingAnchor],
+        [_logo.topAnchor constraintEqualToAnchor:strip.topAnchor],
+        [_logo.bottomAnchor constraintEqualToAnchor:strip.bottomAnchor],
+        [_logo.widthAnchor constraintEqualToConstant:88],
+        [_logo.heightAnchor constraintEqualToConstant:88],
         [_primary.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:kMargin],
         [_primary.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-kMargin],
         [_primary.bottomAnchor constraintEqualToAnchor:footer.topAnchor constant:-12],
@@ -279,25 +432,43 @@ static UIButton *glassButton(NSString *title) {
         [footer.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-8],
     ]];
     [self refresh];
+
+    // The tour opens on the logo alone; the page waits under it until the reeds land.
+    _page = @[heading, _redesigned, _legacy, _note, _primary, footer];
+    [_logo prepare];
+    BOOL reduce = UIAccessibilityIsReduceMotionEnabled();
+    for (UIView *view in _page) {
+        view.alpha = 0;
+        if (!reduce) view.transform = CGAffineTransformMakeTranslation(0, 16);
+    }
 }
 
-// iOS 16 has no symbol effects and skips the bounce.
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    if (@available(iOS 17.0, *)) [_hero addSymbolEffect:[NSClassFromString(@"NSSymbolBounceEffect") effect]];
+    if (_landed) return;
+    _landed = YES;
+    NSArray<UIView *> *page = _page;
+    [_logo landThen:^{
+        // A strong ease out, critically damped, 40 ms between the parts. Under Reduce Motion the page
+        // only fades, as nothing was moved out of place.
+        for (NSUInteger i = 0; i < page.count; i++) {
+            UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc] initWithDuration:0.45 dampingRatio:1 animations:^{
+                page[i].alpha = 1;
+                page[i].transform = CGAffineTransformIdentity;
+            }];
+            [animator startAnimationAfterDelay:i * 0.04];
+        }
+    }];
 }
 
 - (void)picked:(SGLookCard *)card {
     _redesigned.selected = card == _redesigned;
     _legacy.selected = card == _legacy;
-    BOOL hide = !_redesigned.selected;
-    if (_beta.hidden != hide) {
-        [UIView animateWithDuration:0.25 animations:^{
-            self->_beta.hidden = hide;
-            self->_beta.alpha = hide ? 0 : 1;
-            [self.view layoutIfNeeded];
-        }];
-    }
+    [UIView animateWithDuration:0.25 animations:^{
+        [self updateNote];
+        self->_note.alpha = self->_note.hidden ? 0 : 1;
+        [self.view layoutIfNeeded];
+    }];
     [self refresh];
 }
 
@@ -313,6 +484,8 @@ static UIButton *glassButton(NSString *title) {
     _primary.configuration = config;
 }
 
+// Below iOS 26 the note above the button has said what the redesign risks there, so picking it and
+// going on is the warning accepted (SGSetRedesignedUI stores that).
 - (void)finish {
     SGSetEnabled(SGKeyOnboardingSeen, YES);
     SGSetRedesignedUI(_redesigned.selected);

@@ -20,10 +20,11 @@ sources, gestures, blocked artists, flags, Vibrations, Speed and pitch, and the 
 last three were the redesign's until they moved to `Shared/`, so their keys lost the `.redesign.` and
 `Core/SGPrefs.h`'s `SGMigrateKey` carries the old ones over at launch.
 
-**The redesign needs iOS 26.** It is Liquid Glass, which the system draws from 26 on and no older OS
-can be given, so `SGRedesignAvailable()` (`Core/SGUIMode.h`) holds it there: below 26 both
-`SGRedesignedUI()` and `SGRedesignedUIStored()` answer NO whatever is stored, the switch becomes a
-"Needs iOS 26" row and the tour greys its card out. The native look's floor is iOS 16.1, which is
+**The redesign is built for iOS 26.** It is Liquid Glass, which the system draws from 26 on and no older OS
+can be given. `SGRedesignAvailable()` (`Core/SGUIMode.h`) says whether this OS has it. Below 26 the
+redesign runs only after a warning that it is untested there (`SGKeyRedesignUntested`, stored by
+`SGSetRedesignedUI` in `App/Pages.m`), and a launch with it that hangs (issue #37) is followed by one in
+the native look with both switches off. The native look's floor is iOS 16.1, which is
 Spotify 9.1.78's own.
 
 ## Where code goes (`tweak/Sources/`)

@@ -27,8 +27,16 @@
 
 NSString *const SGRedesignedUIInfo = @"The newest version of Vitrine, leaning towards Apple Music's style. It is not compatible with the legacy look's settings.\n\nThe legacy look gives you more freedom, yet still looks like Spotify.";
 
+// Below iOS 26 the redesign also needs SGKeyRedesignUntested (Core/SGUIMode.h): whoever calls this has
+// shown the warning. Turning it off takes that back, so turning it on again warns again.
 void SGSetRedesignedUI(BOOL on) {
     SGSetEnabled(SGKeyRedesign, on);
+    SGSetEnabled(SGKeyRedesignUntested, on && !SGRedesignAvailable());
+}
+
+NSString *SGRedesignUntestedWarning(void) {
+    return [NSString stringWithFormat:@"The redesign is built on iOS 26's Liquid Glass. iOS %@ draws a blur in its place, and nobody has tested the redesign there: pages can be laid out wrongly, and Spotify can freeze as it starts. If Spotify does not start with it, the next launch goes back to Legacy.",
+            UIDevice.currentDevice.systemVersion];
 }
 
 // The whole look changes hands at launch, so the switch asks for the restart straight away rather than
@@ -42,23 +50,36 @@ static void offerRestart(BOOL on) {
     [SGTopController() presentViewController:alert animated:YES completion:nil];
 }
 
-// Below iOS 26 the row is not a switch: Liquid Glass is the redesign, and the system draws it from
-// that version on, so the row reads out what is missing and the page carries the native look's rows alone.
-static SGModRow *unavailableRow(void) {
-    SGModRow *row = SGStatActionRow(@"Redesigned UI", nil, ^NSString *{ return @"Needs iOS 26"; }, ^{
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Redesigned UI"
-            message:[NSString stringWithFormat:@"The redesign is built on Liquid Glass, which iOS 26 draws and no earlier version can. This phone runs iOS %@, so the mod gives you its legacy look instead: Spotify's own screens with everything else the mod adds on them.", UIDevice.currentDevice.systemVersion]
+// Below iOS 26 the switch stores the warning's key, not the look's: it is on only once the warning has
+// been accepted, which restarts Spotify at once, so the switch never reads on for a look that is not coming.
+static SGModRow *untestedRow(void) {
+    SGModRow *row = SGOptionRow(@"Redesigned UI", [NSString stringWithFormat:@"Untested on iOS %@", UIDevice.currentDevice.systemVersion], SGKeyRedesignUntested);
+    row.glows = YES;
+    row.info = SGRedesignedUIInfo;
+    row.changed = ^(BOOL on) {
+        if (!on) {
+            SGSetRedesignedUI(NO);
+            offerRestart(NO);
+            return;
+        }
+        SGSetEnabled(SGKeyRedesignUntested, NO);   // the page reloads to off; the warning's button turns it on
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Turn on the redesign?"
+            message:[SGRedesignUntestedWarning() stringByAppendingString:@"\n\nSpotify restarts to turn it on."]
             preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Turn On and Restart" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            SGSetRedesignedUI(YES);
+            SGRestartSpotify();
+        }]];
         [SGTopController() presentViewController:alert animated:YES completion:nil];
-    });
+    };
     return SGWithTile(row, @"sparkles", UIColor.systemPurpleColor);
 }
 
-// Redesigned UI, then the stored look's own rows (below iOS 26 that is always the native look's), then the
+// Redesigned UI, then the stored look's own rows, then the
 // font and the app icon, which work under either look on any iOS.
 UIViewController *SGAppearancePage(void) {
-    SGModRow *look = unavailableRow();
+    SGModRow *look = untestedRow();
     if (SGRedesignAvailable()) {
         SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
         redesign.glows = YES;
