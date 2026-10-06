@@ -18,8 +18,9 @@
 //     PlayerGestures.x   the gestures' hookup
 //     PlayerMorph.x      the open and close grown out of the now playing bar's card, the cover flown
 //     PlayerMotion.x     Animated artwork: the Canvas or Apple Music's animated cover behind the player
-//     PlayerMenu.m       the more button's system menu: Spotify's rows, then speed, pitch, reverb and
-//                        Animated artwork (Redesigned/ContextMenu)
+//     PlayerMenu.m       the more button's system menu: Share, Add to playlist and Add to queue on top, then
+//                        speed, pitch and reverb and Show Animated or Fluid artwork, and Spotify's other rows
+//                        under More (Redesigned/ContextMenu)
 //     PlayerSettings.m   the Player page in Mod Settings, led by a showcase of the player
 //     PlayerFree.x       a Spotify Free account given the player mode these units belong to
 //
