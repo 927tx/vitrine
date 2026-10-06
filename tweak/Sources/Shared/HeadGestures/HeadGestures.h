@@ -1,11 +1,13 @@
-// AirPods gestures (Mod Settings > Player > AirPods gestures), under either look: a double nod adds the
-// playing song to Liked Songs and a shake of the head skips it, read from the head motion that AirPods Pro,
-// AirPods 3 and later, AirPods Max and some Beats report through CMHeadphoneMotionManager.
+// AirPods gestures (Mod Settings > Player > AirPods gestures), under either look: a double nod and a shake of
+// the head, each doing what its pull-down says (Like and Next track until changed), read from the head motion
+// that AirPods Pro, AirPods 3 and later, AirPods Max and some Beats report through CMHeadphoneMotionManager.
 //
 //     SGHeadDetector.m         the gestures out of the motion, plain C, tested on the Mac (harness/head-gestures)
 //     HeadGestures.x           the motion listened to while the switch is on and Spotify plays, and what each
-//                              gesture does: Spotify's player skips, its collection platform saves the track
-//     HeadGesturesSettings.m   the page: the switch, the sensitivity, and learning one's own nod and shake
+//                              gesture does through Spotify's player and its collection platform
+//     HeadGesturesSettings.m   the page: the switch, each gesture's action, the sensitivity, Try it and Forget
+//     HeadGesturesTeach.m      the teaching sheet: five of each gesture, one after each tone, over a ring that
+//                              shows the head live
 //
 // HeadGestures.x owns the app's one CMHeadphoneMotionManager (iOS hands a manager's motion to one handler) and
 // lends its motion to other features through SGHeadMotionListen: Sing's spatial voice listens there.
@@ -22,21 +24,65 @@
 // What learning set, in thousandths of a radian a second; unset or 0 is the detector's default.
 #define SGKeyHeadNod @"spotifyglass.headgestures.nod"
 #define SGKeyHeadShake @"spotifyglass.headgestures.shake"
+// Each gesture's SGHeadAction; unset is Like for the nod and Next track for the shake.
+#define SGKeyHeadNodAction @"spotifyglass.headgestures.nodaction"
+#define SGKeyHeadShakeAction @"spotifyglass.headgestures.shakeaction"
 
 enum { SGHeadSensitivityMin = 50, SGHeadSensitivityMax = 200, SGHeadSensitivityStep = 10 };
 
-// From the switch, the sensitivity and learning: listens or stops, and reads the thresholds again.
+// What a gesture does, stored as this number: the order is the pull-down's and only grows at the end.
+typedef NS_ENUM(NSInteger, SGHeadAction) {
+    SGHeadActionNothing,
+    SGHeadActionSeekBack,      // 15 s
+    SGHeadActionSeekForward,   // 15 s
+    SGHeadActionPlayPause,
+    SGHeadActionNext,
+    SGHeadActionPrevious,
+    SGHeadActionShuffle,       // on or off
+    SGHeadActionRepeat,        // off, the context, the track, as Spotify's button goes
+    SGHeadActionLike,          // into Liked Songs, never out
+    SGHeadActionCount,
+};
+SGHeadAction SGHeadGestureAction(SGHeadGesture gesture);
+void SGSetHeadGestureAction(SGHeadGesture gesture, SGHeadAction action);
+
+// The cue's sounds, mixed into the music: one tone to time a gesture by, a rising pair when one worked, a low
+// tone when it did not. A haptic comes with each while Spotify is in front.
+typedef NS_ENUM(NSInteger, SGHeadCue) {
+    SGHeadCueReady,
+    SGHeadCueWorked,
+    SGHeadCueFailed,
+};
+void SGHeadGesturesCue(SGHeadCue cue);
+
+// From the switch, the sensitivity, the actions and learning: listens or stops, and reads the thresholds again.
 void SGHeadGesturesSettingsChanged(void);
 // Whether this iPhone can read headphone motion at all (iOS 14 and up; the headphones are another matter).
 BOOL SGHeadGesturesAvailable(void);
-// Listens for `seconds` whatever plays and answers the threshold learned for `axis` (0 when the motion held
-// no gesture) and how many samples came (0 when no headphones sent any, or motion is not allowed).
-void SGHeadGesturesLearn(SGHeadAxis axis, double seconds, void (^done)(double threshold, NSInteger samples));
-// Ends the learning that listens now, at once: nothing is stored, its done is never called, and the motion stops
-// unless the gestures or another feature want it. A new learning can start straight after.
-void SGHeadGesturesCancelLearn(void);
+
+// The page's listening, whatever plays, during which no gesture does anything to the song. One at a time:
+// starting one ends the last, and a stopped one's done is never called.
+//
+// Records `seconds` of motion and hands it back, three doubles a sample (time, pitch, yaw), empty when no
+// headphones sent any or motion is not allowed.
+void SGHeadGesturesRecord(double seconds, void (^done)(NSData *motion));
+// Listens up to `seconds` at the thresholds set now, sensitivity included, and hands back the first gesture,
+// or SGHeadGestureNone once the time is up; `heard` says whether any motion came.
+void SGHeadGesturesTry(double seconds, void (^done)(SGHeadGesture gesture, BOOL heard));
+void SGHeadGesturesStopListening(void);
+// While held the motion runs whatever plays and no gesture does anything: the teaching sheet holds it open, so
+// the headphones are sending already when each of its recordings starts.
+void SGHeadGesturesHold(BOOL hold);
+
+// The threshold one recording of the gesture of `axis` teaches, 0 when it holds no such gesture.
+double SGHeadGesturesSampleThreshold(NSData *motion, SGHeadAxis axis);
+// Learns `axis` from recordings of it (SGHeadLearnSamples, all but one of them at least) and stores the
+// threshold; answers it, or 0 with nothing stored.
+double SGHeadGesturesLearnFrom(NSArray<NSData *> *motions, SGHeadAxis axis);
 
 UIViewController *SGHeadGesturesSettingsPage(void);
+// The teaching sheet over `owner`; `closed` runs once it is gone, whatever it stored.
+void SGPresentHeadGesturesTeaching(UIViewController *owner, void (^closed)(void));
 
 // Head motion for another feature, under `name`; a nil handler takes it out. While any listener is in, the
 // manager runs whatever the gestures' switch says. A handler is called on the motion's serial queue with every

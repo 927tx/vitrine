@@ -218,12 +218,17 @@ Shared:
                   against harness/haptics/, as are Native iOS's pure steps (build/track), the hook in the simulator
                   against its sim/, the settings against harness/haptics-page/
     HeadGestures/ AirPods gestures (HeadGestures.h lists its files): CMHeadphoneMotionManager's attitudes, while the
-                  switch is on and Spotify plays, read for a double nod, which adds the track to Liked Songs through
-                  Spotify's collection platform (addURL:showUIConfirmation:completion:), and a shake, which skips; a
+                  switch is on and Spotify plays, read for a double nod and a shake, each doing what its pull-down
+                  says: Nothing, back or forward 15 s, play or pause (which listens with the song paused too), next or
+                  previous track, shuffle, repeat, or Like, which adds the track to Liked Songs through Spotify's
+                  collection platform (addURL:showUIConfirmation:completion:); Like and Next track until changed. A
                   tone played through Spotify's playback session confirms each, whatever the Ring/Silent switch says.
-                  Learning one's own nod and shake sets the thresholds, each kept only if the detector, set to it,
-                  finds the gesture in what was recorded; its Cancel stops listening at once, and Forget shows only
-                  while something is learned. The one CMHeadphoneMotionManager is lent to other features
+                  Try it listens a few seconds and names in its row what it picked up, doing nothing to the song. A
+                  sheet teaches one's own nod and shake, five of each after a tone, a ring showing the head live (a dot
+                  that moves with it, ticks lighting toward where it went; SGHeadMotionListen) and five dots counting
+                  what landed, with Redo last; the threshold kept is the one that fires on all five but one at least, the nod
+                  stored before the shakes begin, so Cancel keeps it. Forget shows only while something is learned.
+                  The one CMHeadphoneMotionManager is lent to other features
                   (SGHeadMotionListen: Sing's spatial voice), and runs for them with the switch off, the detector then
                   unfed. The detector is
                   tested on the Mac against harness/head-gestures/, the hook and the page in the simulator against its sim/
