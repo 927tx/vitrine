@@ -10,6 +10,7 @@
 #import "Core/SGCore.h"
 #import "SGRKaraokeView.h"
 #import "LyricsText.h"
+#import "LyricsLook.h"
 #import "MeaningSheet.h"
 #import "SGRSingButton.h"
 #import "Shared/LyricsSources/LyricsSources.h"
@@ -20,11 +21,12 @@
 #import "Redesigned/Kit/SGRGlass.h"
 #import "Redesigned/Kit/SGRTokens.h"
 
-static const CGFloat kFontSize = 30, kMargin = 24, kLineGap = 24, kRowTighten = 2;
+// The size of the words and the room between lines are the Lyrics page's (LyricsLook.h).
+static const CGFloat kMargin = 24, kRowTighten = 2;
 static const CGFloat kDimAlpha = 0.3, kFillEdge = 22, kLift = 2.5, kDimScale = 0.97;
 static const CGFloat kAnchor = 0.28;   // where the sung line rests, as a share of the height
 static const CGFloat kEdgeFade = 0.1;  // the lines fade out over this share at the top and bottom
-static const CGFloat kBlurPerLine = 1.4, kMaxBlur = 6;
+static const CGFloat kBlurPerLine = 1.4, kMaxBlur = 6;   // Apple Music's, scaled by the Lyrics page's blur
 // The (oh, aye) hanging under a line: smaller, a little dimmer, and just clear of it.
 static const CGFloat kBackingScale = 0.62, kBackingAlpha = 0.8, kBackingGap = 4;
 // The mark of a line Genius explains: a bubble after it for the artist's own word, a dotted underline
@@ -44,6 +46,8 @@ static const double kFloatMinMs = 700, kFloatLeadMs = 80;   // a short word stil
 // word and fades over kGlowFadeMs after it.
 static const double kGlowFromMs = 900, kGlowFullMs = 2400, kGlowFadeMs = 450;
 static const CGFloat kGlowRadius = 9, kGlowOpacity = 0.85;
+// How strongly the glow and the wave below are drawn, the Lyrics page's (LyricsLook.h), 1 being as here.
+static CGFloat sgr_glowScale = 1, sgr_waveScale = 1;
 // A word held long enough to glow lifts its letters one after another as the sweep reaches each, a wave
 // running through it, as high as this share of the font for the word held longest: a letter starts up a
 // little before the sweep's edge reaches its middle and is up over this share of the word's time. They come
@@ -271,7 +275,7 @@ static double heldStrength(double held) {
 - (void)glowAt:(double)ms {
     double held = _word.end - _word.start;
     CGFloat glow = 0;
-    if (held >= kGlowFromMs && !_whole) {
+    if (held >= kGlowFromMs && !_whole && sgr_glowScale > 0) {
         double strength = heldStrength(held);
         double envelope = ms < _word.start ? 0
                         : ms <= _word.end ? (ms - _word.start) / held
@@ -285,8 +289,8 @@ static double heldStrength(double held) {
     [CATransaction setDisableActions:YES];
     layer.shadowColor = UIColor.whiteColor.CGColor;
     layer.shadowOffset = CGSizeZero;
-    layer.shadowRadius = kGlowRadius * (0.5 + glow / 2);
-    layer.shadowOpacity = kGlowOpacity * glow;
+    layer.shadowRadius = kGlowRadius * (0.5 + glow / 2) * (0.75 + sgr_glowScale / 4);
+    layer.shadowOpacity = MIN(1, kGlowOpacity * glow * sgr_glowScale);
     [CATransaction commit];
 }
 
@@ -296,7 +300,7 @@ static double heldStrength(double held) {
     if (!_litLetters || _whole) return;
     double held = _word.end - _word.start, along = (ms - _word.start) / held;
     double fade = ms <= _word.end ? 1 : MAX(0, 1 - (ms - _word.end) / kGlowFadeMs);
-    CGFloat height = _waveHeight * heldStrength(held) * fade;
+    CGFloat height = _waveHeight * heldStrength(held) * fade * sgr_waveScale;
     for (NSUInteger i = 0; i < _litLetters.count; i++) {
         double p = MAX(0, MIN(1, (along - _letterAt[i] + kWaveLead) / kWaveSpan));
         CGFloat lift = round(height * p * p * (3 - 2 * p) * 4) / 4;   // quarter points, so most frames change nothing
@@ -1223,6 +1227,9 @@ typedef struct {
     CFTimeInterval _seekAt;   // when, 0 while no seek is waiting
     BOOL _sweepsEstimates;   // the Lyrics page's "Simulate word-by-word timing", read once like the credit
     BOOL _plain;             // the song has no timing at all: every line lit, nothing follows the clock
+    NSArray<SGKaraokeLine *> *_sample;   // the preview's lines, nil for the player's
+    NSInteger _sampleLength;
+    CFTimeInterval _sampleEpoch;
     NSDictionary<NSNumber *, NSArray<SGLyricsMeaning *> *> *_meanings;   // Genius's, by line
     NSUInteger _meaningsAsked;
 }
@@ -1232,11 +1239,8 @@ typedef struct {
     if (!self) return nil;
     self.hidden = YES;
     _focus = _openBreak = -1;
-    _fontSize = kFontSize;
     _margin = kMargin;
-    _lineGap = kLineGap;
-    _blurPerLine = kBlurPerLine;
-    _maxBlur = kMaxBlur;
+    [self takeLook];
     _shown = [NSMutableDictionary dictionary];
     _sightArrangement = NSUIntegerMax;
     _fade = [CAGradientLayer layer];
@@ -1266,6 +1270,7 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionEndedNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(restyle) name:SGRLyricsTextDidChangeNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(lookChanged) name:SGRLyricsLookDidChangeNotification object:nil];
     // A locked phone leaves the card in its window, so the link has to be put down by the app going
     // away rather than by the view going: see scheduleLink.
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationDidBecomeActiveNotification object:nil];
@@ -1273,10 +1278,53 @@ typedef struct {
     return self;
 }
 
+- (instancetype)initWithSampleLines:(NSArray<SGKaraokeLine *> *)lines length:(NSInteger)length {
+    if (!(self = [self initWithFrame:CGRectZero])) return nil;
+    _sample = lines;
+    _sampleLength = MAX(length, 1);
+    _sampleEpoch = CACurrentMediaTime();
+    _crediting = NO;
+    [_sing removeFromSuperview];
+    _sing = nil;
+    self.userInteractionEnabled = NO;
+    self.accessibilityElementsHidden = YES;   // a picture of the setting, with nothing to read or do
+    return self;
+}
+
 - (void)dealloc {
     [NSNotificationCenter.defaultCenter removeObserver:self];
     free(_spans);
     free(_breaks);
+}
+
+// The Lyrics page's look: the size and the room are the lines' layout, the blur their placing, the glow
+// and the wave every held word's, so a change is the song measured again in it and crossfaded over.
+- (void)takeLook {
+    SGRLyricsLook look = SGRLyricsLookNow();
+    _fontSize = look.size;
+    _lineGap = look.spacing;
+    _blurPerLine = kBlurPerLine * look.blur;
+    _maxBlur = kMaxBlur * look.blur;
+    sgr_glowScale = look.glow;
+    sgr_waveScale = look.wave;
+}
+
+- (void)lookChanged {
+    [self takeLook];
+    _font = [UIFont systemFontOfSize:_fontSize weight:UIFontWeightBold];
+    [_dots removeFromSuperview];   // made again in the new font, at the next frame with a break open
+    _dots = nil;
+    [self restyle];
+}
+
+// The preview's lines on its own clock, round and round; everything else the player's.
+- (NSInteger)positionMs {
+    if (!_sample) return SGKaraokePositionMs();
+    return (NSInteger)fmod((CACurrentMediaTime() - _sampleEpoch) * 1000, _sampleLength);
+}
+
+- (NSArray<SGKaraokeLine *> *)linesFor:(NSString *)track {
+    return _sample ?: SGKaraokeLinesForTrack(track);
 }
 
 - (void)tapped:(UITapGestureRecognizer *)tap {
@@ -1321,6 +1369,7 @@ typedef struct {
 // Genius is asked once the song's lines are in; lines that change under it are matched again.
 - (void)askMeanings {
     _meanings = nil;
+    if (_sample) return;
     NSUInteger asked = ++_meaningsAsked;
     NSArray<SGKaraokeLine *> *lines = _lines;
     __weak SGRKaraokeView *weakSelf = self;
@@ -1615,7 +1664,7 @@ static BOOL hasWords(SGKaraokeLine *line) {
 // what the song has: a switch for each, reading what tapping it will do.
 - (void)offerExtras {
     BOOL gemini = SGGeminiKeySet();
-    BOOL offered = _lines && (_hasSpoken || _hasTranslation || gemini);
+    BOOL offered = _lines && !_sample && (_hasSpoken || _hasTranslation || gemini);
     if (!offered) {
         _extrasBox.hidden = YES;
         return;
@@ -1900,7 +1949,7 @@ static BOOL hasWords(SGKaraokeLine *line) {
 // reading, so the sweep follows neither the callback's jitter nor the small jumps of the core's
 // corrections. A seek or a new track is too far off to ease and is taken at once.
 - (double)clockMs {
-    NSInteger raw = SGKaraokePositionMs();
+    NSInteger raw = [self positionMs];
     CFTimeInterval shown = _link ? _link.targetTimestamp : CACurrentMediaTime();
     if (_seekAt) {
         // A paused player never moves, so the hold ends by the position or the time, not by motion.
@@ -1926,9 +1975,9 @@ static BOOL hasWords(SGKaraokeLine *line) {
 }
 
 - (void)tick {
-    NSString *track = SGKaraokePlayingTrack();
+    NSString *track = _sample ? @"sample" : SGKaraokePlayingTrack();
     if (!(track == _track || [track isEqualToString:_track])) {
-        SGLog(@"karaoke: page shows track %@, lyrics %@", track, SGKaraokeLinesForTrack(track) ? @"captured" : @"not captured yet");
+        SGLog(@"karaoke: page shows track %@, lyrics %@", track, [self linesFor:track] ? @"captured" : @"not captured yet");
         _track = track;
         _lines = nil;
         _passedOver = nil;
@@ -1937,7 +1986,7 @@ static BOOL hasWords(SGKaraokeLine *line) {
         [self dropLineViews];
         [self offerExtras];
     }
-    NSArray<SGKaraokeLine *> *kept = _lines && track ? SGKaraokeLinesForTrack(track) : nil;
+    NSArray<SGKaraokeLine *> *kept = _lines && track ? [self linesFor:track] : nil;
     if (kept && kept != _lines && kept != _passedOver) {
         if (!_hasTranslation && kept.count == _lines.count && SGKaraokeLinesTiming(kept) == SGKaraokeLinesTiming(_lines)
             && hasTranslations(kept)) {
@@ -1966,7 +2015,7 @@ static BOOL hasWords(SGKaraokeLine *line) {
             _passedOver = kept;
         }
     }
-    if (!_lines && track && (_lines = SGKaraokeLinesForTrack(track))) {
+    if (!_lines && track && (_lines = [self linesFor:track])) {
         SGLog(@"karaoke: showing %lu lines of %@", (unsigned long)_lines.count, track);
         [self timeLines];
         [self setNeedsLayout];
@@ -1982,7 +2031,7 @@ static BOOL hasWords(SGKaraokeLine *line) {
     }
 
     double now = [self clockMs];
-    [self arrangeAt:now glide:NO];
+    [self arrangeAt:now glide:_sample != nil];   // the preview coming round glides back to its first line
     for (NSUInteger i = 0; i < _sungCount; i++) [_shown[@(_sung[i])] showTime:now];
     if (_dots.superview) [_dots showTime:now running:!_stillSince || _link.targetTimestamp - _stillSince < kStillFor at:_link.targetTimestamp];
 }

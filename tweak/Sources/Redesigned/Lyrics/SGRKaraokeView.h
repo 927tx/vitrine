@@ -9,6 +9,9 @@
 #import "Shared/Lyrics/Lyrics.h"
 
 @interface SGRKaraokeView : UIView
+// The Lyrics page's preview: `lines` played on a clock of its own, round and round every `length` ms, in
+// the look the page sets. It takes no touches and asks nothing of the player, the sources, Genius or Sing.
+- (instancetype)initWithSampleLines:(NSArray<SGKaraokeLine *> *)lines length:(NSInteger)length;
 // Hides Spotify's own lyrics next to this view while it has lyrics to show, and brings them back when not.
 - (void)syncSiblings;
 // Called as a finger starts to scroll the lines, for a host that hides its controls then.

@@ -45,6 +45,8 @@ id SGKaraokeTrackFor(NSString *trackID) {
     track.artistName = [NSUserDefaults.standardUserDefaults stringForKey:@"artist"];
     return track;
 }
+// lyrics-page links the real Settings/ framework, which has both.
+#ifndef SG_HARNESS_SETTINGS
 id SGChoiceRow(NSString *title, NSString *subtitle, NSString *key, NSArray *choices, NSInteger fallback) { return nil; }
 UIViewController *SGTopController(void) {
     UIWindowScene *scene = (UIWindowScene *)UIApplication.sharedApplication.connectedScenes.anyObject;
@@ -52,6 +54,7 @@ UIViewController *SGTopController(void) {
     while (top.presentedViewController) top = top.presentedViewController;
     return top;
 }
+#endif
 
 static NSArray<SGKaraokeLine *> *sg_lines;
 static double sg_from = -1, sg_rate = 1, sg_pauseAt = -1, sg_holdFor = 0;
