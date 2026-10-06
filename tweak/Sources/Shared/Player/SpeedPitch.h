@@ -19,6 +19,10 @@
 void SGPlayerMenuWatchMoreButton(UIView *button);
 // Whether a context menu sheet is the player's, by the same test; decided once per menu.
 BOOL SGPlayerMenuIsPlayers(UIViewController *menu);
+// Whether the sheet is shown as the system menu instead, unseen under it (Redesigned/ContextMenu), whose own
+// items then stand in for the block, which stays out of it. Defined by the redesign; NO under the native look
+// and once the sheet itself is shown.
+BOOL SGPlayerMenuReplaced(UIViewController *menu);
 // The speed Spotify's sound plays at, 1 when normal.
 double SGPlayerSpeed(void);
 // Whether speed can apply: Spotify's output was taken over when it wired it.
@@ -34,6 +38,10 @@ BOOL SGPlayerPitchFollowsSpeed(void);
 void SGSetPlayerPitchFollowsSpeed(BOOL follows);
 // Whether the output could be reached to change its pitch.
 BOOL SGPlayerPitchAvailable(void);
+// The audio effects' reverb as the menu sets it, 0 to 100, 0 while it is off. Any amount turns the effects and
+// the reverb on with it; 0 turns the reverb off and leaves the rest of the effects as they were.
+float SGPlayerReverb(void);
+void SGPlayerSetReverb(float amount);
 
 // The redesign's Animated artwork, switched in the same block: whether the player offers the switch (the
 // redesign is running and its background is Fluid or Animated, the two that share a field), whether it is

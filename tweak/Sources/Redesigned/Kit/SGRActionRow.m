@@ -424,6 +424,7 @@ static const CGFloat kCornerSide = 16;
 // Spotify's ⋯ from the same event, so a sheet Spotify puts up in that same turn would ask which page it
 // belonged to before a target added after -sgr_tap had answered.
 static __weak UIView *sg_morePage;
+static __weak SGRMirrorButton *sg_moreButton;
 static NSTimeInterval sg_moreTappedAt;
 static char kRecorderKey;
 
@@ -432,11 +433,17 @@ UIView *SGRPinnedMoreRecentPage(void) {
     return sg_morePage;
 }
 
+SGRMirrorButton *SGRPinnedMoreRecentButton(void) {
+    if (!sg_moreButton || CACurrentMediaTime() - sg_moreTappedAt > SGRPinnedMoreWindow) return nil;
+    return sg_moreButton;
+}
+
 @interface SGRPinnedMoreRecorder : NSObject
 @end
 @implementation SGRPinnedMoreRecorder
 - (void)sgr_moreTapped:(SGRMirrorButton *)button {
     sg_morePage = button.superview;
+    sg_moreButton = button;
     sg_moreTappedAt = CACurrentMediaTime();
 }
 @end

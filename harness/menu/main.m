@@ -35,6 +35,8 @@ static BOOL sg_animated;
 BOOL SGPlayerMenuOffersAnimatedArtwork(void) { return [NSProcessInfo.processInfo.arguments containsObject:@"animated"]; }
 BOOL SGPlayerMenuAnimatedArtwork(void) { return sg_animated; }
 void SGPlayerMenuSetAnimatedArtwork(BOOL on) { sg_animated = on; NSLog(@"[harness] animated artwork %d", on); }
+// The redesign's system menu, which never takes this sheet over here (harness/system-menu has it).
+BOOL SGPlayerMenuReplaced(UIViewController *menu) { return NO; }
 // The audio effects' settings, kept in a dictionary: the reverb slider reads and writes them.
 static NSMutableDictionary *sg_dsp;
 BOOL SGDSPSwitch(NSString *key) { return [sg_dsp[key] boolValue]; }

@@ -18,9 +18,12 @@
 //     PlayerGestures.x   the gestures' hookup
 //     PlayerMorph.x      the open and close grown out of the now playing bar's card, the cover flown
 //     PlayerMotion.x     Animated artwork: the Canvas or Apple Music's animated cover behind the player
+//     PlayerMenu.m       the more button's system menu: Spotify's rows, then speed, pitch, reverb and
+//                        Animated artwork (Redesigned/ContextMenu)
 //
 // Speed and pitch, once the redesign's own, are Shared/Player/SpeedPitch.h's; PlayerHeader.x still hands
-// the more button over, so a menu opened from it is taken for the player's.
+// the more button over, so a menu opened from it is taken for the player's, and hands it to PlayerMenu.m,
+// which opens it as the system menu.
 //
 // Every hook installs only while Redesigned UI is on (SGRedesignedUI); the native look's do not then.
 // Threading: main thread only.
@@ -92,3 +95,7 @@ BOOL SGRPlayerMotionShowing(void);
 // Alpha 0, no touches, hidden from accessibility, set again on every call: for Spotify's Swift views,
 // which SGRSuppress cannot keep (PlayerControls.x).
 void SGRPlayerVanish(UIView *view);
+
+// The more button's menu opens as the system menu with the player's own items (PlayerMenu.m). Called from
+// PlayerHeader.x with Spotify's more button on every pass; watching it again changes nothing.
+void SGRPlayerMenuWatch(UIView *button);

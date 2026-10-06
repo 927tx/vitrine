@@ -24,6 +24,10 @@
 //
 // Under the redesign, with the player's background Fluid or Animated, a row under the block switches
 // Animated artwork (SpeedPitch.h), which the redesign's PlayerMotion.x defines.
+//
+// The redesign shows the player's sheet as the system menu, with speed, pitch, reverb and Animated artwork
+// as items of its own (Redesigned/Player/PlayerMenu.m), so the block stays out of a sheet shown that way
+// and comes in only if the sheet itself is shown after all (SGPlayerMenuReplaced).
 #import <CoreText/SFNTLayoutTypes.h>
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
@@ -299,9 +303,11 @@ static void placeTick(UISlider *slider) {
 
 #pragma mark state
 
-// The audio effects' reverb, from the menu: any amount turns the effects and the reverb on, none turns the
-// reverb off and leaves the rest of the effects as they were.
-static void setReverb(float amount) {
+float SGPlayerReverb(void) {
+    return SGDSPSwitch(SGKeyDSP) && SGDSPSwitch(SGKeyDSPReverb) ? roundf(SGDSPNumber(SGKeyDSPReverbAmount)) : 0;
+}
+
+void SGPlayerSetReverb(float amount) {
     if (amount > 0) {
         SGDSPSetNumber(SGKeyDSPReverbAmount, amount);
         if (!SGDSPSwitch(SGKeyDSPReverb)) SGDSPSetSwitch(SGKeyDSPReverb, YES);
@@ -330,7 +336,7 @@ static NSString *pitchText(float pitch) {
     BOOL speedAllowed = SGPlayerSpeedAllowed(), pitchAvailable = SGPlayerPitchAvailable();
     if (!_speed.tracking) _shownSpeed = snappedSpeed(SGPlayerSpeed());
     if (!_pitch.tracking) _shownPitch = SGPlayerPitch();
-    if (!_reverb.tracking) _shownReverb = SGDSPSwitch(SGKeyDSP) && SGDSPSwitch(SGKeyDSPReverb) ? roundf(SGDSPNumber(SGKeyDSPReverbAmount)) : 0;
+    if (!_reverb.tracking) _shownReverb = SGPlayerReverb();
     _reverb.value = _shownReverb;
     _speed.value = _shownSpeed;
     _pitch.value = _shownPitch;
@@ -446,7 +452,7 @@ static NSString *pitchText(float pitch) {
         if (amount == _shownReverb) return;
         if (amount == 0 || _shownReverb == 0) SGPlayFeedback(SGFeedbackDetent);
         _shownReverb = amount;
-        setReverb(amount);
+        SGPlayerSetReverb(amount);
     } else {
         float pitch = roundf(slider.value);
         if (pitch == _shownPitch) return;
@@ -470,7 +476,7 @@ static NSString *pitchText(float pitch) {
 
 - (void)resetReverb {
     _shownReverb = 0;
-    setReverb(0);
+    SGPlayerSetReverb(0);
     [_reverb setValue:0 animated:YES];
     [self showValues];
 }
@@ -645,6 +651,8 @@ static void watchRows(UIViewController *menu) {
 static void install(UIViewController *menu) {
     UIView *root = menu.viewIfLoaded;
     if (!root || !isPlayerMenu(menu)) return;
+    // Shown as the system menu, whose own items are speed, pitch and reverb.
+    if (SGPlayerMenuReplaced(menu)) return;
     UITableView *table = findTable(root, 0);
     SGSpeedPitchView *block = objc_getAssociatedObject(menu, &kBlockKey);
     if (!table) {

@@ -163,7 +163,11 @@ Shared:
                   and is drawn from its own measures, not the Kit's, so it sits there under either look. Tested on the
                   Mac against harness/pitch/ and in the simulator against harness/speed/ and harness/menu/. Under the
                   redesign, with the player's background Fluid or Animated, a row under the block switches Animated
-                  artwork at once, through functions the redesign's PlayerMotion.x defines
+                  artwork at once, through functions the redesign's PlayerMotion.x defines. The redesign shows that
+                  sheet as the system menu (Redesigned/ContextMenu), whose own items stand in for the block, so the
+                  block stays out of it unless the sheet itself is shown (SGPlayerMenuReplaced). Switch to video,
+                  the chip over the title of a song with a music video, is hidden under either look on request
+                  (VideoSwitch.x, spotifyglass.hide.videoSwitch), by its identifier in FloatingElementsUnit
     AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): Spotify's
                   import of AudioOutputUnitStart is rebound, as Music Haptics does, and a render notify on its RemoteIO
                   unit runs each finished buffer through the mod's own engine, re-blocked to 1024 frames one block late,
@@ -289,8 +293,19 @@ Redesigned:
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
                   (BarConnect.x, its own key and its own Now playing page, apart from the native look's). In a Jam the
                   glass stays on the track and Spotify's Jam strip gets a pane of its own above it (harness/tabbar/, jam)
-    Player/       the redesigned full screen player (Player.h lists its files); its more button is handed to
-                  Shared/Player's Speed and pitch, which draws in the menu it opens, and a hold on either side of the
+    ContextMenu/  the ⋯ of the player and the ⋯ pinned over the playlist, album and artist pages open the system menu,
+                  always (ContextMenu.h): Spotify's sheet is still made, presented unanimated in a container hidden from
+                  the presented controller's viewWillAppear: on, so nothing darkens; the menu comes from an invisible
+                  button inside the ⋯ that takes touches only while it is up, opened with -performPrimaryAction (else
+                  UIContextMenuInteraction's private _presentMenuAtLocation:, checked with respondsToSelector:).
+                  Spotify's rows, read off the sheet's cells (words, glyph, greyed out), are a deferred element that
+                  waits for them as long as the menu is up; the mod's own rows in the sheet's header and footer (Sort,
+                  Mix, Edit info) come with them. A pick selects the row on the sheet once the menu is gone; a pick
+                  that leaves the sheet up, or a menu that does not come up, shows the sheet; a close with no pick
+                  dismisses it. Checked in the simulator against harness/system-menu/
+    Player/       the redesigned full screen player (Player.h lists its files); its more button opens the system
+                  menu (ContextMenu/), Spotify's rows and then Playback Speed, Pitch (with Pitch follows speed),
+                  Reverb and Animated artwork (PlayerMenu.m), and a hold on either side of the
                   cover plays at 2x until the finger lifts (PlayerArtwork.x), an octave higher while Pitch follows
                   speed is on. Animated artwork (PlayerMotion.x)
                   runs the clip edge to edge from the top over its own last rows drawn on down, with a blur coming in
