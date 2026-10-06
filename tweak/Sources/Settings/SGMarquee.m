@@ -1,11 +1,11 @@
-#import "SGRMarquee.h"
+#import "SGMarquee.h"
 
 // Points a second the text moves at, the rest at each end, and the fade over the edge it runs past.
 static const CGFloat kSpeed = 30, kFade = 16;
 static const CFTimeInterval kRest = 2;
 static NSString *const kScroll = @"sg.marquee";
 
-@implementation SGRMarqueeLabel {
+@implementation SGMarqueeLabel {
     UILabel *_label;
     CAGradientLayer *_fade;
     CGFloat _scrolled;   // how far the running animation travels, 0 while still

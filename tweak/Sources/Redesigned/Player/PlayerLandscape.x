@@ -32,7 +32,7 @@ static BOOL sg_shut;
 @implementation SGRLandscapeLyricsController {
     SGRArtworkField *_field;
     UIImageView *_cover;
-    SGRMarqueeLabel *_title, *_artist;
+    SGMarqueeLabel *_title, *_artist;
     UIStackView *_controls;
     UIButton *_play, *_close;
     UIView *_stage;   // the lines' own view: the karaoke view dims every sibling it has
@@ -103,9 +103,9 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
     [self.view addSubview:_cover];
 
     // A title or artist too long for the column scrolls, as the player's own do.
-    _title = [SGRMarqueeLabel new];
+    _title = [SGMarqueeLabel new];
     _title.textColor = UIColor.whiteColor;
-    _artist = [SGRMarqueeLabel new];
+    _artist = [SGMarqueeLabel new];
     _artist.textColor = [UIColor colorWithWhite:1 alpha:0.6];
     [self applyFonts];
     [self.view addSubview:_title];

@@ -10,7 +10,8 @@
     tweak/Sources/Settings/     the Mod Settings framework: SGPage (a page on Spotify's stack), SGModPage (sections
                                 of rows: switches, choices, sliders, links, rows shown only while a choice
                                 asks for them, and rows greyed out while the switch they wait on is off, a tap
-                                on one nudging that switch), SGPageStyle (the system Settings look), SGGlowSwitch
+                                on one nudging that switch), SGPageStyle (the system Settings look), SGGlowSwitch,
+                                SGMarquee (a title that glides side to side when it is too long, for every layer)
     tweak/Sources/Shared/       what works the same with either look, see Layers below
     tweak/Sources/Native/       tweaks on Spotify's own screens, running only while Redesigned UI is off
     tweak/Sources/Redesigned/   the redesign, running only while Redesigned UI is on
