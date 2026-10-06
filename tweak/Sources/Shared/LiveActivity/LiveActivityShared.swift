@@ -143,7 +143,7 @@ private func askSpotify(_ action: String) async throws -> String {
 @available(iOS 16.0, *)
 enum SGSleepTimerLength: String, AppEnum {
     // The raw values are the timer action's, timer:VALUE.
-    case fifteen = "15", thirty = "30", hour = "60", endOfTrack = "track", off = "cancel"
+    case fifteen = "15", thirty = "30", hour = "60", endOfTrack = "track", endOfAlbum = "album", off = "cancel"
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Sleep Timer"
     static let caseDisplayRepresentations: [SGSleepTimerLength: DisplayRepresentation] = [
@@ -151,6 +151,7 @@ enum SGSleepTimerLength: String, AppEnum {
         .thirty: "30 Minutes",
         .hour: "1 Hour",
         .endOfTrack: "End of Track",
+        .endOfAlbum: "End of Album",
         .off: "Off",
     ]
 }
@@ -244,7 +245,7 @@ struct SGSingIntent: LiveActivityIntent {
 @available(iOS 17.0, *)
 struct SGSleepTimerIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Sleep Timer"
-    static let description = IntentDescription("Pauses Spotify after a while or at the end of the track, or turns the timer off.")
+    static let description = IntentDescription("Pauses Spotify after a while or at the end of the track or the album, or turns the timer off.")
 
     @Parameter(title: "Length")
     var length: SGSleepTimerLength

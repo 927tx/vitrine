@@ -40,6 +40,10 @@ struct Harness {
         _ = try? await SGPlayPauseIntent().perform()
         check(SGHarnessPosts == 3, "timer, next and play or pause each answered first time")
 
+        // End of album reaches LiveActivity.x as the Live Activity's own action, which SleepTimer.h's end of album sets.
+        _ = try? await SGSleepTimerIntent(.endOfAlbum).perform()
+        check(SGHarnessLastAction == "timer:album", "end of album posts \(String(describing: SGHarnessLastAction))")
+
         SGHarnessPosts = 0
         let start = Date()
         do {

@@ -22,6 +22,9 @@ struct SGLiveActivityBundle: WidgetBundle {
         SGLyricsLiveActivity()
         if #available(iOS 18.0, *) {
             SGLyricsWatchLiveActivity()
+            SGLikeControl()
+            SGSingControl()
+            SGSleepTimerControl()
         }
     }
 }

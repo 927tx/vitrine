@@ -290,8 +290,9 @@ Shared:
                   (extension/LiveActivity/Controls.swift), buttons, as the extension cannot read Sing's state. Each is
                   a LiveActivityIntent or AudioPlaybackIntent, so it runs inside Spotify, launched in the background
                   when needed, and LiveActivity.x answers it with the activity on or off, Like through
-                  HeadGestures.x's collection platform and Sing through SGSetSingOn; a sleep timer set with the
-                  activity off keeps a clock of its own. The intent asks again for 8 s while the player is not up,
+                  HeadGestures.x's collection platform and Sing through SGSetSingOn; the sleep timer (15 min, 30 min,
+                  1 hour, End of track, End of album or Off) is the card's own, Player/SleepTimer.m, which keeps its
+                  own clock with the activity off. The intent asks again for 8 s while the player is not up,
                   then tells Siri to open Spotify. Checked in the simulator against harness/shortcuts/
 
     ListeningStats/ listening stats kept on the phone (ListeningStats.h lists its files): each music track timed while

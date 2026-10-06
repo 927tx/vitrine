@@ -4,6 +4,7 @@
 #import "observer.h"
 
 NSInteger SGHarnessPosts;
+NSString *SGHarnessLastAction;
 
 void SGHarnessObserve(NSInteger waitPosts) {
     [NSNotificationCenter.defaultCenter addObserverForName:@"SGShortcut" object:nil queue:nil usingBlock:^(NSNotification *note) {
@@ -14,6 +15,7 @@ void SGHarnessObserve(NSInteger waitPosts) {
         }
         NSString *action = note.object;
         SGHarnessPosts++;
+        SGHarnessLastAction = action;
         static NSInteger total;
         // The player not up for the first posts: no answer, as runShortcut gives none without a track.
         if (++total <= waitPosts ||[action isEqualToString:@"previous"]) return;
