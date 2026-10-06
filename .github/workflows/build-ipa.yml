@@ -50,14 +50,14 @@ jobs:
       - uses: actions/upload-artifact@v5
         if: inputs.upload_method != 'filebin'
         with:
-          name: spoti.ipa
+          name: vitrine.ipa
           path: out/*.ipa
           if-no-files-found: error
 
       - name: Upload to filebin.net
         if: inputs.upload_method != 'artifacts'
         run: |
-          BIN="spotifyglass-${{ github.run_id }}"
+          BIN="vitrine-${{ github.run_id }}"
           echo "### filebin.net download" >> "$GITHUB_STEP_SUMMARY"
           for f in out/*.ipa; do
             curl -fsS -X POST -H "Content-Type: application/octet-stream" --data-binary "@$f" "https://filebin.net/$BIN/$(basename "$f")" >/dev/null
