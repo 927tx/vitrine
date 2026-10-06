@@ -39,7 +39,7 @@ static const CGFloat kRowAboveSafeArea = 20, kRowMinBottom = 34;
 // and below them even out instead of all the room opening under them.
 static const CGFloat kControlsShare = 0.3;
 
-static char kConnectKey, kShareKey, kTrimmerKey, kQueueKey, kLyricsGlyphKey, kReachKey;
+static char kConnectKey, kShareKey, kTrimmerKey, kSharedByKey, kQueueKey, kLyricsGlyphKey, kReachKey;
 static __weak SGRGlyphButton *sg_lyricsGlyph;
 
 // The view the footer's stack view arranges around `view`.
@@ -203,6 +203,11 @@ static void lowerRow(UIView *row) {
     UIView *trimmer = SGRFindByIdentifier(host, @"nowplaying-npv-media-trimmer-navigation-button", &kTrimmerKey);
     SGRPlayerVanish(trimmer);
     SGRPlayerVanish(arrangedAround(trimmer, host));
+    // "From <friend>" on a track a friend shared sits in the middle of the row, over Connect, which the
+    // row moves there; the Music app has no such chip.
+    UIView *sharedBy = SGRFindByIdentifier(host, @"Components.UI.SharedByChip", &kSharedByKey);
+    SGRPlayerVanish(sharedBy);
+    SGRPlayerVanish(arrangedAround(sharedBy, host));
 
     SGRGlyphButton *lyrics = lyricsGlyphIn(host);
     lyrics.bounds = CGRectMake(0, 0, 44, 44);
