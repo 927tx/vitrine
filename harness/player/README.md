@@ -14,7 +14,7 @@ too. `SRC=<another checkout>/tweak/Sources OUT=<dir> ./build.sh` builds it again
 sources, for example an older commit, to see a bug before its fix.
 
 `build.sh` runs `logos.pl -c generator=internal` over `PlayerLyrics.x`, `PlayerArtwork.x`,
-`PlayerFooter.x`, `PlayerScroll.x`, `PlayerField.x` and the Kit's `SGRBridges.x`, and links them with
+`PlayerControls.x`, `PlayerFooter.x`, `PlayerScroll.x`, `PlayerField.x` and the Kit's `SGRBridges.x`, and links them with
 the real `Core/`, `Redesigned/Kit/`, `SGRKaraokeView`, `Settings/` and the Player page. `stubs.m` stands in for the hooks the harness
 does not compile (the Kit's accent and repaint, the rest of the player, the lyrics store, the haptics,
 Sing's mic) and plays a mock player: `SGRHarnessSetTrack` reports a track, with the image ids Spotify's
@@ -74,6 +74,13 @@ come late, out of order, or not at all.
   picks each in turn, that the card shows Animated (the clip, the sources and Low Data Mode's rows in), Fluid,
   Colours, Still and Animated again, with a note for each and the header the same height throughout. The log
   ends with `settings checks: n of 7 right -- PASS` or `FAIL`.
+
+- `seek` is the tap around the progress bar (`PlayerControls.x`): a mock slider with Spotify's identifier and
+  the two times beside it. It checks that a tap counts below the bar and up to 12 pt past its ends, not on the
+  thumb or the times, that the ends of the thumb's travel are the song's start and end, that a tap is played
+  to the slider as touch down, value changed and touch up with the slider still tracking, that a drag nobody
+  seeks for is seeked directly after a second, and that the slider lets go once the position is there. The
+  log ends with `seek checks: n of 9 right -- PASS` or `FAIL`.
 
 `HARNESS_VOLUME=0` leaves out the volume row that the phone has and the tree does not.
 

@@ -112,6 +112,12 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more);
 // which SGRSuppress cannot keep (PlayerControls.x).
 void SGRPlayerVanish(UIView *view);
 
+// The tap to seek around the progress bar (PlayerControls.x), apart for the harness: whether a tap at `point`
+// in the duration unit's view seeks, and the share of the song a point on the slider stands for, measured
+// over the thumb's travel (NAN while the slider has no width).
+BOOL SGRSeekTapLands(UIView *unit, UISlider *slider, CGPoint point);
+CGFloat SGRSeekShareAt(UISlider *slider, CGPoint point);
+
 // The more button's menu opens as the system menu with the player's own items (PlayerMenu.m). Called from
 // PlayerHeader.x with Spotify's more button on every pass; watching it again changes nothing.
 void SGRPlayerMenuWatch(UIView *button);

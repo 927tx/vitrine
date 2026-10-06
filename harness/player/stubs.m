@@ -78,14 +78,6 @@ void SGRHarnessSetTrack(NSString *uri, NSString *imageURI, BOOL paused) {
     for (id<SGPlayerStateObserver> observer in sg_observers.allObjects) [observer playerStateDidChange:state];
 }
 
-#pragma mark - Redesigned/Player/PlayerControls.x
-
-void SGRPlayerVanish(UIView *view) {
-    view.alpha = 0;
-    view.userInteractionEnabled = NO;
-    view.accessibilityElementsHidden = YES;
-}
-
 #pragma mark - Shared/Haptics
 
 void SGPlayFeedback(NSInteger feedback) {}

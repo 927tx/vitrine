@@ -16,8 +16,10 @@
 // id=now-playing-time-take-label and id=now-playing-time-remaning-label, SPTEncoreLabels whose UILabel
 // is id=...-internal (:227). The sticky header has a play button of its own (:492), which a search
 // inside the unit's view never reaches.
+#import <UIKit/UIGestureRecognizerSubclass.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Shared/Haptics/Haptics.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Player.h"
 
@@ -231,33 +233,158 @@ static UILabel *monospaced(UIView *host, NSString *identifier, const void *findK
 
 #pragma mark - tap to seek
 
-static char kSliderKey, kSeekTapKey;
+// Spotify's slider only drags. A tap in the band around it seeks: anywhere across the duration unit's height,
+// up to kSeekReach past either end of the bar, moving at most kSeekSlop and lifting within kSeekLongest. A tap
+// on the thumb is the thumb's, and a tap on a time is Spotify's, which turns the remaining time into the length.
+static const CGFloat kSeekReach = 12, kSeekSlop = 10, kThumbSlop = 6;
+static const NSTimeInterval kSeekLongest = 0.5;
+// The tap is played to the slider as a short drag, so Spotify's unit seeks the way it does at the end of one.
+// Meanwhile the slider says it is still tracking, until the player's position is this near the place tapped or
+// for this long at most, so the unit does not put the thumb back to the old place first. A drag that did not
+// seek by kSeekCheck is seeked directly.
+static const NSInteger kSeekNear = 1500;
+static const NSTimeInterval kSeekHold = 2, kSeekCheck = 1;
 
-// Spotify's slider only drags. A tap on it seeks to where it landed; the tap cancels the slider's own
-// tracking, so the two never both seek.
-@interface SGRSeekTap : UITapGestureRecognizer
+static char kSliderKey, kSeekTapKey, kTakeTimeKey, kRemainingTimeKey;
+static __weak UISlider *sg_seekSlider;
+static NSInteger sg_seekTarget;
+static CFTimeInterval sg_seekHeldUntil;
+
+static CGFloat thumbCentre(UISlider *slider, float value) {
+    CGRect bounds = slider.bounds;
+    return CGRectGetMidX([slider thumbRectForBounds:bounds trackRect:[slider trackRectForBounds:bounds] value:value]);
+}
+
+// Where along the song a point on the slider is, over the thumb's travel rather than the slider's width, so
+// either end of the bar is the song's start or end exactly.
+CGFloat SGRSeekShareAt(UISlider *slider, CGPoint point) {
+    CGFloat start = thumbCentre(slider, slider.minimumValue), end = thumbCentre(slider, slider.maximumValue);
+    if (end - start < 1) return NAN;
+    return MIN(1, MAX(0, (point.x - start) / (end - start)));
+}
+
+// Whether a tap at `point` in the duration unit's view seeks.
+BOOL SGRSeekTapLands(UIView *unit, UISlider *slider, CGPoint point) {
+    if (!slider.window || !slider.enabled || ![slider isDescendantOfView:unit] || !CGRectContainsPoint(unit.bounds, point)) return NO;
+    CGRect bar = [unit convertRect:slider.bounds fromView:slider];
+    if (point.x < CGRectGetMinX(bar) - kSeekReach || point.x > CGRectGetMaxX(bar) + kSeekReach) return NO;
+    CGRect bounds = slider.bounds;
+    CGRect thumb = [slider thumbRectForBounds:bounds trackRect:[slider trackRectForBounds:bounds] value:slider.value];
+    if (CGRectContainsPoint(CGRectInset([unit convertRect:thumb fromView:slider], -kThumbSlop, -kThumbSlop), point)) return NO;
+    for (UIView *time in @[SGRFindByIdentifier(unit, @"now-playing-time-take-label", &kTakeTimeKey) ?: NSNull.null,
+                           SGRFindByIdentifier(unit, @"now-playing-time-remaning-label", &kRemainingTimeKey) ?: NSNull.null]) {
+        if ([time isKindOfClass:UIView.class] && !time.hidden && CGRectContainsPoint([unit convertRect:time.bounds fromView:time], point)) return NO;
+    }
+    return YES;
+}
+
+static BOOL seekHeld(void) {
+    if (!sg_seekHeldUntil) return NO;
+    NSInteger at = SGKaraokePositionMs();
+    if (CACurrentMediaTime() < sg_seekHeldUntil && (at < 0 || labs(at - sg_seekTarget) >= kSeekNear)) return YES;
+    sg_seekHeldUntil = 0;
+    return NO;
+}
+
+// Whether Spotify listens to the slider's control events, which is how a played drag reaches it.
+static BOOL listensToSlider(UISlider *slider) {
+    __block BOOL listens = NO;
+    [slider enumerateEventHandlers:^(UIAction *action, id target, SEL selector, UIControlEvents events, BOOL *stop) {
+        if (events & (UIControlEventTouchUpInside | UIControlEventValueChanged)) listens = *stop = YES;
+    }];
+    return listens;
+}
+
+static void seekTo(UISlider *slider, CGFloat share) {
+    SPTPlayerState *state = SGPlayerState();
+    if (!state || state.duration <= 0 || isnan(share)) return;
+    NSInteger ms = (NSInteger)(share * state.duration * 1000);
+    SGPlayFeedback(SGFeedbackSkip);
+    BOOL played = listensToSlider(slider);
+    static NSUInteger logged;
+    if (logged++ < 3) SGLog(@"redesign player: a tap seeks to %.3f of the song, %@", share, played ? @"played to the slider as a drag" : @"directly (nothing listens to the slider)");
+    if (!played) {
+        SGKaraokeSeek(ms);
+        return;
+    }
+    [slider setValue:slider.minimumValue + share * (slider.maximumValue - slider.minimumValue) animated:NO];
+    sg_seekSlider = slider;
+    sg_seekTarget = ms;
+    sg_seekHeldUntil = CACurrentMediaTime() + kSeekHold;
+    [slider sendActionsForControlEvents:UIControlEventTouchDown];
+    [slider sendActionsForControlEvents:UIControlEventValueChanged];
+    [slider sendActionsForControlEvents:UIControlEventTouchUpInside];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kSeekCheck * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        NSInteger at = SGKaraokePositionMs();
+        if (sg_seekTarget != ms || at < 0 || labs(at - ms) < kSeekNear) return;
+        SGLog(@"redesign player: the played drag did not seek (at %ld ms, not %ld), seeking directly", (long)at, (long)ms);
+        sg_seekHeldUntil = 0;
+        SGKaraokeSeek(ms);
+    });
+}
+
+// A recognizer of its own rather than a tap: UIKit lets a slider keep a single tap from a tap recognizer
+// over it, and the band reaches past the slider.
+@interface SGRSeekTap : UIGestureRecognizer
+@property (nonatomic, weak) UISlider *slider;
 @end
 
-@implementation SGRSeekTap
+@implementation SGRSeekTap {
+    CGPoint _start;
+    CFTimeInterval _began;
+}
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    UIView *unit = self.view;
+    UITouch *touch = touches.anyObject;
+    CGPoint point = [touch locationInView:unit];
+    if (touches.count > 1 || [event touchesForGestureRecognizer:self].count > 1 || !SGRSeekTapLands(unit, self.slider, point)) {
+        self.state = UIGestureRecognizerStateFailed;
+        return;
+    }
+    _start = point;
+    _began = CACurrentMediaTime();
+}
+
+- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    CGPoint point = [touches.anyObject locationInView:self.view];
+    if (hypot(point.x - _start.x, point.y - _start.y) > kSeekSlop) self.state = UIGestureRecognizerStateFailed;
+}
+
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    BOOL tap = CACurrentMediaTime() - _began <= kSeekLongest;
+    self.state = tap ? UIGestureRecognizerStateEnded : UIGestureRecognizerStateFailed;
+}
+
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    self.state = UIGestureRecognizerStateFailed;
+}
+
 - (void)sgr_seek {
-    UIView *slider = self.view;
-    SPTPlayerState *state = SGPlayerState();
-    CGFloat width = slider.bounds.size.width;
-    if (!state || width < 1 || state.duration <= 0) return;
-    CGFloat share = MIN(1, MAX(0, [self locationInView:slider].x / width));
-    SGKaraokeSeek((NSInteger)(share * state.duration * 1000));
+    UISlider *slider = self.slider;
+    if (slider) seekTo(slider, SGRSeekShareAt(slider, [self.view convertPoint:_start toView:slider]));
 }
 @end
 
 static void watchSlider(UIView *host) {
-    UIView *slider = SGRFindByIdentifier(host, @"SPTNowPlayingSliderV2", &kSliderKey);
-    if (!slider || objc_getAssociatedObject(slider, &kSeekTapKey)) return;
-    SGRSeekTap *tap = [[SGRSeekTap alloc] init];
-    [tap addTarget:tap action:@selector(sgr_seek)];
-    [slider addGestureRecognizer:tap];
-    objc_setAssociatedObject(slider, &kSeekTapKey, tap, OBJC_ASSOCIATION_ASSIGN);
-    SGLog(@"redesign player: a tap on the progress bar seeks");
+    UISlider *slider = (UISlider *)SGRFindByIdentifier(host, @"SPTNowPlayingSliderV2", &kSliderKey);
+    if (![slider isKindOfClass:UISlider.class]) return;
+    SGRSeekTap *tap = objc_getAssociatedObject(host, &kSeekTapKey);
+    if (!tap) {
+        tap = [[SGRSeekTap alloc] initWithTarget:nil action:nil];
+        [tap addTarget:tap action:@selector(sgr_seek)];
+        [host addGestureRecognizer:tap];
+        objc_setAssociatedObject(host, &kSeekTapKey, tap, OBJC_ASSOCIATION_ASSIGN);
+        SGLog(@"redesign player: a tap around the progress bar seeks");
+    }
+    tap.slider = slider;
 }
+
+%hook _TtCO17NowPlaying_ECMKit11ProgressBar6Slider
+- (BOOL)isTracking {
+    return ((UISlider *)self == sg_seekSlider && seekHeld()) || %orig;
+}
+%end
 
 %hook _TtC20NowPlaying_ModesImpl19DurationElementUnit
 - (void)viewDidLayoutSubviews {
@@ -284,5 +411,6 @@ static void watchSlider(UIView *host) {
         @"_TtC20NowPlaying_ModesImpl19DurationElementUnit",
         @"_TtC28EncoreConsumerMobile_BaseKit14PlayButtonView",
         @"SPTEncoreIconView",
+        @"_TtCO17NowPlaying_ECMKit11ProgressBar6Slider",
     ]);
 }

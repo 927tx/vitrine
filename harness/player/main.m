@@ -27,6 +27,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
 #import "Shared/Lyrics/Lyrics.h"
 #import "Redesigned/Player/Player.h"
 #import "Redesigned/Kit/SGRBridges.h"
@@ -213,6 +214,12 @@ static NSString *colorName(UIImage *image) {
 - (BOOL)beginTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event { return YES; }
 - (void)endTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {}
 - (void)cancelTrackingWithEvent:(UIEvent *)event {}
+@end
+
+// The play button's view, which PlayerControls.x hooks for its tap.
+@interface _TtC28EncoreConsumerMobile_BaseKit14PlayButtonView : UIView @end
+@implementation _TtC28EncoreConsumerMobile_BaseKit14PlayButtonView
+- (void)uiButtonTapped {}
 @end
 
 @interface MockEncoreButton : UIControl @end
@@ -555,6 +562,7 @@ static void loadLyrics(void) {
     else if ([scenario() isEqualToString:@"cover"]) [self runCoverChecks];
     else if ([scenario() isEqualToString:@"immersive"]) [self runImmersiveChecks];
     else if ([scenario() isEqualToString:@"settings"]) [self runSettingsChecks];
+    else if ([scenario() isEqualToString:@"seek"]) [self runSeekChecks];
     // Opened, closed and opened again, so a screenshot can be taken of each state and of the move itself.
     else for (NSNumber *at in @[@2, @6, @10]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -1271,6 +1279,88 @@ static BOOL linesSeek(SGRKaraokeView *lyrics) {
     });
     after(40, ^{
         NSLog(@"[harness] immersive checks: %lu of %lu right -- %@", (unsigned long)right, (unsigned long)checks, right == checks ? @"PASS" : @"FAIL");
+    });
+}
+
+#pragma mark - tap to seek
+
+// The tap around the progress bar (PlayerControls.x): where it lands, what it maps to, and how it seeks. The
+// slider is the mock's, given Spotify's identifier, with the two times beside it. A tap is the recognizer's
+// action with its starting point set, since the harness cannot make a touch.
+- (void)runSeekChecks {
+    __block NSUInteger right = 0, checks = 0;
+    void (^check)(NSString *, BOOL, NSString *) = ^(NSString *step, BOOL ok, NSString *detail) {
+        checks++;
+        if (ok) right++;
+        NSLog(@"[harness] seek %@: %@ -- %@", step, detail, ok ? @"ok" : @"WRONG");
+    };
+    UIViewController *durationUnit = _units[1];
+    UIView *unit = durationUnit.view;
+    CGFloat W = unit.bounds.size.width;
+    UISlider *slider = [[_TtCO17NowPlaying_ECMKit11ProgressBar6Slider alloc] initWithFrame:CGRectMake(24, 2, W - 48, 14)];
+    slider.accessibilityIdentifier = @"SPTNowPlayingSliderV2";
+    slider.value = 0.22;
+    [unit addSubview:slider];
+    UILabel *taken = [[UILabel alloc] initWithFrame:CGRectMake(24, 20, 44, 16)];
+    taken.accessibilityIdentifier = @"now-playing-time-take-label";
+    UILabel *remaining = [[UILabel alloc] initWithFrame:CGRectMake(W - 24 - 44, 20, 44, 16)];
+    remaining.accessibilityIdentifier = @"now-playing-time-remaning-label";
+    [unit addSubview:taken];
+    [unit addSubview:remaining];
+    [durationUnit viewDidLayoutSubviews];
+    [SGPlayerState() setValue:@200 forKey:@"duration"];
+
+    UIGestureRecognizer *tap = nil;
+    for (UIGestureRecognizer *recognizer in unit.gestureRecognizers) {
+        if ([NSStringFromClass(recognizer.class) isEqualToString:@"SGRSeekTap"]) tap = recognizer;
+    }
+    CGRect bar = slider.frame;
+    CGRect thumb = [unit convertRect:[slider thumbRectForBounds:slider.bounds trackRect:[slider trackRectForBounds:slider.bounds] value:slider.value] fromView:slider];
+    check(@"on the duration unit", tap != nil, tap ? @"a recognizer there" : @"none");
+    check(@"under the bar", SGRSeekTapLands(unit, slider, CGPointMake(W / 2, CGRectGetMaxY(bar) + 12)), @"12pt below the bar");
+    check(@"past the ends", SGRSeekTapLands(unit, slider, CGPointMake(CGRectGetMinX(bar) - 10, 8)) && SGRSeekTapLands(unit, slider, CGPointMake(CGRectGetMaxX(bar) + 10, 8))
+          && !SGRSeekTapLands(unit, slider, CGPointMake(CGRectGetMinX(bar) - 20, 8)), @"10pt past either end, not 20");
+    check(@"not on the thumb", !SGRSeekTapLands(unit, slider, CGPointMake(CGRectGetMidX(thumb), CGRectGetMidY(thumb))), NSStringFromCGRect(thumb));
+    check(@"not on the times", !SGRSeekTapLands(unit, slider, taken.center) && !SGRSeekTapLands(unit, slider, remaining.center), @"either time");
+    CGFloat end = SGRSeekShareAt(slider, CGPointMake(slider.bounds.size.width - 1, 7)), start = SGRSeekShareAt(slider, CGPointMake(1, 7));
+    CGFloat middle = SGRSeekShareAt(slider, CGPointMake(slider.bounds.size.width / 2, 7));
+    check(@"the ends are the song's", end == 1 && start == 0 && fabs(middle - 0.5) < 0.001,
+          [NSString stringWithFormat:@"start %.3f, middle %.3f, end %.3f", start, middle, end]);
+
+    // A tap at three quarters of the thumb's travel, played to the slider as a drag.
+    NSMutableArray<NSNumber *> *events = [NSMutableArray array];
+    __block BOOL answers = NO;
+    for (NSNumber *event in @[@(UIControlEventTouchDown), @(UIControlEventValueChanged), @(UIControlEventTouchUpInside)]) {
+        [slider addAction:[UIAction actionWithHandler:^(UIAction *action) {
+            [events addObject:event];
+            if (answers && event.unsignedIntegerValue == UIControlEventTouchUpInside) SGKaraokeSeek((NSInteger)(slider.value * 200000));
+        }] forControlEvents:event.unsignedIntegerValue];
+    }
+    CGFloat from = CGRectGetMidX([slider thumbRectForBounds:slider.bounds trackRect:[slider trackRectForBounds:slider.bounds] value:0]);
+    CGFloat to = CGRectGetMidX([slider thumbRectForBounds:slider.bounds trackRect:[slider trackRectForBounds:slider.bounds] value:1]);
+    void (^tapAt)(CGFloat) = ^(CGFloat share) {
+        CGPoint point = [unit convertPoint:CGPointMake(from + share * (to - from), 7) fromView:slider];
+        [tap setValue:[NSValue valueWithCGPoint:point] forKey:@"start"];
+        ((void (*)(id, SEL))objc_msgSend)(tap, NSSelectorFromString(@"sgr_seek"));
+    };
+    tapAt(0.75);
+    NSArray *drag = @[@(UIControlEventTouchDown), @(UIControlEventValueChanged), @(UIControlEventTouchUpInside)];
+    check(@"played as a drag", [events isEqualToArray:drag] && fabs(slider.value - 0.75) < 0.001 && slider.isTracking,
+          [NSString stringWithFormat:@"%lu events, value %.3f, tracking %d", (unsigned long)events.count, slider.value, slider.isTracking]);
+    // Nothing seeked for it: after a second the tap seeks directly, and the slider lets go.
+    after(1.3, ^{
+        NSInteger at = SGKaraokePositionMs();
+        check(@"a drag that did not seek is seeked", labs(at - 150000) < 1000 && !slider.isTracking,
+              [NSString stringWithFormat:@"at %ld ms, tracking %d", (long)at, slider.isTracking]);
+        // Spotify seeking for the drag: the slider lets go as the position arrives.
+        answers = YES;
+        tapAt(0.3);
+        NSInteger now = SGKaraokePositionMs();
+        check(@"the slider lets go once the position is there", labs(now - 60000) < 1000 && !slider.isTracking,
+              [NSString stringWithFormat:@"at %ld ms, tracking %d", (long)now, slider.isTracking]);
+    });
+    after(2.6, ^{
+        NSLog(@"[harness] seek checks: %lu of %lu right -- %@", (unsigned long)right, (unsigned long)checks, right == checks ? @"PASS" : @"FAIL");
     });
 }
 
