@@ -307,7 +307,10 @@ Redesigned:
                   menu (ContextMenu/), Spotify's rows and then Playback Speed, Pitch (with Pitch follows speed),
                   Reverb and Animated artwork (PlayerMenu.m), and a hold on either side of the
                   cover plays at 2x until the finger lifts (PlayerArtwork.x), an octave higher while Pitch follows
-                  speed is on. Animated artwork (PlayerMotion.x)
+                  speed is on. A Free account gets it too: Spotify's Reinvented Free player mode, whose units none of
+                  the hooks reach, declines while the redesign runs, so the track falls to Spotify's other Free mode,
+                  built from the units the redesign styles (PlayerFree.x, read from the binary, not yet seen on a Free
+                  account). Animated artwork (PlayerMotion.x)
                   runs the clip edge to edge from the top over its own last rows drawn on down, with a blur coming in
                   from the seam under the controls and over the whole clip behind the lyrics. The clip and the cover
                   cross over as one comes and the other goes, the clip from its poster frame before the video has

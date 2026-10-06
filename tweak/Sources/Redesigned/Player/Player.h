@@ -21,6 +21,7 @@
 //     PlayerMenu.m       the more button's system menu: Spotify's rows, then speed, pitch, reverb and
 //                        Animated artwork (Redesigned/ContextMenu)
 //     PlayerSettings.m   the Player page in Mod Settings, led by a showcase of the player
+//     PlayerFree.x       a Spotify Free account given the player mode these units belong to
 //
 // Speed and pitch, once the redesign's own, are Shared/Player/SpeedPitch.h's; PlayerHeader.x still hands
 // the more button over, so a menu opened from it is taken for the player's, and hands it to PlayerMenu.m,
