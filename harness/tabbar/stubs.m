@@ -22,3 +22,5 @@ BOOL SGRTabIsApart(UIView *item) {
 }
 void SGRLogTabBarRow(UIView *tabBar) {}
 void SGOpenModSettings(UIView *source) {}
+// Shared/Player/PlayerEvents.x, which TabBarMinimize.x listens to.
+NSString *const SGPlayerTransitionNotification = @"spotifyglass.playerTransition";

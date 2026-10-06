@@ -107,7 +107,6 @@ private func lyricsActivity<A: ActivityAttributes, Card: View>(
             .foregroundStyle(.white)
             .activityBackgroundTint(tint(context.state))
             .activitySystemActionForegroundColor(.white)
-            .widgetURL(URL(string: "spotify:"))
     } dynamicIsland: { context in
         DynamicIsland {
             // The row beside the camera: a note, and the sleep timer or whether it plays.
@@ -151,7 +150,6 @@ private func lyricsActivity<A: ActivityAttributes, Card: View>(
         } minimal: {
             Badge(state: context.state)
         }
-        .widgetURL(URL(string: "spotify:"))
     }
 }
 

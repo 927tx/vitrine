@@ -5,7 +5,7 @@ SRC=${SRC:-$(cd "$(dirname "$0")/../../tweak/Sources" && pwd)}
 OUT=$(dirname "$0")/build
 rm -rf "$OUT"; mkdir -p "$OUT/gen" "$OUT/TabBarHarness.app"
 
-for f in Redesigned/Navbar/TabBar.x Redesigned/NowPlayingBar/NowPlayingBar.x; do
+for f in Redesigned/Navbar/TabBar.x Redesigned/Navbar/TabBarMinimize.x Redesigned/NowPlayingBar/NowPlayingBar.x; do
     name=$(basename "$f" .x)
     "$THEOS/bin/logos.pl" -c generator=internal "$SRC/$f" > "$OUT/gen/$name.m"
 done

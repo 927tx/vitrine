@@ -147,6 +147,10 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     SGRNavbarSectionCount,
 };
 
+static NSString *switchKey(NSInteger row) {
+    return row == 2 ? SGRKeyNavbarMinimize : row == 1 ? SGRKeyNavbarHideLabels : SGRKeyNavbar;
+}
+
 // The tabs, in the order the bar shows them: drag to reorder, tap to show or hide, swipe a tab of
 // your own away. Spotify's own tabs can only be hidden, never removed. Mod Settings and the welcome
 // tour show the same editor.
@@ -201,7 +205,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 }
 
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    if (section == SGRNavbarSectionSwitch) return 2;
+    if (section == SGRNavbarSectionSwitch) return 3;
     return section == SGRNavbarSectionTabs ? (NSInteger)_entries.count : 1;
 }
 
@@ -227,12 +231,13 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     UITableViewCell *cell = SGDequeueCell(table, @"navbar");
     switch (path.section) {
         case SGRNavbarSectionSwitch: {
-            BOOL labels = path.row == 1;
-            SGFillCell(cell, labels ? @"Hide labels" : @"Custom navbar", labels ? @"Icons only" : nil, nil, nil);
+            static NSString *const titles[] = {@"Custom navbar", @"Hide labels", @"Minimize on scroll"};
+            static NSString *const subtitles[] = {nil, @"Icons only", @"Two tabs and the now playing bar in one row as a page scrolls down"};
+            SGFillCell(cell, titles[path.row], subtitles[path.row], nil, nil);
             UISwitch *toggle = [UISwitch new];
             toggle.onTintColor = SGGreen();
             toggle.tag = path.row;
-            toggle.on = labels ? SGHidden(SGRKeyNavbarHideLabels) : SGEnabled(SGRKeyNavbar);
+            toggle.on = path.row == 1 ? SGHidden(SGRKeyNavbarHideLabels) : SGEnabled(switchKey(path.row));
             [toggle addTarget:self action:@selector(toggled:) forControlEvents:UIControlEventValueChanged];
             cell.accessoryView = toggle;
             break;
@@ -315,7 +320,8 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 }
 
 - (void)toggled:(UISwitch *)toggle {
-    SGSetEnabled(toggle.tag == 1 ? SGRKeyNavbarHideLabels : SGRKeyNavbar, toggle.on);
+    SGSetEnabled(switchKey(toggle.tag), toggle.on);
+    if (!toggle.on && toggle.tag == 2) SGRSetTabBarMinimized(NO, NO);
     SGRRefreshTabBar();
 }
 

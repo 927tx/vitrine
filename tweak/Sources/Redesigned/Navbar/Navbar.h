@@ -35,5 +35,15 @@ void SGRRefreshTabBar(void);
 // Whether a tab of the composed row is one of the split tabs at its trailing end, for TabBar.x's second bar.
 BOOL SGRTabIsApart(UIView *item);
 
+// The glass bar minimizes as a page scrolls down (TabBarMinimize.x): it shrinks to two of its tabs, the
+// now playing card coming down between them. On unless switched off; read as each scroll goes.
+#define SGRKeyNavbarMinimize @"spotifyglass.redesign.navbar.minimize"
+BOOL SGRTabBarMinimized(void);
+// TabBar.x lays both bars out for it, the now playing bar in the same animation; `animated` NO is a cut.
+void SGRSetTabBarMinimized(BOOL minimized, BOOL animated);
+// The room between the minimized bar's two tabs, `height` high and centred on them, in `host`'s
+// coordinates: where the now playing card goes. CGRectNull while the bar is not minimized or not on screen.
+CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height);
+
 UIViewController *SGRNavbarSettingsPage(void);   // the tab editor, in Mod Settings
 UIViewController *SGRNavbarEditorPage(void);     // the tab editor alone, for the welcome tour

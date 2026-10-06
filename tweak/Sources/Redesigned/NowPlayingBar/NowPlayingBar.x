@@ -22,6 +22,7 @@
 #import "Redesigned/Kit/SGRGlass.h"
 #import "Redesigned/Kit/SGRTokens.h"
 #import "NowPlayingBar.h"
+#import "Redesigned/Navbar/Navbar.h"
 
 static const CGFloat kCardRadius = 24;
 // The strip's pane is this much smaller than the strip at each end, so a gap parts it from the card's glass.
@@ -31,6 +32,10 @@ static __weak UIView *sg_card;
 static CGRect sg_stripFrame;
 static __weak UIVisualEffectView *sg_cardGlass;
 static __weak UIView *sg_cardArtwork;
+static __weak UIView *sg_progress;
+static __weak UIViewController *sg_container;
+// The container's view while it stands in the minimized tab bar's row, below the page that holds it.
+static __weak UIView *sg_inline;
 
 CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius) {
     UIVisualEffectView *glass = sg_cardGlass;
@@ -137,15 +142,22 @@ static void restyleCardContent(UIView *card) {
         }
         sg_cardArtwork = outer;
     });
-    SGForEachView(card, ^(UIView *v) {
-        CGRect f = v.frame;
-        if (inStrip(v, card) || f.size.height > 3 || f.size.width < 200 || v.superview.bounds.size.height < 40) return;
-        CGRect target = CGRectMake(52, card.bounds.size.height - 6, 226, 2);
-        if (CGRectEqualToRect(f, target)) return;
-        v.frame = target;
-        [v setNeedsLayout];
-        [v layoutIfNeeded];
-    });
+    __block UIView *progress = sg_progress;
+    if (![progress isDescendantOfView:card]) {
+        progress = nil;
+        SGForEachView(card, ^(UIView *v) {
+            CGRect f = v.frame;
+            if (!progress && !inStrip(v, card) && f.size.height <= 3 && f.size.width >= 200 && v.superview.bounds.size.height >= 40) progress = v;
+        });
+        sg_progress = progress;
+    }
+    // Under the text, 226pt on a full width card, shorter on the one in the minimized tab bar.
+    CGRect target = CGRectMake(52, card.bounds.size.height - 6, MAX(0, card.bounds.size.width - 160), 2);
+    if (progress && !CGRectEqualToRect(progress.frame, target)) {
+        progress.frame = target;
+        [progress setNeedsLayout];
+        [progress layoutIfNeeded];
+    }
 }
 
 // The strip's own pane, a strip high less the gaps, on the card's side the strip is on. It is measured from
@@ -171,9 +183,117 @@ static void placeStripGlass(UIView *host, UIView *strip, CGRect card, BOOL above
     if (!pane.effect) SGRAnimate(SGRMotionRespond, ^{ SGRShowGlass(pane, YES); }, nil);
 }
 
+// The bar's left and right edges in its superview, set through the constants of the constraints that hold
+// them there (their constants as Spotify set them kept to go back to), or through its frame when it is laid
+// out by frame. A frame alone does not move a view laid out by constraints, nor what is constrained inside
+// it (harness/tabbar). NO, with nothing changed, when its edges are held some other way, or right to left.
+static NSMapTable<NSLayoutConstraint *, NSNumber *> *sg_constants;
+static CGRect sg_fullFrame, sg_narrowFrame;
+
+static void restoreEdges(UIView *bar) {
+    for (NSLayoutConstraint *constraint in sg_constants) constraint.constant = [[sg_constants objectForKey:constraint] doubleValue];
+    [sg_constants removeAllObjects];
+    if (bar.translatesAutoresizingMaskIntoConstraints && CGRectEqualToRect(bar.frame, sg_narrowFrame)) bar.frame = sg_fullFrame;
+    sg_narrowFrame = CGRectNull;
+}
+
+static BOOL setEdges(UIView *bar, CGFloat left, CGFloat right) {
+    UIView *superview = bar.superview;
+    if (bar.translatesAutoresizingMaskIntoConstraints) {
+        CGRect frame = CGRectMake(left, bar.frame.origin.y, right - left, bar.frame.size.height);
+        if (!CGRectEqualToRect(bar.frame, sg_narrowFrame)) sg_fullFrame = bar.frame;
+        sg_narrowFrame = frame;
+        if (!CGRectEqualToRect(bar.frame, frame)) bar.frame = frame;
+        return YES;
+    }
+    if (superview.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft) return NO;
+    if (!sg_constants) sg_constants = [NSMapTable weakToStrongObjectsMapTable];
+    NSUInteger held = 0;
+    for (NSLayoutConstraint *constraint in superview.constraints) {
+        NSLayoutAttribute attribute = constraint.firstAttribute;
+        BOOL barFirst = constraint.firstItem == bar && constraint.secondItem == superview;
+        if (!constraint.active || constraint.relation != NSLayoutRelationEqual || constraint.multiplier != 1 || attribute != constraint.secondAttribute
+            || (!barFirst && !(constraint.secondItem == bar && constraint.firstItem == superview))) continue;
+        BOOL isLeft = attribute == NSLayoutAttributeLeading || attribute == NSLayoutAttributeLeft;
+        if (!isLeft && attribute != NSLayoutAttributeTrailing && attribute != NSLayoutAttributeRight) continue;
+        if (![sg_constants objectForKey:constraint]) [sg_constants setObject:@(constraint.constant) forKey:constraint];
+        CGFloat edge = isLeft ? 0 : superview.bounds.size.width, value = isLeft ? left : right;
+        CGFloat constant = barFirst ? value - edge : edge - value;
+        if (constraint.constant != constant) constraint.constant = constant;
+        held |= isLeft ? 1 : 2;
+    }
+    if (held == 3) return YES;
+    restoreEdges(bar);
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ SGLog(@"now playing bar: its edges are not held by its superview's constraints, so it stays above the tab bar"); });
+    return NO;
+}
+
+// In the row the card keeps the cover, the title and play, as the Music app's does: the device and add
+// buttons stand aside while it is there and come back with the full card. Only what this hid is shown again.
+static NSHashTable<UIView *> *sg_tucked;
+
+static void tuckExtras(UIView *bar, BOOL tuck) {
+    if (!sg_tucked) sg_tucked = [NSHashTable weakObjectsHashTable];
+    if (!tuck) {
+        for (UIView *item in sg_tucked) item.hidden = NO;
+        [sg_tucked removeAllObjects];
+        return;
+    }
+    SGForEachView(bar, ^(UIView *v) {
+        NSString *name = v.accessibilityIdentifier;
+        if (![name isEqualToString:@"Components.ConnectButtonOutputSwitcher"] && ![name isEqualToString:@"Components.UI.AddToButton"]) return;
+        // The stack's own item, so the stack closes the gap.
+        UIView *item = v;
+        while (item.superview && item.superview != bar && ![item.superview isKindOfClass:UIStackView.class]) item = item.superview;
+        if (![item.superview isKindOfClass:UIStackView.class] || item.hidden) return;
+        item.hidden = YES;
+        [sg_tucked addObject:item];
+    });
+}
+
+// In the minimized tab bar's row (TabBar.x): the bar narrowed to the slot by its edges, so Spotify's content
+// lays itself out to the width, and moved down by a transform on the container's view, which Spotify's
+// layout leaves alone. Outside a Jam only: its strip has no room in the row.
+static void placeInline(UIViewController *container) {
+    UIView *view = container.view;
+    UIView *bar = container.childViewControllers.firstObject.viewIfLoaded;
+    UIView *strip = bar ? stripIn(bar) : nil;
+    BOOL jam = strip && !strip.hidden && strip.alpha >= 0.01 && strip.window && strip.bounds.size.height >= 1;
+    CGRect slot = !bar || bar.superview != view || jam ? CGRectNull : SGRTabBarInlineSlot(view.superview, bar.bounds.size.height);
+    // Where the view stands untransformed, in the slot's coordinates.
+    CGPoint origin = CGPointMake(view.center.x - view.bounds.size.width / 2, view.center.y - view.bounds.size.height / 2);
+    if (CGRectIsNull(slot) || !setEdges(bar, CGRectGetMinX(slot) - origin.x, CGRectGetMaxX(slot) - origin.x)) {
+        if (sg_inline) restoreEdges(bar);
+        if (sg_inline) tuckExtras(bar, NO);
+        sg_inline = nil;
+        if (!CGAffineTransformIsIdentity(view.transform)) view.transform = CGAffineTransformIdentity;
+        return;
+    }
+    CGAffineTransform move = CGAffineTransformMakeTranslation(0, CGRectGetMidY(slot) - origin.y - CGRectGetMidY(bar.frame));
+    if (!CGAffineTransformEqualToTransform(view.transform, move)) view.transform = move;
+    tuckExtras(bar, YES);
+    sg_inline = view;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSMutableString *clips = [NSMutableString string];
+        for (UIView *v = view.superview; v; v = v.superview) if (v.clipsToBounds) [clips appendFormat:@" %@", v.class];
+        SGLog(@"now playing bar in the tab bar's row at %@, clipped by:%@", NSStringFromCGRect(slot), clips.length ? clips : @" nothing");
+    });
+}
+
+void SGRNowPlayingBarFollowTabBar(void) {
+    UIViewController *container = sg_container;
+    if (!container.isViewLoaded) return;
+    placeInline(container);
+    [container.view setNeedsLayout];
+    [container.view layoutIfNeeded];
+}
+
 static void styleNowPlayingBar(UIViewController *container) {
     UIViewController *barVC = container.childViewControllers.firstObject;
     UIView *bar = barVC.viewIfLoaded ?: container.view;
+    sg_container = container;
     if (!sgr_nowPlayingPainted) sgr_nowPlayingPainted = [NSHashTable weakObjectsHashTable];
     sgr_nowPlayingRoot = bar;
 
@@ -201,6 +321,7 @@ static void styleNowPlayingBar(UIViewController *container) {
         dispatch_async(dispatch_get_main_queue(), ^{ [host setNeedsLayout]; });
     }
     if (strip.bounds.size.height < 1) strip = nil;
+    placeInline(container);
 
     CGRect frame = card ? SGFrameIn(card, container.view) : contentBounds(bar, container.view);
     if (CGRectIsNull(frame)) return;
@@ -250,6 +371,18 @@ static void styleNowPlayingBar(UIViewController *container) {
 }
 %end
 
+// The page the bar stands in passes touches outside the bar through, and the bar in the tab bar's row is
+// below the page's bounds: a touch there reaches the bar only through this.
+%hook _TtC22NowPlaying_BarPageImplP33_CCC0D2EEA6D4725EECD8965E8C38C86D20TouchPassthroughView
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hit = %orig;
+    UIView *moved = sg_inline;
+    if ((hit && hit != (UIView *)self) || ![moved isDescendantOfView:(UIView *)self]) return hit;
+    CGPoint inMoved = [(UIView *)self convertPoint:point toView:moved];
+    return [moved pointInside:inMoved withEvent:event] ? ([moved hitTest:inMoved withEvent:event] ?: hit) : hit;
+}
+%end
+
 %hook _TtC18NowPlaying_BarImpl27NowPlayingBarViewController
 - (void)viewDidLayoutSubviews {
     %orig;
@@ -264,5 +397,6 @@ static void styleNowPlayingBar(UIViewController *container) {
     SGRequireClasses(@[
         @"_TtC18NowPlaying_BarImpl36NowPlayingBarContainerViewController",
         @"_TtC18NowPlaying_BarImpl27NowPlayingBarViewController",
+        @"_TtC22NowPlaying_BarPageImplP33_CCC0D2EEA6D4725EECD8965E8C38C86D20TouchPassthroughView",
     ]);
 }

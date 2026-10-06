@@ -373,6 +373,7 @@ static UIView *item(Class cls, NSString *title, NSString *symbol, BOOL active) {
 #pragma mark - what the harness measures
 
 extern CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius);
+extern void SGRSetTabBarMinimized(BOOL minimized, BOOL animated);
 
 static UIView *platterIn(UIView *root) {
     // UIKit._UITabBarItemPlatterView on iOS 27; BarTransition.x looks for the same suffix.
@@ -458,6 +459,14 @@ static void report(SGHarnessChrome *chrome, NSString *moment) {
     }
     for (UIView *v in found) [platters appendFormat:@" %@ %@", NSStringFromClass(v.class), NSStringFromCGRect([v convertRect:v.bounds toView:window])];
     NSLog(@"%@", platters);
+    // What a finger at the card's middle lands on, and the fade under the bars.
+    if (!CGRectIsNull(card)) {
+        UIView *hit = [window hitTest:CGPointMake(CGRectGetMidX(card), CGRectGetMidY(card)) withEvent:nil];
+        NSLog(@"[harness] %@ touch at the card's middle lands on %@, in the now playing bar: %d", moment, NSStringFromClass(hit.class), [hit isDescendantOfView:chrome.npb]);
+    }
+    for (UIView *v in stock.subviews) {
+        if ([NSStringFromClass(v.class) isEqualToString:@"SGRBarFade"]) NSLog(@"[harness] %@ fade %@", moment, NSStringFromCGRect([v convertRect:v.bounds toView:window]));
+    }
 }
 
 #pragma mark - the app
@@ -503,6 +512,12 @@ static void after(double seconds, dispatch_block_t block) {
         after(4.5, ^{ report(chrome, @"left the jam"); });
     }
     if ([mode isEqualToString:@"away"]) [chrome setBanner:YES animated:NO];
+    // `mini`: the bar minimized at 1 s and logged at 2.5 s, expanded again at 3.5 s and logged at 5 s.
+    if ([mode isEqualToString:@"mini"]) {
+        after(1.0, ^{ SGRSetTabBarMinimized(YES, YES); });
+        after(3.5, ^{ SGRSetTabBarMinimized(NO, YES); });
+        after(5.0, ^{ report(chrome, @"expanded again"); });
+    }
     // `pick`: Search picked at 2 s and Home at 4 s, which bar selects what logged after each.
     if ([mode isEqualToString:@"pick"]) {
         after(2.0, ^{ pick(chrome, @"Search"); });

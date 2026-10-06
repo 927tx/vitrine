@@ -15,3 +15,6 @@ UIViewController *SGRNowPlayingBarSettingsPage(void);
 CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius);
 // The round artwork on that card in `host`'s coordinates; CGRectNull when none was found.
 CGRect SGRNowPlayingArtworkFrameIn(UIView *host);
+// Lays the bar out again at once, into the minimized tab bar's slot or back above the bar
+// (Navbar.h's SGRTabBarInlineSlot); TabBar.x calls it inside its own animation.
+void SGRNowPlayingBarFollowTabBar(void);

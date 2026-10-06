@@ -43,6 +43,17 @@ and logs which bar selects what after each: `xcrun simctl launch <udid> com.vojt
 
     xcrun simctl spawn <udid> log show --last 1m --style compact --predicate 'eventMessage CONTAINS "[harness]" OR eventMessage CONTAINS "tab bar:"'
 
+`mini` minimizes the bar at 1 s through `SGRSetTabBarMinimized`, logs at 2.5 s and expands it again at 3.5 s,
+logging at 5 s. Minimized, the platters should be two 62 pt circles 21 pt in from each side, the card
+between them 8 pt from each, centred on them, and a touch at the card's middle should land in the now
+playing bar (through the hook on the page's `TouchPassthroughView`); expanded again, all as `none` has
+it. Every report also gives the frame of the fade under the bars. The mock card's labels have fixed
+frames, so how Spotify's own content takes the narrower card is not shown here.
+
+`minimize-check.c` runs the scroll's steps (`MinimizeStep.h`) on the Mac:
+
+    cc -I../../tweak/Sources/Redesigned/Navbar minimize-check.c -o build/minimize-check && build/minimize-check
+
 `jam` plays a Jam: a strip under the class name of Spotify's (a SwiftUI hosting view of
 `Jam_AttachmentsImpl.JamHatElement`, 44 pt) over the card, both in a view painted the album colour too,
 the bar 44 pt taller, and the strip gone again at 3.5 s. The log then lists the bar's glass panes. The
