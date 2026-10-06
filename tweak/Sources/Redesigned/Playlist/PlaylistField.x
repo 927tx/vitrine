@@ -12,8 +12,9 @@
 // exactly this field's colour. What Spotify paints over the field -- the page, the list and every row, all
 // of them the base surface -- is kept clear by the Kit's repaint hook while sgr_playlistRoot is this page.
 //
-// The colour is read from the cover the header shows (PlaylistHeader.x hands it over), and until that has
-// loaded the field is the neutral one, as it is for a playlist with no cover at all.
+// The colour is the main colour of the cover the header shows (PlaylistHeader.x hands it over), not its
+// bottom edge, and until that has loaded the field is the neutral one, as it is for a playlist with no
+// cover at all.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Playlist.h"
@@ -49,6 +50,7 @@ static SGRArtworkField *fieldIn(UIView *page) {
     if (field) return field;
     field = [[SGRArtworkField alloc] initWithFrame:page.bounds];
     field.bleed = kBleed;
+    field.mainColor = YES;
     objc_setAssociatedObject(page, &kFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     SGLog(@"redesign playlist: field on the page %.0fx%.0f", page.bounds.size.width, page.bounds.size.height);
     return field;

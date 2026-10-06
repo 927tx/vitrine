@@ -57,6 +57,8 @@ static SGRArtworkField *fieldIn(UIView *page) {
     if (field) return field;
     field = [[SGRArtworkField alloc] initWithFrame:page.bounds];
     field.bleed = kBleed;
+    // The photo's main colour, not its bottom edge, which on a portrait is the artist's shirt.
+    field.mainColor = YES;
     objc_setAssociatedObject(page, &kFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     SGLog(@"redesign artist: field on the page %.0fx%.0f", page.bounds.size.width, page.bounds.size.height);
     return field;

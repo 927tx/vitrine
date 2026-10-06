@@ -39,7 +39,6 @@ static NSDictionary *noActions(void) {
     SGRFluidLayer *_fluidLayer;
     BOOL _watching;
     UIColor *_color;
-    UIColor *_preferred;   // the page's own colour, made fit; wins over the artwork's
     UIImage *_image;
     NSString *_identity;
     NSUInteger _generation;
@@ -228,21 +227,13 @@ static NSDictionary *noActions(void) {
     [self applyColor:SGRFieldColorFor(color) animated:self.window != nil];
 }
 
-- (void)setPreferredColor:(UIColor *)color {
-    if (!color) return;
-    UIColor *fit = SGRFieldColorFor(color);
-    if (_preferred && CGColorEqualToColor(fit.CGColor, _preferred.CGColor)) return;
-    _preferred = fit;
-    [self applyColor:fit animated:self.window != nil];
-}
-
 - (void)setArtwork:(UIImage *)image identity:(NSString *)identity animated:(BOOL)animated {
     if (!image || image == _image || (identity && [identity isEqualToString:_identity])) return;
     _image = image;
     _identity = [identity copy];
     if (_fluid) [_fluidLayer setArtwork:image animated:animated && self.window != nil];
     NSUInteger generation = ++_generation;
-    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows};
+    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows, _mainColor};
     if (_showsBackdrop && !_flows && !_fluid) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
     __weak SGRArtworkField *weakSelf = self;
     [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
@@ -259,7 +250,7 @@ static NSDictionary *noActions(void) {
         _flow.hidden = NO;
         [self updateMotion];
         // Past the moving field's edges (the pull that dismisses the player) the colour under it goes on.
-        [self applyColor:_preferred ?: _flow.baseColor animated:animated];
+        [self applyColor:_flow.baseColor animated:animated];
         return;
     }
     if (_showsBackdrop && !_flows && !_fluid && palette.backdrop) {
@@ -275,7 +266,7 @@ static NSDictionary *noActions(void) {
         _backdrop.hidden = NO;
         [CATransaction commit];
     }
-    [self applyColor:_preferred ?: palette.fieldColor animated:animated];
+    [self applyColor:palette.fieldColor animated:animated];
 }
 
 @end

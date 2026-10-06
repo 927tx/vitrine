@@ -14,11 +14,11 @@
 // repaint hook while sgr_albumRoot is this page, and by the list's own pass below, which paints itself
 // rather than through a layer the repaint hook would hear about.
 //
-// The colour is Spotify's own for the album, read off the wash it paints behind the header, which
-// AlbumHeader.x hands over as it conceals it. Spotify reads the whole cover; the Kit's palette reads its
-// bottom edge, and a scanned cover's bottom edge is the scanner's pale border, which turned the field grey
-// where Spotify had it blue (device, 2026-09-18). The colour read from the cover is what shows until
-// Spotify's arrives, or for good if it never does, and before either the field is the neutral one.
+// The colour is the cover's main colour, as the playlist's and the artist's are. Read off the bottom edge
+// it was a scanned cover's pale border, which turned the field grey where the cover is blue (device,
+// 2026-09-18); for a while Spotify's own colour, read off the wash it paints behind the header, won over
+// it for that reason. That colour is now only what shows until the cover has been read (AlbumHeader.x
+// hands it over as it conceals the wash), and before either the field is the neutral one.
 //
 // The page is the album's by its identifier, which is how Native/Album/Album.x has told it apart since it
 // shipped: the artist page is TemplateKit's TemplateView instead. A podcast's episode page is built from
@@ -78,7 +78,7 @@ void SGRAlbumSetArtwork(UIView *view, UIImage *image) {
 }
 
 void SGRAlbumSetSpotifyColor(UIView *view, UIColor *color) {
-    if (color) [fieldOn(view) setPreferredColor:color];
+    if (color) [fieldOn(view) setProvisionalColor:color];
 }
 
 static SGRArtworkField *fieldIn(UIView *page) {
@@ -86,6 +86,7 @@ static SGRArtworkField *fieldIn(UIView *page) {
     if (field) return field;
     field = [[SGRArtworkField alloc] initWithFrame:page.bounds];
     field.bleed = kBleed;
+    field.mainColor = YES;
     objc_setAssociatedObject(page, &kFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     SGLog(@"redesign album: field on the page %.0fx%.0f", page.bounds.size.width, page.bounds.size.height);
     return field;

@@ -502,7 +502,7 @@ static UIColor *washColorOf(UIView *gradient) {
 }
 
 // Spotify's colour wash behind the header goes, so the page's field shows through, and the colour it was
-// painted in goes to the field: Spotify reads the whole cover for it, where the Kit reads the bottom edge.
+// painted in goes to the field, to show until the cover's own main colour has been read.
 //
 // The navigation bar's gradient goes too. Hidden at rest, it is shown as the page scrolls under the
 // title, and over the field it was a flat dark band across the top (device, 2026-09-18). What keeps the

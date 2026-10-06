@@ -1,8 +1,8 @@
 // What a redesigned page takes from its artwork, worked out off the main thread in one pass: the
-// colour along the artwork's bottom edge, the field colour made from it, and the blurred bitmaps the
-// field (SGRField.h) draws instead of a live blur.
+// colour along the artwork's bottom edge, the field colour made from it (or from the artwork's main
+// colour, for a page), and the blurred bitmaps the field (SGRField.h) draws instead of a live blur.
 //
-// The field colour is the edge colour with its saturation held to 0.55 and its relative luminance to
+// The field colour is the edge or main colour with its saturation held to 0.55 and its relative luminance to
 // 0.07 (0.04 with Increase Contrast). On anything that dark white text is past 8:1 and SGRSecondary
 // (white 65%) past 4.5:1, WCAG AA, whatever the hue.
 //
@@ -22,6 +22,10 @@ typedef struct {
     BOOL amoled;
     // The colours of a moving field (SGRFlow.h): the artwork's main colour in each quarter and overall.
     BOOL flow;
+    // The field colour from the artwork's main colour (the one +tintForImage: finds) rather than its bottom
+    // edge: for a page, whose cover dissolves into the field across its whole width, where the bottom edge
+    // is a scanned cover's pale border or whatever strip happens to sit at the foot of the picture.
+    BOOL mainColor;
 } SGRPaletteRequest;
 
 @interface SGRPalette : NSObject
