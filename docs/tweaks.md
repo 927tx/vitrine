@@ -156,12 +156,23 @@ Shared:
                   one hook for every feature that wants it (PlayerState.x), the lock screen widget's flags, and in the
                   more button's menu Speed and pitch: both done to Spotify's audio by Apple's time and pitch unit, put
                   between its mixer and its RemoteIO unit by taking over the connection Spotify makes between them
-                  (SpeedPitchMenu.x, SpeedPitch.x, SGTimePitch.m). Pitch follows speed (on until switched off,
+                  (SpeedPitchMenu.x, SpeedPitch.x, SGTimePitch.m). Spotify runs a chain per sample rate, so a local
+                  file at another rate can have two RemoteIO units running at once: SpeedPitch.x keeps a record
+                  per unit (its own mixer, sample time, largest slice and formats; AudioOutputUnitStop and
+                  AudioComponentInstanceDispose rebound too, a disposed unit forgotten after its render in progress)
+                  and names one the music's (SGPlayerMusicOutput), the one Spotify started or connected last, or
+                  one with sound when that one has had none for a second; speed and pitch, Sing's stage, the audio
+                  effects and Music Haptics follow it (SGPlayerWatchMusicOutput), and the other plays as Spotify
+                  made it. A connection whose formats the callback cannot take (not float with a buffer per channel,
+                  more than two channels, or a mixer at another rate than the unit) gets Spotify's own connection
+                  back. Each start, stop and dispose is logged as `audio:` with its formats and where the processors
+                  are. Pitch follows speed (on until switched off,
                   spotifyglass.speed.pitchFollows) plays the speed through Apple's Varispeed instead, faster and higher
                   together like a record; Varispeed also carries 1x while it is on, so a return to normal speed changes
                   nothing, and the stretch is left for pitch alone at 1x, the two swapped only through a reset. A new
                   format on either side of the output while it runs (a route to another rate, Spotify handing it
-                  another one) makes the unit again for it, and until then the sound passes as it is. Under the
+                  another one) makes the unit again for it, and until then the sound passes as it is. harness/speed's
+                  `two` runs a 44.1 and a 48 kHz chain at once. Under the
                   sliders a Reverb slider sets the audio effects' reverb amount (spotifyglass.dsp.reverb.amount), turning
                   the effects and the reverb on with it. The block goes into Spotify's own context menu sheet
                   and is drawn from its own measures, not the Kit's, so it sits there under either look. Tested on the
@@ -172,9 +183,8 @@ Shared:
                   block stays out of it unless the sheet itself is shown (SGPlayerMenuReplaced). Switch to video,
                   the chip over the title of a song with a music video, is hidden under either look on request
                   (VideoSwitch.x, spotifyglass.hide.videoSwitch), by its identifier in FloatingElementsUnit
-    AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): Spotify's
-                  import of AudioOutputUnitStart is rebound, as Music Haptics does, and a render notify on its RemoteIO
-                  unit runs each finished buffer through the mod's own engine, re-blocked to 1024 frames one block late,
+    AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): a render
+                  notify on the music's RemoteIO unit (SGPlayerMusicOutput, Shared/Player) runs each finished buffer through the mod's own engine, re-blocked to 1024 frames one block late,
                   in place (AudioEffects.x, SGDSPEngine.m). The buffers are in the unit's output format, the
                   hardware's, not the client format Spotify sets. The effects are the SGDSP*.m files, on Accelerate,
                   Apple's Reverb2 unit, libbs2b and EEL2 (vendor/audio). Settings apply as they change, on a queue of
@@ -205,8 +215,8 @@ Shared:
     Haptics/      Vibrations (Haptics.h lists its files): a tap of UIKit's feedback generators for the player's and the now
                   playing bar's controls, the scrubber's tenths and ends, cover swipes, gestures and the lyrics page's tap to
                   seek, at the strength set for them (ControlHaptics.x, SGFeedback.m); and Music Haptics, Core Haptics
-                  playing along with the song: Spotify's import of AudioOutputUnitStart is rebound so its RemoteIO output
-                  unit gets a render notify, the samples, in the unit's output format (the hardware's), go through a drum
+                  playing along with the song: the music's RemoteIO output unit (SGPlayerMusicOutput, Shared/Player)
+                  gets a render notify, the samples, in the unit's output format (the hardware's), go through a drum
                   and bass analyzer on the render thread (SGMusicAnalyzer.m, plain C), and a thread of its own schedules
                   the taps and the rumble for when the sound is heard, at their strength and leaving out what Follows
                   leaves out (MusicHaptics.x). Everything applies at once; nothing plays while Spotify is not the active

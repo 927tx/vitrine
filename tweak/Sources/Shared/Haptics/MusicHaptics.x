@@ -3,13 +3,14 @@
 //
 // Spotify plays through Core Audio units of its own (AudioUnitDriver2 in the binary: converter, EQ, mixer
 // and a RemoteIO output unit, started with AudioOutputUnitStart(_outputUnit)), with no Objective-C
-// method between it and the unit. So Spotify's import of AudioOutputUnitStart is rebound
-// (Core/SGRebind.h), and every RemoteIO unit it starts gets a render notify: after each render, the
-// buffer bound for the speaker is mixed to mono and handed to the analyzer (SGMusicAnalyzer.h) on
-// the render thread, which puts what it hears into a ring of events. That buffer is in the unit's output
-// format, the hardware's, not the one Spotify hands the unit (in the simulator 48 kHz float with a buffer
-// per channel, whatever the client: harness/audio-effects/sim, harness/haptics/sim), so the analyzer runs at
-// the hardware's rate, and a listener on the format follows it to a new one. The render timestamp says when
+// method between it and the unit, and it can run two such chains at once, one per sample rate. Shared/Player
+// keeps them apart and names the music's output (SGPlayerMusicOutput), and that one gets a render notify:
+// after each render, the buffer bound for the speaker is mixed to mono and handed to the analyzer
+// (SGMusicAnalyzer.h) on the render thread, which puts what it hears into a ring of events. A notify stays on
+// a unit that was the music's once and does nothing there, so the one analyzer never hears two outputs. That
+// buffer is in the unit's output format, the hardware's, not the one Spotify hands the unit (in the simulator
+// 48 kHz float with a buffer per channel, whatever the client: harness/audio-effects/sim, harness/haptics/sim),
+// so the analyzer runs at the hardware's rate, and Shared/Player says when it changes. The render timestamp says when
 // that buffer reaches the output; AVAudioSession's output latency (large over Bluetooth) is added, so
 // a tap lands when its drum is heard. A thread of this file's own takes the events off the ring and
 // schedules them with Core Haptics at those times: each hit a transient, the rumble one looping
@@ -39,7 +40,7 @@
 #import <pthread.h>
 #import <stdatomic.h>
 #import "Core/SGCore.h"
-#import "Core/SGRebind.h"
+#import "Shared/Player/SpeedPitch.h"
 #import "Haptics.h"
 #import "SGMusicAnalyzer.h"
 
@@ -123,11 +124,11 @@ static inline float sampleAt(const void *data, UInt32 index, UInt32 bytes, BOOL 
 
 // The hardware's format is float with a buffer per channel, but it is read rather than assumed (readFormat),
 // and buffers not laid out the way it says are left alone rather than read as noise: the format read at the
-// start can be a moment old.
+// start can be a moment old. `refCon` is the unit; only the music's output is heard.
 static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                          UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
-    if (!atomic_load_explicit(&sg_listening, memory_order_relaxed)) return noErr;
+    if (!atomic_load_explicit(&sg_listening, memory_order_relaxed) || refCon != SGPlayerMusicOutput()) return noErr;
     if (*flags & kAudioUnitRenderAction_OutputIsSilence) return noErr;
 
     uint64_t layout = atomic_load_explicit(&sg_layout, memory_order_relaxed);
@@ -179,8 +180,6 @@ static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const 
 
 #pragma mark - the output unit
 
-static OSStatus (*sg_startOutput)(AudioUnit unit);
-
 static NSString *fourCC(UInt32 code) {
     char text[5] = {(char)(code >> 24), (char)(code >> 16), (char)(code >> 8), (char)code, 0};
     return @(text);
@@ -224,30 +223,15 @@ static void readFormat(AudioUnit unit) {
     atomic_store(&sg_layout, (uint64_t)format.mFormatFlags | (uint64_t)(format.mChannelsPerFrame & 0xffff) << 32 | (uint64_t)bytes << 48);
 }
 
-// The hardware's format changing under a running unit (a route to a device at another rate).
-static void formatChanged(void *refCon, AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope scope, AudioUnitElement element) {
-    if (property == kAudioUnitProperty_StreamFormat && scope == kAudioUnitScope_Output && element == 0) readFormat(unit);
-}
-
+// The music's output started, changed or changed format (Shared/Player): its format read, the notify on it,
+// and the analyzer started over, since what it held came from before.
 static void listenTo(AudioUnit unit) {
-    AudioComponentDescription description = {0};
-    if (AudioComponentGetDescription(AudioComponentInstanceGetComponent(unit), &description) != noErr) return;
-    if (description.componentType != kAudioUnitType_Output || description.componentSubType != kAudioUnitSubType_RemoteIO) {
-        static int logged;
-        if (logged++ < 8) SGLog(@"music haptics: a started unit is not RemoteIO ('%@' '%@'), not listened to", fourCC(description.componentType), fourCC(description.componentSubType));
-        return;
-    }
-    AudioUnitRemoveRenderNotify(unit, rendered, NULL);
-    AudioUnitRemovePropertyListenerWithUserData(unit, kAudioUnitProperty_StreamFormat, formatChanged, NULL);
-    AudioUnitAddPropertyListener(unit, kAudioUnitProperty_StreamFormat, formatChanged, NULL);
+    if (!unit) return;
+    AudioUnitRemoveRenderNotify(unit, rendered, unit);
     readFormat(unit);
-    OSStatus status = AudioUnitAddRenderNotify(unit, rendered, NULL);
+    atomic_fetch_add(&sg_generation, 1);
+    OSStatus status = AudioUnitAddRenderNotify(unit, rendered, unit);
     if (status != noErr) SGLog(@"music haptics: the render notify could not be added (%d)", (int)status);
-}
-
-static OSStatus startOutput(AudioUnit unit) {
-    if (unit) listenTo(unit);
-    return sg_startOutput(unit);
 }
 
 #pragma mark - the player thread
@@ -591,8 +575,8 @@ void SGMusicHapticsWatchTaps(void (^watcher)(float intensity)) {
     mach_timebase_info_data_t timebase;
     mach_timebase_info(&timebase);
     sg_secondsPerTick = (double)timebase.numer / timebase.denom / 1e9;
-    if (!SGRebindImport("AudioOutputUnitStart", startOutput, (void **)&sg_startOutput) || !sg_startOutput) {
-        SGLog(@"music haptics: Spotify does not import AudioOutputUnitStart, Music Haptics is inactive");
+    if (!SGPlayerWatchMusicOutput(listenTo)) {
+        SGLog(@"music haptics: Spotify's output cannot be reached, Music Haptics is inactive");
         return;
     }
     sg_wake = dispatch_semaphore_create(0);

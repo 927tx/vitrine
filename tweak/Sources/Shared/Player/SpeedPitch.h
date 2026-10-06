@@ -4,7 +4,8 @@
 //
 //     SpeedPitchMenu.x   the expandable row and its two sliders, put into Spotify's context menu, and under
 //                        the redesign the Animated artwork switch under them
-//     SpeedPitch.x       speed and pitch done to Spotify's audio, between its mixer and its speaker unit
+//     SpeedPitch.x       speed and pitch done to Spotify's audio, between its mixer and its speaker unit, and
+//                        Spotify's outputs kept apart, one of them the music's (SGPlayerMusicOutput)
 //     SGTimePitch.m      Apple's time and pitch unit, pulling the mixer or working in place
 //
 // Speed and pitch last until Spotify quits; neither is stored.
@@ -52,7 +53,24 @@ BOOL SGPlayerMenuAnimatedArtwork(void);
 void SGPlayerMenuSetAnimatedArtwork(BOOL on);
 // A stage between Spotify's mixer and the rest of the chain (Sing's look-ahead, Shared/Sing): it fills the
 // chain's buffers, pulling the mixer through `pull` as much as it likes. NULL passes the mixer straight on.
-// Called on the render thread, and only while Spotify's connection is taken over (SGPlayerSpeedAllowed).
+// Called on the render thread, and only on the music's output (below) while Spotify's connection to it is taken
+// over (SGPlayerSpeedAllowed). The buffers are in SGPlayerMusicClientFormat's format.
 typedef OSStatus (*SGPlayerPull)(void *context, UInt32 frames, AudioBufferList *data);
 typedef OSStatus (*SGPlayerStage)(UInt32 frames, AudioBufferList *data, SGPlayerPull pull, void *context);
 void SGPlayerSetStage(SGPlayerStage stage);
+
+// The music's output: of the RemoteIO units Spotify runs at once (a chain per sample rate, and voice search's),
+// the one that carries every processor of its sound (speed and pitch, Sing's stage, the audio effects, Music
+// Haptics), NULL until Spotify connects or starts one. Any thread; the render thread compares it with a render
+// notify's unit to process the music's output alone.
+AudioUnit SGPlayerMusicOutput(void);
+// The format Spotify hands the music's output (its input scope, element 0), the one the stage's buffers are
+// in. NO when there is no such output. Not on the render thread.
+BOOL SGPlayerMusicClientFormat(AudioStreamBasicDescription *format);
+// `watcher` is called with the music's output each time it changes (NULL when there is none any more), Spotify
+// starts it again, or a format of it changes: the time to read its format, add a render notify to it and start
+// over what was held. Called on Spotify's audio thread or a queue of Shared/Player's, under a lock a dispose
+// waits for, so the unit stays alive through the call; it must not wait on the main thread. NO when
+// Spotify's output cannot be reached at all. Register from a %ctor; up to four.
+typedef void (*SGPlayerOutputWatcher)(AudioUnit output);
+BOOL SGPlayerWatchMusicOutput(SGPlayerOutputWatcher watcher);

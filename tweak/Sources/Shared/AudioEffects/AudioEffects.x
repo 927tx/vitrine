@@ -3,11 +3,12 @@
 //
 // Spotify plays through Core Audio units of its own (AudioUnitDriver2 in the binary: converter, EQ, mixer
 // and a RemoteIO output unit, started with AudioOutputUnitStart), with no Objective-C method between it and
-// the unit. So Spotify's import of AudioOutputUnitStart is rebound (Core/SGRebind.h; Music Haptics and Speed
-// and pitch rebind it too, and each replacement calls on what the slot held), and every RemoteIO unit it
-// starts gets a render notify. After each render the notify reads the buffer bound for the speaker into
-// float lanes, runs the engine over them and writes them back, in place: the way the first version of Pitch
-// worked on the phone. Speed and pitch feeds the unit's input, so its sound reaches the notify changed.
+// the unit, and it can run two such chains at once, one per sample rate. Shared/Player keeps them apart and
+// names the music's output (SGPlayerMusicOutput); that one gets a render notify. After each render the notify
+// reads the buffer bound for the speaker into float lanes, runs the engine over them and writes them back, in
+// place: the way the first version of Pitch worked on the phone. A notify stays on a unit that was the music's
+// once and does nothing there, so one engine never runs on two render threads. Speed and pitch feeds the
+// unit's input, so its sound reaches the notify changed.
 //
 // The engine is made the first time the output starts with the master switch on, at the output's rate,
 // and lives as long as Spotify: the render thread may be holding it at any time. With the switch off the
@@ -25,7 +26,7 @@
 #import <os/lock.h>
 #import <stdatomic.h>
 #import "Core/SGCore.h"
-#import "Core/SGRebind.h"
+#import "Shared/Player/SpeedPitch.h"
 #import "AudioEffects.h"
 #import "AudioEffectsApply.h"
 #import "SGDSPEngine.h"
@@ -50,6 +51,7 @@ typedef enum { SGOutputUnseen, SGOutputPCM, SGOutputUnsupported } SGOutputState;
 static _Atomic(SGDSPEngine *) sg_engine;       // made once on the queue, never freed
 static atomic_bool sg_running;                 // the switch on and the engine set up for the output
 static atomic_int sg_outputState;
+static BOOL sg_reachable;                      // Shared/Player reaches Spotify's output
 // The format of the buffers the notify gets: the rate, and the layout packed into one word so the render
 // thread never reads half of a change (flags in the low 32 bits, then channels, then bytes per sample).
 static atomic_uint_fast64_t sg_rateBits;
@@ -164,9 +166,11 @@ static void processBuffer(SGDSPEngine *engine, AudioUnitRenderActionFlags *flags
     if (loud) *flags &= ~kAudioUnitRenderAction_OutputIsSilence;
 }
 
+// `refCon` is the unit; only the music's output is processed.
 static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                          UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
+    if (refCon != SGPlayerMusicOutput()) return noErr;
     if (!atomic_load_explicit(&sg_running, memory_order_acquire)) return noErr;
     SGDSPEngine *engine = atomic_load_explicit(&sg_engine, memory_order_acquire);
     // A new rate is being set up on the queue: until then the sound passes as it is.
@@ -180,12 +184,6 @@ static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const 
 static NSString *fourCC(UInt32 code) {
     char text[5] = {(char)(code >> 24), (char)(code >> 16), (char)(code >> 8), (char)code, 0};
     return @(text);
-}
-
-static BOOL isRemoteIO(AudioUnit unit) {
-    AudioComponentDescription description = {0};
-    if (!unit || AudioComponentGetDescription(AudioComponentInstanceGetComponent(unit), &description) != noErr) return NO;
-    return description.componentType == kAudioUnitType_Output && description.componentSubType == kAudioUnitSubType_RemoteIO;
 }
 
 static NSString *formatText(AudioStreamBasicDescription format) {
@@ -234,28 +232,17 @@ static BOOL readFormat(AudioUnit unit) {
     return YES;
 }
 
-// The hardware's format changing under a running unit (a route to a device at another rate).
-static void formatChanged(void *refCon, AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope scope, AudioUnitElement element) {
-    if (property == kAudioUnitProperty_StreamFormat && scope == kAudioUnitScope_Output && element == 0) readFormat(unit);
-}
-
+// The music's output started, changed or changed format (Shared/Player): its format read, the notify on it.
 static void listenTo(AudioUnit unit) {
-    AudioUnitRemoveRenderNotify(unit, rendered, NULL);
-    AudioUnitRemovePropertyListenerWithUserData(unit, kAudioUnitProperty_StreamFormat, formatChanged, NULL);
-    AudioUnitAddPropertyListener(unit, kAudioUnitProperty_StreamFormat, formatChanged, NULL);
+    if (!unit) return;
+    AudioUnitRemoveRenderNotify(unit, rendered, unit);
     if (!readFormat(unit)) return;
-    // The sound held from before the output stopped would play first; the stream starts over instead.
+    // The sound held from before the output stopped, or from another output, would play first; the stream
+    // starts over instead.
     SGDSPEngine *engine = atomic_load(&sg_engine);
     if (engine) SGDSPEngineRestart(engine);
-    OSStatus status = AudioUnitAddRenderNotify(unit, rendered, NULL);
+    OSStatus status = AudioUnitAddRenderNotify(unit, rendered, unit);
     if (status != noErr) SGLog(@"dsp: the render notify could not be added (%d)", (int)status);
-}
-
-static OSStatus (*sg_startOutput)(AudioUnit unit);
-
-static OSStatus startOutput(AudioUnit unit) {
-    if (isRemoteIO(unit)) listenTo(unit);
-    return sg_startOutput(unit);
 }
 
 #pragma mark - errors
@@ -558,7 +545,7 @@ NSString *SGDSPStatus(void) {
     if (!SGDSPSwitch(SGKeyDSP)) return @"Off";
     if (atomic_load(&sg_outputState) == SGOutputUnsupported) return @"Spotify's output is in a format the engine does not take";
     SGDSPEngine *engine = atomic_load(&sg_engine);
-    if (!sg_startOutput) return @"Unavailable: Spotify's output could not be reached";
+    if (!sg_reachable) return @"Unavailable: Spotify's output could not be reached";
     if (!engine || !atomic_load(&sg_running)) return @"Waiting for Spotify to play";
     double rate = SGDSPEngineSampleRate(engine);
     double load = SGDSPEngineReadStats(engine, false).load;
@@ -580,9 +567,9 @@ void SGDSPCompanderResponse(NSArray<NSNumber *> *gains, NSInteger count, double 
 }
 
 %ctor {
-    if (!SGRebindImport("AudioOutputUnitStart", startOutput, (void **)&sg_startOutput) || !sg_startOutput) {
-        sg_startOutput = NULL;
-        SGLog(@"dsp: Spotify does not import AudioOutputUnitStart, the effects cannot reach its sound");
+    sg_reachable = SGPlayerWatchMusicOutput(listenTo);
+    if (!sg_reachable) {
+        SGLog(@"dsp: Spotify's output cannot be reached, the effects cannot reach its sound");
         return;
     }
     SGLog(@"dsp: listening for Spotify's output unit (%@)", SGDSPSwitch(SGKeyDSP) ? @"on" : @"off");

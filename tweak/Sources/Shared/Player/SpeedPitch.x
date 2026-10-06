@@ -1,4 +1,5 @@
-// Speed and Pitch (SpeedPitchMenu.x draws them), both done on Spotify's audio, under either look.
+// Speed and Pitch (SpeedPitchMenu.x draws them), both done on Spotify's audio, under either look, and the
+// record of Spotify's outputs that every processor of its sound follows (SpeedPitch.h).
 //
 // Spotify's player takes a speed only for podcasts: for songs its restrictions refuse it (device test,
 // 2026-09-18: the slider read "Unavailable here"), its own music speed being a per track setting kept on
@@ -7,13 +8,33 @@
 //
 // Spotify's audio (AudioUnitDriver2 in the binary) is a chain of units it wires with MakeConnection:
 // converter (fed by its decoder through a render callback), EQ, mixer, RemoteIO. Its import of
-// AudioUnitSetProperty is rebound (Core/SGRebind.h), and the one call connecting the mixer to the RemoteIO
-// unit's input is answered by a render callback of this file's instead, which pulls the mixer itself. At
-// normal speed and pitch the callback passes the mixer's sound straight through. Otherwise it renders the
-// time and pitch unit, which pulls the mixer for rate times the frames it hands back, so Spotify's decoder
-// is drained that much faster: the song plays faster or slower, at its own pitch unless Pitch moves it.
-// Switching the unit in or out skips or repeats its 93 ms, so it stays in for a moment after both return
-// to normal, and a finger dragging across normal does not switch it back and forth.
+// AudioUnitSetProperty is rebound (Core/SGRebind.h), and the call connecting a mixer to a RemoteIO unit's
+// input is answered by a render callback of this file's instead, which pulls the mixer itself. At normal
+// speed and pitch the callback passes the mixer's sound straight through. Otherwise it renders the time and
+// pitch unit, which pulls the mixer for rate times the frames it hands back, so Spotify's decoder is drained
+// that much faster: the song plays faster or slower, at its own pitch unless Pitch moves it. Switching the
+// unit in or out skips or repeats its 93 ms, so it stays in for a moment after both return to normal, and a
+// finger dragging across normal does not switch it back and forth.
+//
+// Spotify keeps a chain per sample rate: a local file at another rate gets a second one, and both can be
+// alive and running at once. So every RemoteIO unit has its own record (Output): the mixer and bus feeding
+// it, that mixer's largest slice, a sample time of its own, and its two formats. Each unit's callback pulls
+// only its own mixer; one pulling another's would drain it twice as fast, and the song would speed up. The
+// processors (this file's unit, Sing's stage, the audio effects, Music Haptics) are on one output only, the
+// music's: the one Spotify started or connected last, since a new chain is started for the song about to
+// play. A unit Spotify never connected (one it feeds with a callback of its own, such as voice search) gets
+// them only when no connected one runs. And an output that has had no sound for a second gives them up to
+// a connected one that has: a chain left running and fed again without a new start (going back to a
+// streamed song after a local file, or the end of a crossfade) is still found. AudioOutputUnitStop and
+// AudioComponentInstanceDispose are rebound too: a stopped unit gives the processors up, and a disposed one
+// is forgotten, after its render in progress is over, so nothing ever pulls a disposed mixer.
+//
+// The callback stands in for Spotify's connection only when it can: Spotify's side of the unit float, a
+// buffer per channel, 32-bit, one or two channels, and the mixer's output the same rate, layout and
+// channels. Otherwise Spotify's own connection is put back and its sound passes untouched (a mixer at
+// another rate than the unit would play fast or slow through the callback, where Spotify's own connection
+// refuses it). This is checked when Spotify connects, starts and changes a format, and the callback takes
+// over again once the formats agree.
 //
 // Spotify's clock keeps running at its own speed between the player's reports: -[SPTPlayerState position]
 // is positionAsOfTimestamp minus timeIntervalSinceNow times [self playbackSpeed] (disassembly,
@@ -21,18 +42,19 @@
 // screen move with the sound. That bets the player's reported positions follow what the decoder handed
 // over, which is what it counts.
 //
-// When the connection is never seen, pitch falls back to the way it first shipped: a render notify on the
-// RemoteIO unit (after Music Haptics' own rebinding of AudioOutputUnitStart) runs each finished buffer
-// through a unit working in place; speed is then unavailable. Those buffers are in the unit's output format,
-// the hardware's, not the one Spotify hands the unit (harness/audio-effects/sim), so the fallback's unit is made
-// for that one.
+// When the music's output was never connected, pitch falls back to the way it first shipped: a render notify
+// on the RemoteIO unit runs each finished buffer through a unit working in place; speed is then unavailable.
+// Those buffers are in the unit's output format, the hardware's, not the one Spotify hands the unit
+// (harness/audio-effects/sim), so the fallback's unit is made for that one.
 //
 // Speed and pitch last until Spotify quits.
 //
-// Threading: the render callback and the notify run on the render thread and touch only atomics and the
-// units; Spotify sets its properties and starts its unit on its audio thread; everything else is main
-// thread.
+// Threading: the render callbacks and the notify run on each unit's render thread and touch only atomics,
+// their own output's record and the units. Spotify connects, starts, stops and disposes on its audio thread;
+// the record changes under sg_outputsLock, there and on sg_outputsQueue (format changes, the silence check).
+// A change waits for a render in progress to end; a render never waits. Everything else is main thread.
 #import <AudioToolbox/AudioToolbox.h>
+#import <mach/mach_time.h>
 #import <pthread.h>
 #import <stdatomic.h>
 #import "Core/SGCore.h"
@@ -43,34 +65,70 @@
 
 // The unit stays in this long after speed and pitch both came back to normal.
 static const double kOffAfter = 1.5;
+// An output silent this long gives the processors up to a connected one that is not; one started or connected
+// this recently counts as having sound.
+static const double kSilentFor = 1;
+// How often the outputs are checked for that while two or more run.
+static const double kCheckEvery = 0.5;
+
+enum { kMaxOutputs = 8, kMaxWatchers = 4 };
 
 #pragma mark - shared between the threads
 
 static float sg_speed = 1, sg_semitones;     // main thread
 static atomic_uint sg_speedBits;             // sg_speed for SPTPlayerState, read on any thread
 
-// The chain as Spotify wired it: the unit and bus feeding its RemoteIO unit (NULL until the
-// connection was taken over), pulled in chunks no larger than Spotify's own maximum slice.
-static _Atomic(AudioUnit) sg_source;
-static UInt32 sg_sourceBus;
-static atomic_uint sg_chunk = 1024;
-static Float64 sg_sourceTime;                // render thread only
-
-// The unit in use and whether the render thread runs it: in the chain (pull), else in place (pitch only).
-static _Atomic(SGTimePitch *) sg_pull, sg_inPlace;
-static atomic_bool sg_engaged, sg_busy;
-static pthread_mutex_t sg_buildLock = PTHREAD_MUTEX_INITIALIZER;
-
-// The formats when Spotify started its output: the one it hands the RemoteIO unit, which the chain's unit
-// feeds, and the unit's output side, the hardware's, which the in place fallback's notify gets.
 typedef struct {
     atomic_uint_fast64_t rateBits;
     atomic_uint flags, channels, bytes;
 } Format;
-static Format sg_client, sg_hardware;
 
+// A RemoteIO unit of Spotify's. A slot whose unit is NULL is free; slots are used again, never freed, since a
+// render thread may hold one.
+typedef struct {
+    _Atomic(AudioUnit) unit;
+    // What Spotify connected to it, NULL when nothing is; `taken` while this file's callback stands in for that
+    // connection, pulling it in chunks no larger than its own largest slice.
+    _Atomic(AudioUnit) source;
+    UInt32 sourceBus;
+    atomic_bool taken;
+    atomic_uint chunk;
+    Float64 sourceTime;                      // its render thread only
+    // Spotify's side (input scope, element 0), which the callback fills, and the hardware's (output scope),
+    // which render notifies get.
+    Format client, hardware;
+    atomic_bool running, busy;
+    atomic_uint_fast64_t loudAt;             // host time of its last rendered buffer with sound
+    // Under sg_outputsLock: when Spotify last started or connected it, as an order and as a host time,
+    // and whether its notify and listener are on.
+    uint64_t order, eventAt;
+    BOOL listened;
+} Output;
+
+static Output sg_outputs[kMaxOutputs];
+static _Atomic(Output *) sg_music;           // the output carrying the processors
+static pthread_mutex_t sg_outputsLock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+static dispatch_queue_t sg_outputsQueue;
+static SGPlayerOutputWatcher sg_watchers[kMaxWatchers];
+static BOOL sg_reachable;                    // Spotify's AudioOutputUnitStart could be rebound
+
+// The unit in use and whether the render thread runs it: in the music's chain (pull), else in place (pitch only).
+static _Atomic(SGTimePitch *) sg_pull, sg_inPlace;
+static atomic_bool sg_engaged;
+static pthread_mutex_t sg_buildLock = PTHREAD_MUTEX_INITIALIZER;
+static _Atomic(SGPlayerStage) sg_stage;
+
+static double sg_secondsPerTick;
+static OSStatus (*sg_setProperty)(AudioUnit, AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, const void *, UInt32);
+
+static Output *music(void) {
+    return atomic_load(&sg_music);
+}
+
+// Whether the music's output is fed through this file's callback.
 static BOOL tapped(void) {
-    return atomic_load(&sg_source) != NULL;
+    Output *output = music();
+    return output && atomic_load(&output->taken);
 }
 
 static double rateOf(Format *format) {
@@ -93,13 +151,22 @@ static void storeFloat(atomic_uint *slot, float value) {
     atomic_store(slot, bits);
 }
 
+static double seconds(uint64_t ticks) {
+    return ticks * sg_secondsPerTick;
+}
+
 #pragma mark - the render thread: the chain
 
-// The source's next `frames` frames into `data`, in chunks of at most sg_chunk frames, each with a sample
-// time of its own, so Spotify's units never see a time twice (an AU renders a time it has seen from cache).
-static OSStatus pullSource(AudioUnit source, const AudioTimeStamp *outputTime, UInt32 frames, AudioBufferList *data) {
+static void silence(AudioBufferList *data) {
+    for (UInt32 b = 0; b < data->mNumberBuffers; b++) if (data->mBuffers[b].mData) memset(data->mBuffers[b].mData, 0, data->mBuffers[b].mDataByteSize);
+}
+
+// The output's mixer's next `frames` frames into `data`, in chunks of at most its largest slice, each with a
+// sample time of the output's own, so Spotify's units never see a time twice (an AU renders a time it has
+// seen from cache).
+static OSStatus pullSource(Output *output, AudioUnit source, const AudioTimeStamp *outputTime, UInt32 frames, AudioBufferList *data) {
     enum { kMaxBuffers = 8 };
-    UInt32 chunk = atomic_load_explicit(&sg_chunk, memory_order_relaxed);
+    UInt32 chunk = atomic_load_explicit(&output->chunk, memory_order_relaxed);
     if (data->mNumberBuffers > kMaxBuffers) chunk = frames;
     for (UInt32 b = 0; b < data->mNumberBuffers; b++) if (!data->mBuffers[b].mData) chunk = frames;
     UInt32 bytesPerFrame[kMaxBuffers];
@@ -118,48 +185,50 @@ static OSStatus pullSource(AudioUnit source, const AudioTimeStamp *outputTime, U
             target = &part.list;
         }
         AudioTimeStamp time = outputTime ? *outputTime : (AudioTimeStamp){0};
-        time.mSampleTime = sg_sourceTime;
+        time.mSampleTime = output->sourceTime;
         time.mFlags |= kAudioTimeStampSampleTimeValid;
         AudioUnitRenderActionFlags flags = 0;
-        OSStatus status = AudioUnitRender(source, &flags, &time, sg_sourceBus, count, target);
-        sg_sourceTime += count;
+        OSStatus status = AudioUnitRender(source, &flags, &time, output->sourceBus, count, target);
+        output->sourceTime += count;
         if (status != noErr) return status;
         done += count;
     }
     return noErr;
 }
 
-static _Atomic(SGPlayerStage) sg_stage;
-
 void SGPlayerSetStage(SGPlayerStage stage) {
     atomic_store(&sg_stage, stage);
 }
 
 typedef struct {
+    Output *output;
     AudioUnit source;
     const AudioTimeStamp *time;
 } MixerPull;
 
 static OSStatus pullMixer(void *context, UInt32 frames, AudioBufferList *data) {
     MixerPull *mixer = context;
-    return pullSource(mixer->source, mixer->time, frames, data);
+    return pullSource(mixer->output, mixer->source, mixer->time, frames, data);
 }
 
-// The mixer's sound, through the stage when one is set.
-static OSStatus pullChain(AudioUnit source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *data) {
+// The music's mixer's sound, through the stage when one is set.
+static OSStatus pullChain(Output *output, AudioUnit source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *data) {
     SGPlayerStage stage = atomic_load_explicit(&sg_stage, memory_order_acquire);
-    if (!stage) return pullSource(source, time, frames, data);
-    MixerPull mixer = {source, time};
+    if (!stage) return pullSource(output, source, time, frames, data);
+    MixerPull mixer = {output, source, time};
     return stage(frames, data, pullMixer, &mixer);
 }
 
+// The time and pitch unit's input. It renders only on the music's output, and a change of music takes the
+// unit out first (disengage), so the music here is the output rendering it.
 static OSStatus pullForUnit(void *context, UInt32 frames, AudioBufferList *data) {
-    AudioUnit source = atomic_load(&sg_source);
+    Output *output = music();
+    AudioUnit source = output ? atomic_load(&output->source) : NULL;
     if (!source) {
-        for (UInt32 b = 0; b < data->mNumberBuffers; b++) if (data->mBuffers[b].mData) memset(data->mBuffers[b].mData, 0, data->mBuffers[b].mDataByteSize);
+        silence(data);
         return noErr;
     }
-    return pullChain(source, NULL, frames, data);
+    return pullChain(output, source, NULL, frames, data);
 }
 
 static BOOL fitsUnit(const AudioBufferList *data, UInt32 frames, SGTimePitch *unit) {
@@ -170,24 +239,29 @@ static BOOL fitsUnit(const AudioBufferList *data, UInt32 frames, SGTimePitch *un
     return YES;
 }
 
-// The RemoteIO unit's input, in place of Spotify's connection from the mixer.
+// A RemoteIO unit's input, in place of Spotify's connection from its mixer. `refCon` is its Output.
 static OSStatus feed(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                      UInt32 frames, AudioBufferList *data) {
-    AudioUnit source = atomic_load(&sg_source);
+    Output *output = refCon;
+    atomic_store(&output->busy, true);
+    AudioUnit source = atomic_load(&output->source);
+    OSStatus status = noErr;
     if (!source) {
-        for (UInt32 b = 0; b < data->mNumberBuffers; b++) if (data->mBuffers[b].mData) memset(data->mBuffers[b].mData, 0, data->mBuffers[b].mDataByteSize);
+        silence(data);
         *flags |= kAudioUnitRenderAction_OutputIsSilence;
-        return noErr;
+    } else if (output != music()) {
+        // Another chain plays as Spotify made it.
+        status = pullSource(output, source, timestamp, frames, data);
+    } else {
+        status = -1;
+        SGTimePitch *unit = atomic_load(&sg_pull);
+        // A unit made for another rate passes the sound as it is, until the main thread makes one for the new rate.
+        if (atomic_load(&sg_engaged) && unit && fitsUnit(data, frames, unit) && SGTimePitchSampleRate(unit) == rateOf(&output->client)) {
+            status = SGTimePitchRender(unit, frames, data);
+        }
+        if (status != noErr) status = pullChain(output, source, timestamp, frames, data);
     }
-    atomic_store(&sg_busy, true);
-    OSStatus status = -1;
-    SGTimePitch *unit = atomic_load(&sg_pull);
-    // A unit made for another rate passes the sound as it is, until the main thread makes one for the new rate.
-    if (atomic_load(&sg_engaged) && unit && fitsUnit(data, frames, unit) && SGTimePitchSampleRate(unit) == rateOf(&sg_client)) {
-        status = SGTimePitchRender(unit, frames, data);
-    }
-    if (status != noErr) status = pullChain(source, timestamp, frames, data);
-    atomic_store(&sg_busy, false);
+    atomic_store(&output->busy, false);
     return status;
 }
 
@@ -218,9 +292,9 @@ static inline void writeSample(void *data, UInt32 index, float value, UInt32 byt
     }
 }
 
-static void shiftInPlace(SGTimePitch *unit, AudioUnitRenderActionFlags *flags, UInt32 frames, AudioBufferList *data) {
-    UInt32 formatFlags = atomic_load_explicit(&sg_hardware.flags, memory_order_relaxed);
-    UInt32 bytes = atomic_load_explicit(&sg_hardware.bytes, memory_order_relaxed);
+static void shiftInPlace(SGTimePitch *unit, Format *hardware, AudioUnitRenderActionFlags *flags, UInt32 frames, AudioBufferList *data) {
+    UInt32 formatFlags = atomic_load_explicit(&hardware->flags, memory_order_relaxed);
+    UInt32 bytes = atomic_load_explicit(&hardware->bytes, memory_order_relaxed);
     UInt32 channels = SGTimePitchChannels(unit);
     BOOL isFloat = (formatFlags & kAudioFormatFlagIsFloat) != 0;
     BOOL split = (formatFlags & kAudioFormatFlagIsNonInterleaved) != 0;
@@ -254,18 +328,40 @@ static void shiftInPlace(SGTimePitch *unit, AudioUnitRenderActionFlags *flags, U
     *flags &= ~kAudioUnitRenderAction_OutputIsSilence;
 }
 
+// Whether a buffer in `format` holds sound: float over -80 dB, so a mixer's noise floor is not taken for
+// music, and in any other format anything but zeros.
+static BOOL hasSound(Format *format, AudioUnitRenderActionFlags flags, const AudioBufferList *data) {
+    if (flags & kAudioUnitRenderAction_OutputIsSilence) return NO;
+    BOOL floats = (atomic_load_explicit(&format->flags, memory_order_relaxed) & kAudioFormatFlagIsFloat)
+                  && atomic_load_explicit(&format->bytes, memory_order_relaxed) == 4;
+    for (UInt32 b = 0; b < data->mNumberBuffers; b++) {
+        const uint32_t *words = data->mBuffers[b].mData;
+        UInt32 count = words ? data->mBuffers[b].mDataByteSize / sizeof *words : 0;
+        for (UInt32 i = 0; i < count; i++) {
+            if (floats ? fabsf(((const float *)words)[i]) > 1e-4f : words[i] != 0) return YES;
+        }
+    }
+    return NO;
+}
+
+// On every started output, `refCon` its Output: notes when it has sound, and shifts the pitch on the music's
+// when it is not fed by the callback.
 static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                          UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
-    if (tapped() || !atomic_load(&sg_engaged)) return noErr;
-    atomic_store(&sg_busy, true);
+    Output *output = refCon;
+    if (hasSound(&output->hardware, *flags, data)) atomic_store_explicit(&output->loudAt, mach_absolute_time(), memory_order_relaxed);
+    if (output != music() || atomic_load(&output->taken) || !atomic_load(&sg_engaged)) return noErr;
+    atomic_store(&output->busy, true);
     SGTimePitch *unit = atomic_load(&sg_inPlace);
-    if (atomic_load(&sg_engaged) && unit && SGTimePitchSampleRate(unit) == rateOf(&sg_hardware)) shiftInPlace(unit, flags, frames, data);
-    atomic_store(&sg_busy, false);
+    if (atomic_load(&sg_engaged) && output == music() && unit && SGTimePitchSampleRate(unit) == rateOf(&output->hardware)) {
+        shiftInPlace(unit, &output->hardware, flags, frames, data);
+    }
+    atomic_store(&output->busy, false);
     return noErr;
 }
 
-#pragma mark - Spotify's audio thread
+#pragma mark - the outputs (sg_outputsLock)
 
 static BOOL isRemoteIO(AudioUnit unit) {
     AudioComponentDescription description = {0};
@@ -273,123 +369,369 @@ static BOOL isRemoteIO(AudioUnit unit) {
     return description.componentType == kAudioUnitType_Output && description.componentSubType == kAudioUnitSubType_RemoteIO;
 }
 
-static OSStatus (*sg_setProperty)(AudioUnit, AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, const void *, UInt32);
-
-static OSStatus setProperty(AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope scope, AudioUnitElement element,
-                            const void *data, UInt32 size) {
-    if (property == kAudioUnitProperty_MaximumFramesPerSlice && data && size >= sizeof(UInt32)) {
-        UInt32 frames = *(const UInt32 *)data;
-        if (frames >= 256) atomic_store(&sg_chunk, frames);
-    }
-    if (property != kAudioUnitProperty_MakeConnection || scope != kAudioUnitScope_Input || element != 0 || !data
-        || size < sizeof(AudioUnitConnection) || !isRemoteIO(unit)) {
-        return sg_setProperty(unit, property, scope, element, data, size);
-    }
-    const AudioUnitConnection *connection = data;
-    if (!connection->sourceAudioUnit) {
-        atomic_store(&sg_source, NULL);
-        AURenderCallbackStruct none = {0};
-        sg_setProperty(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &none, sizeof none);
-        SGLog(@"redesign speed: Spotify disconnected its output");
-        return sg_setProperty(unit, property, scope, element, data, size);
-    }
-    sg_sourceBus = connection->sourceOutputNumber;
-    atomic_store(&sg_source, connection->sourceAudioUnit);
-    AURenderCallbackStruct callback = {feed, NULL};
-    OSStatus status = sg_setProperty(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callback, sizeof callback);
-    SGLog(@"redesign speed: Spotify's mixer feeds its output through the menu's unit now (status %d)", (int)status);
-    if (status == noErr) return noErr;
-    atomic_store(&sg_source, NULL);
-    return sg_setProperty(unit, property, scope, element, data, size);
+static Output *outputOf(AudioUnit unit) {
+    for (int i = 0; unit && i < kMaxOutputs; i++) if (atomic_load(&sg_outputs[i].unit) == unit) return &sg_outputs[i];
+    return NULL;
 }
 
-static OSStatus (*sg_startOutput)(AudioUnit unit);
+static Output *outputFor(AudioUnit unit) {
+    Output *output = outputOf(unit);
+    for (int i = 0; !output && i < kMaxOutputs; i++) {
+        if (atomic_load(&sg_outputs[i].unit)) continue;
+        output = &sg_outputs[i];
+        atomic_store(&output->source, NULL);
+        atomic_store(&output->taken, false);
+        atomic_store(&output->running, false);
+        atomic_store(&output->chunk, 1024);
+        atomic_store(&output->loudAt, 0);
+        output->sourceTime = 0;
+        output->order = output->eventAt = 0;
+        output->listened = NO;
+        atomic_store(&output->unit, unit);
+    }
+    if (!output) {
+        static int logged;
+        if (logged++ < 3) SGLog(@"audio: more than %d outputs at once, %p is left as Spotify made it", kMaxOutputs, unit);
+    }
+    return output;
+}
 
-// One side of the RemoteIO unit's element 0 into `into`; a side that is not linear PCM is left as it was.
-static BOOL readScope(AudioUnit unit, AudioUnitScope scope, Format *into, AudioStreamBasicDescription *format) {
+// Waits for the output's render in progress, if any, to end.
+static void waitFor(Output *output) {
+    for (int i = 0; i < 400 && atomic_load(&output->busy); i++) usleep(250);
+}
+
+// Stops the render threads using the unit, and returns once none is.
+static void disengage(void) {
+    atomic_store(&sg_engaged, false);
+    for (int i = 0; i < kMaxOutputs; i++) waitFor(&sg_outputs[i]);
+}
+
+static void readScope(AudioUnit unit, AudioUnitScope scope, Format *into, AudioStreamBasicDescription *format) {
     UInt32 size = sizeof *format;
     OSStatus status = AudioUnitGetProperty(unit, kAudioUnitProperty_StreamFormat, scope, 0, format, &size);
-    if (status != noErr || format->mFormatID != kAudioFormatLinearPCM || format->mSampleRate <= 0) return NO;
+    if (status != noErr || format->mFormatID != kAudioFormatLinearPCM || format->mSampleRate <= 0) {
+        *format = (AudioStreamBasicDescription){0};
+    }
     uint64_t bits;
     memcpy(&bits, &format->mSampleRate, sizeof bits);
     atomic_store(&into->rateBits, bits);
     atomic_store(&into->flags, format->mFormatFlags);
     atomic_store(&into->channels, format->mChannelsPerFrame);
     atomic_store(&into->bytes, format->mBitsPerChannel / 8);
-    return YES;
 }
 
-static void readFormat(AudioUnit unit) {
-    AudioStreamBasicDescription client = {0}, hardware = {0};
-    BOOL clientRead = readScope(unit, kAudioUnitScope_Input, &sg_client, &client);
-    BOOL hardwareRead = readScope(unit, kAudioUnitScope_Output, &sg_hardware, &hardware);
-    static int logged;
-    if (!clientRead || !hardwareRead) {
-        if (logged++ < 6) SGLog(@"redesign speed: the output is not linear PCM (Spotify's side %@, the hardware's %@)", clientRead ? @"is" : @"is not", hardwareRead ? @"is" : @"is not");
-        if (!clientRead) return;
+static NSString *formatText(const AudioStreamBasicDescription *format) {
+    if (format->mFormatID != kAudioFormatLinearPCM) return @"not linear PCM";
+    return [NSString stringWithFormat:@"%.0f Hz, %u ch, %u-bit %@%@", format->mSampleRate, (unsigned)format->mChannelsPerFrame,
+            (unsigned)format->mBitsPerChannel, (format->mFormatFlags & kAudioFormatFlagIsFloat) ? @"float" : @"integer",
+            (format->mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? @" split" : @" interleaved"];
+}
+
+// Why the callback cannot stand in for the connection to the client format `client`, nil when it can.
+static NSString *refusal(Output *output, const AudioStreamBasicDescription *client) {
+    BOOL canonical = client->mFormatID == kAudioFormatLinearPCM && (client->mFormatFlags & kAudioFormatFlagIsFloat)
+                     && (client->mFormatFlags & kAudioFormatFlagIsNonInterleaved) && client->mBitsPerChannel == 32
+                     && client->mChannelsPerFrame >= 1 && client->mChannelsPerFrame <= kSGTimePitchMaxChannels;
+    if (!canonical) return [NSString stringWithFormat:@"Spotify's side is %@, not float split 1 or 2 ch", formatText(client)];
+    AudioStreamBasicDescription mixer = {0};
+    UInt32 size = sizeof mixer;
+    AudioUnit source = atomic_load(&output->source);
+    if (AudioUnitGetProperty(source, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, output->sourceBus, &mixer, &size) != noErr) return nil;
+    UInt32 layout = kAudioFormatFlagIsFloat | kAudioFormatFlagIsNonInterleaved;
+    if (mixer.mSampleRate != client->mSampleRate || (mixer.mFormatFlags & layout) != (client->mFormatFlags & layout)
+        || mixer.mChannelsPerFrame != client->mChannelsPerFrame || mixer.mBitsPerChannel != client->mBitsPerChannel) {
+        return [NSString stringWithFormat:@"its mixer gives %@ for %@", formatText(&mixer), formatText(client)];
     }
-    if (logged++ < 6) SGLog(@"redesign speed: Spotify's output is %.0f Hz, %u channels, %u bits, flags 0x%x, into the hardware's %.0f Hz, %u channels, %u bits, flags 0x%x, slices of %u, %@",
-                            client.mSampleRate, (unsigned)client.mChannelsPerFrame, (unsigned)client.mBitsPerChannel, (unsigned)client.mFormatFlags,
-                            hardware.mSampleRate, (unsigned)hardware.mChannelsPerFrame, (unsigned)hardware.mBitsPerChannel, (unsigned)hardware.mFormatFlags,
-                            atomic_load(&sg_chunk), tapped() ? @"fed through the menu's unit" : @"not taken over");
+    return nil;
 }
 
-static void apply(void);
-
-// A speed or pitch chosen before the output started, or kept across a new format, applies now: apply()
-// makes the unit again when the rate or the channels changed.
-static void applyToFormat(void) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (sg_speed != 1 || sg_semitones != 0) apply();
-    });
+// Reads both formats and the mixer's slice, and puts in the callback or Spotify's own connection, whichever
+// the formats allow. Answers why Spotify's connection is kept, nil when the callback feeds the output.
+static NSString *settle(Output *output, AudioStreamBasicDescription *client, AudioStreamBasicDescription *hardware) {
+    AudioUnit unit = atomic_load(&output->unit);
+    readScope(unit, kAudioUnitScope_Input, &output->client, client);
+    readScope(unit, kAudioUnitScope_Output, &output->hardware, hardware);
+    AudioUnit source = atomic_load(&output->source);
+    if (!source) return @"not connected";
+    UInt32 slice = 0, size = sizeof slice;
+    if (AudioUnitGetProperty(source, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &slice, &size) == noErr && slice >= 256) {
+        atomic_store(&output->chunk, slice);
+    }
+    NSString *why = refusal(output, client);
+    BOOL take = !why;
+    if (take == atomic_load(&output->taken)) return why;
+    OSStatus status;
+    if (take) {
+        AURenderCallbackStruct callback = {feed, output};
+        status = sg_setProperty(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callback, sizeof callback);
+    } else {
+        // Its sound passes as Spotify made it; the callback's render in progress, if any, ends first.
+        AudioUnitConnection connection = {source, output->sourceBus, 0};
+        status = sg_setProperty(unit, kAudioUnitProperty_MakeConnection, kAudioUnitScope_Input, 0, &connection, sizeof connection);
+        waitFor(output);
+    }
+    if (status == noErr) atomic_store(&output->taken, take);
+    SGLog(@"audio: output %p %@ (status %d)%@", unit, take ? @"fed through the mod's callback" : @"given Spotify's own connection back",
+          (int)status, why ? [@": " stringByAppendingString:why] : @"");
+    return atomic_load(&output->taken) ? nil : why ?: @"the callback could not be set";
 }
 
-// Either side of element 0 changing under a running unit: the hardware's on a route to a device at
-// another rate, Spotify's when it hands the unit another format without starting it again.
+static void markEvent(Output *output) {
+    static uint64_t order;
+    output->order = ++order;
+    output->eventAt = mach_absolute_time();
+}
+
+static NSString *describe(Output *output) {
+    if (!output) return @"none";
+    return [NSString stringWithFormat:@"%p (%.0f Hz)", atomic_load(&output->unit), rateOf(&output->client)];
+}
+
+static void tellWatchers(void) {
+    Output *output = music();
+    AudioUnit unit = output ? atomic_load(&output->unit) : NULL;
+    for (int i = 0; i < kMaxWatchers && sg_watchers[i]; i++) sg_watchers[i](unit);
+}
+
+static void applyToFormat(void);
+
+// The output that should carry the processors, Spotify's newest of the best kind: running and connected
+// with sound in the last second, then running and connected, then running and fed by Spotify itself, then
+// connected but not started, so speed can be chosen before Spotify starts it.
+static Output *choose(void) {
+    uint64_t now = mach_absolute_time();
+    Output *best = NULL;
+    int bestRank = -1;
+    for (int i = 0; i < kMaxOutputs; i++) {
+        Output *output = &sg_outputs[i];
+        if (!atomic_load(&output->unit)) continue;
+        BOOL connected = atomic_load(&output->source) != NULL, running = atomic_load(&output->running);
+        if (!running && !connected) continue;
+        BOOL sounds = seconds(now - MAX(atomic_load(&output->loudAt), output->eventAt)) < kSilentFor;
+        int rank = running * 4 + connected * 2 + (running && connected && sounds);
+        if (rank > bestRank || (rank == bestRank && output->order > best->order)) {
+            best = output;
+            bestRank = rank;
+        }
+    }
+    return best;
+}
+
+// Hands the processors to the output that should have them; the watchers are told when they moved, or when
+// `always` (a start of the music's output, a format change on it).
+static void reselect(BOOL always, NSString *why) {
+    Output *previous = music(), *next = choose();
+    if (next != previous) {
+        disengage();
+        // The newest now, so it keeps the processors through a tie with the one it took them from.
+        if (next) markEvent(next);
+        atomic_store(&sg_music, next);
+        SGLog(@"audio: the processors move from %@ to %@%@", describe(previous), describe(next), why ? [@", " stringByAppendingString:why] : @"");
+    }
+    if (next != previous || always) {
+        tellWatchers();
+        applyToFormat();
+    }
+}
+
+static void checkSilence(void) {
+    pthread_mutex_lock(&sg_outputsLock);
+    int running = 0;
+    for (int i = 0; i < kMaxOutputs; i++) running += atomic_load(&sg_outputs[i].unit) && atomic_load(&sg_outputs[i].running);
+    if (running > 1) reselect(NO, [NSString stringWithFormat:@"its output silent for %.0f s while another has sound", kSilentFor]);
+    pthread_mutex_unlock(&sg_outputsLock);
+}
+
 static void formatChanged(void *refCon, AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope scope, AudioUnitElement element) {
     if (property != kAudioUnitProperty_StreamFormat || element != 0) return;
     if (scope != kAudioUnitScope_Input && scope != kAudioUnitScope_Output) return;
-    readFormat(unit);
-    applyToFormat();
+    // Off the thread setting it: settling may set the unit's connection, which is not done from inside its own listener.
+    Output *output = refCon;
+    dispatch_async(sg_outputsQueue, ^{
+        pthread_mutex_lock(&sg_outputsLock);
+        if (atomic_load(&output->unit) == unit) {
+            AudioStreamBasicDescription client, hardware;
+            settle(output, &client, &hardware);
+            SGLog(@"audio: output %p's format changed: Spotify's side %@, the hardware's %@", unit, formatText(&client), formatText(&hardware));
+            reselect(output == music(), nil);
+        }
+        pthread_mutex_unlock(&sg_outputsLock);
+    });
+}
+
+#pragma mark - Spotify's audio thread
+
+// A format or slice Spotify sets on a mixer feeding an output: settled again, the output's own listener
+// covering its side.
+static void sourceChanged(AudioUnit unit) {
+    pthread_mutex_lock(&sg_outputsLock);
+    for (int i = 0; i < kMaxOutputs; i++) {
+        Output *output = &sg_outputs[i];
+        AudioUnit outputUnit = atomic_load(&output->unit);
+        if (!outputUnit || atomic_load(&output->source) != unit) continue;
+        dispatch_async(sg_outputsQueue, ^{
+            pthread_mutex_lock(&sg_outputsLock);
+            AudioStreamBasicDescription client, hardware;
+            if (atomic_load(&output->unit) == outputUnit && atomic_load(&output->source) == unit) {
+                settle(output, &client, &hardware);
+                if (output == music()) applyToFormat();
+            }
+            pthread_mutex_unlock(&sg_outputsLock);
+        });
+    }
+    pthread_mutex_unlock(&sg_outputsLock);
+}
+
+static OSStatus setProperty(AudioUnit unit, AudioUnitPropertyID property, AudioUnitScope scope, AudioUnitElement element,
+                            const void *data, UInt32 size) {
+    if (property != kAudioUnitProperty_MakeConnection || scope != kAudioUnitScope_Input || element != 0 || !data
+        || size < sizeof(AudioUnitConnection) || !isRemoteIO(unit)) {
+        OSStatus status = sg_setProperty(unit, property, scope, element, data, size);
+        if (status == noErr && (property == kAudioUnitProperty_StreamFormat || property == kAudioUnitProperty_MaximumFramesPerSlice)) sourceChanged(unit);
+        return status;
+    }
+    const AudioUnitConnection *connection = data;
+    pthread_mutex_lock(&sg_outputsLock);
+    Output *output = outputFor(unit);
+    if (!output) {
+        pthread_mutex_unlock(&sg_outputsLock);
+        return sg_setProperty(unit, property, scope, element, data, size);
+    }
+    if (!connection->sourceAudioUnit) {
+        BOOL wasTaken = atomic_exchange(&output->taken, false);
+        atomic_store(&output->source, NULL);
+        waitFor(output);
+        if (wasTaken) {
+            AURenderCallbackStruct none = {0};
+            sg_setProperty(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &none, sizeof none);
+        }
+        SGLog(@"audio: Spotify disconnected output %p", unit);
+        OSStatus status = sg_setProperty(unit, property, scope, element, data, size);
+        reselect(NO, @"its output disconnected");
+        pthread_mutex_unlock(&sg_outputsLock);
+        return status;
+    }
+    // A new mixer: the old one's render, if any, ends first, and the new one's time starts at 0.
+    atomic_store(&output->taken, false);
+    atomic_store(&output->source, NULL);
+    waitFor(output);
+    output->sourceBus = connection->sourceOutputNumber;
+    output->sourceTime = 0;
+    atomic_store(&output->source, connection->sourceAudioUnit);
+    markEvent(output);
+    AudioStreamBasicDescription client, hardware;
+    // Spotify's connection is made too only when the callback cannot stand in for it.
+    NSString *why = settle(output, &client, &hardware);
+    OSStatus status = why ? sg_setProperty(unit, property, scope, element, data, size) : noErr;
+    SGLog(@"audio: Spotify connects mixer %p (bus %u) to output %p, %@%@", connection->sourceAudioUnit, (unsigned)connection->sourceOutputNumber,
+          unit, formatText(&client), why ? [@"; its own connection kept: " stringByAppendingString:why] : @"; fed through the mod's callback");
+    reselect(NO, @"Spotify connected it last");
+    pthread_mutex_unlock(&sg_outputsLock);
+    return status;
+}
+
+static OSStatus (*sg_startOutput)(AudioUnit unit);
+
+// The silence check, a couple of times a second from Spotify's first start; it returns at once unless two
+// outputs run.
+static void startChecking(void) {
+    static dispatch_once_t once;
+    static dispatch_source_t timer;   // kept, or it stops with its last reference
+    dispatch_once(&once, ^{
+        timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, sg_outputsQueue);
+        dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, 0), (uint64_t)(kCheckEvery * NSEC_PER_SEC), NSEC_PER_SEC / 10);
+        dispatch_source_set_event_handler(timer, ^{
+            checkSilence();
+        });
+        dispatch_resume(timer);
+    });
 }
 
 static OSStatus startOutput(AudioUnit unit) {
-    if (unit && isRemoteIO(unit)) {
-        readFormat(unit);
-        AudioUnitRemoveRenderNotify(unit, rendered, NULL);
-        AudioUnitAddRenderNotify(unit, rendered, NULL);
-        AudioUnitRemovePropertyListenerWithUserData(unit, kAudioUnitProperty_StreamFormat, formatChanged, NULL);
-        AudioUnitAddPropertyListener(unit, kAudioUnitProperty_StreamFormat, formatChanged, NULL);
-        applyToFormat();
+    if (!isRemoteIO(unit)) return sg_startOutput(unit);
+    pthread_mutex_lock(&sg_outputsLock);
+    Output *output = outputFor(unit);
+    if (output) {
+        startChecking();
+        AudioStreamBasicDescription client, hardware;
+        NSString *why = settle(output, &client, &hardware);
+        markEvent(output);
+        atomic_store(&output->running, true);
+        if (!output->listened) {
+            output->listened = YES;
+            AudioUnitAddRenderNotify(unit, rendered, output);
+            AudioUnitAddPropertyListener(unit, kAudioUnitProperty_StreamFormat, formatChanged, output);
+        }
+        // Every start of the music's output is told, so what holds sound from before the pause starts over.
+        reselect(music() == output, @"Spotify started it last");
+        AudioUnit source = atomic_load(&output->source);
+        SGLog(@"audio: output %p started: Spotify's side %@, the hardware's %@, %@; the processors are on %@", unit, formatText(&client),
+              formatText(&hardware), !source ? @"fed by Spotify itself" : why ? [NSString stringWithFormat:@"mixer %p through Spotify's connection (%@)", source, why]
+              : [NSString stringWithFormat:@"mixer %p through the mod's callback", source], music() == output ? @"this one" : describe(music()));
     }
+    pthread_mutex_unlock(&sg_outputsLock);
     return sg_startOutput(unit);
+}
+
+static OSStatus (*sg_stopOutput)(AudioUnit unit);
+
+static OSStatus stopOutput(AudioUnit unit) {
+    OSStatus status = sg_stopOutput(unit);
+    pthread_mutex_lock(&sg_outputsLock);
+    Output *output = outputOf(unit);
+    if (output && atomic_exchange(&output->running, false)) {
+        reselect(NO, @"its output stopped");
+        SGLog(@"audio: output %p stopped (Spotify's side %.0f Hz); the processors are on %@", unit, rateOf(&output->client), describe(music()));
+    }
+    pthread_mutex_unlock(&sg_outputsLock);
+    return status;
+}
+
+static OSStatus (*sg_dispose)(AudioComponentInstance unit);
+
+// Every output fed by the unit loses it, and the unit's own output is forgotten, before it goes; renders in
+// progress end first.
+static OSStatus disposeUnit(AudioComponentInstance unit) {
+    pthread_mutex_lock(&sg_outputsLock);
+    BOOL changed = NO;
+    for (int i = 0; i < kMaxOutputs; i++) {
+        Output *output = &sg_outputs[i];
+        AudioUnit outputUnit = atomic_load(&output->unit);
+        if (!outputUnit) continue;
+        if (outputUnit == unit) {
+            if (output == music()) disengage();
+            atomic_store(&output->running, false);
+            atomic_store(&output->source, NULL);
+            waitFor(output);
+            atomic_store(&output->unit, NULL);
+            SGLog(@"audio: output %p disposed (Spotify's side %.0f Hz)", unit, rateOf(&output->client));
+            changed = YES;
+        } else if (atomic_load(&output->source) == unit) {
+            atomic_store(&output->source, NULL);
+            waitFor(output);
+            SGLog(@"audio: mixer %p disposed, output %p plays silence until Spotify connects another", unit, outputUnit);
+            changed = YES;
+        }
+    }
+    if (changed) reselect(NO, @"a unit disposed");
+    // Under the lock, so its slot is not used again while its last render may still be running.
+    OSStatus status = sg_dispose(unit);
+    pthread_mutex_unlock(&sg_outputsLock);
+    return status;
 }
 
 #pragma mark - engaging the unit
 
-// Stops the render thread using a unit, and returns once it no longer is.
-static void disengage(void) {
-    atomic_store(&sg_engaged, false);
-    for (int i = 0; i < 200 && atomic_load(&sg_busy); i++) usleep(250);
-}
-
-// The unit for the output's format and the way in use, made when there is none or the format changed. A
+// The unit for the music's format and the way in use, made when there is none or the format changed. A
 // replaced one is never freed: the render thread may still hold it, and a format change is rare.
 static SGTimePitch *unitForFormat(void) {
-    BOOL pull = tapped();
-    Format *format = pull ? &sg_client : &sg_hardware;
+    Output *output = music();
+    if (!output) return NULL;
+    BOOL pull = atomic_load(&output->taken);
+    Format *format = pull ? &output->client : &output->hardware;
     double rate = rateOf(format);
     UInt32 channels = atomic_load(&format->channels);
-    if (pull) {
-        // In the chain the unit hands its buffers to the RemoteIO unit as they are: float, one per channel.
-        UInt32 flags = atomic_load(&format->flags);
-        BOOL canonical = (flags & kAudioFormatFlagIsFloat) && (flags & kAudioFormatFlagIsNonInterleaved) && atomic_load(&format->bytes) == 4;
-        if (!canonical) {
-            static int logged;
-            if (logged++ < 3) SGLog(@"redesign speed: the output is not float per channel (flags 0x%x), speed cannot apply", (unsigned)flags);
-            return NULL;
-        }
-    }
     if (rate <= 0 || channels < 1 || channels > kSGTimePitchMaxChannels) return NULL;
     _Atomic(SGTimePitch *) *slot = pull ? &sg_pull : &sg_inPlace;
     pthread_mutex_lock(&sg_buildLock);
@@ -445,7 +787,7 @@ static void apply(void) {
     SGTimePitch *unit = unitForFormat();
     if (!unit) {
         static int logged;
-        if (!normal && logged++ < 3) SGLog(@"redesign speed: Spotify's output has not started, nothing to change yet");
+        if (!normal && logged++ < 3) SGLog(@"redesign speed: Spotify's output has not started, or is in a format the unit does not take; nothing to change yet");
         return;
     }
     SGTimePitchSetRate(unit, tapped() ? sg_speed : 1);
@@ -458,7 +800,16 @@ static void apply(void) {
     switchIfAsked(unit);
 }
 
-#pragma mark - the menu's calls
+// A speed or pitch chosen before the output started, or kept across a new format or another output, applies
+// now: apply() makes the unit again when the rate or the channels changed, and puts it back in, reset, after
+// a change of output took it out.
+static void applyToFormat(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (sg_speed != 1 || sg_semitones != 0) apply();
+    });
+}
+
+#pragma mark - the calls
 
 double SGPlayerSpeed(void) {
     return sg_speed;
@@ -480,7 +831,7 @@ float SGPlayerPitch(void) {
 }
 
 void SGSetPlayerPitch(float semitones) {
-    if (!sg_startOutput && !tapped()) return;
+    if (!sg_reachable && !tapped()) return;
     sg_semitones = semitones;
     apply();
 }
@@ -497,7 +848,57 @@ void SGSetPlayerPitchFollowsSpeed(BOOL follows) {
 }
 
 BOOL SGPlayerPitchAvailable(void) {
-    return sg_startOutput != NULL || tapped();
+    return sg_reachable || tapped();
+}
+
+AudioUnit SGPlayerMusicOutput(void) {
+    Output *output = music();
+    return output ? atomic_load(&output->unit) : NULL;
+}
+
+BOOL SGPlayerMusicClientFormat(AudioStreamBasicDescription *format) {
+    pthread_mutex_lock(&sg_outputsLock);
+    AudioUnit unit = SGPlayerMusicOutput();
+    UInt32 size = sizeof *format;
+    BOOL read = unit && AudioUnitGetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, format, &size) == noErr;
+    pthread_mutex_unlock(&sg_outputsLock);
+    return read;
+}
+
+static void rebind(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        mach_timebase_info_data_t timebase;
+        mach_timebase_info(&timebase);
+        sg_secondsPerTick = (double)timebase.numer / timebase.denom / 1e9;
+        sg_outputsQueue = dispatch_queue_create("spotifyglass.outputs", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, 0));
+        if (!SGRebindImport("AudioUnitSetProperty", setProperty, (void **)&sg_setProperty) || !sg_setProperty) {
+            sg_setProperty = NULL;
+            SGLog(@"redesign speed: Spotify does not import AudioUnitSetProperty, the menu offers pitch only");
+        }
+        sg_reachable = SGRebindImport("AudioOutputUnitStart", startOutput, (void **)&sg_startOutput) && sg_startOutput;
+        if (!sg_reachable) {
+            SGLog(@"audio: Spotify does not import AudioOutputUnitStart, its output cannot be reached");
+            return;
+        }
+        if (!SGRebindImport("AudioOutputUnitStop", stopOutput, (void **)&sg_stopOutput) || !sg_stopOutput) sg_stopOutput = AudioOutputUnitStop;
+        if (!SGRebindImport("AudioComponentInstanceDispose", disposeUnit, (void **)&sg_dispose) || !sg_dispose) {
+            sg_dispose = AudioComponentInstanceDispose;
+            SGLog(@"audio: Spotify does not import AudioComponentInstanceDispose, a disposed output is not seen");
+        }
+    });
+}
+
+BOOL SGPlayerWatchMusicOutput(SGPlayerOutputWatcher watcher) {
+    rebind();
+    pthread_mutex_lock(&sg_outputsLock);
+    for (int i = 0; i < kMaxWatchers; i++) {
+        if (sg_watchers[i]) continue;
+        sg_watchers[i] = watcher;
+        break;
+    }
+    pthread_mutex_unlock(&sg_outputsLock);
+    return sg_reachable;
 }
 
 #pragma mark - Spotify's clock
@@ -512,14 +913,7 @@ BOOL SGPlayerPitchAvailable(void) {
 
 %ctor {
     storeFloat(&sg_speedBits, 1);
-    if (!SGRebindImport("AudioUnitSetProperty", setProperty, (void **)&sg_setProperty) || !sg_setProperty) {
-        sg_setProperty = NULL;
-        SGLog(@"redesign speed: Spotify does not import AudioUnitSetProperty, the menu offers pitch only");
-    }
-    if (!SGRebindImport("AudioOutputUnitStart", startOutput, (void **)&sg_startOutput) || !sg_startOutput) {
-        sg_startOutput = NULL;
-        SGLog(@"redesign speed: Spotify does not import AudioOutputUnitStart");
-    }
+    rebind();
     %init;
     SGRequireClasses(@[@"SPTPlayerState"]);
 }
