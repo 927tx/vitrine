@@ -12,3 +12,7 @@ extern NSString *const SGTabIconSet;   // SGTabIconSetSymbols (TabIcons.h) for a
 // `presets` carry Encore icons; those Spotify's router has nowhere to send are left out. `add` is given
 // the tab when Add is tapped, then the sheet goes; Cancel hands back nothing.
 void SGPresentAddTabSheet(UIViewController *owner, NSArray<NSDictionary *> *presets, void (^add)(NSDictionary *tab));
+// The same sheet as Edit Tab, over `tab` (the keys above): Save hands the tab back as it now is, and a Remove
+// Tab row under the rest runs `remove` once an action sheet has asked.
+void SGPresentEditTabSheet(UIViewController *owner, NSArray<NSDictionary *> *presets, NSDictionary *tab,
+                           void (^save)(NSDictionary *tab), void (^remove)(void));

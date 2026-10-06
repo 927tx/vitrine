@@ -11,6 +11,7 @@ xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-ar
     -I"$SRC" -I"$SRC/Shared/Navigation" -isysroot "$SDK" -Wno-deprecated-declarations \
     "$(dirname "$0")/main.m" "$(dirname "$0")/stubs.m" "$OUT/gen/Links.m" \
     "$SRC"/Shared/Navigation/AddTabSheet.m "$SRC"/Shared/Navigation/TabIcons.m \
+    "$SRC"/Redesigned/Navbar/NavbarSettings.m "$SRC"/Redesigned/Navbar/NavbarLayout.m \
     "$SRC"/Settings/SGPage.m "$SRC"/Settings/SGPageStyle.m \
     "$SRC"/Core/SGLog.m "$SRC"/Core/SGPrefs.m "$SRC"/Core/SGViewTree.m "$SRC"/Core/SGGlass.m \
     "$SRC"/Core/SGBackdrop.m "$SRC"/Core/SGFlagForce.m "$SRC"/Core/SGUIMode.m \

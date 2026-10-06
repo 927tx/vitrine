@@ -282,7 +282,8 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
                        @"Apple Music style shrinks the tab bar to two tabs as a page scrolls down and puts the now "
                        "playing bar between them; scrolling back up undoes it. There the bar keeps its cover, title "
-                       "and play button, and the device button too when it is on."), nil];
+                       "and play button, and the device button too when it is on. Apple Music style applies at once, the device button "
+                       "the next time the bar shrinks."), nil];
     [sections addObjectsFromArray:more];
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:SGRestartNote];
     page.showcase = showcase;

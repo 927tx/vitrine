@@ -45,5 +45,8 @@ void SGRSetTabBarMinimized(BOOL minimized, BOOL animated);
 // coordinates: where the now playing card goes. CGRectNull while the bar is not minimized or not on screen.
 CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height);
 
+// A tab's glyph as the glass bar draws it, white, filled when `active` (TabBar.x), for the Tab bar page.
+UIImage *SGRNavbarGlyph(NSDictionary *entry, BOOL active);
+
 UIViewController *SGRNavbarSettingsPage(void);   // the tab editor, in Mod Settings
 UIViewController *SGRNavbarEditorPage(void);     // the tab editor alone, for the welcome tour

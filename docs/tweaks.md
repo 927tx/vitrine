@@ -296,7 +296,7 @@ Redesigned:
                   bars the pages fade to half black (SGRBarFade, the stock bar's own subview). A page scrolled down
                   minimizes the bar to two circles, the first or current tab and the last, with the now playing card
                   between them, and a scroll back up, its top, another tab or the player brings it back
-                  (TabBarMinimize.x, MinimizeStep.h; the Navbar page's Minimize on scroll). Spotify's container is no
+                  (TabBarMinimize.x, MinimizeStep.h; the Player page's Apple Music style). Spotify's container is no
                   UITabBarController, so UIKit's tabBarMinimizeBehavior and bottomAccessory cannot do it. Laid out on
                   the Mac against harness/tabbar/ (`mini`), the scroll's steps checked by harness/tabbar/minimize-check.c
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
@@ -509,7 +509,7 @@ only when their feature first needs them, so 15 s after launch the log says how 
 it has asked for and which not yet (`flags: N overrides stored, …`), and an override asked for later
 gets its own line as it is asked (`flags: Spotify asked for <flag> only now, …`).
 
-The tab editor on the Navbar page is the exception and applies as soon as the bar lays out again. It lists the tabs in the order
+The tab editor on the Tab bar page is the exception and applies as soon as the bar lays out again. It lists the tabs in the order
 the bar shows them: drag to reorder, tap to hide or show, and Add a tab puts a page of Spotify's or
 any `spotify:` link on the bar. It is a sheet: a name, a link picked from Spotify's pages or pasted (one
 Spotify's router cannot open is refused there), and an icon picked from Encore's glyphs or the SF Symbols,
@@ -517,8 +517,15 @@ searchable. Split tabs sets chosen tabs apart at the right end of the bar: after
 on a glass bar of their own in the redesign, like Search in the Music app. Spotify's own tabs are kept by the
 name under their icon, so they can be hidden but never removed, and switching the app's language
 starts the order over. A tab of the mod's own opens its link through Spotify's link dispatcher, so it
-never lights up as the tab you are on. Hide labels, on the same page, leaves the glass bar with its
-icons alone and applies straight away too.
+never lights up as the tab you are on. In the redesign (Redesigned/Navbar/NavbarSettings.m) the page leads
+with a preview of the glass bar, drawn by the same system UITabBar as the bar itself from the list as it
+stands, the split tabs on a bar of their own, and changing with every change on the page; then Custom tab
+bar (off, the bar is Spotify's own tabs in Spotify's order, the list kept); two picture cards for the labels,
+Icons and names or Icons only (the glass bar's names hidden, applying straight away); the tabs, each with a
+check circle that shows or hides it, its glyph (TabBar.x draws Spotify's own off their items on the bar) and
+the drag handle, a tap on a tab of the mod's own opening the Add a Tab sheet as Edit Tab, with Save and Remove
+Tab; Add a tab and Use Spotify's tabs; and Split tabs. Spotify's own tabs keep their names and icons. Checked
+in the simulator against harness/addtab/ (`navbar`, `icons`, `off`, `hide`, `edit`, `remove`, `links`).
 
 ## Adding a feature
 

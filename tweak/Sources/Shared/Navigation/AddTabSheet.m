@@ -359,7 +359,7 @@ static void showProblem(UIViewController *page, NSString *title, NSString *messa
 typedef NS_ENUM(NSInteger, SGAddTabSection) {
     SGAddTabSectionName,
     SGAddTabSectionCustomize,
-    SGAddTabSectionCount,
+    SGAddTabSectionRemove,   // editing only
 };
 
 @interface SGAddTabPage : SGPage <UITextFieldDelegate>
@@ -370,7 +370,22 @@ typedef NS_ENUM(NSInteger, SGAddTabSection) {
     SGTabDraft *_draft;
     NSArray<NSDictionary *> *_presets;
     void (^_add)(NSDictionary *tab);
+    void (^_remove)(void);   // set while editing a tab, which the sheet then offers to remove
     UITextField *_name;
+}
+
+// The same sheet over a tab already on the bar: its name, link and icon filled in, Save in place of Add.
+- (instancetype)initWithTab:(NSDictionary *)tab presets:(NSArray<NSDictionary *> *)presets save:(void (^)(NSDictionary *tab))save remove:(void (^)(void))remove {
+    if (!(self = [self initWithPresets:presets add:save])) return nil;
+    self.title = @"Edit Tab";
+    _draft.title = tab[SGTabTitle];
+    _draft.uri = tab[SGTabURI];
+    _draft.icon = tab[SGTabIcon] ?: @"star";
+    _draft.symbols = [tab[SGTabIconSet] isEqual:SGTabIconSetSymbols];
+    // A link picked from the presets now leaves the name and the icon the tab has.
+    _draft.iconChosen = YES;
+    _remove = [remove copy];
+    return self;
 }
 
 - (instancetype)initWithPresets:(NSArray<NSDictionary *> *)presets add:(void (^)(NSDictionary *tab))add {
@@ -390,7 +405,7 @@ typedef NS_ENUM(NSInteger, SGAddTabSection) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel target:self action:@selector(cancel)];
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Add" style:UIBarButtonItemStyleDone target:self action:@selector(addTab)];
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:_remove ? @"Save" : @"Add" style:UIBarButtonItemStyleDone target:self action:@selector(addTab)];
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
 
     _name = [UITextField new];
@@ -438,19 +453,20 @@ typedef NS_ENUM(NSInteger, SGAddTabSection) {
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table {
-    return SGAddTabSectionCount;
+    return _remove ? 3 : 2;
 }
 
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    return section == SGAddTabSectionName ? 1 : 2;
+    return section == SGAddTabSectionCustomize ? 2 : 1;
 }
 
 - (UIView *)tableView:(UITableView *)table viewForHeaderInSection:(NSInteger)section {
+    if (section == SGAddTabSectionRemove) return nil;
     return SGSectionHeader(table, section == SGAddTabSectionName ? @"Name" : @"Customize");
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return SGSectionHeaderHeight;
+    return section == SGAddTabSectionRemove ? SGSectionGap : SGSectionHeaderHeight;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {
@@ -474,6 +490,13 @@ typedef NS_ENUM(NSInteger, SGAddTabSection) {
         }
         return cell;
     }
+    if (path.section == SGAddTabSectionRemove) {
+        UITableViewCell *cell = SGDequeueCell(table, @"remove");
+        SGFillCell(cell, @"Remove Tab", nil, SGRed(), nil);
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+        cell.accessibilityTraits = UIAccessibilityTraitButton;
+        return cell;
+    }
     UITableViewCell *cell = SGDequeueCell(table, @"customize");
     if (path.row == 0) {
         SGFillCell(cell, @"Link", _draft.uri ?: @"Choose a page or paste a link", nil, @"link");
@@ -488,6 +511,10 @@ typedef NS_ENUM(NSInteger, SGAddTabSection) {
 
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path {
     [table deselectRowAtIndexPath:path animated:YES];
+    if (path.section == SGAddTabSectionRemove) {
+        [self confirmRemove];
+        return;
+    }
     if (path.section != SGAddTabSectionCustomize) {
         [_name becomeFirstResponder];
         return;
@@ -498,21 +525,46 @@ typedef NS_ENUM(NSInteger, SGAddTabSection) {
     [self.navigationController pushViewController:page animated:YES];
 }
 
+// The tab, its link and its icon go with it, so the sheet asks first.
+- (void)confirmRemove {
+    NSString *name = _draft.title.length ? _draft.title : @"this tab";
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:[NSString stringWithFormat:@"Remove %@ from the tab bar?", name]
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Remove Tab" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+        void (^remove)(void) = self->_remove;
+        [self.presentingViewController dismissViewControllerAnimated:YES completion:nil];
+        if (remove) remove();
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    alert.popoverPresentationController.sourceView = [self.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:SGAddTabSectionRemove]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 @end
 
-void SGPresentAddTabSheet(UIViewController *owner, NSArray<NSDictionary *> *presets, void (^add)(NSDictionary *tab)) {
-    SGAddTabPage *page = [[SGAddTabPage alloc] initWithPresets:presets add:add];
+static void presentSheet(UIViewController *owner, SGAddTabPage *page) {
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:page];
     // Outside Spotify's own stacks the sheet would take the system's appearance, light in light mode.
     nav.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     UISheetPresentationController *sheet = nav.sheetPresentationController;
-    // Tall enough for the name and the two rows under the navigation bar; the keyboard lifts it.
+    // Tall enough for the name and the two rows under the navigation bar, and Remove Tab while editing; the
+    // keyboard lifts it.
+    CGFloat height = [page numberOfSectionsInTableView:page.tableView] > 2 ? 400 : 320;
     UISheetPresentationControllerDetent *compact = [UISheetPresentationControllerDetent customDetentWithIdentifier:kCompactDetent resolver:^CGFloat(id<UISheetPresentationControllerDetentResolutionContext> context) {
-        return MIN(320, context.maximumDetentValue);
+        return MIN(height, context.maximumDetentValue);
     }];
     sheet.detents = @[compact, UISheetPresentationControllerDetent.largeDetent];
     sheet.selectedDetentIdentifier = kCompactDetent;
     sheet.prefersGrabberVisible = YES;
     sheet.prefersScrollingExpandsWhenScrolledToEdge = YES;
     [owner presentViewController:nav animated:YES completion:nil];
+}
+
+void SGPresentAddTabSheet(UIViewController *owner, NSArray<NSDictionary *> *presets, void (^add)(NSDictionary *tab)) {
+    presentSheet(owner, [[SGAddTabPage alloc] initWithPresets:presets add:add]);
+}
+
+void SGPresentEditTabSheet(UIViewController *owner, NSArray<NSDictionary *> *presets, NSDictionary *tab,
+                           void (^save)(NSDictionary *tab), void (^remove)(void)) {
+    presentSheet(owner, [[SGAddTabPage alloc] initWithTab:tab presets:presets save:save remove:remove]);
 }

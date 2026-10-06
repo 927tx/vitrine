@@ -16,6 +16,7 @@
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Settings/SGPage.h"
 #import "Headers/SPTEncoreIconView.h"
+#import "Shared/Navigation/TabIcons.h"
 #import <objc/message.h>
 
 static char kBarKey, kApartBarKey, kHostKey, kFadeKey;
@@ -137,6 +138,27 @@ static UIImage *glyphOf(UIView *item, BOOL active) {
     }
     // Tabs of the mod's own draw a UIImageView, or an icon Encore would not draw off screen.
     return size.width >= 2 ? renderLayer(live.layer, size) : nil;
+}
+
+// For the Tab bar page's list and preview: a tab of Spotify's drawn from its item on the bar, hidden or not,
+// found by the label its entry is named after; a tab of the mod's own drawn from its entry, as Navbar.x
+// draws it on the bar. Nil while Spotify's item has not been built.
+UIImage *SGRNavbarGlyph(NSDictionary *entry, BOOL active) {
+    if (entry[SGRNavbarURI]) {
+        UIView *holder = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 24, 24)];
+        UIView *icon = SGTabIconView(entry[SGRNavbarIcon], [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols], UIColor.whiteColor);
+        icon.translatesAutoresizingMaskIntoConstraints = YES;
+        icon.frame = holder.bounds;
+        if ([icon isKindOfClass:UIImageView.class]) icon.contentMode = UIViewContentModeScaleAspectFit;
+        [holder addSubview:icon];
+        [holder layoutIfNeeded];
+        return glyphOf(holder, active);
+    }
+    for (UIView *item in SGRowIn(sg_stockBar).arrangedSubviews) {
+        if ([NSStringFromClass(item.class) isEqualToString:@"SGRTabItemView"]) continue;
+        if ([labelIn(item).text isEqualToString:entry[SGRNavbarID]]) return glyphOf(item, active);
+    }
+    return nil;
 }
 
 #pragma mark - passing a tap on
