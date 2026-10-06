@@ -12,6 +12,7 @@
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/LyricsSources/LyricsSources.h"
 #import "Shared/Sing/Sing.h"
+#import "Shared/Player/PlayerState.h"
 #import "Headers/SPTPlayer.h"
 #import <mach-o/dyld.h>
 #import <objc/runtime.h>
@@ -470,20 +471,42 @@ static void prefetch(SPTPlayerTrack *track, NSString *trackID, SPTPlayerState *s
     SGLyricsPrefetch(nextID);
 }
 
+// A state the player reported or was asked for: a new track is remembered and its walk begun. From the
+// -state hook on any thread, and from the player's own reports on the main one.
+static void seen(SPTPlayerState *state) {
+    SPTPlayerTrack *track = state.track;
+    if (!track || track == sg_lastSeen) return;
+    NSString *trackID = nil;
+    @synchronized (sg_seenTracks) {
+        if (track == sg_lastSeen) return;
+        sg_lastSeen = track;
+        trackID = idOf(track);
+        if (!trackID || [trackID isEqualToString:sg_lastSeenID]) return;
+        sg_lastSeenID = trackID;
+    }
+    remember(track, trackID);
+    prefetch(track, trackID, state);
+}
+
+// The -state hook runs only when something asks the player, which nothing may do with the app in the
+// background and nothing on screen. The player's own reports come there too, so the next track's walk
+// begins as it starts and its lines are in for the lock screen.
+@interface SGKaraokeTrackWatcher : NSObject <SGPlayerStateObserver>
+@end
+
+@implementation SGKaraokeTrackWatcher
+- (void)playerStateDidChange:(SPTPlayerState *)state {
+    seen(state);
+}
+@end
+
+static SGKaraokeTrackWatcher *sg_trackWatcher;
+
 %hook SPTEsperantoPlayer
 - (id)state {
     if (!sg_player) sg_player = self;
     SPTPlayerState *state = %orig;
-    SPTPlayerTrack *track = state.track;
-    if (track && track != sg_lastSeen) {
-        sg_lastSeen = track;
-        NSString *trackID = idOf(track);
-        if (trackID && ![trackID isEqualToString:sg_lastSeenID]) {
-            sg_lastSeenID = trackID;
-            remember(track, trackID);
-            prefetch(track, trackID, state);
-        }
-    }
+    seen(state);
     return state;
 }
 %end
@@ -567,6 +590,17 @@ static void prefetch(SPTPlayerTrack *track, NSString *trackID, SPTPlayerState *s
         SGKaraokeRequestLyrics(playing);
         announce(playing);
     }];
+    // Spotify asks for a track's lyrics only while a page of its own shows them, so a track the player
+    // moved on to in the background came back to the app with none, and the redesign's lyrics, which
+    // ask for nothing themselves, stayed empty. They are asked for here as the app becomes active again,
+    // which also follows Control Center, a call or Siri without the background.
+    [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil
+                                                usingBlock:^(NSNotification *note) {
+        NSString *playing = SGKaraokePlayingTrack();
+        if (playing && !sg_lyrics[playing] && !SGKaraokeLooking(playing)) SGKaraokeRequestLyrics(playing);
+    }];
+    sg_trackWatcher = [SGKaraokeTrackWatcher new];
+    SGAddPlayerStateObserver(sg_trackWatcher);
     %init;
     SGLog(@"karaoke: on");
     SGRequireClasses(@[
