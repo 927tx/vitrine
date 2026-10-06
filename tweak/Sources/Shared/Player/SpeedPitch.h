@@ -13,12 +13,8 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
 
-// Marks a menu opened soon after a tap on `button`, the player's more button, as the player's, so it gets
-// Speed and pitch (watching it twice does nothing). The redesign's PlayerHeader.x hands its button over;
-// a menu presented from a now playing controller is taken for the player's without it, which is how the
-// native look's player gets the block.
-void SGPlayerMenuWatchMoreButton(UIView *button);
-// Whether a context menu sheet is the player's, by the same test; decided once per menu.
+// Whether a context menu sheet is the player's ⋯ card: the first to come up within a few seconds of a tap on
+// the player's more button (SpeedPitchMenu.x watches it under either look); decided once per menu.
 BOOL SGPlayerMenuIsPlayers(UIViewController *menu);
 // Whether the sheet is shown as the system menu instead, unseen under it (Redesigned/ContextMenu), whose own
 // items then stand in for the block, which stays out of it. Defined by the redesign; NO under the native look

@@ -1,8 +1,10 @@
-// Spotify's context menu sheet mocked under its class name, presented from a now playing controller,
-// so SpeedPitchMenu.x's hook adds Speed and pitch the way it would on the phone.
+// Spotify's context menu sheet mocked under its class name, presented from a now playing controller on a tap
+// of the player's more button, so SpeedPitchMenu.x's hook adds Speed and pitch the way it would on the phone.
+// `sleep` opens a second sheet from the first, as the ⋯ card's Sleep timer does, and `notap` one with no tap:
+// neither may get the block.
 //
 //     THEOS=$HOME/theos ./build.sh && xcrun simctl install <udid> build/MenuHarness.app
-//     xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open] [animated]
+//     xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open] [animated] [sleep] [notap]
 //
 // The plain run opens the menu at 1 s, opens the block at 3 s, moves the sliders at 5 s, checks what the
 // block says at 6 s (PASS or FAIL lines), closes the block at 7 s and checks its row at 8 s. `loading` builds the sheet the way Spotify's is (the ivars of ContextMenuViewController in
@@ -190,13 +192,36 @@ static NSArray<NSArray<NSString *> *> *spotifyRows(void) {
 
 #pragma mark - the player
 
+// The player's header row (NowPlaying_ModesImpl.HeaderElementsUnit), its more button an Encore button with
+// the identifier "Context menu" (trees/lyrics.txt:183), which SpeedPitchMenu.x finds and watches.
+@interface _TtC20NowPlaying_ModesImpl18HeaderElementsUnit : UIViewController
+@property (nonatomic, strong) UIButton *more;
+@end
+
+@implementation _TtC20NowPlaying_ModesImpl18HeaderElementsUnit
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.more = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.more setImage:[UIImage systemImageNamed:@"ellipsis"] forState:UIControlStateNormal];
+    self.more.frame = CGRectMake(330, 0, 48, 48);
+    self.more.accessibilityIdentifier = @"Context menu";
+    [self.view addSubview:self.more];
+}
+@end
+
 @interface NowPlayingHarnessViewController : UIViewController
+@property (nonatomic, strong) _TtC20NowPlaying_ModesImpl18HeaderElementsUnit *header;
 @end
 
 @implementation NowPlayingHarnessViewController
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor colorWithRed:0.25 green:0.1 blue:0.2 alpha:1];
+    self.header = [_TtC20NowPlaying_ModesImpl18HeaderElementsUnit new];
+    [self addChildViewController:self.header];
+    self.header.view.frame = CGRectMake(0, 60, 402, 48);
+    [self.view addSubview:self.header.view];
+    [self.header didMoveToParentViewController:self];
 }
 @end
 
@@ -321,7 +346,9 @@ static void tapRow(UIViewController *menu) {
     static SGHarnessFrameWatch *watch;
     __block _TtC24ContextMenu_InternalImpl25ContextMenuViewController *menu;
     BOOL loading = argument(@"loading"), stuck = argument(@"stuck");
+    // Spotify's ⋯ card, put up by a tap on the player's more button: the tap first, as a finger lifting off it.
     void (^present)(void) = ^{
+        [player.header.more sendActionsForControlEvents:UIControlEventTouchUpInside];
         menu = [_TtC24ContextMenu_InternalImpl25ContextMenuViewController new];
         UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:menu];
         navigation.navigationBarHidden = YES;
@@ -331,6 +358,35 @@ static void tapRow(UIViewController *menu) {
         [[CADisplayLink displayLinkWithTarget:watch selector:@selector(tick:)] addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
         [player presentViewController:navigation animated:YES completion:nil];
     };
+    if (argument(@"sleep") || argument(@"notap")) {
+        // `sleep`: the ⋯ card's Sleep timer row opens a context menu sheet of its own in the card, with no tap
+        // on the more button; it must stay Spotify's. `notap`: a sheet the player puts up with no tap at all.
+        BOOL sleep = argument(@"sleep");
+        after(1, ^{
+            if (sleep) {
+                present();
+                return;
+            }
+            menu = [_TtC24ContextMenu_InternalImpl25ContextMenuViewController new];
+            [player presentViewController:[[UINavigationController alloc] initWithRootViewController:menu] animated:YES completion:nil];
+        });
+        if (!sleep) {
+            after(3, ^{ check(!findBlock(menu.view), @"a sheet the player put up with no tap on ⋯ has no Speed and pitch"); });
+            return;
+        }
+        __block UIViewController *card;
+        after(3, ^{
+            card = menu;
+            check(findBlock(card.view) != nil, @"the ⋯ card has Speed and pitch");
+            menu = [_TtC24ContextMenu_InternalImpl25ContextMenuViewController new];
+            [card.navigationController pushViewController:menu animated:YES];
+        });
+        after(5, ^{
+            check(menu.view.window && menu.navigationController.presentingViewController == player, @"the sleep timer sheet is up, presented from the player");
+            check(!findBlock(menu.view), @"the sleep timer sheet has no Speed and pitch");
+        });
+        return;
+    }
     if (argument(@"animated")) {
         void (^where)(NSString *) = ^(NSString *when) {
             UIView *block = findBlock(menu.view);

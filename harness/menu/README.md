@@ -1,12 +1,13 @@
 # Menu harness
 
 Spotify's context menu sheet (`ContextMenu_InternalImpl.ContextMenuViewController`) mocked under its
-class name and presented from a now playing controller, so `SpeedPitchMenu.x`'s hook adds Speed and
-pitch the way it would on the phone. Speed and pitch themselves are stubs that log.
+class name and presented from a now playing controller on a tap of the player's more button (a mock
+`NowPlaying_ModesImpl.HeaderElementsUnit` holding a button with the identifier `Context menu`), so
+`SpeedPitchMenu.x`'s hooks find the button and add Speed and pitch the way they would on the phone. Speed and pitch themselves are stubs that log.
 
     THEOS=$HOME/theos ./build.sh
     xcrun simctl install <udid> build/MenuHarness.app
-    xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open] [animated]
+    xcrun simctl launch --console-pty <udid> com.vojta.menuharness [footer] [nospeed] [loading] [stuck] [open] [animated] [sleep] [notap]
 
 It has a scene delegate, so it runs on the iOS 27 simulator as well as 26. The mod's own lines
 (`SGLog`) go to the unified log: `xcrun simctl spawn <udid> log stream --predicate 'eventMessage CONTAINS "[spotifyglass]"'`.
@@ -29,6 +30,10 @@ the Pitch and the row read "−3 st".
 - `animated` offers the redesign's Animated artwork switch (stubbed): it flips the switch with the block
   closed and again with it open, and reports where its row sits each time, `PASS` when the row is inside
   the block and the switch shows what was set.
+
+- `sleep` opens the ⋯ card, checks it has the block, then pushes a second sheet into it with no tap, as
+  the card's Sleep timer row does: `PASS` when that sheet has no block.
+- `notap` presents a sheet from the player with no tap on the more button: `PASS` when it has no block.
 
 For the first second the block is on screen, every frame is checked for anything it draws in the
 system tint (`tint check: 0 of the block's first N frames ...`).

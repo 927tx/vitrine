@@ -10,11 +10,12 @@
 // follow.
 //
 // Only the menu the player's more button opens gets it: the button (id=Context menu,
-// trees/lyrics.txt:183, an Encore Tertiary button) is watched from the redesign's PlayerHeader.x, and a
-// menu shown within a few seconds of its tap, or presented from a now playing controller, is the
-// player's. Under the native look nothing hands the button over, so the block rides on the second test
-// alone, the presenter being Spotify's own now playing controller. The first time, the menu's structure
-// is logged, since no recorded tree shows it yet.
+// trees/lyrics.txt:183, an Encore Tertiary button in NowPlaying_ModesImpl.HeaderElementsUnit) is watched
+// from here under either look, and the first menu that comes up within a few seconds of its tap is the
+// player's. The presenter is not a test: every sheet the player puts up comes from its
+// NowPlayingOverlayContainer, the ⋯ card's own pages too (its Sleep timer is a context menu sheet of its own,
+// which took the block as well, "tapped 0" in the log). The first time, the menu's structure is logged,
+// since no recorded tree shows it yet.
 //
 // The block is drawn from its own measures and type (below), not from the redesign's Kit, so it sits on
 // Spotify's sheet under either look.
@@ -522,7 +523,7 @@ static NSString *pitchText(float pitch) {
 }
 @end
 
-void SGPlayerMenuWatchMoreButton(UIView *button) {
+static void watchMoreButton(UIView *button) {
     if (!button || objc_getAssociatedObject(button, &kWatchedKey)) return;
     static SGMoreTapWatcher *watcher;
     if (!watcher) watcher = [SGMoreTapWatcher new];
@@ -540,16 +541,6 @@ void SGPlayerMenuWatchMoreButton(UIView *button) {
 }
 
 #pragma mark - the menu
-
-// The presenter or one of its parents is a now playing controller. Only the chain up is looked at: the
-// root's children include the now playing bar's, which every menu would match.
-static BOOL presentedFromPlayer(UIViewController *menu) {
-    UIViewController *presenter = menu.navigationController.presentingViewController ?: menu.presentingViewController;
-    for (UIViewController *vc = presenter; vc; vc = vc.parentViewController) {
-        if ([NSStringFromClass(vc.class) containsString:@"NowPlaying"]) return YES;
-    }
-    return NO;
-}
 
 static void logStructure(UIView *view, int depth, NSMutableString *out) {
     if (depth > 6 || out.length > 3000) return;
@@ -576,13 +567,12 @@ static UITableView *findTable(UIView *root, int depth) {
 static BOOL isPlayerMenu(UIViewController *menu) {
     NSNumber *decided = objc_getAssociatedObject(menu, &kDecidedKey);
     if (decided) return decided.boolValue;
-    BOOL tapped = sg_moreTappedAt && CACurrentMediaTime() - sg_moreTappedAt < kMenuAfterTap;
-    BOOL fromPlayer = presentedFromPlayer(menu);
-    BOOL ours = tapped || fromPlayer;
-    if (tapped) sg_moreTappedAt = 0;
+    // The tap is used up by the menu it opened, so a sheet that menu opens in turn is not taken for it.
+    BOOL ours = sg_moreTappedAt && CACurrentMediaTime() - sg_moreTappedAt < kMenuAfterTap;
+    if (ours) sg_moreTappedAt = 0;
     objc_setAssociatedObject(menu, &kDecidedKey, @(ours), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     UIViewController *presenter = menu.navigationController.presentingViewController ?: menu.presentingViewController;
-    SGLog(@"speed and pitch: a context menu, %@ (tapped %d, presented by %@)", ours ? @"the player's" : @"not the player's", tapped,
+    SGLog(@"speed and pitch: a context menu, %@ (tapped %d, presented by %@)", ours ? @"the player's" : @"not the player's", ours,
           presenter ? NSStringFromClass(presenter.class) : @"nothing");
     return ours;
 }
@@ -704,6 +694,22 @@ static void install(UIViewController *menu) {
     }
 }
 
+// The player's header row: its more button found by its identifier and watched, under either look.
+%hook _TtC20NowPlaying_ModesImpl18HeaderElementsUnit
+- (void)viewDidLayoutSubviews {
+    %orig;
+    UIView *row = ((UIViewController *)self).viewIfLoaded;
+    static __weak UIView *watched;
+    if (watched && [watched isDescendantOfView:row]) return;
+    __block UIView *more = nil;
+    SGForEachView(row, ^(UIView *view) {
+        if (!more && [view.accessibilityIdentifier isEqualToString:@"Context menu"]) more = view;
+    });
+    watchMoreButton(more);
+    if (more) watched = more;
+}
+%end
+
 %hook _TtC24ContextMenu_InternalImpl25ContextMenuViewController
 - (void)viewDidLayoutSubviews {
     %orig;
@@ -720,5 +726,5 @@ static void install(UIViewController *menu) {
 
 %ctor {
     %init;
-    SGRequireClasses(@[@"_TtC24ContextMenu_InternalImpl25ContextMenuViewController"]);
+    SGRequireClasses(@[@"_TtC24ContextMenu_InternalImpl25ContextMenuViewController", @"_TtC20NowPlaying_ModesImpl18HeaderElementsUnit"]);
 }
