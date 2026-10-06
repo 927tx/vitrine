@@ -9,8 +9,8 @@ looked at on the Mac without the phone.
     SIMCTL_CHILD_HARNESS_SCENARIO=artwork xcrun simctl launch --console-pty <udid> com.vojta.playerharness
     xcrun simctl io <udid> screenshot shot.png
 
-Launch it on an iOS 26 simulator by UDID. The iOS 27 runtime kills an app that has a scene manifest but
-no scene delegate. `SRC=<another checkout>/tweak/Sources OUT=<dir> ./build.sh` builds it against other
+Launch it on a simulator by UDID; it has a scene delegate (`../scene.m`), so the iOS 27 runtime runs it
+too. `SRC=<another checkout>/tweak/Sources OUT=<dir> ./build.sh` builds it against other
 sources, for example an older commit, to see a bug before its fix.
 
 `build.sh` runs `logos.pl -c generator=internal` over `PlayerLyrics.x`, `PlayerArtwork.x`,
@@ -39,6 +39,18 @@ come late, out of order, or not at all.
   the safe area with a grabber, where the sheet before it covered the whole screen. It also logs that the
   window comes up clear and fades in, dark, that every button has a label and 44pt, and at 22 s that
   VoiceOver's escape takes the screen away and gives the key back to the player.
+- `scroll` moves the list up and down in code and logs whether it stayed at its top, then scrubs a mock of
+  the progress bar's slider in code (issue #172): the list's pan off while it tracks, back at its end, at a
+  cancel and when the slider leaves the window, and a pan that was off already left off. The log ends
+  with `scrub checks: ... -- PASS` or `FAIL`.
+- `cover` is issue #77. The cover is checked untouched first, then given Spotify's layout for a track with
+  lyrics, a smaller cover over the lyric preview, and must take its room back as a centred square the
+  Kit also reports. The log ends with `cover checks: n of 4 right -- PASS` or `FAIL`.
+- `immersive` opens the lyrics and waits past the rest: only the bottom stack under the title row
+  (progress bar, buttons, volume row, footer) fades, the lines grow down only, a touch where the buttons
+  were lands on the lines, the thumbnail takes its own, and the lines' tap is off. Then the tap that
+  wakes them (fired in code), a scroll that hides them again and the thumbnail closing the lyrics. The
+  log ends with `immersive checks: n of 10 right -- PASS` or `FAIL`.
 - `badge` shows the hold's 2× badge on the cover by hand, holds again while it fades out and lets go.
   The log ends with `badge checks: n of 3 right -- PASS` or `FAIL`.
 
