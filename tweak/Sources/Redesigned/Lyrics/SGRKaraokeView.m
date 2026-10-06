@@ -44,6 +44,12 @@ static const double kFloatMinMs = 700, kFloatLeadMs = 80;   // a short word stil
 // word and fades over kGlowFadeMs after it.
 static const double kGlowFromMs = 900, kGlowFullMs = 2400, kGlowFadeMs = 450;
 static const CGFloat kGlowRadius = 9, kGlowOpacity = 0.85;
+// A word held long enough to glow lifts its letters one after another as the sweep reaches each, a wave
+// running through it, as high as this share of the font for the word held longest: a letter starts up a
+// little before the sweep's edge reaches its middle and is up over this share of the word's time. They come
+// down with the glow once the word is sung, and the wave is left out under Reduce Motion.
+static const CGFloat kWaveShare = 0.1;
+static const double kWaveLead = 0.08, kWaveSpan = 0.3;
 // A line lit whole: how long its words take to come up to full white, and to float up together.
 static const NSTimeInterval kWholeFade = 0.35;
 static const double kWholeRiseMs = 900;
@@ -132,7 +138,7 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
 // from the edge its script starts at.
 @interface SGRKaraokeWordView : UIView
 @property (nonatomic, readonly) SGKaraokeWord *word;
-@property (nonatomic, readonly) UILabel *lit;
+@property (nonatomic, readonly) UIView *lit;   // a label, or for a word that waves a view of its letters
 @property (nonatomic) CGFloat offset;   // where the word starts along its line, rows laid end to end
 // Lit with the rest of its line at once rather than swept, and floated up with it over riseStart to
 // riseEnd, which are the word's own times until the sweep says otherwise.
@@ -149,6 +155,24 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     CAGradientLayer *_fill;
     CGFloat _filled, _lift, _glow;
     BOOL _rightToLeft;
+    // A word that waves: its letters, dim and lit, each letter's middle as a share of the word's width,
+    // and how high each is lifted now.
+    NSArray<UILabel *> *_dimLetters, *_litLetters;
+    CGFloat *_letterAt, *_letterLift;
+    CGFloat _waveHeight;
+}
+
+// The word set letter by letter, each where the whole word would put it, in a view the word's size.
+static UIView *lettersOf(NSArray<NSString *> *letters, NSArray<NSNumber *> *xs, UIFont *font, UIColor *color, CGSize size,
+                         NSMutableArray<UILabel *> *made) {
+    UIView *run = [[UIView alloc] initWithFrame:(CGRect){CGPointZero, size}];
+    for (NSUInteger i = 0; i < letters.count; i++) {
+        CGFloat x = xs[i].doubleValue, next = i + 1 < xs.count ? xs[i + 1].doubleValue : size.width;
+        UILabel *label = wordLabel(letters[i], font, color, CGRectMake(x, 0, ceil(next - x) + 2, size.height), NO);
+        [run addSubview:label];
+        [made addObject:label];
+    }
+    return run;
 }
 
 - (instancetype)initWithWord:(SGKaraokeWord *)word font:(UIFont *)font rightToLeft:(BOOL)rightToLeft {
@@ -159,8 +183,35 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     _riseStart = word.start;
     _riseEnd = word.end;
     _rightToLeft = rightToLeft;
-    [self addSubview:wordLabel(word.text, font, [UIColor colorWithWhite:1 alpha:kDimAlpha], self.bounds, rightToLeft)];
-    _lit = wordLabel(word.text, font, UIColor.whiteColor, self.bounds, rightToLeft);
+    // Only a word held long enough to glow waves, and only one written left to right: a script that joins
+    // its letters, as Arabic does, cannot be set a letter at a time.
+    NSMutableArray<NSString *> *letters = [NSMutableArray array];
+    NSMutableArray<NSNumber *> *xs = [NSMutableArray array];
+    if (word.end - word.start >= kGlowFromMs && !rightToLeft && !SGRReduceMotion()) {
+        NSDictionary *attributes = @{NSFontAttributeName: font};
+        [word.text enumerateSubstringsInRange:NSMakeRange(0, word.text.length) options:NSStringEnumerationByComposedCharacterSequences
+                                   usingBlock:^(NSString *letter, NSRange range, NSRange enclosing, BOOL *stop) {
+            [letters addObject:letter];
+            [xs addObject:@([[word.text substringToIndex:range.location] sizeWithAttributes:attributes].width)];
+        }];
+    }
+    if (letters.count > 1) {
+        NSMutableArray<UILabel *> *dim = [NSMutableArray array], *lit = [NSMutableArray array];
+        [self addSubview:lettersOf(letters, xs, font, [UIColor colorWithWhite:1 alpha:kDimAlpha], self.bounds.size, dim)];
+        _lit = lettersOf(letters, xs, font, UIColor.whiteColor, self.bounds.size, lit);
+        _dimLetters = dim;
+        _litLetters = lit;
+        _letterAt = calloc(letters.count, sizeof(CGFloat));
+        _letterLift = calloc(letters.count, sizeof(CGFloat));
+        for (NSUInteger i = 0; i < letters.count; i++) {
+            CGFloat next = i + 1 < xs.count ? xs[i + 1].doubleValue : size.width;
+            _letterAt[i] = (xs[i].doubleValue + next) / 2 / MAX(size.width, 1);
+        }
+        _waveHeight = font.pointSize * kWaveShare;
+    } else {
+        [self addSubview:wordLabel(word.text, font, [UIColor colorWithWhite:1 alpha:kDimAlpha], self.bounds, rightToLeft)];
+        _lit = wordLabel(word.text, font, UIColor.whiteColor, self.bounds, rightToLeft);
+    }
     // Hidden until the line is sung: a masked layer is drawn offscreen every frame even when the
     // mask leaves nothing of it, and a song has hundreds of words waiting their turn.
     _lit.hidden = YES;
@@ -176,6 +227,11 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     _filled = NAN;
     [self fillTo:-CGFLOAT_MAX];
     return self;
+}
+
+- (void)dealloc {
+    free(_letterAt);
+    free(_letterLift);
 }
 
 // The cursor is in line units and the feathered edge is centred on it, so the edge runs on through
@@ -199,9 +255,15 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     double x = MAX(0, ms - _riseStart + kFloatLeadMs) / MAX(_riseEnd - _riseStart, kFloatMinMs) * 5;
     CGFloat lift = kLift * (1 - (1 + x) * exp(-x));
     [self glowAt:ms];
+    [self waveAt:ms];
     if (lift == _lift) return;
     _lift = lift;
     self.transform = CGAffineTransformMakeTranslation(0, -lift);
+}
+
+// How strongly a held word glows and waves: from a quarter for the shortest that does, to all of it.
+static double heldStrength(double held) {
+    return MIN(1, (held - kGlowFromMs) / (kGlowFullMs - kGlowFromMs) + 0.25);
 }
 
 // A held word glows, the more the longer it is held: white light around the lit part of it, since the
@@ -210,7 +272,7 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     double held = _word.end - _word.start;
     CGFloat glow = 0;
     if (held >= kGlowFromMs && !_whole) {
-        double strength = MIN(1, (held - kGlowFromMs) / (kGlowFullMs - kGlowFromMs) + 0.25);
+        double strength = heldStrength(held);
         double envelope = ms < _word.start ? 0
                         : ms <= _word.end ? (ms - _word.start) / held
                         : MAX(0, 1 - (ms - _word.end) / kGlowFadeMs);
@@ -228,6 +290,24 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     [CATransaction commit];
 }
 
+// Each letter comes up on a smoothstep as the sweep nears it and stays up while the word is held, so a
+// crest runs through the word with the sweep; once it is sung they all come down as the glow fades.
+- (void)waveAt:(double)ms {
+    if (!_litLetters || _whole) return;
+    double held = _word.end - _word.start, along = (ms - _word.start) / held;
+    double fade = ms <= _word.end ? 1 : MAX(0, 1 - (ms - _word.end) / kGlowFadeMs);
+    CGFloat height = _waveHeight * heldStrength(held) * fade;
+    for (NSUInteger i = 0; i < _litLetters.count; i++) {
+        double p = MAX(0, MIN(1, (along - _letterAt[i] + kWaveLead) / kWaveSpan));
+        CGFloat lift = round(height * p * p * (3 - 2 * p) * 4) / 4;   // quarter points, so most frames change nothing
+        if (lift == _letterLift[i]) continue;
+        _letterLift[i] = lift;
+        CGAffineTransform up = CGAffineTransformMakeTranslation(0, -lift);
+        _litLetters[i].transform = up;
+        _dimLetters[i].transform = up;
+    }
+}
+
 - (void)settle {
     [self land];
     [self unglow];
@@ -236,6 +316,11 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
 - (void)land {
     _lift = 0;
     self.transform = CGAffineTransformIdentity;
+    for (NSUInteger i = 0; i < _litLetters.count; i++) {
+        _letterLift[i] = 0;
+        _litLetters[i].transform = CGAffineTransformIdentity;
+        _dimLetters[i].transform = CGAffineTransformIdentity;
+    }
 }
 
 - (void)unglow {

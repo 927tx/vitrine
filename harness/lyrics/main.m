@@ -322,13 +322,21 @@ static void runChecks(SGRKaraokeView *karaoke, UIView *host) {
     [karaoke.window addSubview:lineView];
     [lineView setValue:@YES forKey:@"active"];
     ((void (*)(id, SEL, double))objc_msgSend)(lineView, NSSelectorFromString(@"showTime:"), line.words.lastObject.start + 2500.0);
-    UILabel *lit = [[[lineView valueForKey:@"words"] lastObject] valueForKey:@"lit"];
+    UIView *lit = [[[lineView valueForKey:@"words"] lastObject] valueForKey:@"lit"];
     float glow = lit.layer.shadowOpacity;
     expect(glow > 0.3, [NSString stringWithFormat:@"a word held 3 s glows (%.2f)", glow]);
+    // Its letters rise one after another: most of the way through, the first are up and the last on its way.
+    NSArray<UIView *> *letters = lit.subviews;
+    CGFloat first = letters.firstObject.transform.ty, last = letters.lastObject.transform.ty;
+    expect(letters.count == 4 && first < -1.5 && last > first + 0.25,
+           [NSString stringWithFormat:@"its %lu letters rise in a wave (first %.2f, last %.2f)", (unsigned long)letters.count, first, last]);
     [lineView setValue:@NO forKey:@"active"];
     expect(lit.layer.shadowOpacity == glow, @"the glow stays on as its line goes out, for the fade to carry it");
     after(0.8, ^{
         expect(lit.layer.shadowOpacity == 0 && lit.hidden, @"the glow is off once the line is dim");
+        BOOL landed = YES;
+        for (UIView *letter in letters) landed = landed && CGAffineTransformIsIdentity(letter.transform);
+        expect(landed, @"and its letters are back down");
         [lineView removeFromSuperview];
     });
 
