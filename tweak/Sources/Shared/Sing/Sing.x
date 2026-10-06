@@ -24,11 +24,12 @@
 // before the last one ended: something new was played.
 //
 // The model is loaded by SGSingLoader.m, only while Spotify is active and the mic is on, and kept a minute after the
-// mic goes off. From the thermal state Serious up the engine is held, plays the song as it is and lets the model go,
+// mic goes off: a CPU copy, then on Automatic a Neural Engine copy beside it, which runs the windows once it is in. From the thermal state Serious up the engine is held, plays the song as it is and lets the model go,
 // unless Ignore heat warnings is on; it loads again once the iPhone is back at Fair. The model is what heats it, so
 // Sing does not keep a hot iPhone hot. A model that falls 8 s behind stops Sing for the rest of the song, which then
 // plays as it is; Sing tries again with the next track, when the iPhone cools or when Runs on changes, and stays
-// stopped after three in a row with no song kept up.
+// stopped after three in a row with no song kept up. While the Neural Engine copy loads (its first compile among
+// them), the CPU's falling behind counts for none of that: the song plays with what vocals are in.
 // With the vocals as sung, Spatial voice off and the Sing page's lines not on screen, what Sing plays is the song
 // itself, so it rests: the engine is held as for the heat and the model kept a minute as for a mic switched off.
 // Whenever Sing does not separate (stopped, held, resting, standing aside), the engine plays the sound it holds ahead
@@ -169,12 +170,16 @@ static void announce(void) {
     [NSNotificationCenter.defaultCenter postNotificationName:SGSingChangedNotification object:nil];
 }
 
-// Runs on: Automatic, CPU only, GPU, Neural Engine, GPU and Neural Engine. Automatic is the GPU beside the CPU: on an
-// M4 the GPU's copy runs a window in 405-525 ms against the CPU's 1.2 s, while the Neural Engine's copy, which
-// leaves the model's float32 operations to the CPU, took 6.25 s. On an iPhone 15 Pro the GPU's load never came
-// back from a background launch; it now loads only in the foreground, and a GPU load that runs past its deadline
-// with Spotify active throughout keeps Automatic on the CPU alone for this iOS, until Runs on is changed.
-static NSString *const kGPUStuckOn = @"spotifyglass.sing.gpuStuckOn";
+// Runs on: Automatic or CPU only. Automatic is a Neural Engine copy beside the CPU's, on an iPhone with a Neural Engine
+// (A12 on): on an iPhone 15 Pro it takes 231-325 ms a window there, against 632-723 ms on the CPU (which keeps up,
+// warmer). Once that copy has failed to load, warm up or run a window in this launch, Automatic is the CPU's alone
+// until Spotify is opened again or Runs on changes (falling behind is not a failure: that is the budget's, as on any
+// copy). A copy past its deadline is not remembered as failed: Core ML carries on compiling a load given up on and
+// keeps the result, so the next launch may load it at once.
+// The iOS and the folder the Neural Engine copy last loaded on and from: Core ML has kept its compiled form, so it
+// loads in seconds.
+static NSString *const kNeuralReadyOn = @"spotifyglass.sing.neuralReadyOn";
+static NSString *sg_neuralFailed;   // why the Neural Engine copy is not used for the rest of this launch
 
 static NSString *osBuild(void) {
     return NSProcessInfo.processInfo.operatingSystemVersionString;
@@ -184,30 +189,76 @@ static NSInteger runsOn(void) {
     return SGInt(SGKeySingComputeUnits, 0);
 }
 
-static BOOL gpuStuck(void) {
-    return [[NSUserDefaults.standardUserDefaults stringForKey:kGPUStuckOn] isEqualToString:osBuild()];
+static NSString *runsOnName(void) {
+    return SGSingComputeUnitNames()[runsOn() == 1];
 }
 
-static MLComputeUnits fastUnits(void) {
-    switch (runsOn()) {
-        case 1: return MLComputeUnitsCPUOnly;
-        case 2: return MLComputeUnitsCPUAndGPU;
-        case 3: return MLComputeUnitsCPUAndNeuralEngine;
-        case 4: return MLComputeUnitsAll;
-        default: return gpuStuck() ? MLComputeUnitsCPUOnly : MLComputeUnitsCPUAndGPU;
+static BOOL hasNeuralEngine(void) {
+    static int has = -1;
+    if (has < 0) {
+        has = 0;
+        if (@available(iOS 17.0, *)) {
+            for (id<MLComputeDeviceProtocol> device in MLAllComputeDevices()) {
+                if ([device isKindOfClass:MLNeuralEngineComputeDevice.class]) has = 1;
+            }
+        }
     }
+    return has;
 }
 
-// The loader's news: the separator into the engine, a GPU load stuck in the foreground remembered.
+// Runs on is Automatic, the iPhone has a Neural Engine, its copy has not failed in this launch, and the model is not the
+// old one, which the Neural Engine does not run.
+static BOOL neuralWanted(void) {
+    return runsOn() != 1 && hasNeuralEngine() && !sg_neuralFailed && !SGSingModelUpdateAvailable();
+}
+
+// What Core ML keeps the compiled model for: this iOS and the model's folder.
+static NSString *neuralCompiled(void) {
+    return [NSString stringWithFormat:@"%@ %@", osBuild(), SGSingModelURL().path];
+}
+
+static void wantModel(void) {
+    SGSingLoaderWant(SGSingModelURL(), neuralWanted());
+}
+
+// The Neural Engine copy given up on for the rest of the launch: the CPU's carries on alone.
+static void apply(void);
+static void neuralFailed(NSString *why) {
+    if (sg_neuralFailed) return;
+    sg_neuralFailed = why;
+    SGLog(@"sing: the Neural Engine copy %@, so Karaoke runs on the CPU copy for the rest of this launch", why);
+    if (SGSingOn()) apply();
+}
+
+// The first load on this iOS, from this folder, compiles the model for the Neural Engine.
+static BOOL preparingNeural(void) {
+    return SGSingLoaderFastState() == SGSingFastLoading
+           && ![[NSUserDefaults.standardUserDefaults stringForKey:kNeuralReadyOn] isEqualToString:neuralCompiled()];
+}
+
+// While the Neural Engine copy loads or warms up, the CPU's falling behind is "not yet", not "cannot": the engine's
+// budget is held, so no song is given up and no strike counted, until the copy is in or has failed.
+static void holdBudget(SGSingEngine *engine) {
+    static BOOL held;
+    BOOL hold = SGSingLoaderFastState() == SGSingFastLoading;
+    if (engine) SGSingEngineHoldBudget(engine, hold);
+    if (hold == held) return;
+    held = hold;
+    SGLog(@"sing: %@", hold ? @"falling behind spends none of the 8 s while the Neural Engine copy loads" : @"falling behind counts again");
+}
+
+// The loader's news: the separator into the engine, the Neural Engine copy loaded (remembered) or failed (the CPU's
+// alone from then on).
 static void loaderChanged(void) {
     SGSingEngine *engine = atomic_load(&sg_engine);
     if (engine) SGSingEngineSetSeparator(engine, SGSingLoaderSeparator());
-    if (SGSingLoaderFastState() == SGSingFastTimedOut && SGSingLoaderFastTimedOutActive() && runsOn() == 0
-        && SGSingLoaderFastUnits() == MLComputeUnitsCPUAndGPU && !gpuStuck()
-        && NSProcessInfo.processInfo.thermalState < NSProcessInfoThermalStateSerious) {
-        [NSUserDefaults.standardUserDefaults setObject:osBuild() forKey:kGPUStuckOn];
-        SGLog(@"sing: the GPU did not load on %@ with Spotify active, so Automatic stays on the CPU on this iOS", osBuild());
+    switch (SGSingLoaderFastState()) {
+        case SGSingFastReady: [NSUserDefaults.standardUserDefaults setObject:neuralCompiled() forKey:kNeuralReadyOn]; break;
+        case SGSingFastFailed: neuralFailed(@"did not load"); break;
+        case SGSingFastTimedOut: neuralFailed([NSString stringWithFormat:@"did not load in %.0f minutes", SGSingLoaderNeuralDeadline / 60]); break;
+        default: break;
     }
+    holdBudget(engine);
     announce();
 }
 
@@ -272,7 +323,8 @@ static void watch(void);
 
 // Resting: nothing needs the model, so the engine is held as for the heat and the song plays straight. The vocals are
 // as sung (which plays exactly the song), Spatial voice is off, and no page traces the lines: the Sing page's card
-// reads them ten times a second while it shows (SGSingReadLevels), so a second without a read is the page gone.
+// reads them thirty times a second while it shows with Spotify in front (SGSingReadLevels), so a second without a
+// read is the page gone (popped, covered or in the background). The lyrics page reads none: it is not a viewer.
 static const CFTimeInterval kLinesGoneAfter = 1;
 static CFAbsoluteTime sg_linesReadAt;
 static BOOL sg_resting;
@@ -313,9 +365,10 @@ static void apply(void) {
     else if (!on) SGSingLoaderRelease();
     else if (held) SGSingLoaderPurge(@"the iPhone is too hot (thermal state serious or above)");
     else if (rest) { if (toRest) SGSingLoaderRelease(); }
-    else if (sg_active) SGSingLoaderWant(SGSingModelURL(), fastUnits());
+    else if (sg_active) wantModel();
     if (!engine) return;
     SGSingEngineSetSeparator(engine, SGSingLoaderSeparator());
+    holdBudget(engine);
     SGSingEngineSetPaused(engine, held || rest);
     SGSingEngineSetOn(engine, on);
     double lead = SGSingEngineLead(engine);
@@ -384,9 +437,9 @@ void SGSetSingLevel(float level) {
 }
 
 void SGSingComputeUnitsChanged(void) {
-    // A choice made is a new try, the GPU's included.
-    [NSUserDefaults.standardUserDefaults removeObjectForKey:kGPUStuckOn];
-    SGLog(@"sing: Runs on is now %@", SGSingComputeUnitNames()[(NSUInteger)MIN(MAX(runsOn(), 0), 4)]);
+    // A choice made is a new try, the Neural Engine's included.
+    sg_neuralFailed = nil;
+    SGLog(@"sing: Runs on is now %@", runsOnName());
     // Somewhere else to run is a fresh try, however often it fell behind before.
     sg_giveUps = 0;
     if (sg_stopKind == SGSingStopForGood) sg_stopKind = SGSingStopBehind;
@@ -448,7 +501,9 @@ NSString *SGSingStatusText(void) {
         case SGSingStateWaiting: return sg_resting ? @"As sung" : @"Ready";
         case SGSingStateBuffering: return @"Listening ahead";
         case SGSingStateSinging: return @"On";
-        case SGSingStateBehind: return @"Too slow";
+        // The Neural Engine copy on its way: the budget is held (holdBudget), so this is not yet Too slow.
+        case SGSingStateBehind:
+            return SGSingLoaderFastState() == SGSingFastLoading ? @"Preparing for the Neural Engine" : @"Too slow";
         case SGSingStateHot: return @"Held, too hot";
         case SGSingStateFailed:
             if (!sg_stopped && sg_refused) return [sg_refused containsString:@"AirPlay"] ? @"Off over AirPlay" : @"Songs only";
@@ -459,19 +514,27 @@ NSString *SGSingStatusText(void) {
 
 // Where the model runs now, for the details of a working Sing.
 static NSString *runsOnNote(void) {
-    MLComputeUnits units = SGSingLoaderFastUnits();
-    NSString *name = SGSingUnitsName(units);
-    if (units == MLComputeUnitsCPUOnly) {
-        return runsOn() == 0 ? @"The GPU did not load on this iOS before, so Karaoke runs on the CPU alone. Choosing GPU under Runs on tries it again."
-                             : @"Karaoke runs on the CPU alone, as Runs on says.";
+    if (SGSingModelUpdateAvailable()) {
+        return [NSString stringWithFormat:@"Karaoke runs on the CPU with the voice model it had before. Its update (%@, on the Voice model row) runs "
+                                          @"on the Neural Engine, faster and cooler.", SGSingModelSizeText()];
+    }
+    if (runsOn() == 1) return @"Karaoke runs on the CPU alone, as Runs on says.";
+    if (!hasNeuralEngine()) return @"This iPhone has no Neural Engine Karaoke can use, so it runs on the CPU.";
+    if (sg_neuralFailed) {
+        return [NSString stringWithFormat:@"The Neural Engine copy of the voice model %@, so Karaoke runs on the CPU until Spotify is opened again.", sg_neuralFailed];
+    }
+    if (preparingNeural()) {
+        return [NSString stringWithFormat:@"Preparing for the Neural Engine, first time only (%.0f s so far). Karaoke runs on the CPU until then.",
+                SGSingLoaderFastSeconds()];
     }
     switch (SGSingLoaderFastState()) {
-        case SGSingFastNone: return [NSString stringWithFormat:@"Karaoke runs on the CPU; a copy for the %@ loads once Spotify is open.", name];
-        case SGSingFastLoading: return [NSString stringWithFormat:@"Karaoke runs on the CPU while a copy for the %@ loads.", name];
-        case SGSingFastReady: return [NSString stringWithFormat:@"Karaoke runs on the %@ while Spotify is open, and on the CPU in the background.", name];
-        case SGSingFastSkipped: return [NSString stringWithFormat:@"Too little memory is left for a copy on the %@, so Karaoke runs on the CPU alone.", name];
-        case SGSingFastFailed: return [NSString stringWithFormat:@"The %@ could not load the voice model, so Karaoke runs on the CPU alone.", name];
-        case SGSingFastTimedOut: return [NSString stringWithFormat:@"The %@ did not load the voice model in %.0f minutes, so Karaoke runs on the CPU alone.", name, SGSingLoaderFastDeadline / 60];
+        case SGSingFastNone: return @"Karaoke runs on the CPU; the Neural Engine copy loads once Spotify is open.";
+        case SGSingFastLoading: return @"Karaoke runs on the CPU while the Neural Engine copy loads.";
+        case SGSingFastReady: return @"Karaoke runs on the Neural Engine.";
+        case SGSingFastSkipped: return @"Too little memory is left for the Neural Engine copy, so Karaoke runs on the CPU alone.";
+        case SGSingFastFailed: return @"The Neural Engine could not load the voice model, so Karaoke runs on the CPU alone.";
+        case SGSingFastTimedOut: return [NSString stringWithFormat:@"The Neural Engine did not load the voice model in %.0f minutes, so Karaoke runs on the CPU alone.",
+                                         SGSingLoaderNeuralDeadline / 60];
     }
     return nil;
 }
@@ -706,6 +769,10 @@ static void tick(void) {
     SGSingEngine *engine = atomic_load(&sg_engine);
     logClock(engine);
     if (state == SGSingStateSinging) sg_sangThisTrack = YES;
+    // A Neural Engine copy that failed a window (Core ML's error) is given up on for the launch. One that is only slow
+    // stays: falling behind is the budget's, as on any copy.
+    SGSingSeparator *current = SGSingLoaderSeparator();
+    if (current && [current stats].fastFailed) neuralFailed(@"failed a window");
     if (engine && SGSingOn() && !sg_stopped && SGSingEngineGaveUp(engine)) {
         BOOL forGood = ++sg_giveUps >= kGiveUpsKept;
         sg_stopKind = forGood ? SGSingStopForGood : SGSingStopBehind;
@@ -723,17 +790,16 @@ static void tick(void) {
         SGSingEngineStats stats = SGSingEngineReadStats(engine);
         SGSingSeparator *separator = SGSingLoaderSeparator();
         SGSingSeparatorStats copies = separator ? [separator stats] : (SGSingSeparatorStats){0};
-        MLComputeUnits fast = SGSingLoaderFastUnits();
-        NSString *fastPart = fast == MLComputeUnitsCPUOnly ? @"no faster copy"
-            : [NSString stringWithFormat:@"%@ copy %@, %llu at %.0f ms", SGSingUnitsName(fast),
+        NSString *fastPart = !neuralWanted() && SGSingLoaderFastState() == SGSingFastNone ? @"no Neural Engine copy"
+            : [NSString stringWithFormat:@"Neural Engine copy %@, %llu at %.0f ms",
                @[@"not started", @"loading", @"ready", @"skipped", @"failed", @"timed out"][(NSUInteger)SGSingLoaderFastState()], copies.windows[1], copies.averageMS[1]];
         SGLog(@"sing: %@, %llu windows at %.0f ms each (1500 ms keeps up; CPU copy %llu at %.0f ms, %@, %llu redone on the CPU, the last on the %@), "
-              @"lead %.2f s of %.2f s (the clock's %.2f s), %.2f s separated ahead, %llu frames dry, %.1f s dropped, %.1f s of 8 s short, %llu failures, Spotify %@, "
-              @"thermal state %s, %@%@",
+              @"lead %.2f s of %.2f s (the clock's %.2f s), %.2f s separated ahead, %llu frames dry, %.1f s dropped, %.1f s of 8 s short%@, %llu failures, Spotify %@, "
+              @"thermal state %s, %@, Runs on %@%@",
               SGSingStatusText(), stats.windows, stats.averageMS, copies.windows[0], copies.averageMS[0], fastPart,
-              copies.fallbacks, copies.fast ? SGSingUnitsName(fast) : @"CPU", stats.lead, stats.targetLead, player ? SGSingLeadOf(player) : 0, stats.ready,
-              stats.dryFrames, stats.dropped, stats.budgetSpent, stats.failures, sg_active ? @"active" : @"not active", SGSingThermalName(),
-              [NSString stringWithFormat:@"Runs on %@", SGSingComputeUnitNames()[(NSUInteger)MIN(MAX(runsOn(), 0), 4)]],
+              copies.fallbacks, copies.fast ? @"Neural Engine" : @"CPU", stats.lead, stats.targetLead, player ? SGSingLeadOf(player) : 0, stats.ready,
+              stats.dryFrames, stats.dropped, stats.budgetSpent, stats.budgetHeld ? @" (held while the Neural Engine copy loads)" : @"", stats.failures, sg_active ? @"active" : @"not active", SGSingThermalName(),
+              SGSingMemoryText(), runsOnName(),
               sg_spatialListening ? [NSString stringWithFormat:@", the voice %.0f degrees right", stats.voiceAngle * 180 / M_PI] : @"");
     }
     // Off, with the lead let go: nothing left to watch.
@@ -885,15 +951,15 @@ static void readHeat(void) {
     SGPlayerSetStage(stage);
     %init;
     SGRequireClasses(@[@"SPTPlayerState", @"SPTEsperantoPlayer"]);
-    // Runs on was GPU, GPU and Neural Engine, Neural Engine (unset: Neural Engine); a choice made then is the
-    // faster copy's now, under its new place in the list, and unset is Automatic.
+    // Runs on is Automatic or CPU only: GPU, Neural Engine and GPU and Neural Engine (2-4) are Automatic now, as is every
+    // value of the earlier key (GPU, GPU and Neural Engine, Neural Engine). The GPU's memory of a stuck load and the
+    // one-model test's switch are gone with them.
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-    NSNumber *before = [defaults objectForKey:SGKeySingComputeUnitsBefore];
-    if (before && ![defaults objectForKey:SGKeySingComputeUnits]) {
-        NSInteger was = before.integerValue;
-        [defaults setInteger:was == 0 ? 2 : was == 1 ? 4 : 3 forKey:SGKeySingComputeUnits];
-        [defaults removeObjectForKey:SGKeySingComputeUnitsBefore];
-    }
+    if (runsOn() > 1) SGLog(@"sing: Runs on was %ld, which is gone, so it is Automatic", (long)runsOn());
+    if (runsOn() != 1) [defaults removeObjectForKey:SGKeySingComputeUnits];
+    for (NSString *key in @[SGKeySingComputeUnitsBefore, @"spotifyglass.sing.gpuStuckOn", @"spotifyglass.sing.oneModel"]) [defaults removeObjectForKey:key];
+    // The 489 MB model this one replaces, deleted off the main thread once this one is in (kept and run until then).
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{ SGSingRemoveOldModel(); });
     dispatch_async(dispatch_get_main_queue(), ^{
         static SGSingTrackWatcher *watcher;
         watcher = [SGSingTrackWatcher new];
@@ -917,8 +983,7 @@ static void readHeat(void) {
                 });
             }];
         }
-        // A load starts only while Spotify is active, so never in a launch into the background, and the faster copy
-        // runs the windows only then.
+        // A load starts only while Spotify is active, so never in a launch into the background.
         [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
             sg_active = YES;
             SGSingLoaderSetForeground(YES);
@@ -942,8 +1007,10 @@ static void readHeat(void) {
         [center addObserverForName:SGSingChangedNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
             if (SGSingModelCurrentState() != SGSingModelReady) {
                 SGSingLoaderPurge(@"the voice model is gone from the iPhone");
-            } else if (SGSingOn() && sg_active && !sg_resting && SGSingLoaderCurrentState() == SGSingLoaderIdle && !(sg_hot && !SGHidden(SGKeySingIgnoreHeat))) {
-                // A download finishing with the mic already on loads the model.
+            } else if (SGSingOn() && sg_active && !sg_resting && !(sg_hot && !SGHidden(SGKeySingIgnoreHeat))
+                       && (SGSingLoaderCurrentState() == SGSingLoaderIdle || ![SGSingLoaderURL() isEqual:SGSingModelURL()])) {
+                // A download finishing with the mic already on loads the model, or the update in place of the old one
+                // (whose files are gone; its copies in memory run until the new ones are in).
                 apply();
             }
         }];

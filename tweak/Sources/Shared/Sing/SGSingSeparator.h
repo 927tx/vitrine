@@ -12,14 +12,13 @@
 // The vocals come back from the model's complex mask times the spectrum, through the inverse STFT
 // (torch.istft: overlap-add of the windowed frames divided by the window's squared sum).
 //
-// Two copies of the model can stand behind one separator: the CPU's, which it is made with, and a faster one
-// (the GPU's or the Neural Engine's) handed over once it is loaded and warm. A window goes to the faster copy only
-// while Spotify is in the foreground (SGSingSeparatorSetForeground), since iOS refuses GPU work from the
-// background; a window the faster copy fails is done again on the CPU's, and the faster copy rests until the app
-// has left the foreground. The first windows on each copy are logged with their time.
+// Two copies of the model can stand behind one separator: the CPU's, which it is made with, and a faster one (the
+// Neural Engine's) handed over once it is loaded and warm, which then takes every window, in the background too. A
+// window the faster copy fails is done again on the CPU's, and the faster copy is not used again until another is
+// handed over (Sing.x drops it for the launch). The first windows on each copy are logged with their time.
 //
-// Threading: one separator is used by one thread at a time (its buffers are its own); the faster copy and the
-// foreground can be set from any thread.
+// Threading: one separator is used by one thread at a time (its buffers are its own); the faster copy can be set from
+// any thread.
 #import <Foundation/Foundation.h>
 
 @class MLModel;
@@ -36,13 +35,15 @@ enum {
 
 // The thermal state in a word, for the log.
 const char *SGSingThermalName(void);
-// Whether Spotify is in the foreground, process-wide; the faster copy is used only then.
-void SGSingSeparatorSetForeground(bool foreground);
+// The process's memory for the log (TASK_VM_INFO): its footprint (phys_footprint, what iOS holds against its limit) and
+// what is resident, the model's weights mapped from their file with it.
+NSString *SGSingMemoryText(void);
 
 typedef struct {
     unsigned long long windows[2], fallbacks;   // [0] the CPU's copy, [1] the faster one
     double averageMS[2];
     bool fast;                                  // the last window went to the faster copy
+    bool fastFailed;                            // the faster copy now in failed a window, and is not used again
 } SGSingSeparatorStats;
 
 @interface SGSingSeparator : NSObject

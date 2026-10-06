@@ -2,7 +2,9 @@
 // (SGSingCard.m: the song, what Sing is doing, the vocals and the rest traced live, play and pause, the vocals'
 // level and its three stops), Sing's switch, which turns the mic on and off at once, Ignore heat warnings, the voice
 // model and its removal, spatial voice's page (its preview, SGSpatialPreview.m, and its switch), and Runs on under
-// Advanced.
+// Advanced. While the page is on screen with Spotify in front, the card's reads of its lines keep Sing separating
+// the playing song even at As sung, where it otherwise rests (SGSingReadLevels), so what the card shows and what
+// its slider sets are heard at once; popped, covered or in the background, the page no longer counts.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
@@ -36,18 +38,28 @@ static NSString *bytes(long long count) {
     return [NSByteCountFormatter stringFromByteCount:count countStyle:NSByteCountFormatterCountStyleFile];
 }
 
+// The row's state: with the old model, its update reads as the model's download, worded as an update.
+static SGSingModelState rowState(void) {
+    if (SGSingModelUpdateDownloading()) return SGSingModelDownloading;
+    if (SGSingModelUpdateAvailable()) return SGSingModelMissing;
+    return SGSingModelCurrentState();
+}
+
 static NSString *modelValue(void) {
     if (!SGSingOSSupported() || !SGSingDeviceSupported()) return @"Unavailable";
-    switch (SGSingModelCurrentState()) {
+    BOOL update = SGSingModelUpdateAvailable();
+    switch (rowState()) {
         case SGSingModelDownloading:
             if (SGSingModelChecking()) return @"Checking…";
             if (SGSingModelWaitingForNetwork()) return SGSingModelOverCellular() ? @"Waiting for the network" : @"Waiting for Wi-Fi";
             return [NSString stringWithFormat:@"%.0f%%", SGSingModelProgress() * 100];
         case SGSingModelReady: return [NSString stringWithFormat:@"Downloaded · %@", SGSingModelSizeText()];
         case SGSingModelMissing:
-            if (SGSingModelError()) return @"Failed, try again";
-            if (SGSingModelPausedBytes()) return [NSString stringWithFormat:@"Paused · %@ of %@", bytes(SGSingModelPausedBytes()), SGSingModelSizeText()];
-            return [NSString stringWithFormat:@"Download, %@", SGSingModelSizeText()];
+            if (SGSingModelError()) return update ? @"Update failed, try again" : @"Failed, try again";
+            if (SGSingModelPausedBytes()) {
+                return [NSString stringWithFormat:@"%@ · %@ of %@", update ? @"Update paused" : @"Paused", bytes(SGSingModelPausedBytes()), SGSingModelSizeText()];
+            }
+            return [NSString stringWithFormat:update ? @"Update available · %@" : @"Download, %@", SGSingModelSizeText()];
     }
     return @"";
 }
@@ -57,11 +69,16 @@ static void modelTapped(UITableViewController *page) {
         tell(@"Voice model", SGSingMissing());
         return;
     }
-    switch (SGSingModelCurrentState()) {
+    switch (rowState()) {
         case SGSingModelMissing: {
-            NSString *message = [NSString stringWithFormat:@"%@%@ from Hugging Face. It waits for Wi-Fi unless you let it use cellular. It stays on this iPhone, and no audio leaves it.",
-                                 SGSingModelError() ? [NSString stringWithFormat:@"The last try failed: %@\n\n", SGSingModelError()] : @"", SGSingModelSizeText()];
-            ask(SGSingModelPausedBytes() ? @"Carry on with the download?" : @"Download the voice model?", message, @"Download", NO, ^{ SGSingDownloadModel(); });
+            BOOL update = SGSingModelUpdateAvailable();
+            NSString *message = [NSString stringWithFormat:@"%@%@%@ from Hugging Face. It waits for Wi-Fi unless you let it use cellular. It stays on this iPhone, and no audio leaves it.",
+                                 SGSingModelError() ? [NSString stringWithFormat:@"The last try failed: %@\n\n", SGSingModelError()] : @"",
+                                 update ? @"The new voice model runs on the Neural Engine, faster and cooler, and Karaoke keeps the one it has until it is in. " : @"",
+                                 SGSingModelSizeText()];
+            NSString *title = SGSingModelPausedBytes() ? (update ? @"Carry on with the update?" : @"Carry on with the download?")
+                                                       : (update ? @"Download the update?" : @"Download the voice model?");
+            ask(title, message, @"Download", NO, ^{ SGSingDownloadModel(); });
             break;
         }
         case SGSingModelDownloading:
@@ -73,7 +90,7 @@ static void modelTapped(UITableViewController *page) {
             ask(@"Stop the download?", @"What has come in is kept, so the next download carries on from it.", @"Stop", YES, ^{ SGSingCancelModelDownload(); });
             break;
         case SGSingModelReady:
-            ask(@"Delete the voice model?", [NSString stringWithFormat:@"It frees %@. Karaoke needs it again to turn the vocals down.", SGSingModelSizeText()],
+            ask(@"Delete the voice model?", [NSString stringWithFormat:@"It frees %@. Karaoke needs it again to turn the vocals down.", SGSingModelInUseSizeText()],
                 @"Delete", YES, ^{
                     SGSetSingOn(NO);
                     SGSingDeleteModel();
@@ -165,7 +182,7 @@ UIViewController *SGSingSettingsPage(void) {
         BOOL partial = SGSingModelCurrentState() != SGSingModelReady;
         ask(partial ? @"Remove the paused download?" : @"Remove the voice model?",
             partial ? [NSString stringWithFormat:@"It frees %@. A new download starts from the beginning.", bytes(SGSingModelPausedBytes())]
-                    : [NSString stringWithFormat:@"It frees %@. Karaoke needs it again to turn the vocals down.", SGSingModelSizeText()],
+                    : [NSString stringWithFormat:@"It frees %@. Karaoke needs it again to turn the vocals down.", SGSingModelInUseSizeText()],
             @"Remove", YES, ^{
                 SGSetSingOn(NO);
                 SGSingDeleteModel();
@@ -180,10 +197,11 @@ UIViewController *SGSingSettingsPage(void) {
     // Facts about the iPhone, which do not change while the page shows.
     spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
     SGModRow *units = SGChoiceRow(@"Runs on", nil, SGKeySingComputeUnits, SGSingComputeUnitNames(), 0);
-    units.choiceNotes = @[@"The GPU, unless it did not load on this iOS before", @"Slower, and the least memory", @"Tried every time, even after it did not load",
-                          @"Experimental: slower than the CPU on a Mac", @"Experimental"];
-    units.choiceFooter = @"Karaoke loads the voice model on the CPU first and starts with it. A second copy then loads for the windows "
-                         @"played while Spotify is open; in the background they run on the CPU.";
+    units.choiceNotes = @[@"The Neural Engine, the fastest, with the CPU while it loads", @"Slower and warmer, and a little less memory"];
+    units.choiceFooter = @"Karaoke loads the voice model on the CPU first and starts with it. On Automatic a second copy then loads on "
+                         @"the Neural Engine and takes over, in the background too. The iPhone prepares it the first time after Vitrine "
+                         @"is installed or updated, for a minute or so, and Karaoke runs on the CPU until then. If it does not load, "
+                         @"Karaoke stays on the CPU until Spotify is opened again.";
     units.chosen = ^(NSInteger index) { SGSingComputeUnitsChanged(); };
     SGSingPage *made = [[SGSingPage alloc] initWithTitle:@"Karaoke" intro:nil sections:@[
         SGSection(nil, @[sing, heat, model, remove]),

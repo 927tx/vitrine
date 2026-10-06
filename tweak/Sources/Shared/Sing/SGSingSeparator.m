@@ -1,7 +1,7 @@
 #import <Accelerate/Accelerate.h>
 #import <CoreML/CoreML.h>
+#import <mach/mach.h>
 #import <os/lock.h>
-#import <stdatomic.h>
 #import "Core/SGLog.h"
 #import "SGSingSeparator.h"
 
@@ -15,14 +15,6 @@ static NSString *const kInput = @"spectrum", *const kOutput = @"vocals_spectrum"
 // This many windows on each copy are logged with their time.
 static const unsigned long long kLoggedWindows = 5;
 
-static atomic_bool sg_foreground;
-static atomic_uint sg_backgrounds;   // counts the times the app left the foreground
-
-void SGSingSeparatorSetForeground(bool foreground) {
-    if (!foreground && atomic_exchange(&sg_foreground, false)) atomic_fetch_add(&sg_backgrounds, 1);
-    atomic_store(&sg_foreground, foreground);
-}
-
 const char *SGSingThermalName(void) {
     switch (NSProcessInfo.processInfo.thermalState) {
         case NSProcessInfoThermalStateNominal: return "nominal";
@@ -31,6 +23,13 @@ const char *SGSingThermalName(void) {
         case NSProcessInfoThermalStateCritical: return "critical";
     }
     return "?";
+}
+
+NSString *SGSingMemoryText(void) {
+    task_vm_info_data_t info;
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) != KERN_SUCCESS) return @"footprint unknown";
+    return [NSString stringWithFormat:@"footprint %.2f GB, resident %.2f GB", info.phys_footprint / 1e9, info.resident_size / 1e9];
 }
 
 // Where bin `bin` of channel `channel` at STFT frame `frame` starts in the model's layout (its real part;
@@ -44,8 +43,6 @@ static inline size_t at(int bin, int channel, int frame) {
     os_unfair_lock _lock;        // the faster copy and its name
     MLModel *_fast;
     NSString *_fastName;
-    bool _fastResting;           // failed a window: rests until the app has left the foreground
-    unsigned _restingFrom;       // sg_backgrounds when it failed
     SGSingSeparatorStats _stats; // the worker's; read whole under the lock
     MLMultiArray *_input;
     vDSP_DFT_Setup _forward, _inverse;
@@ -191,7 +188,7 @@ static BOOL readOutput(MLMultiArray *array, float *into) {
     os_unfair_lock_lock(&_lock);
     _fast = model;
     _fastName = name;
-    _fastResting = false;
+    _stats.fastFailed = false;
     _stats.windows[1] = 0;
     _stats.averageMS[1] = 0;
     os_unfair_lock_unlock(&_lock);
@@ -249,6 +246,7 @@ static BOOL predict(MLModel *model, MLDictionaryFeatureProvider *features, float
     _stats.fast = copy == 1;
     os_unfair_lock_unlock(&_lock);
     if (n <= kLoggedWindows) SGLog(@"sing: window %llu on the %@ copy took %.0f ms (1500 ms keeps up), thermal state %s", n, name, ms, SGSingThermalName());
+    if (n == kLoggedWindows) SGLog(@"sing: memory after %llu windows on the %@ copy: %@", n, name, SGSingMemoryText());
 }
 
 - (BOOL)separateLeft:(const float *)left right:(const float *)right vocalsLeft:(float *)vocalsLeft
@@ -257,11 +255,8 @@ static BOOL predict(MLModel *model, MLDictionaryFeatureProvider *features, float
     [self analyzeLeft:left right:right into:_spectrum];
     MLDictionaryFeatureProvider *features = [[MLDictionaryFeatureProvider alloc] initWithDictionary:@{kInput: _input} error:error];
     if (!features) return NO;
-    bool foreground = atomic_load(&sg_foreground);
-    unsigned backgrounds = atomic_load(&sg_backgrounds);
     os_unfair_lock_lock(&_lock);
-    if (_fastResting && backgrounds != _restingFrom) _fastResting = false;
-    MLModel *fast = foreground && !_fastResting ? _fast : nil;
+    MLModel *fast = _stats.fastFailed ? nil : _fast;
     NSString *fastName = _fastName;
     os_unfair_lock_unlock(&_lock);
     if (fast) {
@@ -273,13 +268,10 @@ static BOOL predict(MLModel *model, MLDictionaryFeatureProvider *features, float
             return YES;
         }
         os_unfair_lock_lock(&_lock);
-        if (_fast == fast) {
-            _fastResting = true;
-            _restingFrom = backgrounds;
-        }
+        if (_fast == fast) _stats.fastFailed = true;
         _stats.fallbacks++;
         os_unfair_lock_unlock(&_lock);
-        SGLog(@"sing: the %@ copy failed a window (%@), so it is done on the CPU's, and the %@ copy rests until Spotify has been in the background",
+        SGLog(@"sing: the %@ copy failed a window (%@), so it is done on the CPU's, and the %@ copy is not used again",
               fastName, fastError.localizedDescription, fastName);
     }
     CFAbsoluteTime began = CFAbsoluteTimeGetCurrent();

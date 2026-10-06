@@ -1,9 +1,21 @@
-// The voice model's download (SGSingModel.m) as the tweak compiles it, run on the Mac against Hugging Face: the
-// four small files and part of the weights come in, the download is stopped, and the next one carries the weights
+// The voice model's download (SGSingModel.m) as the tweak compiles it, run on the Mac against Hugging Face: what the
+// old model's download left, stood in by files of their sizes, is deleted at launch; the four small files of
+// separator-ane.mlmodelc and part of its weights come in, the download is stopped, and the next one carries the weights
 // on from where the stop left them (a 206 from the server) through to the move into place.
 //
 //     ./build.sh && CFFIXED_USER_HOME=<empty dir> ../build/download [stop at, 0 to 1 of the weights]
+//
+// `update` starts from the old model (separator.mlmodelc, stood in by files of its sizes) instead: kept and used until
+// the new one is downloaded, then deleted.
+//
+//     ./build.sh && CFFIXED_USER_HOME=<empty dir> ../build/download update
+//
+// `dev` checks the dev folder instead: used only with every file in it and only on a FLEX build (a FLEXManager class),
+// the model then Ready without a download.
+//
+//     ./build.sh && CFFIXED_USER_HOME=<empty dir> ../build/download dev
 #import <Foundation/Foundation.h>
+#import <objc/runtime.h>
 #import "Shared/Sing/Sing.h"
 
 static int failures;
@@ -14,6 +26,76 @@ static void runUntil(BOOL (^done)(void), NSTimeInterval limit) {
     while (!done() && end.timeIntervalSinceNow > 0) CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.25, false);
 }
 
+// Files of these sizes, sparse, at these paths under `folder`.
+static void standIn(NSURL *folder, NSDictionary<NSString *, NSNumber *> *files) {
+    for (NSString *path in files) {
+        NSURL *file = [folder URLByAppendingPathComponent:path];
+        [NSFileManager.defaultManager createDirectoryAtURL:file.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
+        [NSFileManager.defaultManager createFileAtPath:file.path contents:nil attributes:nil];
+        truncate(file.fileSystemRepresentation, files[path].longLongValue);
+    }
+}
+
+static BOOL exists(NSURL *url) {
+    return [NSFileManager.defaultManager fileExistsAtPath:url.path];
+}
+
+// The dev folder: not loaded with a file missing (Core ML would crash on it), nor outside a FLEX build; on one it is
+// the model, Ready without a download.
+static int checkDev(NSURL *sing) {
+    NSURL *dev = [[sing URLByAppendingPathComponent:@"dev"] URLByAppendingPathComponent:@"separator-ane.mlmodelc"];
+    standIn(dev, @{@"metadata.json": @2333, @"coremldata.bin": @388, @"analytics/coremldata.bin": @243, @"model.mil": @1346642});
+    CHECK(!SGSingModelURL() && SGSingModelCurrentState() == SGSingModelMissing, @"a dev copy missing weights/weight.bin is not loaded");
+    standIn(dev, @{@"weights/weight.bin": @209077208});
+    SGSingCancelModelDownload();   // nothing to stop: it has the folders looked at again
+    CHECK(!SGSingModelURL(), @"a whole dev copy is not loaded outside a FLEX build");
+    objc_registerClassPair(objc_allocateClassPair(NSObject.class, "FLEXManager", 0));
+    SGSingCancelModelDownload();
+    CHECK(SGSingModelCurrentState() == SGSingModelReady && [SGSingModelURL().path isEqualToString:dev.path],
+          @"on a FLEX build it is the model, Ready without a download (%@)", SGSingModelURL().path);
+    printf("%s\n", failures ? "FAILED" : "all passed");
+    return failures ? 1 : 0;
+}
+
+// The old model on the iPhone, the new one not: the old one is kept, is the model Karaoke loads and reads as an update
+// available; it stays so while the update downloads, and goes as soon as the update is in. A launch that finds both
+// deletes the old one.
+static int checkUpdate(NSURL *sing) {
+    NSURL *old = [sing URLByAppendingPathComponent:@"separator.mlmodelc"];
+    NSDictionary *oldFiles = @{@"metadata.json": @2431, @"coremldata.bin": @507, @"analytics/coremldata.bin": @243, @"model.mil": @669061,
+                               @"weights/weight.bin": @488986336};
+    standIn(old, oldFiles);
+    SGSingRemoveOldModel();
+    CHECK(exists(old), @"at launch, with the new model not in, the old one is kept");
+    CHECK(SGSingModelCurrentState() == SGSingModelReady && [SGSingModelURL().path isEqualToString:old.path] && SGSingModelUpdateAvailable(),
+          @"it is the model, Ready, and the download reads as its update (%@)", SGSingModelURL().lastPathComponent);
+    CHECK(SGSingModelProgress() == 0 && SGSingModelPausedBytes() == 0, @"the update is not downloaded");
+    printf("the model on the iPhone reads %s, its update %s\n", SGSingModelInUseSizeText().UTF8String, SGSingModelSizeText().UTF8String);
+
+    SGSingDownloadModelOverCellular();
+    __block BOOL readyThroughout = YES, sawUpdating = NO;
+    runUntil(^BOOL {
+        readyThroughout &= SGSingModelCurrentState() == SGSingModelReady;
+        if (SGSingModelUpdateDownloading()) {
+            sawUpdating = YES;
+            readyThroughout &= [SGSingModelURL().path isEqualToString:old.path];
+        }
+        return !SGSingModelUpdateDownloading() && sawUpdating;
+    }, 1800);
+    CHECK(sawUpdating && readyThroughout, @"while the update downloads the old model stays the model, Ready");
+    CHECK(!exists(old), @"the update in, the old model is deleted at once (%@)", SGSingModelError() ?: @"no error");
+    CHECK(SGSingModelCurrentState() == SGSingModelReady && [SGSingModelURL().lastPathComponent isEqualToString:@"separator-ane.mlmodelc"] && !SGSingModelUpdateAvailable(),
+          @"and the model is separator-ane.mlmodelc, no update left (%@)", SGSingModelURL().lastPathComponent);
+    NSArray *left = [NSFileManager.defaultManager contentsOfDirectoryAtPath:sing.path error:nil];
+    CHECK([left isEqualToArray:@[@"separator-ane.mlmodelc"]], @"nothing else in Sing/ (%@)", [left componentsJoinedByString:@", "]);
+
+    standIn(old, oldFiles);
+    SGSingRemoveOldModel();
+    CHECK(!exists(old) && exists([sing URLByAppendingPathComponent:@"separator-ane.mlmodelc"]), @"a launch that finds both deletes the old one");
+    printf("%s\n", failures ? "FAILED" : "all passed");
+    return failures ? 1 : 0;
+}
+
 int main(int argc, char **argv) {
     @autoreleasepool {
         setvbuf(stdout, NULL, _IOLBF, 0);
@@ -21,32 +103,52 @@ int main(int argc, char **argv) {
         NSURL *sing = [[[NSFileManager.defaultManager URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject
             URLByAppendingPathComponent:@"Vitrine"] URLByAppendingPathComponent:@"Sing"];
         printf("the model goes to %s\n", sing.path.UTF8String);
-        CHECK(SGSingModelCurrentState() == SGSingModelMissing, @"no model to start with");
+        if (argc > 1 && !strcmp(argv[1], "dev")) return checkDev(sing);
 
-        // The small files are 0.14% of the bytes, so the progress is nearly the weights' own.
-        SGSingDownloadModel();
+        if (argc > 1 && !strcmp(argv[1], "update")) return checkUpdate(sing);
+
+        // A paused download of the old model, never finished.
+        standIn([sing URLByAppendingPathComponent:@"download"], @{@"model.mil": @669061});
+        standIn(sing, @{@"download-4.resume": @1000});
+        [NSUserDefaults.standardUserDefaults setInteger:97000000 forKey:@"spotifyglass.sing.downloadPaused"];
+        CHECK(SGSingModelCurrentState() == SGSingModelMissing && SGSingModelPausedBytes() == 97000000,
+              @"no model, and the old model's paused download reads %lld bytes", SGSingModelPausedBytes());
+        SGSingRemoveOldModel();
+        CHECK(!exists([sing URLByAppendingPathComponent:@"download"]) && !exists([sing URLByAppendingPathComponent:@"download-4.resume"]),
+              @"at launch the old download's staging folder and resume data are deleted");
+        CHECK(SGSingModelPausedBytes() == 0, @"and the paused bytes, which were the old model's, are forgotten");
+        printf("the model's size reads %s\n", SGSingModelSizeText().UTF8String);
+
+        // The small files are 0.65% of the bytes, so the progress is nearly the weights' own. This Mac's network may count
+        // as expensive, which the download otherwise waits out.
+        SGSingDownloadModelOverCellular();
         runUntil(^BOOL { return SGSingModelProgress() >= stopAt || SGSingModelCurrentState() != SGSingModelDownloading; }, 900);
         double stopped = SGSingModelProgress();
         CHECK(SGSingModelCurrentState() == SGSingModelDownloading, @"the download runs into the weights (%.0f%%)", stopped * 100);
         SGSingCancelModelDownload();
-        NSURL *resume = [sing URLByAppendingPathComponent:@"download-4.resume"];
-        runUntil(^BOOL { return [NSFileManager.defaultManager fileExistsAtPath:resume.path]; }, 10);
-        CHECK([NSFileManager.defaultManager fileExistsAtPath:resume.path], @"the stop keeps the weights' resume data");
+        NSURL *resume = [sing URLByAppendingPathComponent:@"download-ane-4.resume"];
+        runUntil(^BOOL { return exists(resume); }, 10);
+        CHECK(exists(resume), @"the stop keeps the weights' resume data");
         CHECK(SGSingModelCurrentState() == SGSingModelMissing, @"stopped, the model is still missing");
+        SGSingRemoveOldModel();
+        CHECK(exists(resume) && exists([sing URLByAppendingPathComponent:@"download-ane"]), @"the launch's cleanup leaves this model's stopped download alone");
 
         // Started over, the first bytes read well under 1%; carried on, the stop's share.
         SGSingDownloadModel();
         __block double first = -1;
         runUntil(^BOOL {
-            if (first < 0 && SGSingModelProgress() > 0.005) first = SGSingModelProgress();
+            if (first < 0 && SGSingModelProgress() > 0.01) first = SGSingModelProgress();
             return SGSingModelCurrentState() != SGSingModelDownloading;
         }, 1800);
         CHECK(first >= stopped - 0.01, @"the next download carries on from %.0f%%, not from the start", first * 100);
-        CHECK(![NSFileManager.defaultManager fileExistsAtPath:resume.path], @"the resume data is used once");
+        CHECK(!exists(resume), @"the resume data is used once");
         CHECK(SGSingModelCurrentState() == SGSingModelReady, @"the model is in place and checked (%@)", SGSingModelError() ?: @"no error");
+        CHECK([SGSingModelURL().lastPathComponent isEqualToString:@"separator-ane.mlmodelc"], @"it is separator-ane.mlmodelc (%@)", SGSingModelURL().path);
         NSArray *inside = [NSFileManager.defaultManager contentsOfDirectoryAtPath:SGSingModelURL().path error:nil];
         CHECK(inside && ![[inside componentsJoinedByString:@" "] containsString:@"resume"], @"nothing but the model in its folder (%@)",
               [inside componentsJoinedByString:@", "]);
+        NSArray *left = [NSFileManager.defaultManager contentsOfDirectoryAtPath:sing.path error:nil];
+        CHECK([left isEqualToArray:@[@"separator-ane.mlmodelc"]], @"and nothing else in Sing/ (%@)", [left componentsJoinedByString:@", "]);
         printf("%s\n", failures ? "FAILED" : "all passed");
         return failures ? 1 : 0;
     }

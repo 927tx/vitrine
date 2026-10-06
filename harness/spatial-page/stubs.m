@@ -23,7 +23,7 @@ NSString *SGSingStatusText(void) {
 NSString *SGSingStatusDetail(void) {
     SGSingState state = SGSingCurrentState();
     return state == SGSingStateFailed ? @"The voice model did not load in 120 s, so that load was given up. Switch Sing off and on again to try again."
-         : state == SGSingStateSinging ? @"Karaoke runs on the GPU while Spotify is open, and on the CPU in the background." : nil;
+         : state == SGSingStateSinging ? @"Karaoke runs on the Neural Engine." : nil;
 }
 NSString *SGSingMissing(void) { return nil; }
 BOOL SGSingOn(void) { return SGHidden(SGKeySing); }
@@ -72,11 +72,15 @@ BOOL SGSingModelOverCellular(void) { return NO; }
 void SGSingDownloadModelOverCellular(void) {}
 long long SGSingModelPausedBytes(void) { return SGSingModelCurrentState() == SGSingModelMissing ? sg_pausedBytes : 0; }
 NSString *SGSingModelError(void) { return nil; }
-NSString *SGSingModelSizeText(void) { return @"489 MB"; }
+NSString *SGSingModelSizeText(void) { return @"210.4 MB"; }
+// `-update 1` on the launch line: the old model in place, its update not downloaded.
+BOOL SGSingModelUpdateAvailable(void) { return SGSingModelCurrentState() == SGSingModelReady && [NSUserDefaults.standardUserDefaults boolForKey:@"update"]; }
+BOOL SGSingModelUpdateDownloading(void) { return NO; }
+NSString *SGSingModelInUseSizeText(void) { return SGSingModelUpdateAvailable() ? @"489.7 MB" : @"210.4 MB"; }
 void SGSingDownloadModel(void) {}
 void SGSingCancelModelDownload(void) {}
 void SGSingDeleteModel(void) {}
-NSArray<NSString *> *SGSingComputeUnitNames(void) { return @[@"Automatic", @"CPU only", @"GPU", @"Neural Engine", @"GPU and Neural Engine"]; }
+NSArray<NSString *> *SGSingComputeUnitNames(void) { return @[@"Automatic", @"CPU only"]; }
 BOOL SGSingOSSupported(void) { return YES; }
 BOOL SGSingDeviceSupported(void) { return YES; }
 

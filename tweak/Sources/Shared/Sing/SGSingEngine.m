@@ -23,6 +23,7 @@ enum { kHistory = 1024, kAsked = 8 };
 // the fade), and comes back to them only with a full hop separated ahead, which the lead (a window, 1.5 times the
 // model's time and the spare) reaches just as each window lands. Time spent so after the vocals were first in comes
 // out of a budget, renewed by that long with the vocals in throughout; spent, the engine gives up (SGSingEngineGaveUp).
+// While a faster copy is on its way (SGSingEngineHoldBudget) none is spent, and the budget starts full once it is in.
 static const uint64_t kReserve = kSGSingRate * 12 / 100;
 static const uint64_t kReturn = kSGSingEngineHop;
 static const uint64_t kBudget = kSGSingRate * 8;
@@ -49,6 +50,7 @@ struct SGSingEngine {
     atomic_bool flushAsked, on, paused, hasSeparator;
     atomic_bool mixing, gaveUp;   // the render's, for the stats and Sing.x
     atomic_bool freshBudget;      // switched on again: the render starts the budget over
+    atomic_bool budgetHeld;       // a faster copy is on its way: falling behind spends no budget
     _Atomic uint64_t spent;       // the render's `recovering`, for the stats
     _Atomic uint64_t dropped;     // frames of held sound never played: flushes
     // What Spotify's clock had counted past what plays, at each render that changed it (written less played,
@@ -218,6 +220,8 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
     if (mixing) {
         engine->steady += frames;
         if (engine->steady >= kBudget) engine->recovering = 0;
+    } else if (atomic_load_explicit(&engine->budgetHeld, memory_order_relaxed)) {
+        engine->recovering = 0;
     } else if (working && engine->established) {
         engine->recovering += frames;
         if (engine->recovering >= kBudget) atomic_store_explicit(&engine->gaveUp, true, memory_order_relaxed);
@@ -466,6 +470,10 @@ void SGSingEngineSetOn(SGSingEngine *engine, bool on) {
     atomic_store(&engine->on, on);
 }
 
+void SGSingEngineHoldBudget(SGSingEngine *engine, bool held) {
+    atomic_store(&engine->budgetHeld, held);
+}
+
 bool SGSingEngineGaveUp(SGSingEngine *engine) {
     return atomic_load(&engine->gaveUp);
 }
@@ -554,6 +562,7 @@ SGSingEngineStats SGSingEngineReadStats(SGSingEngine *engine) {
         .played = played,
         .mixing = atomic_load(&engine->mixing),
         .budgetSpent = atomic_load(&engine->spent) / (double)kSGSingRate,
+        .budgetHeld = atomic_load(&engine->budgetHeld),
     };
 }
 

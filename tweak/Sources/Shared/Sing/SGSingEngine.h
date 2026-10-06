@@ -80,6 +80,9 @@ static inline double SGSpatialVoiceAngle(SGSpatialFront *f, double yaw, double t
 // The vocals fell short for longer than the engine's budget: it plays the song as it is, the lead kept as it is,
 // until switched off and on again.
 bool SGSingEngineGaveUp(SGSingEngine *engine);
+// A faster copy of the model is loading: the slower one falling behind meanwhile is not yet a reason to give up, so no
+// budget is spent, and it starts full once the hold is let go (the faster copy in, or failed).
+void SGSingEngineHoldBudget(SGSingEngine *engine, bool held);
 // Holds the worker (a hot phone, or Sing resting at As sung): what plays is dry, the lead kept as it is.
 void SGSingEngineSetPaused(SGSingEngine *engine, bool paused);
 // Drops the sound held ahead, at the next render; the lead reads as dropped from now.
@@ -102,6 +105,7 @@ typedef struct {
     unsigned long long written, played;   // frames pulled from Spotify's mixer and played, since the engine was made
     bool mixing;               // the vocals are turned down now (the hysteresis in SGSingEngine.m)
     double budgetSpent;        // seconds short of vocals since they were last in, of the 8 s it gives up after
+    bool budgetHeld;           // none spent while a faster copy loads (SGSingEngineHoldBudget)
 } SGSingEngineStats;
 SGSingEngineStats SGSingEngineReadStats(SGSingEngine *engine);
 // The loudness (RMS) of the separated vocals and of the rest of the song, per tenth of a second, for the `count`

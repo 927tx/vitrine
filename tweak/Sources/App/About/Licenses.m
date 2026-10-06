@@ -54,6 +54,7 @@ UIViewController *SGLicensesPage(void) {
                                        @"Checkpoint: KimberleyJensen, https://huggingface.co/KimberleyJSN/melbandroformer (MIT).\n"
                                        @"Core ML conversion: john-rocky / mlboydaisuke, https://huggingface.co/mlboydaisuke/MelBandRoformer-Vocal-CoreAI (MIT).\n"
                                        @"Core ML export: Darkkos, https://huggingface.co/Darkkos/spoti-sing (MIT), mirrored unchanged.\n"
+                                       @"Neural Engine export, the model Karaoke downloads: Vitrine, from the same checkpoint, palettized to 6 bits.\n"
                                        @"Reference architecture: lucidrains/BS-RoFormer. Training code: ZFTurbo.\n\n"
                                        @"Copyright (c) 2023 Phil Wang\n\n" stringByAppendingString:kMIT]),
     ] footer:nil];

@@ -10,6 +10,13 @@
 // Animation alone, with no display link; while none come (a pause), they rest. With Sing off, loading or held they
 // lie flat. Under Reduce Motion they do not scroll: they are redrawn in place every two seconds.
 //
+// Reading the lines is how Sing knows the page shows ("the lines" in its log are these two, not the lyrics' lines):
+// at As sung with Spatial voice off, where Sing otherwise rests, it separates the playing song while they are read,
+// so the lines move and the slider and the three stops are heard at once, and rests again a second after the last
+// read. The timer stops with the page off screen (popped, or covered by another page) and reads nothing while
+// Spotify is in the background. At any other level Sing separates whether the page shows or not. Every other gate
+// (the switch, the model, the heat, memory, Runs on, the model kept a minute after resting) stays Sing.x's.
+//
 // Threading: main thread.
 #import "Core/SGCore.h"
 #import "Core/SGGlass.h"
@@ -323,6 +330,8 @@ static CGFloat height(float rms) {
 }
 
 - (void)tick {
+    // Spotify in the background plays on and so runs this timer: no reads then, so Sing rests as with the page gone.
+    if (UIApplication.sharedApplication.applicationState == UIApplicationStateBackground) return;
     // The words ten times a second, the lines at every read.
     if (_ticks++ % 3 == 0) [self refresh];
     [self drawLines:YES];

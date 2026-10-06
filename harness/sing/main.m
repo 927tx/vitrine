@@ -3,11 +3,12 @@
 //
 // - the STFT: a sine's peak bin at the size torch.stft gives it (amplitude times the window's sum over two), and
 //   noise through the STFT and back unchanged;
-// - the loader (SGSingLoader.m): the CPU copy loaded and warmed first, then the faster copy on the compute units
-//   asked for; a second want joining the load in flight; a load past its deadline abandoned, Sing Failed, and a
-//   fresh load working while the abandoned one still runs, which is let go when it comes back; a purge during a
-//   load dropping its result; the copies kept over a quick off and on, and dropped after the time kept; each
-//   window on the faster copy only in the foreground; a window the faster copy fails done again on the CPU's;
+// - the loader (SGSingLoader.m): the CPU copy loaded and warmed first, then the Neural Engine copy of the same model
+//   beside it (`cpu` for none); a second want joining the load in flight; a load past its deadline abandoned, Sing
+//   Failed, and a fresh load working while the abandoned one still runs, which is let go when it comes back; a purge
+//   during a load dropping its result; the copies kept over a quick off and on, and dropped after the time kept; every
+//   window on the Neural Engine copy once it is in; a window it fails done again on the CPU's, and it not used again;
+//   a Neural Engine copy past its deadline leaving Sing Ready on the CPU's, and dropped, as Sing.x drops it;
 // - the model: its shapes, the time a window takes, and a voice mixed over chords taken apart: the vocals it finds
 //   against the voice, beside the mix's own score;
 // - the engine: Spotify's mixer stood in for by the mix, pulled through SGSingEngineRender in IO buffers on a
@@ -24,8 +25,11 @@
 //   degrees left the same mirrored; back ahead it is exact again; and no turn clicks. Then the front the voice
 //   is held off: a turned head has it off to the side, the front catching up over 20 s, across +-180 degrees
 //   without a jump, and ahead again after a gap in the motion.
+// - the Neural Engine copy loading, without the model: copies that take a set time a window; the CPU's falling behind
+//   while the budget is held spends none of it, and the budget starts full once the copy is in or has failed. A Neural
+//   Engine copy that only falls behind reads unfailed; one that fails a window reads failed after CPU windows too.
 //
-//     ./build.sh && build/sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]   (the faster copy's units)
+//     ./build.sh && build/sing <separator-ane.mlmodelc> <voice> <out dir> [ane|cpu]   (with or without the Neural Engine copy)
 //     ./build.sh && build/sing spatial        (the checks without the model: the lead, spatial voice, falling behind)
 #import <Foundation/Foundation.h>
 #import <Accelerate/Accelerate.h>
@@ -161,13 +165,6 @@ static void checkSTFT(void) {
 
 #pragma mark - the model
 
-static MLComputeUnits unitsNamed(NSString *name) {
-    if ([name isEqualToString:@"cpu"]) return MLComputeUnitsCPUOnly;
-    if ([name isEqualToString:@"gpu"]) return MLComputeUnitsCPUAndGPU;
-    if ([name isEqualToString:@"ane"]) return MLComputeUnitsCPUAndNeuralEngine;
-    return MLComputeUnitsAll;
-}
-
 static double now(void) {
     return CFAbsoluteTimeGetCurrent();
 }
@@ -210,37 +207,37 @@ static bool waitFor(double seconds, bool (^done)(void)) {
     return done();
 }
 
-// An MLModel whose every prediction fails, standing in for a GPU copy that iOS stops.
+// An MLModel whose every prediction fails, standing in for a Neural Engine copy whose window Core ML fails.
 @interface SGFailingModel : MLModel
 @end
 
 @implementation SGFailingModel
 - (id<MLFeatureProvider>)predictionFromFeatures:(id<MLFeatureProvider>)input error:(NSError **)error {
-    if (error) *error = [NSError errorWithDomain:@"harness" code:1 userInfo:@{NSLocalizedDescriptionKey: @"refused, as iOS refuses the GPU in the background"}];
+    if (error) *error = [NSError errorWithDomain:@"harness" code:1 userInfo:@{NSLocalizedDescriptionKey: @"refused, as Core ML can refuse a window"}];
     return nil;
 }
 @end
 
-// The loader through its cases; hands back the separator it leaves Ready, both copies in it.
-static SGSingSeparator *checkLoader(NSString *path, NSString *units) {
+// The loader through its cases; hands back the separator it leaves Ready, both copies in it. With `neural`, the
+// model's Neural Engine copy loads beside its CPU copy, as Sing.x has it on Automatic.
+static SGSingSeparator *checkLoader(NSString *path, bool neural) {
     NSURL *url = [NSURL fileURLWithPath:path];
-    MLComputeUnits fast = unitsNamed(units);
     SGSingLoaderSetForeground(YES);
 
     // A load past its deadline is abandoned and Sing is Failed; the mic off and on starts a fresh one at once,
     // which works while the first is still out, and the first is let go when it comes back.
     SGSingLoaderCPUDeadline = 0.2;
-    SGSingLoaderWant(url, MLComputeUnitsCPUOnly);
+    SGSingLoaderWant(url, NO);
     waitFor(5, ^bool { return SGSingLoaderCurrentState() != SGSingLoaderLoading; });
     CHECK(SGSingLoaderCurrentState() == SGSingLoaderFailed && [SGSingLoaderError() containsString:@"did not load in"],
           "a load past its deadline is abandoned, and Sing is Failed: %s", SGSingLoaderError().UTF8String ?: "(no reason)");
     SGSingLoaderCPUDeadline = 120;
-    SGSingLoaderWant(url, MLComputeUnitsCPUOnly);
+    SGSingLoaderWant(url, NO);
     CHECK(SGSingLoaderCurrentState() == SGSingLoaderFailed && SGSingLoaderAttempts() == 1, "Failed stays Failed until the mic is switched off and on");
     SGSingLoaderRelease();
     double began = now();
-    SGSingLoaderWant(url, fast);
-    SGSingLoaderWant(url, fast);
+    SGSingLoaderWant(url, neural);
+    SGSingLoaderWant(url, neural);
     CHECK(SGSingLoaderAttempts() == 2 && SGSingLoaderOutstanding() == 2, "off and on starts a fresh load beside the abandoned one, and a second want joins it (%u loads, %u out)",
           SGSingLoaderAttempts(), SGSingLoaderOutstanding());
     waitFor(300, ^bool { return SGSingLoaderCurrentState() != SGSingLoaderLoading; });
@@ -249,42 +246,56 @@ static SGSingSeparator *checkLoader(NSString *path, NSString *units) {
     CHECK(SGSingLoaderCurrentState() == SGSingLoaderReady && separator, "the CPU copy loads and warms in %.1f s, and Sing is Ready", ready);
     waitFor(300, ^bool { return SGSingLoaderOutstanding() == 0 && SGSingLoaderFastState() != SGSingFastLoading; });
     CHECK(SGSingLoaderSeparator() == separator, "the abandoned load came back and was let go: the separator is still the fresh load's");
-    if (fast != MLComputeUnitsCPUOnly) {
-        CHECK(SGSingLoaderFastState() == SGSingFastReady, "then the %s copy loads and warms beside it, %.1f s after the want (state %ld)",
-              SGSingUnitsName(fast).UTF8String, now() - began, (long)SGSingLoaderFastState());
+    if (neural) {
+        CHECK(SGSingLoaderFastState() == SGSingFastReady, "then the Neural Engine copy loads and warms beside it, %.1f s after the want (state %ld)",
+              now() - began, (long)SGSingLoaderFastState());
+    } else {
+        CHECK(SGSingLoaderFastState() == SGSingFastNone, "and no Neural Engine copy loads (state %ld)", (long)SGSingLoaderFastState());
     }
 
     // Kept over a quick off and on, dropped once the time kept has passed.
     SGSingLoaderKeepSeconds = 1.5;
     SGSingLoaderRelease();
     waitFor(0.5, ^bool { return false; });
-    SGSingLoaderWant(url, fast);
+    SGSingLoaderWant(url, neural);
     waitFor(2, ^bool { return false; });
-    CHECK(SGSingLoaderSeparator() == separator && SGSingLoaderAttempts() == 2 + (fast != MLComputeUnitsCPUOnly),
+    CHECK(SGSingLoaderSeparator() == separator && SGSingLoaderAttempts() == 2 + neural,
           "switched off and on within the time kept, the copies are still there and nothing loads (%u loads)", SGSingLoaderAttempts());
     SGSingLoaderRelease();
     waitFor(3, ^bool { return SGSingLoaderCurrentState() == SGSingLoaderIdle; });
     CHECK(SGSingLoaderCurrentState() == SGSingLoaderIdle && !SGSingLoaderSeparator(), "left off past the time kept, the copies are dropped");
 
     // A purge during a load: what the load brings back is let go.
-    SGSingLoaderWant(url, MLComputeUnitsCPUOnly);
+    SGSingLoaderWant(url, NO);
     SGSingLoaderPurge(@"the harness purges during the load");
     waitFor(300, ^bool { return SGSingLoaderOutstanding() == 0; });
     waitFor(0.5, ^bool { return false; });
     CHECK(SGSingLoaderCurrentState() == SGSingLoaderIdle && !SGSingLoaderSeparator(), "a load purged on its way is let go when it comes back");
 
-    // The separator for the rest of the run, both copies in it, as Sing.x has it.
+    // Another model wanted (the update in place of the old one), here the same files through a link: the first model's
+    // copies go at once and the other loads.
     SGSingLoaderKeepSeconds = 60;
-    SGSingLoaderWant(url, fast);
-    waitFor(300, ^bool { return SGSingLoaderCurrentState() != SGSingLoaderLoading
-                                && (fast == MLComputeUnitsCPUOnly || SGSingLoaderFastState() != SGSingFastLoading); });
+    NSString *link = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"sing-other-%d.mlmodelc", getpid()]];
+    [NSFileManager.defaultManager createSymbolicLinkAtPath:link withDestinationPath:path error:nil];
+    SGSingLoaderWant(url, NO);
+    waitFor(300, ^bool { return SGSingLoaderCurrentState() != SGSingLoaderLoading; });
+    SGSingSeparator *first = SGSingLoaderSeparator();
+    SGSingLoaderWant([NSURL fileURLWithPath:link], NO);
+    CHECK(first && SGSingLoaderCurrentState() == SGSingLoaderLoading && !SGSingLoaderSeparator(), "another model wanted: the first's copies go at once and it loads");
+    waitFor(300, ^bool { return SGSingLoaderCurrentState() != SGSingLoaderLoading; });
+    CHECK(SGSingLoaderSeparator() && SGSingLoaderSeparator() != first && [SGSingLoaderURL().path isEqualToString:link], "and Sing is Ready on it");
+    [NSFileManager.defaultManager removeItemAtPath:link error:nil];
+
+    // The separator for the rest of the run, both copies in it, as Sing.x has it (the first model again).
+    SGSingLoaderWant(url, neural);
+    waitFor(300, ^bool { return SGSingLoaderCurrentState() != SGSingLoaderLoading && SGSingLoaderFastState() != SGSingFastLoading; });
     separator = SGSingLoaderSeparator();
-    CHECK(separator != nil, "loaded again for the rest of the run");
+    CHECK(separator != nil && [SGSingLoaderURL() isEqual:url], "loaded again for the rest of the run");
     return separator;
 }
 
-// Each window on the copy that fits: the faster only in the foreground, a failed one done again on the CPU's, which
-// keeps it until the app has been in the background.
+// Each window on the faster copy while it is in; a failed one done again on the CPU's, which keeps the rest until
+// another faster copy is handed over.
 static void checkCopies(SGSingSeparator *separator, Audio mix, bool hasFast) {
     float *vl = calloc(kSGSingWindowFrames, sizeof(float)), *vr = calloc(kSGSingWindowFrames, sizeof(float));
     NSError *error;
@@ -292,37 +303,74 @@ static void checkCopies(SGSingSeparator *separator, Audio mix, bool hasFast) {
     if (hasFast) {
         [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
         SGSingSeparatorStats stats = [separator stats];
-        CHECK(stats.fast && stats.windows[1] == before.windows[1] + 1, "in the foreground a window goes to the faster copy");
-        SGSingSeparatorSetForeground(false);
-        [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
-        stats = [separator stats];
-        CHECK(!stats.fast && stats.windows[0] == before.windows[0] + 1, "in the background it goes to the CPU's");
-        SGSingSeparatorSetForeground(true);
+        CHECK(stats.fast && stats.windows[1] == before.windows[1] + 1, "a window goes to the Neural Engine copy");
         before = stats;
     }
-    // The fast copy swapped for one that fails, then put back.
+    // The fast copy swapped for one that fails, then for a working one.
     SGFailingModel *failing = [SGFailingModel alloc];
     [separator setFastModel:failing named:@"failing"];
     BOOL ok = [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
     SGSingSeparatorStats stats = [separator stats];
-    CHECK(ok && stats.fallbacks == before.fallbacks + 1 && stats.windows[0] == before.windows[0] + 1 && !stats.fast,
+    CHECK(ok && stats.fallbacks == before.fallbacks + 1 && stats.windows[0] == before.windows[0] + 1 && !stats.fast && stats.fastFailed,
           "a window the faster copy fails is done again on the CPU's (%s)", ok ? "separated" : error.localizedDescription.UTF8String);
     [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
     stats = [separator stats];
-    CHECK(stats.fallbacks == before.fallbacks + 1 && stats.windows[0] == before.windows[0] + 2, "and the faster copy rests for the next window");
-    SGSingSeparatorSetForeground(false);
-    SGSingSeparatorSetForeground(true);
-    [separator separateLeft:mix.left right:mix.right vocalsLeft:vl vocalsRight:vr error:&error];
-    CHECK([separator stats].fallbacks == before.fallbacks + 2, "until the app has been in the background, when it is tried again");
+    CHECK(stats.fallbacks == before.fallbacks + 1 && stats.windows[0] == before.windows[0] + 2, "and the failed copy is not tried again");
+    [separator setFastModel:nil named:nil];
     free(vl);
     free(vr);
 }
 
+// The model's Neural Engine copy against its CPU copy on the same window: the vocals they find alike. The CPU's window
+// is had with the Neural Engine copy dropped, which is then loaded again (from Core ML's cache).
+static void checkNeuralMatches(SGSingSeparator *separator, Audio mix, NSString *path) {
+    size_t at = (size_t)kSGSingRate * 5;
+    Audio cpu = makeAudio(kSGSingWindowFrames), neural = makeAudio(kSGSingWindowFrames);
+    NSError *error;
+    SGSingLoaderDropFast(nil);
+    BOOL cpuOK = [separator separateLeft:mix.left + at right:mix.right + at vocalsLeft:cpu.left vocalsRight:cpu.right error:&error];
+    bool onCPU = ![separator stats].fast;
+    SGSingLoaderWant([NSURL fileURLWithPath:path], YES);
+    waitFor(300, ^bool { return SGSingLoaderFastState() != SGSingFastLoading; });
+    double began = now();
+    BOOL neuralOK = [separator separateLeft:mix.left + at right:mix.right + at vocalsLeft:neural.left vocalsRight:neural.right error:&error];
+    double took = now() - began;
+    bool onNeural = [separator stats].fast;
+    double alike = snr(cpu, neural, kSGSingWindowFrames / 8, kSGSingWindowFrames * 7 / 8);
+    CHECK(cpuOK && neuralOK && onCPU && onNeural && alike > 25,
+          "on the same window the Neural Engine copy (%.0f ms) finds the vocals the CPU copy does, %.1f dB apart", took * 1000, alike);
+}
+
+// The Neural Engine copy past its deadline: it times out and the CPU's carries on; asked for no Neural Engine copy then,
+// as Sing.x does once it has failed, the windows stay on the CPU's.
+static void checkNeuralFallback(NSString *path) {
+    NSURL *url = [NSURL fileURLWithPath:path];
+    SGSingSeparator *separator = SGSingLoaderSeparator();
+    SGSingLoaderWant(url, NO);
+    CHECK(SGSingLoaderFastState() == SGSingFastNone && ![separator stats].fast, "asked for none, the Neural Engine copy is dropped");
+    SGSingLoaderNeuralDeadline = 0.001;
+    SGSingLoaderWant(url, YES);
+    waitFor(60, ^bool { return SGSingLoaderFastState() != SGSingFastLoading; });
+    CHECK(SGSingLoaderFastState() == SGSingFastTimedOut && SGSingLoaderSeparator() == separator && SGSingLoaderCurrentState() == SGSingLoaderReady,
+          "the Neural Engine copy past its deadline times out, and Sing stays Ready on the CPU's");
+    SGSingLoaderNeuralDeadline = 600;
+    SGSingLoaderWant(url, NO);
+    float *vl = calloc(kSGSingWindowFrames, sizeof(float)), *vr = calloc(kSGSingWindowFrames, sizeof(float));
+    float *silence = calloc(kSGSingWindowFrames, sizeof(float));
+    NSError *error;
+    BOOL ok = [separator separateLeft:silence right:silence vocalsLeft:vl vocalsRight:vr error:&error];
+    CHECK(ok && ![separator stats].fast && SGSingLoaderFastState() == SGSingFastNone, "then asked for none, nothing loads and the windows go to the CPU's");
+    waitFor(300, ^bool { return SGSingLoaderOutstanding() == 0; });
+    free(vl);
+    free(vr);
+    free(silence);
+}
+
 // Which device Core ML means to run each operation on, counted, where the OS can tell.
-static void describePlan(NSString *path, NSString *units) {
+static void describePlan(NSString *path, bool neural) {
     if (@available(macOS 14.4, *)) {
         MLModelConfiguration *configuration = [MLModelConfiguration new];
-        configuration.computeUnits = unitsNamed(units);
+        configuration.computeUnits = neural ? MLComputeUnitsCPUAndNeuralEngine : MLComputeUnitsCPUOnly;
         dispatch_semaphore_t done = dispatch_semaphore_create(0);
         [MLComputePlan loadContentsOfURL:[NSURL fileURLWithPath:path] configuration:configuration completionHandler:^(MLComputePlan *plan, NSError *error) {
             NSMutableDictionary<NSString *, NSNumber *> *counts = [NSMutableDictionary dictionary];
@@ -335,7 +383,7 @@ static void describePlan(NSString *path, NSString *units) {
                                : [device isKindOfClass:MLGPUComputeDevice.class] ? @"GPU" : @"CPU";
                 counts[name] = @(counts[name].intValue + 1);
             }
-            printf("  info  the plan at %s: %s\n", units.UTF8String, counts.description.UTF8String);
+            printf("  info  the plan on %s: %s\n", neural ? "the CPU and Neural Engine" : "the CPU", counts.description.UTF8String);
             dispatch_semaphore_signal(done);
         }];
         dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
@@ -667,6 +715,132 @@ static void checkFallingBehind(void) {
     SGSingEngineDestroy(poisoned);
 }
 
+// A copy of the model without the model, on the compute units it is given: each prediction takes `seconds` and hands
+// back silence as the vocals, or fails.
+@interface SGMockModel : MLModel
+@property double seconds;   // atomic: changed while the worker runs a window
+@property (nonatomic) bool fails;
+@property (nonatomic) MLComputeUnits units;
+@end
+
+@implementation SGMockModel
+- (MLModelConfiguration *)configuration {
+    MLModelConfiguration *configuration = [MLModelConfiguration new];
+    configuration.computeUnits = _units;
+    return configuration;
+}
+- (id<MLFeatureProvider>)predictionFromFeatures:(id<MLFeatureProvider>)input error:(NSError **)error {
+    usleep((useconds_t)(self.seconds * 1e6));
+    if (_fails) {
+        if (error) *error = [NSError errorWithDomain:@"harness" code:2 userInfo:@{NSLocalizedDescriptionKey: @"the mock copy fails every window"}];
+        return nil;
+    }
+    MLMultiArray *vocals = [[MLMultiArray alloc] initWithShape:@[@1, @(2 * kSGSingBins), @(kSGSingSTFTFrames), @2] dataType:MLMultiArrayDataTypeFloat32 error:error];
+    [vocals getMutableBytesWithHandler:^(void *bytes, NSInteger size, NSArray<NSNumber *> *strides) { memset(bytes, 0, (size_t)size); }];
+    return vocals ? [[MLDictionaryFeatureProvider alloc] initWithDictionary:@{@"vocals_spectrum": vocals} error:error] : nil;
+}
+@end
+
+static SGMockModel *mockCopy(MLComputeUnits units, double seconds) {
+    SGMockModel *model = [SGMockModel alloc];
+    model.units = units;
+    model.seconds = seconds;
+    return model;
+}
+
+// The Neural Engine copy loading while the CPU's falls behind (Sing.x holds the budget while the loader reads
+// Loading): a Neural Engine copy keeps up, is dropped at 6 s and another loads until 24 s (a first compile), the CPU's
+// taking 2.2 s a window meanwhile. Held, the engine never gives up; let go with the copy in, the vocals come back; let
+// go with the load failed, the budget starts then, full, and the engine gives up 8 s on, as before.
+static void checkFasterCopyLoading(void) {
+    size_t frames = 40 * kSGSingRate;
+    Audio tone = makeAudio(frames);
+    for (size_t i = 0; i < frames; i++) tone.left[i] = tone.right[i] = (float)(0.5 * sin(2 * M_PI * 440 * i / kSGSingRate));
+    for (int loads = 1; loads >= 0; loads--) {
+        SGSingSeparator *separator = [[SGSingSeparator alloc] initWithModel:mockCopy(MLComputeUnitsCPUOnly, 2.2)];
+        [separator setFastModel:mockCopy(MLComputeUnitsCPUAndNeuralEngine, 0.25) named:@"Neural Engine (mock)"];
+        SGSingEngine *engine = SGSingEngineCreate();
+        SGSingEngineSetSeparator(engine, separator);
+        SGSingEngineSetLevel(engine, 0);
+        SGSingEngineSetOn(engine, true);
+        Source source = {tone, 0};
+        __block bool inBefore = false, outWhileHeld = false, backAfter = false;
+        __block double gaveUpAt = 0, spentWhileHeld = 0;
+        play(engine, tone, &source, 1024, loads ? 32 : 36, ^(double played) {
+            SGSingEngineStats stats = SGSingEngineReadStats(engine);
+            if (played < 6) inBefore |= stats.mixing;
+            if (played >= 6 && !stats.budgetHeld && played < 24) {
+                [separator setFastModel:nil named:nil];
+                SGSingEngineHoldBudget(engine, true);
+            }
+            if (played >= 10 && played < 24) {
+                outWhileHeld |= !stats.mixing;
+                spentWhileHeld = fmax(spentWhileHeld, stats.budgetSpent);
+            }
+            if (played >= 24 && stats.budgetHeld) {
+                if (loads) [separator setFastModel:mockCopy(MLComputeUnitsCPUAndNeuralEngine, 0.3) named:@"Neural Engine (mock, compiled)"];
+                SGSingEngineHoldBudget(engine, false);
+            }
+            if (played >= 24) backAfter |= stats.mixing;
+            if (!gaveUpAt && SGSingEngineGaveUp(engine)) gaveUpAt = played;
+        });
+        if (loads) {
+            CHECK(inBefore && outWhileHeld && spentWhileHeld == 0 && (!gaveUpAt || gaveUpAt >= 24),
+                  "a Neural Engine copy loading from 6 s to 24 s while the CPU's falls behind: the vocals went out, none of the 8 s was spent (%.1f s) and the engine did not give up",
+                  spentWhileHeld);
+            CHECK(backAfter && !gaveUpAt && [separator stats].fast, "with the Neural Engine copy in at 24 s the vocals come back and the windows go to it");
+        } else {
+            CHECK(gaveUpAt >= 31.9 && gaveUpAt < 33,
+                  "with that load failed at 24 s, the budget starts then, full: the engine gives up at %.1f s (8 s on), as a copy that cannot keep up does", gaveUpAt);
+        }
+        SGSingEngineDestroy(engine);
+    }
+}
+
+// What Sing.x drops a Neural Engine copy on (`fastFailed`): a failed window, not a slow one. A copy that falls behind
+// until the engine gives up still reads unfailed, the last window on it; one that fails a window reads failed after the
+// CPU's has run the windows since; a fresh copy reads unfailed again.
+static void checkNeuralFaults(void) {
+    size_t frames = 30 * kSGSingRate;
+    Audio tone = makeAudio(frames);
+    for (size_t i = 0; i < frames; i++) tone.left[i] = tone.right[i] = (float)(0.5 * sin(2 * M_PI * 440 * i / kSGSingRate));
+    SGSingSeparator *separator = [[SGSingSeparator alloc] initWithModel:mockCopy(MLComputeUnitsCPUOnly, 2.2)];
+    SGMockModel *slow = mockCopy(MLComputeUnitsCPUAndNeuralEngine, 0.25);
+    [separator setFastModel:slow named:@"Neural Engine (mock)"];
+    SGSingEngine *engine = SGSingEngineCreate();
+    SGSingEngineSetSeparator(engine, separator);
+    SGSingEngineSetOn(engine, true);
+    Source source = {tone, 0};
+    __block double gaveUpAt = 0;
+    play(engine, tone, &source, 1024, 24, ^(double played) {
+        if (played >= 6) slow.seconds = 2.2;
+        if (!gaveUpAt && SGSingEngineGaveUp(engine)) gaveUpAt = played;
+    });
+    SGSingEngineDestroy(engine);
+    SGSingSeparatorStats stats = [separator stats];
+    CHECK(gaveUpAt > 0 && stats.fast && !stats.fastFailed && stats.fallbacks == 0,
+          "a Neural Engine copy slowed to 2.2 s a window: the engine gives up (%.1f s), and the copy reads unfailed, so Sing.x keeps it", gaveUpAt);
+
+    float *vl = calloc(kSGSingWindowFrames, sizeof(float)), *vr = calloc(kSGSingWindowFrames, sizeof(float));
+    NSError *error;
+    SGSingSeparator *quick = [[SGSingSeparator alloc] initWithModel:mockCopy(MLComputeUnitsCPUOnly, 0)];
+    SGMockModel *failing = mockCopy(MLComputeUnitsCPUAndNeuralEngine, 0);
+    failing.fails = true;
+    [quick setFastModel:failing named:@"Neural Engine (mock, failing)"];
+    BOOL first = [quick separateLeft:tone.left right:tone.right vocalsLeft:vl vocalsRight:vr error:&error];
+    BOOL second = [quick separateLeft:tone.left right:tone.right vocalsLeft:vl vocalsRight:vr error:&error];
+    stats = [quick stats];
+    CHECK(first && second && stats.fallbacks == 1 && stats.windows[0] == 2 && !stats.fast && stats.fastFailed,
+          "a Neural Engine copy that fails a window: the window done on the CPU's, and after a second window on the CPU's "
+          "it still reads failed, so Sing.x drops it");
+    [quick setFastModel:mockCopy(MLComputeUnitsCPUAndNeuralEngine, 0) named:@"Neural Engine (mock, fresh)"];
+    [quick separateLeft:tone.left right:tone.right vocalsLeft:vl vocalsRight:vr error:&error];
+    stats = [quick stats];
+    CHECK(stats.fast && !stats.fastFailed, "a fresh Neural Engine copy put in its place reads unfailed and takes the window");
+    free(vl);
+    free(vr);
+}
+
 static double energy(const float *samples, size_t from, size_t to) {
     double sum = 0;
     for (size_t i = from; i < to; i++) sum += (double)samples[i] * samples[i];
@@ -781,19 +955,23 @@ int main(int argc, char **argv) {
             checkSpatial();
             checkFront();
             checkFallingBehind();
+            checkFasterCopyLoading();
+            checkNeuralFaults();
             printf("%s\n", sg_failures ? "FAILED" : "all passed");
             return sg_failures ? 1 : 0;
         }
-        if (argc < 4) {
-            printf("usage: sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]   (the faster copy's units; cpu for none)\n       sing spatial\n");
+        if (argc < 4 || (argc > 4 && strcmp(argv[4], "ane") && strcmp(argv[4], "cpu"))) {
+            printf("usage: sing <separator-ane.mlmodelc> <voice> <out dir> [ane|cpu]   (with the Neural Engine copy beside the CPU's, the default, or the CPU's alone)\n"
+                   "       sing spatial\n");
             return 2;
         }
-        NSString *modelPath = @(argv[1]), *units = argc > 4 ? @(argv[4]) : @"all";
+        NSString *modelPath = @(argv[1]);
+        bool neural = argc < 5 || !strcmp(argv[4], "ane");
         sg_outDir = @(argv[3]);
         [NSFileManager.defaultManager createDirectoryAtPath:sg_outDir withIntermediateDirectories:YES attributes:nil error:nil];
         checkSTFT();
 
-        SGSingSeparator *separator = checkLoader(modelPath, units);
+        SGSingSeparator *separator = checkLoader(modelPath, neural);
         if (!separator) return 1;
         MLModel *shapes = [MLModel modelWithContentsOfURL:[NSURL fileURLWithPath:modelPath] configuration:[MLModelConfiguration new] error:nil];
         MLFeatureDescription *input = shapes.modelDescription.inputDescriptionsByName[@"spectrum"];
@@ -801,7 +979,7 @@ int main(int argc, char **argv) {
         CHECK([input.multiArrayConstraint.shape isEqualToArray:(@[@1, @2050, @201, @2])] && [output.multiArrayConstraint.shape isEqualToArray:(@[@1, @2050, @201, @2])],
               "its spectrum and vocals_spectrum are [1, 2050, 201, 2]");
         shapes = nil;
-        describePlan(modelPath, units);
+        describePlan(modelPath, neural);
 
         Audio voice = readAudio(@(argv[2]));
         size_t frames = (size_t)kSGSingRate * 30;
@@ -827,17 +1005,21 @@ int main(int argc, char **argv) {
         }
         printf("  info  the mix less them scores %.1f dB against the chords, the mix itself %.1f dB\n", snr(backing, accompaniment, kSGSingRate, to),
                snr(backing, mix, kSGSingRate, to));
+        if (neural) checkNeuralMatches(separator, mix, modelPath);
         writeWAV(@"mix.wav", mix);
         writeWAV(@"vocals.wav", vocals);
         writeWAV(@"accompaniment.wav", accompaniment);
 
         checkEngine(separator, mix, padded, vocals);
         // Last, as it swaps the faster copy out.
-        checkCopies(separator, mix, unitsNamed(units) != MLComputeUnitsCPUOnly);
+        checkCopies(separator, mix, neural);
+        if (neural) checkNeuralFallback(modelPath);
         checkHold();
         checkSpatial();
         checkFront();
         checkFallingBehind();
+        checkFasterCopyLoading();
+        checkNeuralFaults();
         printf("%s\n", sg_failures ? "FAILED" : "all passed");
         return sg_failures ? 1 : 0;
     }

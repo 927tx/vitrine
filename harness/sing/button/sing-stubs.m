@@ -47,7 +47,7 @@ NSString *SGSingLevelText(double level) {
 
 double SGSingModelProgress(void) { return [defaults() doubleForKey:@"progress"]; }
 BOOL SGSingModelWaitingForNetwork(void) { return [defaults() boolForKey:@"waiting"]; }
-NSString *SGSingModelSizeText(void) { return @"489 MB"; }
+NSString *SGSingModelSizeText(void) { return @"210.4 MB"; }
 NSString *SGSingModelError(void) { return nil; }
 void SGSingDownloadModel(void) {}
 void SGSingCancelModelDownload(void) {}

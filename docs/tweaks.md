@@ -229,10 +229,23 @@ Shared:
                   Tested on the Mac against harness/audio-effects/ and harness/autoeq/, the hook in the simulator
                   against its sim/, the page against harness/audio-effects-page/
     Sing/         Karaoke (Sing in the code and its keys), a song's vocals turned down while it plays (Sing.h lists
-                  its files): the voice model (Mel-Band RoFormer, MIT, from Hugging Face) downloaded and checked file by file over Wi-Fi unless cellular is allowed,
-                  a stop keeping what came in for the next download to carry on from; loaded only while Spotify is active
-                  (SGSingLoader.m), a CPU copy first and warmed, then a faster one beside it for the foreground, each load
-                  with a deadline and kept a minute after the mic goes off; the STFT around it on Accelerate,
+                  its files): one voice model (Mel-Band RoFormer, MIT, exported by Vitrine for the Neural Engine and
+                  palettized to 6 bits: separator-ane.mlmodelc, 210 MB, from Hugging Face; on a FLEX build a copy in
+                  Sing/dev/ comes first) downloaded and checked file by file over Wi-Fi unless cellular is allowed,
+                  a stop keeping what came in for the next download to carry on from; the 489 MB model downloaded
+                  before is kept and loaded on the CPU alone until this one is in (the Voice model row then reads
+                  Update available), and deleted as its download ends or at a launch that finds both
+                  (SGSingRemoveOldModel, which logs the space freed), Sing moving to the new one at its next load;
+                  loaded only while Spotify
+                  is active (SGSingLoader.m), a CPU copy first and warmed, then on Automatic, where the iPhone has a
+                  Neural Engine, a Neural Engine copy of the same model beside it, which takes every window once it is
+                  in, in the background too, each load with a deadline and kept a minute after the mic goes off; the
+                  Neural Engine copy loads only with 0.5 GB left to the process, its first load after every install
+                  compiling it for up to ten minutes while Karaoke runs on the CPU (while it loads, the CPU's falling
+                  behind spends none of the 8 s after which Karaoke gives a song up, nor counts toward its three in a
+                  row), and it is dropped for the launch, the CPU copy carrying on, once it fails to load, warm up or
+                  run a window (one that falls behind keeps its place); Runs on is Automatic or CPU only, the GPU and
+                  Neural Engine choices stored before read as Automatic; the STFT around it on Accelerate,
                   and an engine that stands in Speed and pitch's chain between Spotify's mixer and its output
                   (SGPlayerSetStage), pulls the mixer a few seconds ahead of what plays, separates two-second windows
                   there on a worker thread and mixes the vocals down on the render thread. Spotify's clock has the lead
@@ -243,7 +256,13 @@ Shared:
                   and played, and every lyrics seek logs where it was sent and where it landed), and a seek, a skip or a stop drops it. Not separating (stopped, held, resting at As sung,
                   standing aside), the engine plays the lead it holds on as it is, dry, the clock still corrected, so no
                   part of the song is skipped; it lets it go at a pause, where Sing.x seeks Spotify back to what was
-                  heard, or with a seek, a skip or the output stopping, and builds one only when it separates. From the
+                  heard, or with a seek, a skip or the output stopping, and builds one only when it separates. At As
+                  sung with Spatial voice off it rests (held as for the heat, the model kept a minute as for a mic
+                  switched off, "sing: rests" in the log) unless the Karaoke page's card is on screen with Spotify in
+                  front: its reads of its two lines (SGSingReadLevels; the card's traces, not the lyrics, which are no
+                  viewer) keep Karaoke separating the playing song, so the lines move and the slider is heard at once
+                  ("sing: separates again"), and a second after the page is popped, covered or in the background it
+                  rests again. From the
                   thermal state Serious up Karaoke is held and lets the model go,
                   unless Ignore heat warnings is on, and runs again at Fair. Spatial
                   voice holds the separated vocals in front as the head turns: HeadGestures' motion gives the yaw off a
@@ -252,8 +271,9 @@ Shared:
                   audio. The Spatial voice page's preview (SGSpatialPreview.m) turns a disc of dots under the listener by
                   the same front (SGSpatialVoiceAngle, SGSingEngine.h), on Core Animation alone and only while the page
                   shows. The mic is on the redesign's lyrics (Redesigned/Lyrics/SGRSingButton.m). Tested on the Mac
-                  against harness/sing/ (spatial voice and its front without the model: `build/sing spatial`), the
-                  download against its download/, the pages in the simulator against harness/spatial-page/
+                  against harness/sing/ (spatial voice and its front without the model: `build/sing spatial`; the
+                  model as both copies with `ane`, as the CPU's alone with `cpu`), the download against its download/
+                  (`update` for the old model kept until it, `dev` for the dev folder), the pages in the simulator against harness/spatial-page/
     Haptics/      Vibrations (Haptics.h lists its files): a tap of UIKit's feedback generators for the player's and the now
                   playing bar's controls, the scrubber's tenths and ends, cover swipes, gestures and the lyrics page's tap to
                   seek, at the strength set for them (ControlHaptics.x, SGFeedback.m); and Music Haptics, Core Haptics
@@ -586,13 +606,13 @@ the redesign also which of the lyrics, their pronunciation and their translation
 (applied at once), and the translation's language. Karaoke, under either look, on the main page and as Lyrics' first row, the row reading out On,
 Off or how far the voice model's download has come, kept up to date while the page shows: Karaoke's switch, which turns
 the mic on and off at once, a card at its top (SGSingCard.m: the song, what Karaoke is doing, a tap saying more, the vocals
-and the rest traced live from the engine's loudness, still under Reduce Motion, play and pause, and a tall Vocals slider
+and the rest traced live from the engine's loudness, Karaoke running on the playing song while they show even at As sung, still under Reduce Motion, play and pause, and a tall Vocals slider
 from gone through as sung to the vocals alone, with Sing along, Original and Vocals only under it), Spatial voice
 (where the iPhone reads headphone motion; a page of its own, reading out On or Off, with a live preview at its top that
 follows the head through AirPods, or sways gently without them and holds still under Reduce Motion, a line under it
 saying which, then the switch; its row is on the main page too, under Karaoke's), the voice model's download (Paused and
-Checking among its states) and its removal, Ignore heat warnings, and under Advanced Runs on (Automatic, CPU only, GPU,
-Neural Engine, GPU and Neural Engine: the faster copy's), all applying straight away. Lock screen, on the main
+Checking among its states) and its removal, Ignore heat warnings, and under Advanced Runs on (Automatic: the Neural Engine
+beside the CPU; CPU only), all applying straight away. Lock screen, on the main
 page under either look, opens the lock screen widget's page, titled Lock screen (Moving artwork, Lyrics or Every song, and the lyrics' style,
 Still or Animated, and Spotify's like and dislike buttons' flag; its podcast, audiobook and artwork flags stay in
 All flags). Player: Gestures and Blocked artists (with the count on the row), which work with either look;

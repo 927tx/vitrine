@@ -5,19 +5,24 @@ Three parts: the separator and the engine on the Mac, Sing end to end in the sim
 ## The separator and the engine on the Mac (`main.m`)
 
 Sing's loader, separator and engine (`tweak/Sources/Shared/Sing/SGSingLoader.m`, `SGSingSeparator.m`,
-`SGSingEngine.m`) as the tweak compiles them, their log lines printed through `shim/Core/SGLog.h`, on the Mac, over the voice model as the app downloads it (a `separator.mlmodelc` folder of the five
-files from https://huggingface.co/My-Name-Is-Jeff/vitrine-sing, a mirror of Darkkos/spoti-sing, MIT). Each check prints a line:
+`SGSingEngine.m`) as the tweak compiles them, their log lines printed through `shim/Core/SGLog.h`, on the Mac, over the voice model as the app downloads it (the `separator-ane.mlmodelc` folder of
+five files from https://huggingface.co/My-Name-Is-Jeff/vitrine-sing, the 6-bit Neural Engine export, MIT), which is both
+the CPU copy and the Neural Engine copy. Each check prints a line:
 
 - the STFT: a cosine's peak bin at torch.stft's size (the amplitude times the Hann window's sum over two), noise
   through the STFT and back unchanged, its edges included;
 - the loader: a load past a deadline of 0.2 s abandoned and Sing Failed, Failed kept until the mic goes off and on,
   then a fresh load beside the abandoned one with a second want joining it, the CPU copy loaded and warmed with a
-  window of silence, the abandoned load let go when it comes back (the separator stays the fresh one's), the faster
-  copy (the units asked for; `cpu` for none) loaded beside it, the copies kept over a quick off and on and dropped
-  after the time kept, and a load purged on its way let go;
-- the model: its input and output shapes, the plan Core ML makes for the compute units asked for (how many
-  operations go to the CPU, the GPU and the Neural Engine), the time a two second window takes, and a voice mixed
-  over synthetic chords taken apart: the vocals found scored against the voice, beside the mix's own score;
+  window of silence, the abandoned load let go when it comes back (the separator stays the fresh one's), the Neural
+  Engine copy of the same model loaded beside it (none with `cpu`), the copies kept over a quick off and on and dropped
+  after the time kept, a load purged on its way let go, and another model wanted (as the update replaces the old one)
+  dropping the first's copies and loading; then a window on the Neural Engine copy, one it fails done
+  again on the CPU's and the failed copy not tried again, the Neural Engine copy dropped when none is asked for, and
+  one past its deadline timing out with Sing Ready on the CPU's (`ane` only);
+- the model: its input and output shapes, the plan Core ML makes for the copy that runs the windows (how many
+  operations go to the CPU, the GPU and the Neural Engine), the time a two second window takes, a voice mixed over
+  synthetic chords taken apart (the vocals found scored against the voice, beside the mix's own score), and with
+  `ane` the Neural Engine copy against the CPU copy on the same window;
 - the engine: the mix pulled through `SGSingEngineRender` in buffers of 1024 on a thread that keeps real time,
   with Sing on from the start: the mix plays dry while the lead fills, then exactly the mix less the vocals the
   offline pass finds, the lead kept after Sing is switched off and the mix playing on where it was, nothing skipped, the
@@ -33,6 +38,15 @@ files from https://huggingface.co/My-Name-Is-Jeff/vitrine-sing, a mirror of Dark
   31 frames later (the 28.7 frames around a head and the low-pass's own lag); 90 degrees left mirrors it; back ahead
   it is exact again; no step from one frame to the next is larger than the tone's own at the louder gain, so no
   turn clicks; and nothing is allocated on the render thread;
+- the Neural Engine copy loading, without the model (copies of the model that take a set time a window and hand back
+  silence): a Neural Engine copy keeping up, dropped at 6 s, another loading until 24 s (a first compile) and the
+  CPU's taking 2.2 s a window meanwhile; with the budget held (as Sing.x holds it while the loader reads Loading) the
+  vocals go out and none of the 8 s is spent, the copy in brings them back, and a load that fails instead starts the
+  budget then, full, so the engine gives up 8 s on;
+- what Sing.x drops a Neural Engine copy on, without the model: a copy slowed to 2.2 s a window until the engine
+  gives up reads unfailed (falling behind is the budget's, and the copy keeps its place); one that fails a window has
+  the window done on the CPU's, and it still reads failed after the next window ran on the CPU's; a fresh copy put
+  in its place reads unfailed;
 - the front spatial voice holds the voice off (SGSpatialVoiceAngle, shared with the Spatial voice page's preview),
   fed at 25 Hz: a head turned 60 degrees left has the voice 60 degrees right, and 20 s on 22 (the front's 1/e);
   yaw wrapping across 180 degrees moves the voice by the 1 degree it turned; a gap of 2 s starts it ahead again.
@@ -40,8 +54,8 @@ files from https://huggingface.co/My-Name-Is-Jeff/vitrine-sing, a mirror of Dark
 The voice is macOS's own speech, `say -o speech.aiff "..."` (any file ExtAudioFile reads will do), repeated a
 second apart over 30 seconds.
 
-    ./build.sh && build/sing <separator.mlmodelc> <voice> <out dir> [all|cpu|gpu|ane]
-    ./build.sh thread && build/sing-thread <separator.mlmodelc> <voice> <out dir> gpu     (ThreadSanitizer)
+    ./build.sh && build/sing <separator-ane.mlmodelc> <voice> <out dir> [ane|cpu]   (both copies, the default, or the CPU's alone)
+    ./build.sh thread && build/sing-thread <separator-ane.mlmodelc> <voice> <out dir> ane     (ThreadSanitizer)
     ./build.sh && build/sing spatial                                        (the lead, spatial voice and falling behind)
 
 The out dir gets `mix.wav`, `vocals.wav`, `accompaniment.wav`, `engine.wav` (what played) and `spatial.wav` (the
@@ -94,6 +108,54 @@ vocals to keep up; when they do not, what plays is dry until they catch up.
 and `spatial` under ThreadSanitizer. The lead was off by 0 frames from what was pulled and not played; held from 8 s
 to 12 s it stayed at 2.75 s with every frame played in order; a flush read 0 at once, and a position counted at 1 s
 then had -1.73 s taken off (the 1.02 s held then less the 2.75 s dropped).
+
+2026-10-06, the Neural Engine's model (`build/sing <separator.mlmodelc> <voice> <out dir> ane <separator-ane.mlmodelc>`, the 6-bit export
+compiled for iOS 18): everything passes, the new checks with it. The loader takes it as the faster copy on the CPU and
+Neural Engine: Core ML's plan puts all 2815 operations on the Neural Engine; its first load compiled it in 39.5 s (a
+loaded Mac), and the next process loaded it from Core ML's cache in 0.3 s. A window takes 184-292 ms, 215 ms on
+average, where the CPU copy took 0.6-2.3 s; the vocals score 27.9 dB against the voice (the mix 7.1 dB), and on the
+same window it finds the vocals the first model's CPU copy does within 39.1 dB. Missing, cut short (Core ML fails to
+compile it: a file missing altogether crashes Core ML instead, which is why a dev copy needs every file) or past its
+deadline, its copy fails or times out and Sing stays Ready on the CPU's, and the first model's GPU copy then loads in
+its place and takes the windows, as Sing.x falls back. The `gpu` run and `spatial` pass as before.
+
+2026-10-06, one model (the FLEX test `spotifyglass.sing.oneModel`): the Neural Engine's model as every copy, with
+`build/sing <separator-ane.mlmodelc> <voice> <out dir> cpu|gpu|ane [separator-ane.mlmodelc]`; every run passes, and
+`ane` with it in both places has its CPU, Neural Engine and fallback GPU copies all of the one model. The checks now
+expect a Neural Engine copy to keep background windows (dd486a3). Same Mac, same hour, load 3-7; memory is the whole
+harness process (`/usr/bin/time -l`), the loader's lines log footprint and resident size:
+
+| copy | model | a window, warm (5 logged) | average offline | peak footprint | peak resident |
+|---|---|---|---|---|---|
+| CPU | shipped | 450-469 ms | 534 ms (819-977 at load 6-7) | 0.35 GB | 1.03-1.47 GB |
+| CPU | 6-bit | 461-474 ms | 531 ms (638-758 at load 6-7) | 0.22 GB | 0.68-1.02 GB |
+| GPU | shipped | 344-377 ms | 354 ms | 0.72 GB | 1.96 GB |
+| GPU | 6-bit | 371-419 ms | 382 ms | 0.64 GB | 2.93 GB |
+
+The 6-bit model's GPU copy spreads its weights out when it warms (resident 0.7 to 2.6 GB on that load), where the
+shipped one's stays near 1.1 GB. Its vocals score 27.6-27.7 dB against the voice (the shipped model 28.0-28.1).
+2026-10-06, a faster copy loading (`build/sing spatial`): everything passes. Held, 0.0 s of the budget is spent from
+6 s to 24 s and the engine does not give up; the GPU's copy in at 24 s brings the vocals back; the load failed at 24 s,
+the engine gives up at 32.0 s. The same harness against an engine without the hold gives up at 15.9 s.
+The Neural Engine copy slowed to 2.2 s a window: the engine gives up at 15.9 s and the copy reads unfailed; the
+failing one reads failed after a window on the CPU's, which the old rule (the last window on the faster copy) missed.
+
+2026-10-06, one model (the 6-bit `separator-ane.mlmodelc` as the CPU copy and the Neural Engine copy; no GPU copy):
+everything passes under `ane`, under `cpu` and with `spatial`. Under `ane` (load 4-5) the CPU copy loads and warms in
+2.5 s and the Neural Engine copy beside it 0.5 s later (Core ML had it compiled from before); a window on it takes
+168-202 ms, 173 ms on average; the vocals score 27.8 dB against the voice (the mix 6.9 dB), the engine plays the mix
+less them at 27.6 dB, and the Neural Engine copy finds what the CPU copy does on the same window within 49.2 dB; the
+whole process peaks at 1.08 GB resident and a 0.31 GB footprint. Under `cpu` a window takes 570-662 ms (631 ms on
+average), the engine keeps up (27.5 dB), and the process peaks at 0.68 GB resident and a 0.28 GB footprint. Two `cpu`
+runs earlier, with a simulator booting elsewhere (load average 130-490) and the Mac at thermal state fair, took
+1.1-2.9 s a window and failed the two engine scores; `main`'s harness, run between them at load 8, passed on the same
+model at 521 ms a window, and the last run here passed at load 4.5.
+
+2026-10-06, the old model kept until its update is in: the loader drops the copies of one model when another is wanted
+and loads it (the same files through a link stand in for the update); `ane` passes with it (load 9-10, 306 ms a window
+on the Neural Engine). The old `separator.mlmodelc` as the CPU copy (`cpu`, what Karaoke runs until the update is in)
+loads, warms and finds the vocals at 28.2 dB, every loader check passing, but took 1.8 s a window at load 10-15, so the
+engine fell behind and its score failed: as on the iPhone (2-3.5 s a window), the old model on the CPU does not keep up.
 
 ## Sing end to end in the simulator (`sim/main.m`)
 
@@ -154,18 +216,43 @@ so a report after one of Sing's seeks, skips or seeks back always starts a line.
 ## The download on the Mac (`download/`)
 
 `SGSingModel.m` as the tweak compiles it, built for Mac Catalyst (Sing.h imports UIKit) with `download/shim` standing
-in for the mod's core so its log goes to stderr, against Hugging Face. The four small files and a fifth of the weights
-come in, the download is stopped (its resume data kept beside the staging folder), and the next download carries the
-weights on from there through the checks and the move into place. `CFFIXED_USER_HOME` keeps the 489 MB out of the
-Mac's own Application Support.
+in for the mod's core so its log goes to stderr, against Hugging Face. First what the old model's download left
+(its staging folder, its resume data and its paused bytes, stood in by sparse files of their sizes) is deleted as a
+launch deletes it (`SGSingRemoveOldModel`). Then the four small files of `separator-ane.mlmodelc` and a fifth of its
+weights come in, the download is stopped (its resume data kept beside the staging folder, and left alone by the
+cleanup), and the next download carries the weights on from there through the checks and the move into place, nothing
+else left in `Sing/`. `CFFIXED_USER_HOME` keeps the 210 MB out of the Mac's own Application Support. `update` starts
+from the old model (`separator.mlmodelc`, stood in by sparse files of its sizes) instead: kept at launch and the model
+(Ready, the download its update) while the update downloads, deleted as soon as it is in, and deleted by a launch that
+finds both. `dev` checks the FLEX build's dev folder.
 
     download/build.sh && CFFIXED_USER_HOME="$(mktemp -d)" build/download 0.2
+    download/build.sh && CFFIXED_USER_HOME="$(mktemp -d)" build/download update
+    download/build.sh && CFFIXED_USER_HOME="$(mktemp -d)" build/download dev
+
+2026-10-06, one model, the old one kept until it is in: every mode passes. The size row reads 210.4 MB
+(NSByteCountFormatter's decimal megabytes; 201 MiB), the old model 489.7 MB. Default: the old download's leftovers go
+(670 KB of stand-ins), the stop is at 21%, the next download's first bytes read 22%, the server answers the resumed
+weights 206 and the whole 209077208 bytes are handed over and checked. `update`: the launch logs that the old model is
+kept, it is Ready throughout the update's download, and as the update is checked it is deleted (489.7 MB freed, logged).
+`dev`: a dev copy with weights/weight.bin missing is not loaded, a whole one not outside a FLEX build, and on one it is
+the model, Ready without a download.
 
 2026-10-05, a MacBook with an M4, macOS 27: everything passes. The stop is at 20%, the next download's first bytes
 read 21%, the server answers the resumed weights 206 and the whole 488986336 bytes are handed over and checked. An
 earlier run lost the network for a few seconds and its three retries failed at once, which is why the session now
 waits for connectivity. Not run: an expired resume (the server's signed address lasts a day), which starts the file
 over.
+
+`download/build.sh && CFFIXED_USER_HOME="$(mktemp -d)" build/download neural`: the Neural Engine's model beside a
+first model stood in by sparse files of its sizes. 2026-10-06, before it is on Hugging Face: its download asks for
+separator-ane.mlmodelc/metadata.json, gets 404 and ends, the first model Ready throughout, and is not tried again that
+launch; a dev copy with weights/weight.bin missing is not loaded, a whole one not outside a FLEX build, and on one
+(a FLEXManager class registered) it is the Neural Engine's model.
+
+2026-10-06, iPhone 17 Pro simulator, iOS 27, with the Neural Engine's model in the code: everything passes. The
+simulator has no Neural Engine, so Automatic loads the GPU's copy of the first model as before. The first launch
+aborted in CoreAudio ("Start: RPC timeout. Apparently deadlocked") with the Mac's load average at 350; the next passed.
 
 ## The mic button (`button/`)
 
