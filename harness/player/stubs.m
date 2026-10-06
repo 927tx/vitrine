@@ -136,7 +136,6 @@ BOOL SGGeminiKeySet(void) { return NO; }
 NSString *SGLyricsGeminiLanguage(void) { return @"en"; }
 void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *lines, NSString *languageTag,
                                  void (^done)(NSArray<NSString *> *translations, NSString *error)) { done(nil, @"harness"); }
-UIViewController *SGTopController(void) { return UIApplication.sharedApplication.keyWindow.rootViewController; }
 
 // Local files: no edits in the harness, so the name is all PlayerLyrics.x needs to watch for one.
 #import "Shared/LocalFiles/LocalFiles.h"

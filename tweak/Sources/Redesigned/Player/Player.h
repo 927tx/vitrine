@@ -20,6 +20,7 @@
 //     PlayerMotion.x     Animated artwork: the Canvas or Apple Music's animated cover behind the player
 //     PlayerMenu.m       the more button's system menu: Spotify's rows, then speed, pitch, reverb and
 //                        Animated artwork (Redesigned/ContextMenu)
+//     PlayerSettings.m   the Player page in Mod Settings, led by a showcase of the player
 //
 // Speed and pitch, once the redesign's own, are Shared/Player/SpeedPitch.h's; PlayerHeader.x still hands
 // the more button over, so a menu opened from it is taken for the player's, and hands it to PlayerMenu.m,
@@ -31,7 +32,7 @@
 
 @class SGRArtworkField;
 
-// What is behind the player, chosen on the Now playing page (Redesigned/NowPlayingBar/NowPlayingBarSettings.m).
+// What is behind the player, chosen on the Player page (PlayerSettings.m).
 // SGRKeyPlayerMotion is the switch the choice replaced: until a choice is stored, it picks Still or Colours.
 #define SGRKeyPlayerBackground @"spotifyglass.redesign.player.background"
 #define SGRKeyPlayerMotion @"spotifyglass.redesign.player.movingBackground"
@@ -91,6 +92,15 @@ void SGRPlayerMotionFieldLaidOut(void);
 // A clip is playing in place of the cover, which is then hidden: the lyrics' thumbnail and the open's
 // flown cover fade where they are rather than flying to or from it.
 BOOL SGRPlayerMotionShowing(void);
+// A view of its own playing that clip, drawn as the player draws it (its foot, the blur under the controls),
+// for the Player page's showcase; nil while no clip plays. It plays only in a window, like the player's.
+UIView *SGRPlayerMotionPreview(void);
+
+#pragma mark - Mod Settings (PlayerSettings.m)
+
+// The redesign's Player page: a showcase of the player over the background chosen, the background's and
+// the now playing bar's rows under it, then `more`, the sections either look shares (App/Pages.m).
+UIViewController *SGRPlayerSettingsPage(NSArray *more);
 
 // Alpha 0, no touches, hidden from accessibility, set again on every call: for Spotify's Swift views,
 // which SGRSuppress cannot keep (PlayerControls.x).

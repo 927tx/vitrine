@@ -210,6 +210,9 @@ static UIBlurEffect *blurEffect(void) {
 
 static SGRPlayerMotionView *sg_motion;
 static NSString *sg_track;
+// The clip sg_motion plays and its poster, for the Player page's showcase (SGRPlayerMotionPreview).
+static NSURL *sg_motionFile;
+static UIImage *sg_motionPoster;
 // The clip is in and opaque, so the field under it is covered.
 static BOOL sg_covering;
 // The list the mask went on, so it comes off even while the player is closed and the list cannot be found,
@@ -305,10 +308,20 @@ BOOL SGRPlayerMotionShowing(void) {
     return sg_motion != nil;
 }
 
+UIView *SGRPlayerMotionPreview(void) {
+    if (!sg_motionFile) return nil;
+    SGRPlayerMotionView *preview = [[SGRPlayerMotionView alloc] initWithFrame:CGRectZero];
+    [preview playFile:sg_motionFile poster:sg_motionPoster];
+    [preview appear:NO then:^{}];
+    return preview;
+}
+
 // The clip fades out over the cover coming back where the player is on screen, and goes at once where not.
 static void clear(BOOL animated) {
     SGRPlayerMotionView *old = sg_motion;
     sg_motion = nil;
+    sg_motionFile = nil;
+    sg_motionPoster = nil;
     // Uncovered before the clip starts to fade, so the field is there under it.
     cover(NO);
     holdField();
@@ -325,6 +338,8 @@ static void show(NSString *track, NSURL *file) {
         clear(YES);
         sg_motion = [[SGRPlayerMotionView alloc] initWithFrame:CGRectZero];
         [sg_motion playFile:file poster:poster];
+        sg_motionFile = file;
+        sg_motionPoster = poster;
         layOut();
         holdField();
         [sg_motion setBlurred:SGRPlayerLyricsOpen() animated:NO];
@@ -380,7 +395,7 @@ static SGRPlayerMotionWatcher *sg_watcher;
 #pragma mark - the ⋯ menu's switch (Shared/Player/SpeedPitch.h)
 
 // Fluid and Animated share the field, so the menu moves between the two without a restart. The other
-// backgrounds are a field of another kind, chosen on the Now playing page.
+// backgrounds are a field of another kind, chosen on the Player page (PlayerSettings.m).
 BOOL SGPlayerMenuOffersAnimatedArtwork(void) {
     if (!sg_watcher) return NO;
     SGRPlayerBackgroundKind background = SGRPlayerBackground();

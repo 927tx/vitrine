@@ -15,7 +15,7 @@ sources, for example an older commit, to see a bug before its fix.
 
 `build.sh` runs `logos.pl -c generator=internal` over `PlayerLyrics.x`, `PlayerArtwork.x`,
 `PlayerFooter.x`, `PlayerScroll.x`, `PlayerField.x` and the Kit's `SGRBridges.x`, and links them with
-the real `Core/`, `Redesigned/Kit/` and `SGRKaraokeView`. `stubs.m` stands in for the hooks the harness
+the real `Core/`, `Redesigned/Kit/`, `SGRKaraokeView`, `Settings/` and the Player page. `stubs.m` stands in for the hooks the harness
 does not compile (the Kit's accent and repaint, the rest of the player, the lyrics store, the haptics,
 Sing's mic) and plays a mock player: `SGRHarnessSetTrack` reports a track, with the image ids Spotify's
 metadata carries, to every state observer. A song of ten timed lines plays on from launch. `main.m` also answers
@@ -61,6 +61,12 @@ come late, out of order, or not at all.
   poster under the video and the Fluid field held under it, the foot and the blur, the thumbnail, the clip
   and the cover crossing over half way through the switch) and the log ends with
   `motion checks: n of 11 right -- PASS` or `FAIL`.
+
+- `settings` opens the redesign's Player page (`PlayerSettings.m`, with the real `Settings/` framework) over the
+  player at 3 s, with the clip of `motion` in. It checks the showcase leads the page in the window's shape, the
+  background and device button rows are on the page, and then, as the Background pull-down picks each in turn,
+  that the showcase shows Animated (the clip, the cover gone, Low Data Mode's row in), Fluid, Colours, Still and
+  Animated again. The log ends with `settings checks: n of 7 right -- PASS` or `FAIL`.
 
 `HARNESS_VOLUME=0` leaves out the volume row that the phone has and the tree does not.
 

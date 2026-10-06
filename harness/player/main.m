@@ -19,6 +19,9 @@
 //     motion   Animated artwork: a clip (HARNESS_CANVAS_FILE, an mp4) that comes in before the player has
 //              laid out, then the field, the lyrics, a field built again, the menu's switch and the player
 //              closed, each step checked; the log ends with motion checks n of m right -- PASS or FAIL
+//     settings the redesign's Player page (PlayerSettings.m) over the player with the clip of `motion`: the
+//              showcase over Animated, then Fluid, Colours and Still as the Background menu picks them, and
+//              Animated again; each step checked, the log ends with settings checks n of m right -- PASS or FAIL
 // HARNESS_VOLUME=0 leaves out the volume row the phone has (trees/clean/player/01.txt has none).
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
@@ -542,6 +545,7 @@ static void loadLyrics(void) {
     else if ([scenario() isEqualToString:@"badge"]) [self runBadgeChecks];
     else if ([scenario() isEqualToString:@"cover"]) [self runCoverChecks];
     else if ([scenario() isEqualToString:@"immersive"]) [self runImmersiveChecks];
+    else if ([scenario() isEqualToString:@"settings"]) [self runSettingsChecks];
     // Opened, closed and opened again, so a screenshot can be taken of each state and of the move itself.
     else for (NSNumber *at in @[@2, @6, @10]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -791,7 +795,7 @@ static UIView *motionView(void) {
 - (void)expect:(BOOL)ok step:(NSString *)step detail:(NSString *)detail {
     _checks++;
     if (!ok) _failures++;
-    NSLog(@"[harness] motion check %@: %@ -- %@", step, detail, ok ? @"ok" : @"WRONG");
+    NSLog(@"[harness] %@ check %@: %@ -- %@", scenario(), step, detail, ok ? @"ok" : @"WRONG");
 }
 
 // The field covered by the clip, and its Fluid copies hidden for it.
@@ -902,6 +906,66 @@ static BOOL fieldCovered(void) {
     });
     after(15.7, ^{
         NSLog(@"[harness] motion checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
+              self->_failures ? @"FAIL" : @"PASS");
+    });
+}
+
+static UIView *firstOfClass(UIView *root, NSString *name) {
+    if ([NSStringFromClass(root.class) isEqualToString:name]) return root;
+    for (UIView *sub in root.subviews) {
+        UIView *found = firstOfClass(sub, name);
+        if (found) return found;
+    }
+    return nil;
+}
+
+// The Player page over the player, its showcase checked for each background the Background menu picks.
+- (void)runSettingsChecks {
+    __block UINavigationController *nav;
+    UITableView *(^table)(void) = ^{ return ((UITableViewController *)nav.topViewController).tableView; };
+    UIView *(^showcase)(void) = ^{ return firstOfClass(table().tableHeaderView, @"SGRPlayerShowcase"); };
+    // The Background row's pull-down, picked as a tap on its item does.
+    void (^pick)(NSUInteger) = ^(NSUInteger index) {
+        UIButton *button = (UIButton *)[table() cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]].accessoryView;
+        UIAction *item = (UIAction *)button.menu.children[index];
+        NSLog(@"[harness] Background menu offers %@, picking %@", [[button.menu.children valueForKey:@"title"] componentsJoinedByString:@" / "], item.title);
+        [item performWithSender:button target:nil];
+    };
+    void (^expectBackground)(NSString *, BOOL, BOOL, BOOL) = ^(NSString *step, BOOL fluid, BOOL flows, BOOL clip) {
+        UIView *view = showcase();
+        SGRArtworkField *field = (SGRArtworkField *)firstOfClass(view, @"SGRArtworkField");
+        UIView *motion = firstOfClass(view, @"SGRPlayerMotionView");
+        UIView *cover = [view valueForKey:@"_cover"];
+        NSInteger lowData = [table() numberOfRowsInSection:0];
+        BOOL ok = field && field.fluid == fluid && field.flows == flows && (motion != nil) == clip && cover.hidden == clip && lowData == (clip ? 2 : 1);
+        [self expect:ok step:step detail:[NSString stringWithFormat:@"field %@ fluid %d flows %d, clip %@, cover %@, %ld rows over the device button (%@)",
+                                          field ? @"in" : @"missing", field.fluid, field.flows, motion ? @"on" : @"off", cover.hidden ? @"hidden" : @"shown",
+                                          (long)lowData, view.accessibilityValue]];
+    };
+    // The clip is in by 3 s (the motion scenario's first step), and the page opens over the player then.
+    after(3, ^{
+        nav = [[UINavigationController alloc] initWithRootViewController:SGRPlayerSettingsPage(@[])];
+        nav.modalPresentationStyle = UIModalPresentationFullScreen;
+        [self.window.rootViewController presentViewController:nav animated:NO completion:nil];
+    });
+    after(4, ^{
+        UIView *view = showcase();
+        CGSize window = self.window.bounds.size;
+        BOOL shaped = view.window && fabs(view.bounds.size.width / view.bounds.size.height - window.width / window.height) < 0.01;
+        [self expect:shaped step:@"the showcase leads the page"
+              detail:[NSString stringWithFormat:@"%@ in a header of %@", NSStringFromCGRect(view.frame), NSStringFromCGRect(table().tableHeaderView.frame)]];
+        NSInteger sections = table().numberOfSections;
+        [self expect:sections == 2 && [table() numberOfRowsInSection:1] == 1 step:@"the background and device button rows on the page"
+              detail:[NSString stringWithFormat:@"%ld sections", (long)sections]];
+        expectBackground(@"Animated", YES, NO, YES);
+        pick(2);
+    });
+    after(5, ^{ expectBackground(@"Fluid", YES, NO, NO); pick(1); });
+    after(6, ^{ expectBackground(@"Colours", NO, YES, NO); pick(0); });
+    after(7, ^{ expectBackground(@"Still", NO, NO, NO); pick(3); });
+    after(8, ^{
+        expectBackground(@"Animated again", YES, NO, YES);
+        NSLog(@"[harness] settings checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
               self->_failures ? @"FAIL" : @"PASS");
     });
 }
@@ -1138,7 +1202,7 @@ static BOOL linesSeek(SGRKaraokeView *lyrics) {
 __attribute__((constructor(101))) static void sgr_harnessDefaults(void) {
     [NSUserDefaults.standardUserDefaults setBool:YES forKey:@"spotifyglass.redesign"];
     // Animated artwork, its clip served by the picture server to the shared session too.
-    if ([scenario() isEqualToString:@"motion"]) {
+    if ([scenario() isEqualToString:@"motion"] || [scenario() isEqualToString:@"settings"]) {
         [NSUserDefaults.standardUserDefaults setInteger:3 forKey:@"spotifyglass.redesign.player.background"];
         setenv("HARNESS_CANVAS", "https://canvas.harness/clip.mp4", 1);
         [NSURLProtocol registerClass:SGRHarnessPictureServer.class];

@@ -1,13 +1,16 @@
 // The redesign's now playing bar: the glass card it becomes (NowPlayingBar.x), Spotify's device button
 // on that card hidden on request (BarConnect.x), glass behind the bar's and the tab bar's stand-ins while
-// the player opens and closes (BarTransition.x), and the bar's page in Mod Settings
+// the player opens and closes (BarTransition.x), and the bar's rows in Mod Settings
 // (NowPlayingBarSettings.m). The redesign keeps its own copy of the hide switch and its own key; the
 // native look's lives in Native/NowPlayingBar/.
 #import <UIKit/UIKit.h>
 
+@class SGModRow;
+
 #define SGRHideBarConnect @"spotifyglass.redesign.hide.barConnect"   // the device button on the card
 
-UIViewController *SGRNowPlayingBarSettingsPage(void);
+// The bar's rows, on the Player page under its showcase (Redesigned/Player/PlayerSettings.m).
+NSArray<SGModRow *> *SGRNowPlayingBarRows(void);
 
 // The bar's glass card in `host`'s coordinates, with its corner radius; CGRectNull before the bar has
 // been styled or while it is out of a window (NowPlayingBar.x). The bar keeps its geometry while

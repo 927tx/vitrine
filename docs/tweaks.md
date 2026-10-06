@@ -291,7 +291,7 @@ Redesigned:
                   UITabBarController, so UIKit's tabBarMinimizeBehavior and bottomAccessory cannot do it. Laid out on
                   the Mac against harness/tabbar/ (`mini`), the scroll's steps checked by harness/tabbar/minimize-check.c
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
-                  (BarConnect.x, its own key and its own Now playing page, apart from the native look's). In a Jam the
+                  (BarConnect.x, its own key and its own row on the Player page, apart from the native look's). In a Jam the
                   glass stays on the track and Spotify's Jam strip gets a pane of its own above it (harness/tabbar/, jam)
     ContextMenu/  the ⋯ of the player and the ⋯ pinned over the playlist, album and artist pages open the system menu,
                   always (ContextMenu.h): Spotify's sheet is still made, presented unanimated in a container hidden from
@@ -430,7 +430,11 @@ lyrics' style, Still or Animated), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
-buttons to hide); in the redesign instead Now playing (its device button). Then Vibrations under either look, a card for
+buttons to hide); in the redesign the page instead leads with a showcase of the player (Redesigned/Player/
+PlayerSettings.m): a small copy of it over the background chosen, the cover, title and artist, and a glass sheet over
+the artwork with its progress and volume sliders and the transport between them; under it the Background pull-down
+(Still, Colours, Fluid, Animated, changing the showcase at once), Download in Low Data Mode while Animated is
+chosen, and the now playing bar's device button, checked in the simulator against harness/player/ (`settings`). Then Vibrations under either look, a card for
 Controls (on until switched off) and one for Music Haptics, a choice of None, Generated or Native iOS
 (left out below iOS 18) with an ⓘ saying what each does. Someone with no choice stored gets Native iOS
 when Music Haptics is on in Accessibility, else Generated if the old switch was on, else None. Controls
