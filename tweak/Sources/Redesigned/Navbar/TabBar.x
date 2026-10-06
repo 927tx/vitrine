@@ -17,7 +17,7 @@
 #import "Headers/SPTEncoreIconView.h"
 #import <objc/message.h>
 
-static char kBarKey, kApartBarKey, kHostKey;
+static char kBarKey, kApartBarKey, kHostKey, kFadeKey;
 static __weak UIView *sg_stockBar;
 static CGFloat sg_room, sg_glassHeight;   // see "room for the glass bar"
 
@@ -286,6 +286,43 @@ static void logBarOnce(UITabBar *bar) {
     });
 }
 
+#pragma mark - the fade under the bars
+
+// The pages darken towards the bottom of the screen under the glass bar and the now playing bar, from clear
+// a little above the now playing card to half black at the screen's foot, so a row going under the glass
+// reads as passing behind it. Never darker than half: the glass still has the page to lens. The fade is the
+// stock bar's own subview, behind the glass, so it slides away with the bar when a page hides it; Spotify's
+// bar does not clip, or the glass bar would not have stood over the now playing bar before the room was made.
+@interface SGRBarFade : UIView
+@end
+
+@implementation SGRBarFade
++ (Class)layerClass {
+    return CAGradientLayer.class;
+}
+@end
+
+// The now playing card (56), its gap over the bar (8) and 24 more, whether a song is playing or not.
+static const CGFloat kFadeAbove = 88;
+
+static void placeFade(UIView *stockBar, CGRect glass) {
+    SGRBarFade *fade = objc_getAssociatedObject(stockBar, &kFadeKey);
+    if (!fade) {
+        fade = [SGRBarFade new];
+        fade.userInteractionEnabled = NO;
+        CAGradientLayer *layer = (CAGradientLayer *)fade.layer;
+        // Eased rather than straight, so the fade has no edge where it starts.
+        layer.colors = @[(id)[UIColor colorWithWhite:0 alpha:0].CGColor, (id)[UIColor colorWithWhite:0 alpha:0.3].CGColor,
+                         (id)[UIColor colorWithWhite:0 alpha:0.5].CGColor];
+        layer.locations = @[@0, @0.5, @1];
+        objc_setAssociatedObject(stockBar, &kFadeKey, fade, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    CGFloat top = CGRectGetMinY(glass) - kFadeAbove;
+    CGRect frame = CGRectMake(0, top, stockBar.bounds.size.width, CGRectGetMaxY(glass) - top);
+    if (!CGRectEqualToRect(fade.frame, frame)) fade.frame = frame;
+    if (fade.superview != stockBar || stockBar.subviews.firstObject != fade) [stockBar insertSubview:fade atIndex:0];
+}
+
 #pragma mark - room for the glass bar
 
 // UIKit's glass bar asks for 83 pt, the platter the top 62 of it, over no more safe area than a Face ID
@@ -413,7 +450,7 @@ static void syncBar(UIView *stockBar) {
     UIView *host = objc_getAssociatedObject(stockBar, &kHostKey);
 
     for (UIView *sub in stockBar.subviews) {
-        if (sub == host) continue;
+        if (sub == host || [sub isKindOfClass:SGRBarFade.class]) continue;
         sub.alpha = 0;
         sub.userInteractionEnabled = NO;
     }
@@ -460,6 +497,7 @@ static void syncBar(UIView *stockBar) {
     CGFloat height = MAX(bounds.size.height, glassHeight(bar, stockBar));
     CGRect frame = CGRectMake(0, CGRectGetMaxY(bounds) - height, width, height);
     if (!CGRectEqualToRect(host.frame, frame)) host.frame = frame;
+    placeFade(stockBar, frame);
     CGRect mainFrame = host.bounds, apartFrame = CGRectZero;
     if (apart.count) {
         CGFloat apartWidth = MIN(width / 2, apart.count * kApartItemWidth + 2 * kPlatterInset);
@@ -487,7 +525,7 @@ static UIView *tabBarOf(UIView *item) {
     %orig;
     SGRComposeTabBar((UIView *)self);
     for (UIView *sub in ((UIView *)self).subviews) {
-        if (![sub isKindOfClass:SGRTabBarHost.class]) [sub layoutIfNeeded];
+        if (![sub isKindOfClass:SGRTabBarHost.class] && ![sub isKindOfClass:SGRBarFade.class]) [sub layoutIfNeeded];
     }
     holdHome((UIView *)self);
     syncBar((UIView *)self);

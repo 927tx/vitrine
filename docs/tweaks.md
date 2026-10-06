@@ -279,8 +279,9 @@ Redesigned:
                   been read, at most SGRFieldHoldLimit (1 s), then faded away (SGRField.h)
     Navbar/       the glass tab bar (TabBar.x) over its own composition (Navbar.x, NavbarLayout.m) and editor, the glass search field.
                   Spotify is made to leave the glass bar its height where its own bar is shorter (a phone with a home button,
-                  Offline or Private Session under the bar), so the now playing bar and the pages move up with it. Laid out on
-                  the Mac against harness/tabbar/
+                  Offline or Private Session under the bar), so the now playing bar and the pages move up with it. Under both
+                  bars the pages fade to half black (SGRBarFade, the stock bar's own subview). Laid out on the Mac against
+                  harness/tabbar/
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
                   (BarConnect.x, its own key and its own Now playing page, apart from the native look's). In a Jam the
                   glass stays on the track and Spotify's Jam strip gets a pane of its own above it (harness/tabbar/, jam)
