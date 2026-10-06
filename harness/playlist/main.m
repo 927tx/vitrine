@@ -473,6 +473,23 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
         pillX += width + 8;
     }
 
+    // `rebuilt` on the launch line: Spotify rebuilds the header's cells before the sheet opens. The row the
+    // page was handed leaves the window and a new one takes its place in a cell the redesign's hook never
+    // sees, so the sheet has to read Mix off the new row: the log has to say "Mix (rebuilt)".
+    if ([NSProcessInfo.processInfo.arguments containsObject:@"rebuilt"]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            CGRect frame = curation.frame;
+            [curation removeFromSuperview];
+            UIView *cell = box(list, UICollectionViewCell.class, frame, nil);
+            UIView *row = box(cell, UIView.class, cell.bounds, @"PlaylistCuration.Row.CurationActionsToolbar");
+            UIButton *mix = (UIButton *)box(row, UIButton.class, CGRectMake(0, 10, 60, 32), @"ListPlatform.ToolbarActions.MixButton");
+            mix.accessibilityLabel = @"Mix (rebuilt)";
+            [mix addTarget:page action:@selector(sgr_pillFired:) forControlEvents:UIControlEventTouchUpInside];
+            label(mix, CGRectMake(8, 8, 44, 16), @"Mix (rebuilt)", 11, UIColor.whiteColor, @"Encore.Label");
+            NSLog(@"[harness] the curation row rebuilt");
+        });
+    }
+
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         // Cleared means an alpha of 0, whether the colour was taken off the layer or the view: the clear
         // colour lands on both and reads back with no alpha at all.

@@ -130,8 +130,8 @@ void SGRPlaylistTakeSort(UIView *page, UIView *button) {
 
 // The cell that carries the curation row, as it lays out. Held from the page rather than from the cell: the
 // list reuses the cell once it has scrolled past, and the sheet is opened from the top of a page one is
-// usually well down. Held strongly for the same reason -- the element view Spotify binds to the toolbar is
-// the toolbar's own, so it goes on answering wherever the cell it was in ends up.
+// usually well down. Held strongly for the same reason, so there is still a row to fire once the cell is gone;
+// but a row Spotify has rebuilt since is a stale one, which is why the sheet asks curationIn first.
 void SGRPlaylistTakeCuration(UIView *cell) {
     UIView *toolbar = SGRFindByIdentifier(cell, SGRPlaylistCurationIdentifier, &kToolbarKey);
     UIView *page = toolbar ? SGRPlaylistPageOf(cell) : nil;
@@ -296,17 +296,19 @@ static UITableView *tableIn(UIView *root, int depth) {
     return nil;
 }
 
-// The curation row of the page, held from the cell's own pass where there has been one, and looked for on
-// the page where there has not: the row is a cell closed up to nothing, and a collection view lays out
-// what it has to draw, so a page opened and left alone can reach the sheet before that cell has ever run
-// a pass. It was the only thing keeping Mix off the sheet, and the sheet only came right after the menu
-// had been opened and closed a few times (device 2026-09-20). The walk is the page's live views, which is
-// the cells on screen and no more, and it is done once per sheet.
+// The curation row of the page: the one held from the cell's own pass while it is still in a window, and
+// otherwise the one on the page now. A page opened and left alone can reach the sheet before the cell has
+// ever run a pass, since a collection view lays out only what it has to draw, and that kept Mix off the sheet
+// until the menu had been opened a few times (device 2026-09-20). And once Spotify rebuilds the header's
+// cells, the held row is out of the window and its Mix pill reads and fires nothing: the row went missing,
+// or stayed and did nothing. The walk is the page's live views, the cells on screen and no more, and only
+// when the held row is out of the window; the held row is what is left when the walk finds none.
 static UIView *curationIn(UIView *page) {
     UIView *held = objc_getAssociatedObject(page, &kToolbarKey);
-    if (held) return held;
+    if (held.window) return held;
     UIView *found = SGRFindByIdentifier(page, SGRPlaylistCurationIdentifier, NULL);
-    if (found) objc_setAssociatedObject(page, &kToolbarKey, found, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (!found) return held;
+    if (found != held) objc_setAssociatedObject(page, &kToolbarKey, found, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return found;
 }
 
@@ -317,7 +319,6 @@ static UIView *pageFor(UIViewController *menu) {
     id decided = objc_getAssociatedObject(menu, &kDecidedKey);
     if (decided) return decided == NSNull.null ? nil : decided;
     UIView *page = SGRPinnedMoreRecentPage();
-    if (page) curationIn(page);
     objc_setAssociatedObject(menu, &kDecidedKey, page ?: (id)NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return page;
 }
@@ -350,7 +351,7 @@ static void install(UIViewController *menu) {
     // reused -- and the curation pill only where it has not, which is how it was found before the header's
     // button was (device 2026-09-20: the pill's glyph did not answer and the row went missing).
     UIView *sort = nil, *mix = nil;
-    pillsIn(objc_getAssociatedObject(page, &kToolbarKey), &sort, &mix);
+    pillsIn(curationIn(page), &sort, &mix);
     sort = objc_getAssociatedObject(page, &kSortKey) ?: sort;
     [block showSort:sort mix:mix];
     // Nothing to show yet is not an answer: the page fills in as it lays out, and the next pass is asked

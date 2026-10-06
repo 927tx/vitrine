@@ -50,3 +50,8 @@ identifier and in a mock of the Encore object behind it (`currentState`, `progre
 None, waiting, downloading (held at 50%), downloaded, shuffle on, removed with shuffle off, error, each held a
 few seconds and announced with a `[harness] state:` line to take a screenshot on. Nothing in it lays anything
 out, as on the phone.
+
+`rebuilt` on the launch line rebuilds the curation row at 4.5 s, before the ⋯ sheet opens at 5 s: the row the page
+was handed leaves the window and a new one, in a cell the redesign never hears about, takes its place. The sheet's
+log line has to read "Mix (rebuilt)" and the fired pill has to be "still on screen: yes". Before the sheet looked
+again, it fired the old row's Mix ("still on screen: no").
