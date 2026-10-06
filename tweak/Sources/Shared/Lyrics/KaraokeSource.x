@@ -28,6 +28,7 @@ static NSMutableSet<NSString *> *sg_asking;
 static NSMutableDictionary<NSString *, NSNumber *> *sg_losses;   // requests lost in a row, by track
 static NSMutableSet<NSString *> *sg_looking;   // asked of the sources or spclient right now (SGKaraokeLooking)
 static NSDictionary<NSString *, NSString *> *sg_spclientHeaders;
+static NSMutableArray<void (^)(NSDictionary<NSString *, NSString *> *)> *sg_headersWaiting;   // SGSpclientHeaders
 static __weak id sg_player;
 // Every track the player has reported, by id, so a source can name a track that is not the one
 // playing at the moment it is asked: a lyrics request routinely lands a beat before the player
@@ -62,7 +63,21 @@ static void rememberHeaders(NSURLSession *session, NSURLRequest *request) {
         NSString *name = kSpclientHeaders[i];
         if (all[name]) headers[name] = all[name];
     }
-    dispatch_async(dispatch_get_main_queue(), ^{ sg_spclientHeaders = headers; });
+    dispatch_async(dispatch_get_main_queue(), ^{
+        sg_spclientHeaders = headers;
+        NSArray *waiting = sg_headersWaiting;
+        sg_headersWaiting = nil;
+        for (void (^waiter)(NSDictionary<NSString *, NSString *> *) in waiting) waiter(headers);
+    });
+}
+
+void SGSpclientHeaders(void (^use)(NSDictionary<NSString *, NSString *> *headers)) {
+    if (sg_spclientHeaders) {
+        use(sg_spclientHeaders);
+        return;
+    }
+    if (!sg_headersWaiting) sg_headersWaiting = [NSMutableArray array];
+    [sg_headersWaiting addObject:[use copy]];
 }
 
 static SPTPlayerState *playerState(void);
@@ -415,11 +430,32 @@ static void prefetch(SPTPlayerTrack *track, NSString *trackID, SPTPlayerState *s
 }
 %end
 
+// With nothing of the karaoke's on, the headers are still read for SGSpclientHeaders' other askers
+// (Native iOS Music Haptics, which can be picked at any moment).
+%group SGSpclientHeadersOnly
+%hook SPTDataLoaderService
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)task didReceiveData:(NSData *)data {
+    rememberHeaders(session, task.currentRequest);
+    %orig;
+}
+%end
+
+%hook _TtC26Connectivity_HttpClientKit20HttpClientURLSession
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)task didReceiveData:(NSData *)data {
+    rememberHeaders(session, task.currentRequest);
+    %orig;
+}
+%end
+%end
+
 %ctor {
     // The sources that search by name learn the name from the player, so the player is caught
     // whenever one is on, not only for the redesign's lyrics and the lock screen.
     if (!SGRedesignedUI() && !SGFlag(SGKeyLockScreenLyrics, NO) && !SGLyricsEnabled()
-        && SGLockScreenArtwork() != SGLockArtworkLyrics) return;
+        && SGLockScreenArtwork() != SGLockArtworkLyrics) {
+        %init(SGSpclientHeadersOnly);
+        return;
+    }
     sg_seenTracks = [NSMutableDictionary dictionary];
     sg_lyrics = [NSMutableDictionary dictionary];
     sg_requested = [NSMutableSet set];

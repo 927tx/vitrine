@@ -185,10 +185,13 @@ Shared:
                   and bass analyzer on the render thread (SGMusicAnalyzer.m, plain C), and a thread of its own schedules
                   the taps and the rumble for when the sound is heard, at their strength and leaving out what Follows
                   leaves out (MusicHaptics.x). Everything applies at once; nothing plays while Spotify is not the active
-                  app. iOS's own Music Haptics, when on in Accessibility, is handed the song's ISRC from Apple Music's
-                  catalog (SystemMusicHaptics.x), and for a song Apple has a haptic track for the mod's stands down
-                  until the next song. The analyzer is scored on the Mac against harness/haptics/, the hook in the simulator against its
-                  sim/, the settings against harness/haptics-page/
+                  app. Music Haptics is a choice of None, Generated (the above) or Native iOS (iOS 18 and up), never
+                  both: Native iOS asks Spotify's extended-metadata for the track's ISRC with Spotify's own spclient
+                  headers, asks Apple Music's catalog for that ISRC, and names the matched song's catalog id (same ISRC,
+                  length within 2 s, a haptic track) or else the ISRC in the now playing info for iOS's own Music
+                  Haptics (SystemMusicHaptics.x, its pure steps in SGHapticTrack.m). The analyzer is scored on the Mac
+                  against harness/haptics/, as are Native iOS's pure steps (build/track), the hook in the simulator
+                  against its sim/, the settings against harness/haptics-page/
     HeadGestures/ AirPods gestures (HeadGestures.h lists its files): CMHeadphoneMotionManager's attitudes, while the
                   switch is on and Spotify plays, read for a double nod, which adds the track to Liked Songs through
                   Spotify's collection platform (addURL:showUIConfirmation:completion:), and a shake, which skips; a
@@ -367,12 +370,14 @@ in the native look also Now playing bar (its device button and its flags), Queue
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
 buttons to hide); in the redesign instead Now playing (its device button). Then Vibrations under either look, a card for
-Controls (on until switched off) and one for Music Haptics (off until switched on, with an ⓘ saying it
-follows the sound this iPhone plays while Spotify is open), each opening out while its switch is on:
-Controls into its Strength (10 to 100%, a tap at the new strength with each step), Music Haptics into its
-Strength (20 to 200%, 100% being how it first shipped) and Follows, Everything (a tap on each kick and
-snare and a rumble under the bass), Beat (the taps without the rumble) or Bass (the kicks' taps and the
-rumble), all applying straight away. Live Activity, on iOS 17 and up under either look: its switch and which view it
+Controls (on until switched off) and one for Music Haptics, a choice of None, Generated or Native iOS
+(left out below iOS 18) with an ⓘ saying what each does. Someone with no choice stored gets Native iOS
+when Music Haptics is on in Accessibility, else Generated if the old switch was on, else None. Controls
+opens out while its switch is on into its Strength (10 to 100%, a tap at the new strength with each step);
+Generated into its Strength (20 to 200%, 100% being how it first shipped) and Follows, Everything (a tap on
+each kick and snare and a rumble under the bass), Beat (the taps without the rumble) or Bass (the kicks'
+taps and the rumble); Native iOS into a Status row (Off in iOS, Paused, Waiting, Checking, Ready, Playing
+or Unavailable), all applying straight away. Live Activity, on iOS 17 and up under either look: its switch and which view it
 shows, Lyrics, Queue or Control menu, and for Lyrics its Translations (off until switched on) and Text
 size (Small, Medium or Large), all applying straight away, the row reading out the view or Off. Audio effects, in either look (Shared/AudioEffects/AudioEffectsPage.m):
 the effects' switch with what the engine is doing under it, Presets (built-in ones and your own, saved, loaded

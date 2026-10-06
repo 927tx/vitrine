@@ -1,6 +1,8 @@
 # Music Haptics harness
 
-Two halves: the analyzer on the Mac, and the hook in the simulator.
+Two halves: the analyzer on the Mac, and the hook in the simulator. Beside them, `track.m` checks Native iOS's
+pure steps on the Mac (`./build.sh && build/track`): the ISRC check, hand-built TRACK_V4 replies and Apple's
+catalog songs matched or turned down.
 
 ## The analyzer on the Mac (`main.m`, `score.py`)
 

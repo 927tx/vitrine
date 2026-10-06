@@ -105,6 +105,9 @@ extern NSNotificationName const SGKaraokeLinesKeptNotification;
 // them: the ask in flight, not the pause before a lost one is asked again. A local file's walk can take
 // tens of seconds. A walk LyricsSources runs for Spotify's own request is not seen here. Main queue.
 BOOL SGKaraokeLooking(NSString *trackID);
+// The headers spclient needs to answer a request as the signed-in app, read off Spotify's own requests:
+// `use` runs at once when one has been seen, else with the first. Never logged or stored. Main queue.
+void SGSpclientHeaders(void (^use)(NSDictionary<NSString *, NSString *> *headers));
 // Asks spclient for a track's lyrics once, with the headers of Spotify's own requests, for when no
 // page of Spotify's has asked for them, e.g. with the app in the background.
 void SGKaraokeRequestLyrics(NSString *trackID);

@@ -5,8 +5,9 @@
 //     ControlHaptics.x     the player's and the now playing bar's controls, the scrubber, the cover swipes, the gestures
 //     MusicHaptics.x       Spotify's audio output listened to, and Core Haptics played along with it
 //     SGMusicAnalyzer.m    the listening: taps and a rumble out of the samples
-//     SystemMusicHaptics.x iOS's own Music Haptics given the song's ISRC; the mod's stands down for its songs
-//     HapticsSettings.m    the Vibrations cards, with each switch's strength and what Music Haptics follows
+//     SystemMusicHaptics.x iOS's own Music Haptics given the song's Apple Music id or ISRC (Native iOS)
+//     SGHapticTrack.m      the pure steps behind it: Spotify's extended metadata asked and read, Apple's songs matched
+//     HapticsSettings.m    the Vibrations cards, with each one's strength, what Music Haptics plays and follows
 //
 // Everything on them applies at once, without a restart. Everything hooked is Spotify's own (its controls
 // by accessibility identifier, its scrubber, its cover and title lists, its audio unit), so all of it works
@@ -16,7 +17,10 @@
 #import <UIKit/UIKit.h>
 
 #define SGKeyControlHaptics @"spotifyglass.haptics.controls"
+// The Music Haptics switch of before the choice below; read once to pick the choice for someone who had it.
 #define SGKeyMusicHaptics @"spotifyglass.haptics.music"
+// Which Music Haptics plays, an SGMusicHapticsMode.
+#define SGKeyMusicHapticsMode @"spotifyglass.haptics.music.mode"
 // How hard the taps are, a percentage within the range below; 100 is the feel each shipped with.
 #define SGKeyControlStrength @"spotifyglass.haptics.controls.strength"
 #define SGKeyMusicStrength @"spotifyglass.haptics.music.strength"
@@ -43,6 +47,13 @@ typedef NS_ENUM(NSInteger, SGMusicFollows) {
     SGMusicFollowsBass,         // a tap on each kick, and the rumble
 };
 
+// Stored as the index into the settings' list, which leaves the last one out below iOS 18.
+typedef NS_ENUM(NSInteger, SGMusicHapticsMode) {
+    SGMusicHapticsOff,
+    SGMusicHapticsGenerated,   // the mod's, worked out from the sound (MusicHaptics.x)
+    SGMusicHapticsNative,      // iOS's own, iOS 18 and later (SystemMusicHaptics.x)
+};
+
 typedef NS_ENUM(NSInteger, SGFeedback) {
     SGFeedbackPlay,      // playback starts
     SGFeedbackPause,     // playback stops
@@ -60,13 +71,16 @@ void SGPlayFeedback(SGFeedback feedback);
 // Wakes the Taptic Engine for feedback about to follow quickly (a finger on the scrubber).
 void SGPrepareFeedback(SGFeedback feedback);
 
-// From the Music Haptics switch: starts or stops listening at once.
-void SGSetMusicHapticsEnabled(BOOL on);
+// Which Music Haptics plays. Native reads Off below iOS 18; nothing stored yet reads the old switch, on as
+// Generated. Main thread.
+SGMusicHapticsMode SGMusicHapticsModeNow(void);
+// Posted on the main thread when the choice changes; both engines take it up at once.
+extern NSNotificationName const SGMusicHapticsModeChangedNotification;
 // From its strength and its choice of what to follow: reads them again, for the next tap.
 void SGMusicHapticsSettingsChanged(void);
-// From SystemMusicHaptics.x: iOS's own Music Haptics has a haptic track for the song playing, so the mod's
-// stands down (YES), or the song changed and it may play again (NO).
-void SGMusicHapticsSetSystemPlaying(BOOL playing);
+// What iOS's own Music Haptics is doing, for the settings to read out: SystemMusicHaptics.x sets it. Main thread.
+NSString *SGMusicHapticsStatus(void);
+void SGSetMusicHapticsStatus(NSString *status);
 
 // A strength key's percentage as a factor, 1 for 100%, kept within its range.
 double SGHapticsStrength(NSString *key);

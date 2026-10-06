@@ -17,15 +17,15 @@
 // what Music Haptics follows leaves out the snares' taps (Bass) or the rumble (Beat) there too, so a change
 // applies to the next event.
 //
-// The rebinding and the notify are in place under either look, so the switch works at once;
-// with the switch off the notify returns straight away. Nothing listens while Spotify is not the active
-// app, since iOS plays no haptics for an app in the background. Sound that is not Spotify's own
+// The rebinding and the notify are in place under either look, so the choice works at once; with
+// anything but Generated chosen the notify returns straight away. Nothing listens while Spotify is not the
+// active app, since iOS plays no haptics for an app in the background. Sound that is not Spotify's own
 // output (Connect, AirPlay to another device, video) never passes the unit, and plays no haptics.
-// Nothing listens either while iOS's own Music Haptics plays a haptic track of the song
-// (SystemMusicHaptics.x), so the two never play at once; the mod's fills in for songs Apple has none for.
+// The choice is read again every time listening could start, not kept from launch, so with Native iOS
+// chosen (SystemMusicHaptics.x) this one stays quiet whatever order the two came up in.
 //
 // Threading: the notify runs on the render thread and only touches atomics, the analyzer and the
-// ring; the Core Haptics objects belong to the player thread; the switch, its settings and the app's
+// ring; the Core Haptics objects belong to the player thread; the choice, its settings and the app's
 // state are set on the main thread.
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -62,7 +62,7 @@ enum { kRingSize = 1024, kMonoFrames = 4096 };
 
 #pragma mark - shared between the threads
 
-static atomic_bool sg_enabled, sg_active, sg_systemPlaying, sg_listening;
+static atomic_bool sg_active, sg_listening;
 static atomic_uint sg_generation;
 static atomic_uint_fast64_t sg_latencyBits;
 static atomic_uint sg_lastFrames;
@@ -498,7 +498,7 @@ static void readLatency(void) {
 }
 
 static void updateListening(void) {
-    BOOL listening = atomic_load(&sg_enabled) && atomic_load(&sg_active) && !atomic_load(&sg_systemPlaying);
+    BOOL listening = SGMusicHapticsModeNow() == SGMusicHapticsGenerated && atomic_load(&sg_active);
     if (atomic_exchange(&sg_listening, listening) == listening) return;
     if (listening) {
         atomic_fetch_add(&sg_generation, 1);
@@ -514,18 +514,6 @@ static void updateListening(void) {
         });
     }
     dispatch_semaphore_signal(sg_wake);
-}
-
-void SGSetMusicHapticsEnabled(BOOL on) {
-    if (!sg_wake) return;
-    atomic_store(&sg_enabled, on);
-    updateListening();
-}
-
-void SGMusicHapticsSetSystemPlaying(BOOL playing) {
-    if (atomic_exchange(&sg_systemPlaying, playing) == playing || !sg_wake) return;
-    if (atomic_load(&sg_enabled)) SGLog(@"music haptics: %@", playing ? @"iOS's own plays this song, standing down" : @"playing along again");
-    updateListening();
 }
 
 static void readSettings(void) {
@@ -553,8 +541,10 @@ void SGMusicHapticsSettingsChanged(void) {
     }
     sg_wake = dispatch_semaphore_create(0);
     readSettings();
-    atomic_store(&sg_enabled, SGFlag(SGKeyMusicHaptics, NO));
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+    [center addObserverForName:SGMusicHapticsModeChangedNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+        updateListening();
+    }];
     [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
         atomic_store(&sg_active, true);
         updateListening();

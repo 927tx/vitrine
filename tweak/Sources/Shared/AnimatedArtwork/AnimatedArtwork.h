@@ -38,8 +38,9 @@ void SGMotionArtistLogo(NSString *artist, CGFloat pixels, void (^done)(UIImage *
 // screen's full width ran to 29 MB a song; at this width it was 7 MB and looks the same in motion.
 CGFloat SGMotionPixels(void);
 
-// A song's ISRC from Apple Music's catalog, or nil. Main queue.
-void SGMotionSongISRC(NSString *artist, NSString *title, void (^done)(NSString *isrc));
+// Apple Music's catalog songs with this ISRC, each with its isrc, durationInMillis and hasHaptics, or nil
+// when the catalog could not be asked. Kept for the launch. Main queue.
+void SGMotionSongsWithISRC(NSString *isrc, void (^done)(NSArray *songs));
 
 // Any remote video (a Canvas) as a local file, or nil. Main queue.
 void SGMotionFile(NSURL *remote, void (^done)(NSURL *file));

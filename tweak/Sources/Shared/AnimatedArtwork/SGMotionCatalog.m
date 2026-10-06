@@ -1,4 +1,4 @@
-// Animated album covers and artist logos from Apple Music's catalog. The catalog takes the developer
+// Animated album covers, artist logos and songs by ISRC from Apple Music's catalog. The catalog takes the developer
 // token Apple Music's web player carries, so the token is read out of the web player's script and
 // kept until it is about to expire. Answers are kept for the launch.
 #import "Core/SGCore.h"
@@ -7,6 +7,7 @@
 static NSString *const kTokenKey = @"spotifyglass.motion.token";
 static NSString *const kBrowse = @"https://music.apple.com/us/browse";
 static NSString *const kSearch = @"https://amp-api.music.apple.com/v1/catalog/us/search";
+static NSString *const kSongs = @"https://amp-api.music.apple.com/v1/catalog/us/songs";
 static NSString *const kSafari = @"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15";
 // A token this close to its expiry is read again rather than used.
 static const NSTimeInterval kTokenMargin = 3600;
@@ -224,33 +225,38 @@ static NSString *escaped(NSString *value) {
     return [value stringByAddingPercentEncodingWithAllowedCharacters:unreserved] ?: @"";
 }
 
-// `found` is the search's results of that type, empty when it has none; `answered` is NO when the
-// catalog could not be asked, so the caller does not remember the absence.
-static void search(NSString *type, NSString *term, NSString *extend, BOOL renew, void (^done)(NSArray *found, BOOL answered)) {
+// The array at `path` in the catalog's answer, empty when it has none; `answered` is NO when the catalog
+// could not be asked, so the caller does not remember the absence. A refused token is read again once.
+static void askCatalog(NSString *address, NSString *path, BOOL renew, void (^done)(NSArray *found, BOOL answered)) {
     withToken(^(NSString *token) {
         if (!token) {
             done(nil, NO);
             return;
         }
-        NSString *address = [NSString stringWithFormat:@"%@?term=%@&types=%@&limit=10&extend=%@", kSearch, escaped(term), type, extend];
         NSMutableURLRequest *request = requestFor([NSURL URLWithString:address]);
         [request setValue:[@"Bearer " stringByAppendingString:token] forHTTPHeaderField:@"Authorization"];
         // The catalog refuses the web player's token without the web player's origin.
         [request setValue:@"https://music.apple.com" forHTTPHeaderField:@"Origin"];
         fetch(request, ^id(NSData *data) {
             id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-            id found = dig(json, [NSString stringWithFormat:@"results/%@/data", type]);
+            id found = dig(json, path);
             return [found isKindOfClass:NSArray.class] ? found : @[];
         }, ^(NSArray *found, NSInteger status) {
             if (status == 401 && renew) {
                 SGLog(@"motion: token refused, reading it again");
                 forgetToken(token);
-                search(type, term, extend, NO, done);
+                askCatalog(address, path, NO, done);
                 return;
             }
             done(found, status == 200);
         });
     });
+}
+
+// `found` is the search's results of that type.
+static void search(NSString *type, NSString *term, NSString *extend, BOOL renew, void (^done)(NSArray *found, BOOL answered)) {
+    NSString *address = [NSString stringWithFormat:@"%@?term=%@&types=%@&limit=10&extend=%@", kSearch, escaped(term), type, extend];
+    askCatalog(address, [NSString stringWithFormat:@"results/%@/data", type], renew, done);
 }
 
 // Runs `look` once per key and launch. `look` calls `answer` exactly once; `keep` is NO for a failure
@@ -398,34 +404,19 @@ void SGMotionArtistLogo(NSString *artist, CGFloat pixels, void (^done)(UIImage *
 
 #pragma mark - recordings
 
-// The song's ISRC, for iOS's Music Haptics, which plays haptics for a recording it knows by that code.
-void SGMotionSongISRC(NSString *artist, NSString *title, void (^done)(NSString *isrc)) {
+// The catalog's songs with this ISRC, for iOS's Music Haptics: the recording itself, not a search by name.
+void SGMotionSongsWithISRC(NSString *isrc, void (^done)(NSArray *songs)) {
     if (!NSThread.isMainThread) {
-        dispatch_async(dispatch_get_main_queue(), ^{ SGMotionSongISRC(artist, title, done); });
+        dispatch_async(dispatch_get_main_queue(), ^{ SGMotionSongsWithISRC(isrc, done); });
         return;
     }
-    NSString *artistKey = SGMotionNameKey(artist), *titleKey = SGMotionNameKey(title);
-    if (!artistKey.length || !titleKey.length) {
+    if (!isrc.length) {
         done(nil);
         return;
     }
-    NSString *key = [NSString stringWithFormat:@"isrc\n%@\n%@", artistKey, titleKey];
-    lookUp(key, ^(NSString *isrc) { done(isrc); }, ^(void (^answer)(id, BOOL)) {
-        search(@"songs", [NSString stringWithFormat:@"%@ %@", artist, title], @"", YES, ^(NSArray *found, BOOL answered) {
-            if (!answered) {
-                answer(nil, NO);
-                return;
-            }
-            NSString *isrc = nil;
-            for (id result in found) {
-                id attributes = dig(result, @"attributes");
-                if (!sameArtist(artistKey, SGMotionNameKey(dig(attributes, @"artistName")))) continue;
-                if (![SGMotionNameKey(dig(attributes, @"name")) isEqualToString:titleKey]) continue;
-                id code = dig(attributes, @"isrc");
-                if ([code isKindOfClass:NSString.class] && [code length]) isrc = code;
-                break;
-            }
-            answer(isrc, YES);
-        });
+    lookUp([@"isrc\n" stringByAppendingString:isrc], done, ^(void (^answer)(id, BOOL)) {
+        // filter[isrc] and fields[songs], the brackets escaped: iOS before 17 makes no URL of them bare.
+        NSString *address = [NSString stringWithFormat:@"%@?filter%%5Bisrc%%5D=%@&fields%%5Bsongs%%5D=isrc,durationInMillis,hasHaptics", kSongs, escaped(isrc)];
+        askCatalog(address, @"data", YES, ^(NSArray *found, BOOL answered) { answer(found, answered); });
     });
 }

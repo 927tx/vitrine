@@ -190,6 +190,11 @@ static int sg_failures;
               ok ? @"  ok  " : @"FAILED", @"44.1 kHz client, Everything, 100%", peek.kicks, peek.snares, s, s, s, tap100, peek.levels, level100);
     }]];
 #ifndef BEFORE
+    // What the settings' choice does: stores it and tells both engines.
+    void (^choose)(SGMusicHapticsMode) = ^(SGMusicHapticsMode mode) {
+        SGSetInt(SGKeyMusicHapticsMode, mode);
+        [NSNotificationCenter.defaultCenter postNotificationName:SGMusicHapticsModeChangedNotification object:nil];
+    };
     void (^set)(NSInteger, NSInteger) = ^(NSInteger follows, NSInteger strength) {
         SGSetInt(SGKeyMusicFollows, follows);
         SGSetInt(SGKeyMusicStrength, strength);
@@ -208,21 +213,21 @@ static int sg_failures;
         @[@"Everything at 200%", ^{ set(SGMusicFollowsEverything, 200); }, ^(double s) {
             [self report:@"Everything at 200%" seconds:s kicks:1 snares:1 rumble:YES intensity:NAN level:MIN(1, level100 * 2)];
         }],
-        @[@"the switch off", ^{ SGSetMusicHapticsEnabled(NO); }, ^(double s) {
-            [self report:@"the switch off" seconds:s kicks:0 snares:0 rumble:NO intensity:NAN level:NAN];
+        @[@"None chosen", ^{ choose(SGMusicHapticsOff); }, ^(double s) {
+            [self report:@"None chosen" seconds:s kicks:0 snares:0 rumble:NO intensity:NAN level:NAN];
         }],
-        @[@"on again, Everything, 100%", ^{
+        @[@"Generated again, Everything, 100%", ^{
             set(SGMusicFollowsEverything, 100);
-            SGSetMusicHapticsEnabled(YES);
+            choose(SGMusicHapticsGenerated);
         }, ^(double s) {
-            [self report:@"on again, Everything, 100%" seconds:s kicks:1 snares:1 rumble:YES intensity:tap100 level:level100];
+            [self report:@"Generated again, Everything, 100%" seconds:s kicks:1 snares:1 rumble:YES intensity:tap100 level:level100];
         }],
-        // What SystemMusicHaptics.x says when Apple has a haptic track for the song, and at the next song.
-        @[@"iOS's own Music Haptics plays", ^{ SGMusicHapticsSetSystemPlaying(YES); }, ^(double s) {
-            [self report:@"iOS's own Music Haptics plays" seconds:s kicks:0 snares:0 rumble:NO intensity:NAN level:NAN];
+        // With Native iOS chosen the mod's stays quiet, whatever iOS does with the song.
+        @[@"Native iOS chosen", ^{ choose(SGMusicHapticsNative); }, ^(double s) {
+            [self report:@"Native iOS chosen" seconds:s kicks:0 snares:0 rumble:NO intensity:NAN level:NAN];
         }],
-        @[@"a song iOS has none for", ^{ SGMusicHapticsSetSystemPlaying(NO); }, ^(double s) {
-            [self report:@"a song iOS has none for" seconds:s kicks:1 snares:1 rumble:YES intensity:tap100 level:level100];
+        @[@"Generated chosen again", ^{ choose(SGMusicHapticsGenerated); }, ^(double s) {
+            [self report:@"Generated chosen again" seconds:s kicks:1 snares:1 rumble:YES intensity:tap100 level:level100];
         }],
     ]];
 #endif
@@ -254,8 +259,8 @@ static int sg_failures;
 
 @end
 
-// Music Haptics on, and its settings at their defaults, before MusicHaptics.x's constructor reads them; the
-// redesign on, which gates it.
+// Music Haptics on (the old switch, which reads as Generated with no choice stored), and its settings at
+// their defaults, before MusicHaptics.x's constructor reads them; the redesign on, which gates it.
 __attribute__((constructor(101))) static void sgr_harnessDefaults(void) {
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
     for (NSString *key in defaults.dictionaryRepresentation.allKeys) {

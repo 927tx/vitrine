@@ -6,8 +6,8 @@
 //     THEOS=$HOME/theos ./build.sh && xcrun simctl install <udid> build/HapticsPageHarness.app
 //     xcrun simctl launch <udid> com.vojta.hapticspageharness [setup...] [action...]
 //
-// Setup: keep (the stored settings stay; otherwise every spotifyglass.redesign.haptics key is cleared first),
-// controls-off (Controls switched off), music (Music Haptics on), follows=<n>, slow (animations at a twentieth
+// Setup: keep (the stored settings stay; otherwise every haptics key is cleared first),
+// controls-off (Controls switched off), music (Music Haptics on Generated), native (on Native iOS), follows=<n>, slow (animations at a twentieth
 // of their speed).
 // Actions: toggle=<section>.<row> (that row's switch flipped the way a tap does), slide=<section>.<row>:<value>
 // (that slider dragged there and let go), swipe=<section>.<row>:<n> (VoiceOver's swipe up on it, n times, down
@@ -52,13 +52,14 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
     NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
     if (![args containsObject:@"keep"]) {
         for (NSString *key in store.dictionaryRepresentation.allKeys) {
-            if ([key hasPrefix:@"spotifyglass.redesign.haptics"]) [store removeObjectForKey:key];
+            if ([key hasPrefix:@"spotifyglass."] && [key containsString:@"haptics"]) [store removeObjectForKey:key];
         }
     }
     NSMutableArray<NSString *> *actions = [NSMutableArray array];
     for (NSString *arg in [args subarrayWithRange:NSMakeRange(1, args.count - 1)]) {
         if ([arg isEqualToString:@"controls-off"]) SGSetEnabled(SGKeyControlHaptics, NO);
-        else if ([arg isEqualToString:@"music"]) SGSetEnabled(SGKeyMusicHaptics, YES);
+        else if ([arg isEqualToString:@"music"]) SGSetInt(SGKeyMusicHapticsMode, SGMusicHapticsGenerated);
+        else if ([arg isEqualToString:@"native"]) SGSetInt(SGKeyMusicHapticsMode, SGMusicHapticsNative);
         else if ([arg hasPrefix:@"follows="]) SGSetInt(SGKeyMusicFollows, [arg substringFromIndex:8].integerValue);
         else if (![@[@"keep", @"slow"] containsObject:arg]) [actions addObject:arg];
     }
@@ -138,10 +139,10 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
     } else if ([verb isEqualToString:@"dump"]) {
         NSDictionary *all = NSUserDefaults.standardUserDefaults.dictionaryRepresentation;
         for (NSString *key in [all.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
-            if ([key hasPrefix:@"spotifyglass.redesign.haptics"]) NSLog(@"[harness] stored %@ = %@", key, all[key]);
+            if ([key hasPrefix:@"spotifyglass."] && [key containsString:@"haptics"]) NSLog(@"[harness] stored %@ = %@", key, all[key]);
         }
         NSLog(@"[harness] the hooks read: Controls %@ at %.0f%%, Music Haptics %@ at %.0f%% following %ld", SGEnabled(SGKeyControlHaptics) ? @"on" : @"off",
-              SGHapticsStrength(SGKeyControlStrength) * 100, SGFlag(SGKeyMusicHaptics, NO) ? @"on" : @"off",
+              SGHapticsStrength(SGKeyControlStrength) * 100, @[@"None", @"Generated", @"Native iOS"][SGMusicHapticsModeNow()],
               SGHapticsStrength(SGKeyMusicStrength) * 100, (long)SGMusicHapticsFollows());
         for (NSInteger section = 0; section < table.numberOfSections; section++) {
             NSMutableArray<NSString *> *rows = [NSMutableArray array];
