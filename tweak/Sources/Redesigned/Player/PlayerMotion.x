@@ -357,37 +357,14 @@ void SGRPlayerMotionLyricsChanged(void) {
     [sg_motion setBlurred:SGRPlayerLyricsOpen() animated:sg_motion.window != nil];
 }
 
-@interface SGRPlayerMotionWatcher : NSObject <SGPlayerStateObserver>
-@end
-
-@implementation SGRPlayerMotionWatcher
-- (void)playerStateDidChange:(SPTPlayerState *)state {
-    NSString *track = SGURIString(state.track.URI);
-    if (!track || [track isEqualToString:sg_track]) return;
-    sg_track = track;
-    clear(YES);
-    // Read on every track, since the ⋯ menu switches it.
-    if (SGRPlayerBackground() != SGRPlayerBackgroundAnimated) return;
-    NSDictionary *metadata = [state.track.metadata isKindOfClass:NSDictionary.class] ? state.track.metadata : nil;
-    id type = metadata[@"canvas.type"], address = metadata[@"canvas.url"];
-    BOOL video = [type isKindOfClass:NSString.class] && [type rangeOfString:@"video" options:NSCaseInsensitiveSearch].location != NSNotFound;
-    NSURL *canvas = video && [address isKindOfClass:NSString.class] ? [NSURL URLWithString:address] : nil;
-    NSString *artist = state.track.artistName, *album = metadata[@"album_title"];
-    CGFloat pixels = SGMotionPixels();
-    static NSUInteger logged;
-    if (logged++ < 3) SGLog(@"redesign player: canvas %@ (%@)", canvas ? @"found" : @"none", type ?: @"no type");
-    SGMotionClipFor(canvas, artist, album, SGMotionTall, pixels, ^(NSURL *file) { show(track, file); });
-}
-@end
-
-static SGRPlayerMotionWatcher *sg_watcher;
+static SGMotionFollower *sg_follower;
 
 #pragma mark - the ⋯ menu's switch (Shared/Player/SpeedPitch.h)
 
 // Fluid and Animated share the field, so the menu moves between the two without a restart. The other
 // backgrounds are a field of another kind, chosen on the Player page (PlayerSettings.m).
 BOOL SGPlayerMenuOffersAnimatedArtwork(void) {
-    if (!sg_watcher) return NO;
+    if (!sg_follower) return NO;
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
     return background == SGRPlayerBackgroundFluid || background == SGRPlayerBackgroundAnimated;
 }
@@ -401,15 +378,21 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
     SGSetInt(SGRKeyPlayerBackground, on ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundFluid);
     SGLog(@"redesign player: animated artwork switched %@ from the menu", on ? @"on" : @"off");
     // The playing track is let go, and looked up again when switched on.
-    sg_track = nil;
     clear(YES);
-    [sg_watcher playerStateDidChange:SGPlayerState()];
+    [sg_follower restart];
 }
 
 %ctor {
     if (!SGRedesignedUI()) return;
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
     if (background != SGRPlayerBackgroundFluid && background != SGRPlayerBackgroundAnimated) return;
-    sg_watcher = [SGRPlayerMotionWatcher new];
-    SGAddPlayerStateObserver(sg_watcher);
+    sg_follower = [[SGMotionFollower alloc] initWithBegin:^BOOL(NSString *uri, SPTPlayerState *state) {
+        sg_track = uri;
+        clear(YES);
+        // Read on every track, since the ⋯ menu switches it.
+        return SGRPlayerBackground() == SGRPlayerBackgroundAnimated;
+    } found:^(NSString *uri, NSURL *file) {
+        if (file) show(uri, file);
+        else clear(YES);
+    }];
 }

@@ -47,10 +47,27 @@ void SGMotionSongsWithISRC(NSString *isrc, void (^done)(NSArray *songs));
 #define SGKeyMotionSources @"spotifyglass.motion.sources"
 NSArray<NSString *> *SGMotionSourceOrder(void);
 BOOL SGMotionAppleMusicOn(void);
-// The first clip the order finds for a track, as a local file, or nil. `canvas` is the track's Canvas
-// video, nil when it has none. Main queue.
-void SGMotionClipFor(NSURL *canvas, NSString *artist, NSString *album, SGMotionShape shape, CGFloat pixels,
-                     void (^done)(NSURL *file));
+// The track's Canvas video as its metadata names it (canvas.url, of a canvas.type that is a video), or nil.
+NSURL *SGMotionCanvasIn(NSDictionary *metadata);
+// The first clip the order finds for the track `uri`, as a local file, or nil, and the key of the source it
+// came from. `canvas` is the track's Canvas video, nil when its metadata names none, and then Spotify's
+// Canvas service is asked for it. Main queue.
+void SGMotionClipFor(NSString *uri, NSURL *canvas, NSString *artist, NSString *album, SGMotionShape shape, CGFloat pixels,
+                     void (^done)(NSURL *file, NSString *source));
+
+// Follows the player for one user of moving artwork, the lock screen or the redesign's player
+// (SGMotionFollower.m). Each track's sources are walked once, and again when its Canvas turns up in a later
+// state, as it does on a skip, where Spotify reports the track before its extended metadata, unless the clip
+// showing came from a source above Canvas. `begin` runs as a walk starts, to take the last clip off, and
+// says whether to walk at all; `found` gets the walk's clip, nil for none, and never runs for a walk a newer
+// one overtook. Once a walk has ended, the next track's clip is fetched ahead. Main queue.
+@class SPTPlayerState;
+@interface SGMotionFollower : NSObject
+- (instancetype)initWithBegin:(BOOL (^)(NSString *uri, SPTPlayerState *state))begin
+                        found:(void (^)(NSString *uri, NSURL *file))found;
+// The track is walked again from the player's last state: a setting it depends on changed.
+- (void)restart;
+@end
 // The row that opens the ordered list, for the Player page and the lock screen's.
 @class SGModRow;
 SGModRow *SGMotionSourcesRow(void);

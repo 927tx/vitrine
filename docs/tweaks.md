@@ -130,7 +130,13 @@ Shared:
                   (SGMotionCatalog.m), kept as local files (SGMotionStore.m), on iOS 26 the lock screen's full-screen
                   artwork (LockScreenMotion.x). With Every song, a song with neither gets its cover over copies of it
                   blurred and swaying, a seamless 8 s 3:4 loop drawn on the CPU only when the lock screen asks for it
-                  and kept per picture (SGFluidClip.m). Rendered on the Mac against harness/fluid-clip/
+                  and kept per picture (SGFluidClip.m). Rendered on the Mac against harness/fluid-clip/. A track whose
+                  metadata names no Canvas has it asked of Spotify's Canvas service (MotionSources.m); each track is
+                  looked up again when its Canvas comes in a later state, and the next track's clip is fetched ahead
+                  (SGMotionFollower.m). The lock screen takes a clip under a key the system lists, cut to that key's
+                  shape when it is not, with its still filled to the size asked (SGMotionClip.m), and a change of the
+                  choice applies at once, but to or from Lyrics. The cut and the service's wire format are checked on
+                  the Mac against harness/motion/
     LocalFiles/   local files (LocalFiles.h lists its files): Edit info in the player's ⋯ menu, the table's footer
                   under Speed and pitch, which closes the menu and opens a form sheet (the three names, the cover
                   with a menu to change it, Restore file's info; nothing is stored before Save, and a swipe away

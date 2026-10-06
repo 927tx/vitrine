@@ -170,12 +170,19 @@ NSString *SGSingModelSizeText(void) { return @""; }
 void SGSingDownloadModel(void) {}
 void SGSingCancelModelDownload(void) {}
 
-// MotionSources.m: the default order, Canvas then Apple Music, over the catalog the harness builds.
+// MotionSources.m: the default order, Canvas then Apple Music, over the catalog the harness builds. No
+// Canvas service: a track whose metadata names no Canvas goes to Apple Music.
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
-void SGMotionClipFor(NSURL *canvas, NSString *artist, NSString *album, SGMotionShape shape, CGFloat pixels, void (^done)(NSURL *file)) {
-    void (^apple)(void) = ^{ SGMotionAlbumCover(artist, album, shape, pixels, done); };
+NSArray<NSString *> *SGMotionSourceOrder(void) { return @[@"canvas", @"applemusic"]; }
+NSURL *SGMotionCanvasIn(NSDictionary *metadata) {
+    id address = metadata[@"canvas.url"];
+    return [metadata[@"canvas.type"] hasPrefix:@"VIDEO"] && [address isKindOfClass:NSString.class] ? [NSURL URLWithString:address] : nil;
+}
+void SGMotionClipFor(NSString *uri, NSURL *canvas, NSString *artist, NSString *album, SGMotionShape shape, CGFloat pixels,
+                     void (^done)(NSURL *file, NSString *source)) {
+    void (^apple)(void) = ^{ SGMotionAlbumCover(artist, album, shape, pixels, ^(NSURL *file) { done(file, file ? @"applemusic" : nil); }); };
     if (!canvas) { apple(); return; }
-    SGMotionFile(canvas, ^(NSURL *file) { if (file) done(file); else apple(); });
+    SGMotionFile(canvas, ^(NSURL *file) { if (file) done(file, @"canvas"); else apple(); });
 }
 // The Artwork sources row as a link to nowhere, so the Player page's rows under the card can be counted.
 #import "Settings/SGModPage.h"
