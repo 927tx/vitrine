@@ -15,8 +15,8 @@
 //   at y 12.5 over an SPTEncoreLabel at y 35.
 #import "Core/SGCore.h"
 #import "Navbar.h"
-#import "Headers/SPTEncoreIconView.h"
 #import "Shared/Navigation/Links.h"
+#import "Shared/Navigation/TabIcons.h"
 #import <objc/message.h>
 
 static const CGFloat kIconSize = 24;
@@ -42,27 +42,10 @@ static UIColor *itemColor(void) { return [UIColor colorWithWhite:0xB3 / 255.0 al
 
 #pragma mark - the mod's own items
 
-// One of the 538 glyphs SPTEncoreIcon exposes, one class method each ("podcasts", "heart"), so an
-// item of the mod's own is drawn the same way as Spotify's. An SF Symbol stands in if the name is
-// not one of them.
-static UIView *iconView(NSString *name) {
-    Class icon = NSClassFromString(@"SPTEncoreIcon");
-    Class view = NSClassFromString(@"SPTEncoreIconView");
-    SEL glyphSel = NSSelectorFromString(name.length ? name : @"star");
-    if (icon && view && [icon respondsToSelector:glyphSel]) {
-        id (*glyphFor)(id, SEL) = (id (*)(id, SEL))objc_msgSend;
-        id glyph = glyphFor(icon, glyphSel);
-        SPTEncoreIconView *encore = glyph ? [[view alloc] initWithIcon:glyph] : nil;
-        if (encore) {
-            [encore setForegroundColor:itemColor()];
-            return encore;
-        }
-    }
-    UIImage *image = [UIImage systemImageNamed:@"star.fill" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightSemibold]];
-    UIImageView *fallback = [[UIImageView alloc] initWithImage:image];
-    fallback.tintColor = itemColor();
-    fallback.contentMode = UIViewContentModeCenter;
-    return fallback;
+// Drawn the way Spotify's own are, an Encore glyph or an SF Symbol at the glyphs' size
+// (Shared/Navigation/TabIcons.h).
+static UIView *iconView(NSDictionary *entry) {
+    return SGTabIconView(entry[SGNavbarIcon], [entry[SGNavbarIconSet] isEqual:SGTabIconSetSymbols], itemColor());
 }
 
 @interface SGTabItemView : UIControl
@@ -91,11 +74,12 @@ static UIView *iconView(NSString *name) {
 - (void)applyEntry:(NSDictionary *)entry {
     self.uri = entry[SGNavbarURI];
     _title.text = entry[SGNavbarTitle];
-    NSString *name = entry[SGNavbarIcon] ?: @"star";
+    // The set is part of the name: "star" is a glyph in one and a symbol in the other.
+    NSString *name = [NSString stringWithFormat:@"%@ %@", entry[SGNavbarIconSet] ?: @"encore", entry[SGNavbarIcon] ?: @"star"];
     if ([name isEqualToString:_iconName]) return;
     [_icon removeFromSuperview];
     _iconName = [name copy];
-    _icon = iconView(name);
+    _icon = iconView(entry);
     // Encore's views lay themselves out from constraints; this one is placed by frame.
     _icon.translatesAutoresizingMaskIntoConstraints = YES;
     [self addSubview:_icon];
