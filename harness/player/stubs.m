@@ -227,3 +227,8 @@ BOOL SGMotionAppleMusicOn(void) { return YES; }
 // TabBar.x: the Mini player section's Apple Music style switch lays the tab bar out again; there is none here.
 void SGRSetTabBarMinimized(BOOL minimized, BOOL animated) {}
 void SGRRefreshTabBar(void) {}
+
+// The ⋯'s system menu (PlayerMenu.m, ContextMenu.x), which this harness does not build; PlayerHeader.x hands it
+// the ⋯, and with no button of the mod's over it the ⋯'s own touches press its circle.
+void SGRPlayerMenuWatch(UIView *button) {}
+UIControl *SGRSystemMenuFront(UIView *button) { return nil; }

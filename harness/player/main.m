@@ -46,6 +46,8 @@
 
 void SGRHarnessPlayFrom(NSInteger ms);
 void SGRHarnessSetTrack(NSString *uri, NSString *imageURI, BOOL paused);
+// ../tabbar/touch.m: a finger's touches, through UIKit's own recognizers.
+extern void SGHarnessHold(UIWindow *window, CGPoint point, NSTimeInterval seconds);
 
 static NSString *scenario(void) {
     const char *value = getenv("HARNESS_SCENARIO");
@@ -186,6 +188,9 @@ static NSString *colorName(UIImage *image) {
 
 @interface _TtC20NowPlaying_ModesImpl28PlaybackControlsElementsUnit : UIViewController @end
 @implementation _TtC20NowPlaying_ModesImpl28PlaybackControlsElementsUnit @end
+
+@interface _TtC20NowPlaying_ModesImpl18HeaderElementsUnit : UIViewController @end
+@implementation _TtC20NowPlaying_ModesImpl18HeaderElementsUnit @end
 
 @interface _TtC20NowPlaying_ModesImpl18FooterElementsUnit : UIViewController @end
 @implementation _TtC20NowPlaying_ModesImpl18FooterElementsUnit @end
@@ -375,6 +380,7 @@ static void loadLyrics(void) {
 
 @implementation SGRHarnessDelegate {
     NSArray<UIViewController *> *_units;
+    NSUInteger _headerDowns;
     UIImageView *_cover, *_barCover;
     UIViewController *_bar;
     UICollectionView *_covers;
@@ -538,9 +544,11 @@ static void loadLyrics(void) {
     footer.view = footerView;
     UIViewController *playback = [_TtC20NowPlaying_ModesImpl28PlaybackControlsElementsUnit new];
     playback.view = controls;
+    UIViewController *headerUnit = [_TtC20NowPlaying_ModesImpl18HeaderElementsUnit new];
+    headerUnit.view = header;
     UIViewController *player = [_TtC19NowPlaying_ViewImpl24NowPlayingViewController new];
     player.view = host;
-    _units = @[info, duration, floating, playback, footer, scrollUnit, background, player];
+    _units = @[headerUnit, info, duration, floating, playback, footer, scrollUnit, background, player];
     _covers = covers;
     _plane = plane;
     _host = host;
@@ -548,7 +556,7 @@ static void loadLyrics(void) {
     // The player has not been opened yet: its background plane is laid out only when it is.
     if ([scenario() isEqualToString:@"motion"]) {
         [plane removeFromSuperview];
-        _units = @[info, duration, floating, playback, footer, scrollUnit, player];
+        _units = @[headerUnit, info, duration, floating, playback, footer, scrollUnit, player];
     }
     [self start];
     [self layOut];
@@ -581,6 +589,7 @@ static void loadLyrics(void) {
     else if ([scenario() isEqualToString:@"preview"]) [self runPreviewChecks];
     else if ([scenario() isEqualToString:@"seek"]) [self runSeekChecks];
     else if ([scenario() isEqualToString:@"visualiser"]) [self runVisualiserChecks];
+    else if ([scenario() isEqualToString:@"header"]) [self runHeaderChecks];
     // Opened, closed and opened again, so a screenshot can be taken of each state and of the move itself.
     else for (NSNumber *at in @[@2, @6, @10]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -1558,6 +1567,52 @@ static BOOL linesSeek(SGRKaraokeView *lyrics) {
 }
 
 // One track, then another album's at 8 s, its picture on the screens 0.4 s later.
+// The header's glass circles press in under a finger (PlayerHeader.x): held on the down arrow and then on the
+// ⋯, each circle is smaller while the finger is down and whole again once it lifts.
+- (void)headerDown:(UIControl *)control {
+    _headerDowns++;
+}
+
+- (void)runHeaderChecks {
+    __block NSUInteger right = 0, checks = 0;
+    void (^check)(NSString *, BOOL, NSString *) = ^(NSString *step, BOOL ok, NSString *detail) {
+        checks++;
+        if (ok) right++;
+        NSLog(@"[harness] header %@: %@ -- %@", step, detail, ok ? @"ok" : @"WRONG");
+    };
+    UIView *header = _units.firstObject.view;
+    NSMutableArray<UIView *> *buttons = [NSMutableArray array];
+    for (UIView *view in header.subviews) if ([view isKindOfClass:MockEncoreButton.class]) [buttons addObject:view];
+    check(@"buttons", buttons.count == 2, [NSString stringWithFormat:@"%lu Encore buttons in the header", (unsigned long)buttons.count]);
+    __block NSUInteger i = 0;
+    __block void (^next)(void);
+    next = ^{
+        if (i == buttons.count) {
+            NSLog(@"[harness] header checks: %lu of %lu right -- %@", (unsigned long)right, (unsigned long)checks, right == checks ? @"PASS" : @"FAIL");
+            next = nil;
+            return;
+        }
+        UIView *button = buttons[i++];
+        NSString *name = button.accessibilityIdentifier;
+        UIView *circle = button.subviews.firstObject;
+        check(name, [circle isKindOfClass:UIVisualEffectView.class] && circle.bounds.size.width == 44, [NSString stringWithFormat:@"a 44pt glass circle first in it (%@)", NSStringFromClass(circle.class)]);
+        CGPoint middle = [button convertPoint:CGPointMake(CGRectGetMidX(button.bounds), CGRectGetMidY(button.bounds)) toView:nil];
+        check(name, [self.window hitTest:middle withEvent:nil] == button, @"a touch at its middle lands on the button");
+        [(UIControl *)button addTarget:self action:@selector(headerDown:) forControlEvents:UIControlEventTouchDown];
+        SGHarnessHold(self.window, middle, 0.5);
+        after(0.4, ^{
+            CGFloat scale = circle.transform.a;
+            check(name, scale < 0.95, [NSString stringWithFormat:@"its circle pressed in while the finger is down (scale %.2f, touch down events %lu, tracking %d)", scale, (unsigned long)self->_headerDowns, ((UIControl *)button).tracking]);
+        });
+        after(1.2, ^{
+            CGFloat scale = [[circle.layer.presentationLayer valueForKeyPath:@"transform.scale.x"] doubleValue];
+            check(name, fabs(scale - 1) < 0.01 && CGAffineTransformIsIdentity(circle.transform), [NSString stringWithFormat:@"and whole again once it lifts (scale %.2f)", scale]);
+            next();
+        });
+    };
+    after(2, next);
+}
+
 - (void)runLook {
     UIImage *second = secondArtwork();
     // Issue #54: the footer row moved down past the bottom stack's bounds must still take its touches,

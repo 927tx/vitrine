@@ -6,7 +6,7 @@ OUT=${OUT:-$(dirname "$0")/build}
 rm -rf "$OUT"; mkdir -p "$OUT/gen" "$OUT/PlayerHarness.app"
 
 for f in Redesigned/Player/PlayerLyrics.x Redesigned/Player/PlayerArtwork.x Redesigned/Player/PlayerFooter.x \
-         Redesigned/Player/PlayerScroll.x Redesigned/Player/PlayerField.x Redesigned/Player/PlayerMotion.x Redesigned/Player/PlayerLandscape.x Redesigned/Player/PlayerControls.x Redesigned/Kit/SGRBridges.x; do
+         Redesigned/Player/PlayerScroll.x Redesigned/Player/PlayerField.x Redesigned/Player/PlayerMotion.x Redesigned/Player/PlayerLandscape.x Redesigned/Player/PlayerControls.x Redesigned/Player/PlayerHeader.x Redesigned/Kit/SGRBridges.x; do
     name=$(basename "$f" .x)
     "$THEOS/bin/logos.pl" -c generator=internal "$SRC/$f" > "$OUT/gen/$name.m"
 done
@@ -15,7 +15,7 @@ SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
 xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-arc -g -O0 \
     -I"$SRC" -I"$SRC/Redesigned/Player" -I"$SRC/Redesigned/Kit" -I"$OUT/gen" -isysroot "$SDK" \
     -Wno-deprecated-declarations \
-    "$(dirname "$0")/main.m" "$(dirname "$0")/../scene.m" "$(dirname "$0")/stubs.m" \
+    "$(dirname "$0")/main.m" "$(dirname "$0")/../scene.m" "$(dirname "$0")/stubs.m" "$(dirname "$0")/../tabbar/touch.m" \
     "$OUT"/gen/*.m \
     "$SRC"/Core/SGLog.m "$SRC"/Core/SGPrefs.m "$SRC"/Core/SGViewTree.m "$SRC"/Core/SGGlass.m \
     "$SRC"/Core/SGBackdrop.m "$SRC"/Core/SGFlagForce.m "$SRC"/Core/SGUIMode.m \
@@ -26,7 +26,7 @@ xcrun -sdk iphonesimulator clang -target arm64-apple-ios17.0-simulator -fobjc-ar
     "$SRC"/Redesigned/Player/PlayerSettings.m "$SRC"/Redesigned/Player/PlayerVisualiser.m "$SRC"/Redesigned/Player/SGRSpectrum.m "$SRC"/Redesigned/NowPlayingBar/NowPlayingBarSettings.m \
     "$SRC"/Settings/SGPage.m "$SRC"/Settings/SGPageStyle.m "$SRC"/Settings/SGModPage.m "$SRC"/Settings/SGGlowSwitch.m \
     "$SRC"/Redesigned/Lyrics/SGRKaraokeView.m "$SRC"/Redesigned/Lyrics/LyricsLook.m "$SRC"/Redesigned/Lyrics/SGRSingButton.m "$SRC"/Redesigned/Lyrics/MeaningSheet.m "$SRC"/Redesigned/Lyrics/LyricsText.m "$SRC"/Shared/Lyrics/KaraokeTiming.m "$SRC"/Shared/Lyrics/Romanise.m "$SRC"/Shared/AdBlock/Protobuf.m \
-    -framework UIKit -framework QuartzCore -framework CoreGraphics -framework CoreImage -framework Foundation -framework Symbols -framework AVFoundation -framework CoreMedia -framework CoreVideo -framework Accelerate \
+    -framework UIKit -framework IOKit -framework QuartzCore -framework CoreGraphics -framework CoreImage -framework Foundation -framework Symbols -framework AVFoundation -framework CoreMedia -framework CoreVideo -framework Accelerate \
     -o "$OUT/PlayerHarness.app/PlayerHarness"
 
 cat > "$OUT/PlayerHarness.app/Info.plist" <<'PLIST'

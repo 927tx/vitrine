@@ -14,7 +14,8 @@ too. `SRC=<another checkout>/tweak/Sources OUT=<dir> ./build.sh` builds it again
 sources, for example an older commit, to see a bug before its fix.
 
 `build.sh` runs `logos.pl -c generator=internal` over `PlayerLyrics.x`, `PlayerArtwork.x`,
-`PlayerControls.x`, `PlayerFooter.x`, `PlayerScroll.x`, `PlayerField.x` and the Kit's `SGRBridges.x`, and links them with
+`PlayerControls.x`, `PlayerFooter.x`, `PlayerScroll.x`, `PlayerField.x`, `PlayerHeader.x` (the glass circles of
+the down arrow and the ⋯, in a mocked `HeaderElementsUnit`, and their press) and the Kit's `SGRBridges.x`, and links them with
 the real `Core/`, `Redesigned/Kit/`, `SGRKaraokeView`, `Settings/`, the Player page and the Visualiser (`PlayerVisualiser.m`, `SGRSpectrum.m`). `stubs.m` stands in for the hooks the harness
 does not compile (the Kit's accent and repaint, the rest of the player, the lyrics store, the haptics,
 Sing's mic) and plays a mock player: `SGRHarnessSetTrack` reports a track, with the image ids Spotify's
@@ -92,6 +93,13 @@ come late, out of order, or not at all.
   Fluid field held still with the reader on and the link at up to 60 fps, blur behind the lyrics with the link at
   30, settle and stop with the reader off on a pause, come back on play, and go and come back through the ⋯
   menu's switch to Fluid and back. The log ends with `visualiser checks: n of 7 right -- PASS` or `FAIL`.
+
+- `header` is the glass circles' press (`PlayerHeader.x`): a finger (`../tabbar/touch.m`) held half a second on
+  the down arrow and then on the ⋯, each a `UIControl` under Spotify's identifier. It checks each has a 44pt glass
+  circle first among its subviews, that a touch at its middle lands on the button, that the circle is pressed
+  in (scale 0.92) while the finger is down and whole again once it lifts. The log ends with
+  `header checks: n of 9 right -- PASS` or `FAIL`. The ⋯'s press on the phone comes through the mod's button
+  over it, which this harness does not build; `harness/system-menu`'s `arrow` run covers that button's events.
 
 - `seek` is the tap around the progress bar (`PlayerControls.x`): a mock slider with Spotify's identifier and
   the two times beside it. It checks that a tap counts below the bar and up to 12 pt past its ends, not on the
