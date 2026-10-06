@@ -76,7 +76,8 @@ Shared:
                   Hub JSON (AdHubs.x) and the feeds (Feeds.m), Premium pop-ups dropped (AdPopups.x), and the responses
                   rewritten on the way in (AdNetwork.x, Premium.m over the protobuf walker in Protobuf.m), with crossfade
                   and automix switched on in the player core and crossfade's switch kept in step with its slider (Crossfade.x)
-    Privacy/      telemetry blocking and its counters
+    Privacy/      telemetry blocking and its counters, and the tracking taken off shared open.spotify.com links
+                  (CleanLinks.x over the cleaner in CleanLinks.m)
     ArtistBlock/  tracks by blocked artists skipped as they start (ArtistSkip.x), the list and the Blocked artists page under Player
     Flags/        Spotify's remote-config flags: the provider hook, the generated table, the All flags page and the Labs page
     Gestures/     the double tap zones on the player: the grid, what each cell does, the recognizer (each look hooks it on)
@@ -407,7 +408,7 @@ four heights) and the Home flags, the parts of Home to hide including the DJ but
 playlist header, buttons and pills to hide, and the Library flags. Then Premium, ads & privacy
 (EeveeSpotify's Hide ads and Hide upsells, in the native look hiding the video carousel in Search, and
 an Ad and upsell flags page under them, every switch there forcing a flag Spotify ships on to off;
-Spoof Premium; Block telemetry; then what the ad
+Spoof Premium; Block telemetry; Clean shared links; then what the ad
 blocking and the telemetry blocking have stopped) and Labs (features Spotify built and did not ship,
 AI Chat (Martini) first). Last, All flags, Spotify's remote-config flags with a search field and an
 Auto / Off / On control per flag (a text field for the number and text ones), and Mod: Updates

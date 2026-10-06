@@ -4,6 +4,7 @@
 SGModSection *SGPrivacySection(void) {
     return SGSection(@"Privacy", @[
         SGWithSymbol(SGSwitchRow(@"Block telemetry", @"Spotify's own events still go out, since Recents is built from them", SGKeyBlockTelemetry), @"antenna.radiowaves.left.and.right.slash"),
+        SGWithSymbol(SGSwitchRow(@"Clean shared links", @"Takes the tracking (si, utm) off the links you copy or share", SGKeyCleanLinks), @"link"),
     ]);
 }
 
