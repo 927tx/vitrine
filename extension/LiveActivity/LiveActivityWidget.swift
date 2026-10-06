@@ -451,6 +451,8 @@ private struct Summary: View {
                     Text("Music stops in \(Text(timerInterval: Date()...end, countsDown: true))")
                 } else if state.timerEndOfTrack {
                     Text("Music stops at the end of this track")
+                } else if state.timerEndOfAlbum == true {
+                    Text("Music stops at the end of this album")
                 } else {
                     Text("No sleep timer")
                 }
@@ -626,7 +628,7 @@ private struct TimerPage: View {
 
     var body: some View {
         Group {
-            if (state.timerEnd.map { $0 > Date() } ?? false) || state.timerEndOfTrack {
+            if (state.timerEnd.map { $0 > Date() } ?? false) || state.timerEndOfTrack || state.timerEndOfAlbum == true {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Music stops")
@@ -637,7 +639,7 @@ private struct TimerPage: View {
                                 .font(.system(size: 34, weight: .bold).monospacedDigit())
                                 .foregroundStyle(green)
                         } else {
-                            Text("End of track")
+                            Text(state.timerEndOfAlbum == true ? "End of album" : "End of track")
                                 .font(.title2.weight(.bold))
                                 .foregroundStyle(green)
                         }
@@ -657,6 +659,7 @@ private struct TimerPage: View {
                     ChipButton(action: "timer:30", symbol: "moon", label: "30 min")
                     ChipButton(action: "timer:60", symbol: "moon", label: "1 hour")
                     ChipButton(action: "timer:track", symbol: "music.note", label: "End of track")
+                    ChipButton(action: "timer:album", symbol: "square.stack", label: "End of album")
                 }
             }
         }

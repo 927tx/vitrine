@@ -53,6 +53,8 @@ struct SGLyricsAttributes: ActivityAttributes {
         var cover: Data?
         // The lyrics' size, SGLiveActivityTextSize's values: 0 small, 1 medium, 2 large.
         var textSize: Int?
+        // The sleep timer pauses at the end of the album or playlist playing.
+        var timerEndOfAlbum: Bool?
     }
 }
 
@@ -89,7 +91,7 @@ struct SGPlayQueuedTrackIntent: LiveActivityIntent {
     }
 }
 
-// A control menu action: tab:N, toggle, previous, next, shuffle, repeat, timer:15|30|60|track|add|cancel.
+// A control menu action: tab:N, toggle, previous, next, shuffle, repeat, timer:15|30|60|track|album|add|cancel.
 @available(iOS 17.0, *)
 struct SGLiveActivityActionIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Control menu action"

@@ -193,7 +193,15 @@ Shared:
                   sheet as the system menu (Redesigned/ContextMenu), whose own items stand in for the block, so the
                   block stays out of it unless the sheet itself is shown (SGPlayerMenuReplaced). Switch to video,
                   the chip over the title of a song with a music video, is hidden under either look on request
-                  (VideoSwitch.x, spotifyglass.hide.videoSwitch), by its identifier in FloatingElementsUnit
+                  (VideoSwitch.x, spotifyglass.hide.videoSwitch), by its identifier in FloatingElementsUnit.
+                  The sleep timer (SleepTimer.m, set from the Live Activity) pauses Spotify at a time, at the end of
+                  the track or at the end of the album or playlist, the last track of it found by the tracks to come
+                  that are neither queued by hand nor autoplay's (SPTPlayerTrack's provider), or by the next one
+                  having played already when it repeats. Over the last seconds (the Live Activity page's Fade out: Off,
+                  10 s, 30 s, 1 minute or 2 minutes, 30 s unless picked; at the end of a track, over the whole track
+                  when it is shorter) it fades the sound 60 dB through a gain of the mod's own, applied by SpeedPitch.x's notify on the music's RemoteIO unit (never the system
+                  volume), and puts the gain back a second after the pause. Tested on the Mac against
+                  harness/sleep-timer/, the gain in the simulator against harness/speed/
     AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): a render
                   notify on the music's RemoteIO unit (SGPlayerMusicOutput, Shared/Player) runs each finished buffer through the mod's own engine, re-blocked to 1024 frames one block late,
                   in place (AudioEffects.x, SGDSPEngine.m). The buffers are in the unit's output format, the
@@ -263,7 +271,8 @@ Shared:
     LiveActivity/ a Live Activity on the lock screen and in the Dynamic Island in one of three views, the line being
                   sung with the next one under it, the tracks up next (a tap on one skipping ahead to it), or a control
                   menu of tabs, Controls (previous, play and pause, next, shuffle, repeat), Queue and a sleep Timer of
-                  the mod's own that pauses Spotify (LiveActivity.h lists its files): a timer polls the player and
+                  the mod's own (Player/SleepTimer.m: 15 min, 30 min, 1 hour, End of track, End of album) that fades
+                  the sound out and pauses Spotify, and stays set when the card is switched off (LiveActivity.h lists its files): a timer polls the player and
                   sends a new state only when what the view shows changes, local updates only, no push. The card
                   is tinted with the cover's colour and shows the cover itself, a JPEG of a few dozen pixels inside
                   the state, which ActivityKit caps at 4 KB (the bridge sends it without the cover when it would

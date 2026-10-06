@@ -9,6 +9,9 @@
 @property (nonatomic, readonly) NSString *trackTitle;
 // Every credited artist: artist_uri and artist_name, then artist_uri:1, artist_name:1 and on.
 @property (nonatomic, readonly) NSDictionary<NSString *, NSString *> *metadata;
+// Where the track came from in the tracks to come: the album or playlist, a hand queue, autoplay
+// (Shared/Player/SleepTimer.m reads it).
+@property (nonatomic, readonly, copy) NSString *provider;
 @end
 
 @interface SPTPlayerOptions : NSObject
