@@ -3,10 +3,13 @@
 #import <UIKit/UIKit.h>
 
 #define SGRKeyAccent @"spotifyglass.redesign.accent"   // 0xRRGGBB
+// The last colour picked, kept while a preset is in place so Custom brings it back.
+#define SGRKeyAccentCustom @"spotifyglass.redesign.accent.custom"
+// The redesign's own green until another is picked; Spotify's is a pick of its own, stored as -1.
+#define SGRDefaultAccent 0x37F200
 
 UIColor *SGRAccentColor(void);   // nil while Spotify's own green is kept
-NSString *SGRAccentLabel(void);  // "#RRGGBB", or the name of Spotify's own
-void SGRPickAccent(void);        // the system colour picker over the top of the app, stored on the way out
+NSInteger SGRAccentRGB(void);    // the colour in effect, 0xRRGGBB, Spotify's green included
 
 @class SGModRow;
-NSArray<SGModRow *> *SGRAppearanceRows(void);   // the accent colour, for the Appearance card
+NSArray<SGModRow *> *SGRAppearanceRows(void);   // the accent colour, for the Appearance page

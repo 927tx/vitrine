@@ -6,7 +6,6 @@
 // out of reach.
 #import "Core/SGCore.h"
 #import "Appearance.h"
-#import "Settings/SGPageStyle.h"
 
 // The greens the app is known to build from literals: the token, and the older brand green the
 // upsell backend still names.
@@ -33,38 +32,9 @@ UIColor *SGAccentColor(void) {
     return [UIColor colorWithRed:r green:g blue:b alpha:1];
 }
 
-NSString *SGAccentLabel(void) {
+NSInteger SGAccentRGB(void) {
     NSInteger rgb = chosen();
-    if (rgb == SGAppleMusicRed) return @"Apple Music red";
-    return rgb < 0 ? @"Spotify green" : [NSString stringWithFormat:@"#%06lX", (long)rgb];
-}
-
-#pragma mark - picker
-
-@interface SGAccentPicker : NSObject <UIColorPickerViewControllerDelegate>
-@end
-
-@implementation SGAccentPicker
-
-- (void)colorPickerViewControllerDidFinish:(UIColorPickerViewController *)picker {
-    CGFloat r = 0, g = 0, b = 0, a = 0;
-    [picker.selectedColor getRed:&r green:&g blue:&b alpha:&a];
-    uint32_t rgb = ((uint32_t)lround(MIN(1, MAX(0, r)) * 255) << 16)
-                 | ((uint32_t)lround(MIN(1, MAX(0, g)) * 255) << 8)
-                 | (uint32_t)lround(MIN(1, MAX(0, b)) * 255);
-    SGSetInt(SGKeyAccent, rgb);
-}
-
-@end
-
-void SGPickAccent(void) {
-    static SGAccentPicker *delegate;
-    if (!delegate) delegate = [SGAccentPicker new];
-    UIColorPickerViewController *picker = [UIColorPickerViewController new];
-    picker.supportsAlpha = NO;
-    picker.selectedColor = SGAccentColor() ?: [UIColor colorWithRed:0x1E / 255.0 green:0xD7 / 255.0 blue:0x60 / 255.0 alpha:1];
-    picker.delegate = delegate;
-    [SGTopController() presentViewController:picker animated:YES completion:nil];
+    return rgb < 0 ? SGSpotifyGreen : rgb;
 }
 
 // A darker green than the token comes out as the accent darkened by the same amount, so the two

@@ -369,9 +369,15 @@ Mod Settings, opened by holding Home on the tab bar or from the first row of the
 last row of Spotify's Settings, sorts every
 setting by the part of Spotify it changes, so a part's glass, its hide switches and its flags sit on
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
-they change. It opens on the Appearance card: Redesigned UI, then the stored look's accent colour, and in the native
-look AMOLED (the redesign is always black); Spotify's green is offered from the colour row once a colour
-is set. Last comes the Font, under either look and on any iOS, below 26 too. Redesigned UI is the one switch between the two looks (see Layers): it glows
+they change. It opens on the Appearance row, on a card of its own under the signing warning, which opens the Appearance
+page: Redesigned UI, then in the native look AMOLED (the redesign is always black), then the stored look's Accent colour
+preset, a pull-down of Spotify, Apple Music and Custom read off the colour stored (a colour set before the presets
+existed reads as Custom, Apple Music's red as Apple Music), and Accent colour, the hex and a swatch of the colour in
+effect, which opens the system picker in a sheet that stores only from its checkmark, as Custom. The custom colour is
+kept aside while a preset is in place, so Custom brings it back. Last come the Font, under either look and on any
+iOS, below 26 too, with Custom font among its choices (a .ttf or .otf imported from Files by the row under it,
+copied to Application Support/Vitrine/Font and registered again at each launch, Spotify's font coming back when the
+file is gone), and the App icon. Everything on the page applies after a restart. Redesigned UI is the one switch between the two looks (see Layers): it glows
 (Settings/SGGlowSwitch), its ⓘ says what it changes, and flipping it offers to restart Spotify.
 The pages show only what the stored look has: a page opened after flipping the switch already shows
 what the restart will bring. Then a card of parts. Navbar: the tab editor of the stored look, each with

@@ -199,6 +199,68 @@ SGModRow *SGSliderRow(NSString *title, NSString *subtitle, double minimum, doubl
     return row;
 }
 
+// The page builds the button and its menu (-menuButtonFor:), since it is the page that reads the rows again.
+SGModRow *SGMenuRow(NSString *title, NSArray<NSString *> *choices, NSString *(^value)(void), void (^chosen)(NSInteger index)) {
+    SGModRow *row = SGStatRow(title, value);
+    row.menu = choices;
+    row.chosen = chosen;
+    return row;
+}
+
+#pragma mark - the colour sheet
+
+// Holds the picker's callback for as long as the sheet is up: the checkmark is the one way a colour is stored.
+@interface SGColorSheet : NSObject
+@property (nonatomic, weak) UIColorPickerViewController *picker;
+@property (nonatomic, copy) void (^picked)(NSInteger rgb);
+@end
+
+@implementation SGColorSheet
+
+- (void)confirm {
+    CGFloat r = 0, g = 0, b = 0, a = 0;
+    [self.picker.selectedColor getRed:&r green:&g blue:&b alpha:&a];
+    NSInteger rgb = (lround(MIN(1, MAX(0, r)) * 255) << 16) | (lround(MIN(1, MAX(0, g)) * 255) << 8) | lround(MIN(1, MAX(0, b)) * 255);
+    void (^picked)(NSInteger rgb) = self.picked;
+    [self.picker.navigationController dismissViewControllerAnimated:YES completion:nil];
+    if (picked) picked(rgb);
+}
+
+- (void)cancel {
+    [self.picker.navigationController dismissViewControllerAnimated:YES completion:nil];
+}
+
+@end
+
+// Made from a CGColor: either look's accent hooks swap Spotify's green as UIColor makes it from components, and
+// this colour has to stay the one asked for, Spotify's green included, to show what a preset is.
+UIColor *SGColorRGB(NSInteger rgb) {
+    CGColorRef cg = CGColorCreateSRGB(((rgb >> 16) & 0xFF) / 255.0, ((rgb >> 8) & 0xFF) / 255.0, (rgb & 0xFF) / 255.0, 1);
+    UIColor *color = [UIColor colorWithCGColor:cg];
+    CGColorRelease(cg);
+    return color;
+}
+
+void SGPickColor(NSString *title, NSInteger initial, void (^picked)(NSInteger rgb)) {
+    UIColorPickerViewController *picker = [UIColorPickerViewController new];
+    picker.navigationItem.title = title;
+    picker.supportsAlpha = NO;
+    picker.selectedColor = SGColorRGB(initial);
+    SGColorSheet *sheet = [SGColorSheet new];
+    sheet.picker = picker;
+    sheet.picked = picked;
+    UIBarButtonItem *done = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"checkmark"] style:UIBarButtonItemStyleDone target:sheet action:@selector(confirm)];
+    done.accessibilityLabel = @"Done";
+    picker.navigationItem.rightBarButtonItem = done;
+    // Inside a navigation controller the picker drops its own close button, so the bar carries one.
+    picker.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemClose target:sheet action:@selector(cancel)];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:picker];
+    nav.modalPresentationStyle = UIModalPresentationPageSheet;
+    nav.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    objc_setAssociatedObject(nav, @selector(confirm), sheet, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [SGTopController() presentViewController:nav animated:YES completion:nil];
+}
+
 SGModRow *SGLinkRow(NSString *title, NSString *subtitle, NSString *url) {
     return SGActionRow(title, subtitle, ^{ SGOpenURL(url); });
 }
@@ -247,6 +309,36 @@ static UIView *valueAndChevron(NSString *text) {
     chevron.center = CGPointMake(box.bounds.size.width - chevron.bounds.size.width / 2, height / 2);
     [box addSubview:label];
     [box addSubview:chevron];
+    return box;
+}
+
+// What a row with a value and no page shows on the right: the value, after a swatch of the row's colour
+// when it has one, rounded like the cards and edged with a hairline so a dark colour still shows on them.
+// The swatch is drawn into an image, past the accent hooks on layer backgrounds (see SGColorRGB).
+static UIView *valueView(SGModRow *row) {
+    UILabel *label = [UILabel new];
+    label.font = SGTitleFont();
+    label.textColor = SGGrey();
+    label.text = row.value();
+    [label sizeToFit];
+    if (!row.swatch) return label;
+    CGFloat side = 16, height = MAX(side, label.bounds.size.height);
+    UIColor *fill = row.swatch();
+    UIImage *image = [[[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side)] imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        [fill setFill];
+        [context fillRect:CGRectMake(0, 0, side, side)];
+    }];
+    UIImageView *swatch = [[UIImageView alloc] initWithImage:image];
+    swatch.frame = CGRectMake(0, (height - side) / 2, side, side);
+    swatch.clipsToBounds = YES;
+    swatch.layer.cornerRadius = 4;
+    swatch.layer.cornerCurve = kCACornerCurveContinuous;
+    swatch.layer.borderWidth = 1 / UIScreen.mainScreen.scale;
+    swatch.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.3].CGColor;
+    UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, side + 8 + label.bounds.size.width, height)];
+    label.center = CGPointMake(side + 8 + label.bounds.size.width / 2, height / 2);
+    [box addSubview:swatch];
+    [box addSubview:label];
     return box;
 }
 
@@ -534,6 +626,11 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
             cell.accessoryView = valueAndChevron(text);
             continue;
         }
+        if (row.swatch) {
+            UILabel *shown = (UILabel *)cell.accessoryView.subviews.lastObject;
+            if ([shown isKindOfClass:UILabel.class] && ![shown.text isEqualToString:row.value()]) cell.accessoryView = valueView(row);
+            continue;
+        }
         UILabel *label = (UILabel *)cell.accessoryView;
         if (!row.value || row.page || ![label isKindOfClass:UILabel.class]) continue;
         label.text = row.value();
@@ -625,13 +722,10 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
         UIView *link = row.value ? valueAndChevron(row.value()) : SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightSemibold, 16);
         cell.accessoryView = row.info ? [self infoButtonBeside:link] : link;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    } else if (row.menu) {
+        cell.accessoryView = [self menuButtonFor:row];
     } else if (row.value) {
-        UILabel *label = [UILabel new];
-        label.font = SGTitleFont();
-        label.textColor = SGGrey();
-        label.text = row.value();
-        [label sizeToFit];
-        cell.accessoryView = label;
+        cell.accessoryView = valueView(row);
         cell.selectionStyle = row.action ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
     } else if (row.action) {
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -651,6 +745,37 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
     row.action();
     [table deselectRowAtIndexPath:path animated:YES];
     [self readValues];
+}
+
+// A menu row's value as a pop-up button, the way Settings draws one: the name in grey over the up and down
+// chevrons, the menu opening on the first touch and anchored to the button, so it points at the row on iPad.
+// A pick runs the row's block and every row is read again, the ones that follow from it with it.
+- (UIButton *)menuButtonFor:(SGModRow *)row {
+    NSString *current = row.value();
+    NSMutableArray<UIAction *> *items = [NSMutableArray array];
+    __weak typeof(self) weakSelf = self;
+    [row.menu enumerateObjectsUsingBlock:^(NSString *name, NSUInteger i, BOOL *stop) {
+        UIAction *item = [UIAction actionWithTitle:name image:nil identifier:nil handler:^(UIAction *action) {
+            if (row.chosen) row.chosen((NSInteger)i);
+            [weakSelf.tableView reloadData];
+        }];
+        item.state = [name isEqualToString:current] ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [items addObject:item];
+    }];
+    UIButtonConfiguration *look = [UIButtonConfiguration plainButtonConfiguration];
+    look.attributedTitle = [[NSAttributedString alloc] initWithString:current ?: @"" attributes:@{NSFontAttributeName: SGTitleFont()}];
+    look.image = [UIImage systemImageNamed:@"chevron.up.chevron.down" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:11 weight:UIImageSymbolWeightSemibold]];
+    look.imagePlacement = NSDirectionalRectEdgeTrailing;
+    look.imagePadding = 5;
+    look.baseForegroundColor = SGGrey();
+    look.contentInsets = NSDirectionalEdgeInsetsMake(8, 8, 8, 0);
+    UIButton *button = [UIButton buttonWithConfiguration:look primaryAction:nil];
+    button.menu = [UIMenu menuWithChildren:items];
+    button.showsMenuAsPrimaryAction = YES;
+    button.accessibilityLabel = row.title;
+    button.accessibilityValue = current;
+    [button sizeToFit];
+    return button;
 }
 
 // The ⓘ to the left of the switch (or of a choice's name and chevron), the grey of a subtitle, 30pt across

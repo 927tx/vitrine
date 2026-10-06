@@ -40,6 +40,10 @@
 @property (nonatomic, copy) double (^number)(void);
 @property (nonatomic, copy) void (^setNumber)(double value);
 @property (nonatomic, copy) NSString *(^format)(double value);
+// A menu row's (SGMenuRow): the names its pull-down menu offers, the current one being whichever `value` reads.
+@property (nonatomic, copy) NSArray<NSString *> *menu;
+// A small rounded square of this colour before the row's value.
+@property (nonatomic, copy) UIColor *(^swatch)(void);
 @end
 
 @interface SGModSection : NSObject
@@ -78,6 +82,14 @@ SGModRow *SGChoiceRow(NSString *title, NSString *subtitle, NSString *key, NSArra
 // changes applies while it is dragged. `subtitle` may be nil.
 SGModRow *SGSliderRow(NSString *title, NSString *subtitle, double minimum, double maximum, double step,
                       double (^get)(void), void (^set)(double value), NSString *(^format)(double value));
+// A setting picked from a short list without leaving the page: the value is a button whose pull-down menu
+// lists `choices`, a checkmark against the one `value` reads, and picking one runs `chosen` with its index,
+// after which the page reads every row again.
+SGModRow *SGMenuRow(NSString *title, NSArray<NSString *> *choices, NSString *(^value)(void), void (^chosen)(NSInteger index));
+// The system colour picker in a page sheet, opaque colours only: the checkmark hands 0xRRGGBB to `picked`,
+// closing or swiping the sheet away keeps what was there.
+void SGPickColor(NSString *title, NSInteger initial, void (^picked)(NSInteger rgb));
+UIColor *SGColorRGB(NSInteger rgb);   // 0xRRGGBB, opaque
 SGModRow *SGLinkRow(NSString *title, NSString *subtitle, NSString *url);
 SGModRow *SGStatActionRow(NSString *title, NSString *subtitle, NSString *(^value)(void), void (^action)(void));
 SGModSection *SGSection(NSString *title, NSArray<SGModRow *> *rows);

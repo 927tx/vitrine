@@ -34,3 +34,5 @@ void SGRestartSpotify(void);
 
 // Apple Music's red, 0xRRGGBB, offered under either look's accent colour.
 #define SGAppleMusicRed 0xFA2D48
+// Spotify's own green, the token either look's accent replaces.
+#define SGSpotifyGreen 0x1ED760

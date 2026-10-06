@@ -7,7 +7,6 @@
 // out of reach.
 #import "Core/SGCore.h"
 #import "SGRAccent.h"
-#import "Settings/SGPageStyle.h"
 
 // The greens the app is known to build from literals: the token, and the older brand green the
 // upsell backend still names.
@@ -15,11 +14,8 @@ static const uint32_t kGreens[] = {0x1ED760, 0x1DB954};
 
 static NSInteger sg_accent = -1;   // 0xRRGGBB once chosen, read at launch
 
-// The redesign's own green until another is picked; Spotify's is a pick of its own, stored as -1.
-static const NSInteger kDefaultAccent = 0x37F200;
-
 static NSInteger chosen(void) {
-    NSInteger rgb = SGInt(SGRKeyAccent, kDefaultAccent);
+    NSInteger rgb = SGInt(SGRKeyAccent, SGRDefaultAccent);
     return rgb >= 0 && rgb <= 0xFFFFFF ? rgb : -1;
 }
 
@@ -37,38 +33,9 @@ UIColor *SGRAccentColor(void) {
     return [UIColor colorWithRed:r green:g blue:b alpha:1];
 }
 
-NSString *SGRAccentLabel(void) {
+NSInteger SGRAccentRGB(void) {
     NSInteger rgb = chosen();
-    if (rgb == SGAppleMusicRed) return @"Apple Music red";
-    return rgb < 0 ? @"Spotify green" : [NSString stringWithFormat:@"#%06lX", (long)rgb];
-}
-
-#pragma mark - picker
-
-@interface SGRAccentPicker : NSObject <UIColorPickerViewControllerDelegate>
-@end
-
-@implementation SGRAccentPicker
-
-- (void)colorPickerViewControllerDidFinish:(UIColorPickerViewController *)picker {
-    CGFloat r = 0, g = 0, b = 0, a = 0;
-    [picker.selectedColor getRed:&r green:&g blue:&b alpha:&a];
-    uint32_t rgb = ((uint32_t)lround(MIN(1, MAX(0, r)) * 255) << 16)
-                 | ((uint32_t)lround(MIN(1, MAX(0, g)) * 255) << 8)
-                 | (uint32_t)lround(MIN(1, MAX(0, b)) * 255);
-    SGSetInt(SGRKeyAccent, rgb);
-}
-
-@end
-
-void SGRPickAccent(void) {
-    static SGRAccentPicker *delegate;
-    if (!delegate) delegate = [SGRAccentPicker new];
-    UIColorPickerViewController *picker = [UIColorPickerViewController new];
-    picker.supportsAlpha = NO;
-    picker.selectedColor = SGRAccentColor() ?: [UIColor colorWithRed:0x1E / 255.0 green:0xD7 / 255.0 blue:0x60 / 255.0 alpha:1];
-    picker.delegate = delegate;
-    [SGTopController() presentViewController:picker animated:YES completion:nil];
+    return rgb < 0 ? SGSpotifyGreen : rgb;
 }
 
 // A darker green than the token comes out as the accent darkened by the same amount, so the two
