@@ -76,7 +76,7 @@ static NSString *takeCommitURL(NSString **line) {
 // A release body into its lines: "### Features" names what follows, "* …" is a line of it, and a
 // line that wraps onto the next one is joined back together. Anything else -- the "## [0.19.0](…)"
 // heading release-please leads with, blank lines -- is dropped, the version being known already.
-static NSArray<SGUpdateChange *> *changesIn(NSString *body) {
+NSArray<SGUpdateChange *> *SGUpdateChangesIn(NSString *body) {
     NSMutableArray<SGUpdateChange *> *changes = [NSMutableArray array];
     NSString *kind = @"Changes";
     SGUpdateChange *open = nil;
@@ -121,7 +121,7 @@ NSArray<SGUpdateRelease *> *SGUpdateReleases(void) {
         release.version = version;
         release.date = stringOr(entry[@"date"], @"");
         release.url = stringOr(entry[@"url"], nil);
-        release.changes = changesIn(stringOr(entry[@"notes"], @""));
+        release.changes = SGUpdateChangesIn(stringOr(entry[@"notes"], @""));
         [releases addObject:release];
     }
     return releases;

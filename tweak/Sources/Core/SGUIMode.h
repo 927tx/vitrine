@@ -16,8 +16,8 @@
 // fall back to a blur, and the redesign runs untested against an older UIKit (issue #37, iOS 17: a
 // scene-update watchdog hang). So below 26 it runs only after a warning has been accepted, which stores
 // SGKeyRedesignUntested (App/Pages.m's SGSetRedesignedUI does it), and only while it starts: a launch
-// whose main queue did not run for 15 s is followed by one in the native look, with both switches off
-// and SGRedesignFellBack() answering YES for the App layer to say so.
+// whose main queue neither ran for 15 s nor saw Spotify leave the front is followed by one in the native
+// look, with both switches off and SGRedesignFellBack() answering YES for the App layer to say so.
 #define SGKeyRedesignUntested @"spotifyglass.redesign.untested"
 
 // Whether this OS has the redesign's material: iOS 26 and up.

@@ -26,6 +26,8 @@ extern NSString *const SGUpdateCheckedNotification;   // on the main thread, aft
 @end
 
 NSArray<SGUpdateRelease *> *SGUpdateReleases(void);   // newest first, empty until a check lands
+// The lines of a release body as Release Please writes it, also what the What's new sheet reads.
+NSArray<SGUpdateChange *> *SGUpdateChangesIn(NSString *body);
 SGUpdateRelease *SGUpdateNewestRelease(void);
 NSString *SGUpdateVersion(void);  // nil unless GitHub has a release newer than this build
 BOOL SGUpdateIsNewer(NSString *version);   // whether that release is newer than the build running

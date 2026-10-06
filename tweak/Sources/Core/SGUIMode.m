@@ -1,3 +1,4 @@
+#import <UIKit/UIKit.h>
 #import "SGUIMode.h"
 #import "SGLog.h"
 #import "SGPrefs.h"
@@ -16,9 +17,10 @@ BOOL SGRedesignFellBack(void) {
 }
 
 // Below iOS 26 a launch with the redesign leaves a mark that the main queue takes off once it has run
-// for a while; a launch that hung (the watchdog of #37) never gets there, so the next one finds the
-// mark and starts native. ponytail: a quit inside the first 15 s also counts as a launch that hung, and
-// turns the redesign off; a hang later on is not caught.
+// for a while, or as Spotify first leaves the front, which only a main thread that answers is told of. A
+// launch that hung (the watchdog of #37) gets to neither, so the next one finds the mark and starts
+// native. ponytail: a force quit from the switcher in the first 15 s, with Spotify still in front until
+// then, counts as a hang; a hang later on is not caught.
 static BOOL startsUntested(void) {
     NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
     if ([store boolForKey:kStarting]) {
@@ -34,6 +36,11 @@ static BOOL startsUntested(void) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kStarted * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [store removeObjectForKey:kStarting];
     });
+    __block id token = [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:nil
+                                                                  usingBlock:^(NSNotification *note) {
+        [NSNotificationCenter.defaultCenter removeObserver:token];
+        [store removeObjectForKey:kStarting];
+    }];
     return YES;
 }
 

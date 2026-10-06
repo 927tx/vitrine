@@ -206,10 +206,6 @@ static const CGFloat kLogoRadius = 22;
 - (void)layoutSubviews {
     [super layoutSubviews];
     _pane.frame = self.bounds;
-    // Glass draws a little past its own bounds, which clipsToBounds lets through; a mask does not.
-    CAShapeLayer *mask = [CAShapeLayer layer];
-    mask.path = [UIBezierPath bezierPathWithRoundedRect:_pane.bounds cornerRadius:kLogoRadius].CGPath;
-    _pane.layer.mask = mask;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     _glow.frame = _pane.bounds;
@@ -503,7 +499,7 @@ static const CGFloat kLogoRadius = 22;
 static __weak SGOnboardingController *sg_tour;
 
 BOOL SGOnboardingShowing(void) {
-    return sg_tour != nil;
+    return sg_tour != nil || SGWhatsNewShowing();
 }
 
 void SGShowOnboarding(void) {

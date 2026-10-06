@@ -10,6 +10,12 @@ PACKAGE_VERSION := $(SG_VERSION)
 
 include $(THEOS)/makefiles/common.mk
 
+# The What's new sheet's text, this version's section of CHANGELOG.md, as a gitignored header that
+# App/Onboarding/WhatsNew.m reads. A copy of tweak/ without the scripts beside it builds without it.
+ifneq ($(wildcard ../scripts/whats-new.sh),)
+$(shell ../scripts/whats-new.sh $(SG_VERSION) ../CHANGELOG.md Sources/App/Onboarding/SGWhatsNewNotes.h)
+endif
+
 TWEAK_NAME := spotifyglass
 
 # Every source under Sources/, so a new feature needs no Makefile edit. Shared/Flags/SGFlagList.m

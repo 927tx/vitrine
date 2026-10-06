@@ -13,6 +13,7 @@ tweak/.theos/
 tweak/obj/
 tweak/packages/
 tweak/Sources/Shared/Flags/SGFlagList.m
+tweak/Sources/App/Onboarding/SGWhatsNewNotes.h
 /trees/continuous
 /trees/clean
 harness/*/build/
