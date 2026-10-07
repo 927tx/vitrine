@@ -39,7 +39,7 @@ struct SGLyricsAttributes: ActivityAttributes {
         var repeatMode: Int   // 0 off, 1 the playlist or album, 2 the track
         var timerEnd: Date?   // the sleep timer's end, nil when none is set
         var timerEndOfTrack: Bool
-        // The cover's colour as RRGGBB, darkened for white text; nil before it is read.
+        // The cover's color as RRGGBB, darkened for white text; nil before it is read.
         var tint: String?
         // When the track started and ends at the speed it plays, for a progress bar that runs by itself;
         // nil when the length is not known. Paused, the bar holds at `pausedAt`.
@@ -55,6 +55,20 @@ struct SGLyricsAttributes: ActivityAttributes {
         var textSize: Int?
         // The sleep timer pauses at the end of the album or playlist playing.
         var timerEndOfAlbum: Bool?
+        // The page's options (LiveActivity.h), nil in a state from a build before them, which reads as each
+        // one's default. The lyric lines' alignment, SGLiveActivityAlignment's values: 0 left, 1 center.
+        var alignment: Int?
+        // The track has no lyrics with a time on them, so the lyrics view has no line to show for all of it,
+        // and what it shows then, SGLiveActivityWithoutLyrics's values: 0 a note under the track, 1 the track large.
+        var noLyrics: Bool?
+        var withoutLyrics: Int?
+        // The card's colors, SGLiveActivityColors's values: 0 Spotify's (the cover's color, darkened, behind
+        // green), 1 the cover's (the same behind `accent`, the cover's color lightened, RRGGBB), 2 white on the
+        // system's own background.
+        var colors: Int?
+        var accent: String?
+        // The track's progress bar; nil or true shows it.
+        var progressBar: Bool?
     }
 }
 

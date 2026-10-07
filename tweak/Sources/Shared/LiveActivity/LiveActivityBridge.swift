@@ -93,7 +93,8 @@ public final class SGLiveActivityBridge: NSObject {
                                   tab: Int, title: String, artist: String, shuffle: Bool, repeatMode: Int,
                                   timerEnd: Date?, timerEndOfTrack: Bool, timerEndOfAlbum: Bool,
                                   tint: String?, trackStart: Date?, trackEnd: Date?, pausedAt: NSNumber?, translation: String?,
-                                  cover: Data?, textSize: Int) {
+                                  cover: Data?, textSize: Int, alignment: Int, noLyrics: Bool, withoutLyrics: Int,
+                                  colors: Int, accent: String?, progressBar: Bool) {
         let tracks = titles.indices.map {
             SGLyricsAttributes.Track(title: titles[$0], artist: artists[$0], uri: uris[$0])
         }
@@ -103,7 +104,9 @@ public final class SGLiveActivityBridge: NSObject {
             tab: SGLyricsAttributes.Tab(rawValue: tab) ?? .controls, title: title, artist: artist,
             shuffle: shuffle, repeatMode: repeatMode, timerEnd: timerEnd, timerEndOfTrack: timerEndOfTrack,
             tint: tint, trackStart: trackStart, trackEnd: trackEnd, pausedAt: pausedAt?.doubleValue,
-            translation: translation, cover: cover, textSize: textSize, timerEndOfAlbum: timerEndOfAlbum)
+            translation: translation, cover: cover, textSize: textSize, timerEndOfAlbum: timerEndOfAlbum,
+            alignment: alignment, noLyrics: noLyrics, withoutLyrics: withoutLyrics, colors: colors, accent: accent,
+            progressBar: progressBar)
         // ActivityKit drops a state over 4 KB without a word and the card freezes, so with long lines and
         // a busy cover the cover gives way.
         if cover != nil, let size = try? JSONEncoder().encode(state).count, size > maxStateBytes {

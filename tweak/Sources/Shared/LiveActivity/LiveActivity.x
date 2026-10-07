@@ -28,7 +28,9 @@ API_AVAILABLE(ios(17.0))
                  tab:(NSInteger)tab title:(NSString *)title artist:(NSString *)artist shuffle:(BOOL)shuffle repeatMode:(NSInteger)repeatMode
             timerEnd:(NSDate *)timerEnd timerEndOfTrack:(BOOL)timerEndOfTrack timerEndOfAlbum:(BOOL)timerEndOfAlbum
                 tint:(NSString *)tint trackStart:(NSDate *)trackStart trackEnd:(NSDate *)trackEnd pausedAt:(NSNumber *)pausedAt
-         translation:(NSString *)translation cover:(NSData *)cover textSize:(NSInteger)textSize;
+         translation:(NSString *)translation cover:(NSData *)cover textSize:(NSInteger)textSize
+           alignment:(NSInteger)alignment noLyrics:(BOOL)noLyrics withoutLyrics:(NSInteger)withoutLyrics
+             colors:(NSInteger)colors accent:(NSString *)accent progressBar:(BOOL)progressBar;
 + (void)end;
 + (void)endBeforeExit;
 @end
@@ -67,11 +69,19 @@ static const NSTimeInterval kStartSlack = 1.5;
 // The card's background is at most this light, as relative luminance (about #383838), so every white on
 // it keeps 4.5:1: the dimmest, at 0.6, comes to about 5.3:1 there, the line itself over 11:1.
 static const double kTintLuminance = 0.04;
+// Colors' Artwork accent is at least this light, as relative luminance: about Spotify's green's, so a lit chip
+// reads as well as it does in Spotify's colors, and text in it keeps over 5:1 on the lightest card,
+// (0.48 + 0.05) / (0.04 + 0.05).
+static const double kAccentLuminance = 0.48;
 
 static NSTimer *sg_timer;
 static NSTimeInterval sg_tickEvery;
 static NSString *sg_shown;
 static NSString *sg_missingLyrics;
+// The tracks whose look for lyrics ended (SGKaraokeLinesKeptNotification), with lines or without: a set, since
+// the track up next is looked up too, ahead of the one playing.
+// ponytail: grows by one short ID a track for the session; clear it on a track change if that ever matters.
+static NSMutableSet<NSString *> *sg_lookEnded;
 static NSDate *sg_lastStart;
 static NSDate *sg_lastSent;
 static SGLiveActivityTab sg_tab;
@@ -126,8 +136,10 @@ static NSInteger repeatModeOf(SPTPlayerOptions *options) {
 }
 
 // The line being sung and the one after it; before the first line, between lines and without lyrics
-// at all, a note holds the place.
-static NSString *lyricsLine(NSString *trackID, NSString **next, NSString **translation) {
+// at all, a note holds the place. `none` says the track has no timed lines to follow, no lyrics or plain text,
+// and only once a look for them has ended and no other is under way: a look that never ends, as with
+// EeveeSpotify answering the lyrics, leaves the track in the note's place without the line saying so.
+static NSString *lyricsLine(NSString *trackID, NSString **next, NSString **translation, BOOL *none) {
     NSArray<SGKaraokeLine *> *lines = SGKaraokeLinesForTrack(trackID);
     if (!lines) {
         SGKaraokeRequestLyrics(trackID);
@@ -138,6 +150,7 @@ static NSString *lyricsLine(NSString *trackID, NSString **next, NSString **trans
     }
     // Plain text has no line being sung: the note, as for a track with no lyrics.
     if (lines && SGKaraokeLinesTiming(lines) == SGKaraokeTimingNone) lines = nil;
+    *none = !lines && [sg_lookEnded containsObject:trackID] && !SGKaraokeLooking(trackID);
     NSInteger position = SGKaraokePositionMs();
     if (position >= 0 && !SGPlayerState().isPaused) position += kRenderLeadMs;
     if (position >= 0) position -= SGKaraokeDelayMs();
@@ -152,17 +165,17 @@ static NSString *lyricsLine(NSString *trackID, NSString **next, NSString **trans
     return SGKaraokeLineText(current);
 }
 
-// The cover for the card, read once a track from Spotify's now playing artwork: its colour, darkened so
+// The cover for the card, read once a track from Spotify's now playing artwork: its color, darkened so
 // white text keeps its contrast, and a small JPEG of it. At a track change the player moves a moment
 // before Spotify hands over the new artwork, so it is read only once the now playing title is the
 // track's (as Shared/LockScreenLyrics/LyricsArtwork.x does); until then the last track's stays. Spotify
 // hands over a placeholder first and the cover after it, a new artwork object each time, so a new
 // object for the same track is read again.
-static NSString *sg_artTrack, *sg_tint;
+static NSString *sg_artTrack, *sg_tint, *sg_accent;
 static NSData *sg_cover;
 static __weak id sg_artObject;
 
-// The cover at the largest of a few sizes whose JPEG fits kCoverBytes, drawn in device RGB so no colour
+// The cover at the largest of a few sizes whose JPEG fits kCoverBytes, drawn in device RGB so no color
 // profile rides along; nil when none fits.
 static NSData *coverJPEG(CGImageRef image) {
     for (NSNumber *side in @[@56, @48, @40, @32]) {
@@ -188,13 +201,23 @@ static double linear(double channel) {
     return channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4);
 }
 
-// The card's background, RRGGBB: at most 0.55 of the cover's colour, the rest black, and darker still
+// The card's background, RRGGBB: at most 0.55 of the cover's color, the rest black, and darker still
 // until it is no lighter than kTintLuminance. At a fixed 0.55 a white or yellow cover came out #8C8C8C.
 static NSString *tintOf(double red, double green, double blue) {
     double keep = 0.55;
     while (keep > 0 && 0.2126 * linear(red * keep) + 0.7152 * linear(green * keep) + 0.0722 * linear(blue * keep) > kTintLuminance) keep -= 0.01;
     keep = MAX(keep, 0);
     return [NSString stringWithFormat:@"%02X%02X%02X", (int)(red * keep), (int)(green * keep), (int)(blue * keep)];
+}
+
+// Colors' Artwork accent, RRGGBB: the cover's color mixed with white until it is at least kAccentLuminance.
+static NSString *accentOf(double red, double green, double blue) {
+    double white = 0;
+    while (white < 1 && 0.2126 * linear(red + (255 - red) * white) + 0.7152 * linear(green + (255 - green) * white)
+                        + 0.0722 * linear(blue + (255 - blue) * white) < kAccentLuminance) white += 0.02;
+    white = MIN(white, 1);
+    return [NSString stringWithFormat:@"%02X%02X%02X", (int)(red + (255 - red) * white), (int)(green + (255 - green) * white),
+            (int)(blue + (255 - blue) * white)];
 }
 
 static void readArtwork(SPTPlayerState *state, NSString *trackID) {
@@ -216,6 +239,7 @@ static void readArtwork(SPTPlayerState *state, NSString *trackID) {
     CGContextRelease(context);
     sg_artTrack = trackID;
     sg_tint = tintOf(pixel[0], pixel[1], pixel[2]);
+    sg_accent = accentOf(pixel[0], pixel[1], pixel[2]);
     sg_cover = coverJPEG(image.CGImage);
     static int logged;
     if (logged++ < 6) SGLog(@"live activity: cover of %@, %lu bytes", trackID, (unsigned long)sg_cover.length);
@@ -233,12 +257,19 @@ static void tick(void) API_AVAILABLE(ios(17.0)) {
     NSTimeInterval every = paused ? kPausedTick : kTick;
     if (sg_timer && sg_tickEvery != every) startTimer(every);
     NSString *line = @"", *next = @"", *translation = nil;
-    if (view == SGLiveActivityLyrics) line = lyricsLine(trackID, &next, &translation);
+    BOOL noLyrics = NO;
+    if (view == SGLiveActivityLyrics) line = lyricsLine(trackID, &next, &translation, &noLyrics);
     if (!SGFlag(SGKeyLiveActivityTranslation, NO)) translation = nil;
     NSInteger textSize = view == SGLiveActivityLyrics ? SGInt(SGKeyLiveActivityTextSize, SGLiveActivityTextMedium) : SGLiveActivityTextMedium;
+    NSInteger alignment = SGInt(SGKeyLiveActivityAlignment, SGLiveActivityAlignCenter);
+    NSInteger withoutLyrics = SGInt(SGKeyLiveActivityWithoutLyrics, SGLiveActivityWithoutLyricsNote);
     readArtwork(state, trackID);
     NSString *tint = sg_tint;
-    NSData *cover = sg_cover;
+    // Artwork off: no cover anywhere, the Dynamic Island's note in its place; the color is still the cover's.
+    NSData *cover = SGEnabled(SGKeyLiveActivityArtwork) ? sg_cover : nil;
+    NSInteger colors = SGInt(SGKeyLiveActivityColors, SGLiveActivityColorsSpotify);
+    NSString *accent = colors == SGLiveActivityColorsArtwork ? sg_accent : nil;
+    BOOL progressBar = SGEnabled(SGKeyLiveActivityProgressBar);
     // The bar runs by itself from where the track started; paused, it holds at the share played.
     double duration = [state respondsToSelector:@selector(duration)] ? state.duration : 0;
     NSInteger position = SGKaraokePositionMs();
@@ -281,7 +312,8 @@ static void tick(void) API_AVAILABLE(ios(17.0)) {
         @(tab).stringValue, title, artist, shuffle ? @"1" : @"0", @(repeatMode).stringValue,
         @((long long)sleepEnd.timeIntervalSince1970).stringValue, @(sleepMode).stringValue, tint ?: @"", translation ?: @"",
         paused ? @"" : @((long long)trackStart.timeIntervalSince1970).stringValue, paused ? @(round(pausedAt.doubleValue * 100)).stringValue : @"",
-        cover ? sg_artTrack : @"", @(textSize).stringValue, nil];
+        cover ? sg_artTrack : @"", @(textSize).stringValue, @(alignment).stringValue, noLyrics ? @"1" : @"0",
+        @(withoutLyrics).stringValue, @(colors).stringValue, accent ?: @"", progressBar ? @"1" : @"0", nil];
     for (NSUInteger i = 0; i < titles.count; i++) [parts addObject:[NSString stringWithFormat:@"%@\t%@\t%@", titles[i], artists[i], uris[i]]];
     send([parts componentsJoinedByString:@"\n"], ^{
         [SGLiveActivityBridge showWithView:view paused:paused line:line nextLine:next titles:titles artists:artists uris:uris
@@ -289,7 +321,8 @@ static void tick(void) API_AVAILABLE(ios(17.0)) {
                                    timerEnd:sleepEnd timerEndOfTrack:sleepMode == SGSleepTimerEndOfTrack
                             timerEndOfAlbum:sleepMode == SGSleepTimerEndOfAlbum
                                        tint:tint trackStart:trackStart trackEnd:trackEnd pausedAt:pausedAt translation:translation
-                                      cover:cover textSize:textSize];
+                                      cover:cover textSize:textSize alignment:alignment noLyrics:noLyrics
+                              withoutLyrics:withoutLyrics colors:colors accent:accent progressBar:progressBar];
     });
 }
 
@@ -445,6 +478,12 @@ void SGSetLiveActivityEnabled(BOOL on) {
         SGMigrateKey(SGKeyLiveActivityWas, SGKeyLiveActivity);
         SGMigrateKey(SGKeyLiveActivityViewWas, SGKeyLiveActivityView);
         BOOL on = SGFlag(SGKeyLiveActivity, NO);
+        // From launch, card on or off, so a look that ends before the card is switched on still counts. Posted on
+        // the main queue, so no queue: it is noted before the post returns.
+        sg_lookEnded = [NSMutableSet set];
+        [NSNotificationCenter.defaultCenter addObserverForName:SGKaraokeLinesKeptNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+            if ([note.object isKindOfClass:NSString.class]) [sg_lookEnded addObject:note.object];
+        }];
         // Answered inside the post, which the intent makes on the main thread, so the reply is there when it returns.
         [NSNotificationCenter.defaultCenter addObserverForName:@"SGShortcut" object:nil queue:nil usingBlock:^(NSNotification *note) {
             NSMutableDictionary *reply = note.userInfo[@"reply"];

@@ -14,6 +14,7 @@
 //                                 with the activity on or off; checked in the simulator (harness/shortcuts)
 //     AppShortcuts.swift          Spotify's App Shortcuts, tweak only
 //     LiveActivitySettings.m      its page, opened from the root of Mod Settings
+//     SGLiveActivityPreview.m     the page's preview, a mock of the card on a slice of the lock screen
 //
 // Every tap in the card runs an intent inside Spotify and takes a second or two to show on the card.
 //
@@ -21,6 +22,7 @@
 // intent runs in Spotify, so scripts/merge-appintents.py adds it to Spotify's App Intents metadata. The lines and
 // the clock come from Shared/Lyrics, the queue from the player's state. The switch and the view apply at
 // once: iOS lets an activity start only while the app is in front, which it is when the switch is flipped.
+// The page's other options are read on every tick and sent in the state, so they apply within a tick too.
 //
 // The Swift names crossing into the widget (SGLyricsAttributes, the intents and their enums, the notifications)
 // are a contract with extension/LiveActivity and with the App Intents metadata merged into Spotify:
@@ -35,6 +37,15 @@
 // SGLiveActivityTextSize.
 #define SGKeyLiveActivityTranslation @"spotifyglass.liveActivity.translation"
 #define SGKeyLiveActivityTextSize @"spotifyglass.liveActivity.textSize"
+// The lyrics view's too: what it shows on a track with no timed lyrics, an SGLiveActivityWithoutLyrics, and
+// the lines' alignment, an SGLiveActivityAlignment.
+#define SGKeyLiveActivityWithoutLyrics @"spotifyglass.liveActivity.withoutLyrics"
+#define SGKeyLiveActivityAlignment @"spotifyglass.liveActivity.alignment"
+// Every view's: the cover beside the track and in the Dynamic Island (on until switched off), the card's
+// colors, an SGLiveActivityColors, and the progress bar (on until switched off).
+#define SGKeyLiveActivityArtwork @"spotifyglass.liveActivity.artwork"
+#define SGKeyLiveActivityColors @"spotifyglass.liveActivity.colors"
+#define SGKeyLiveActivityProgressBar @"spotifyglass.liveActivity.progressBar"
 // What the keys were called while this was the redesign's alone; LiveActivity.x's %ctor moves them over.
 #define SGKeyLiveActivityWas @"spotifyglass.redesign.liveActivity"
 #define SGKeyLiveActivityViewWas @"spotifyglass.redesign.liveActivity.view"
@@ -52,9 +63,30 @@ typedef NS_ENUM(NSInteger, SGLiveActivityTextSize) {
     SGLiveActivityTextLarge,
 };
 
+// SGLyricsAttributes.ContentState's withoutLyrics: a note under the track, or the track large in place of the lines.
+typedef NS_ENUM(NSInteger, SGLiveActivityWithoutLyrics) {
+    SGLiveActivityWithoutLyricsNote = 0,
+    SGLiveActivityWithoutLyricsTrack,
+};
+
+// SGLyricsAttributes.ContentState's alignment, of the lyric lines.
+typedef NS_ENUM(NSInteger, SGLiveActivityAlignment) {
+    SGLiveActivityAlignLeft = 0,
+    SGLiveActivityAlignCenter,
+};
+
+// SGLyricsAttributes.ContentState's colors: Spotify's (the cover's color darkened behind Spotify's green),
+// the cover's (the same behind the cover's color lightened) or plain (white on the system's background).
+typedef NS_ENUM(NSInteger, SGLiveActivityColors) {
+    SGLiveActivityColorsSpotify = 0,
+    SGLiveActivityColorsArtwork,
+    SGLiveActivityColorsPlain,
+};
+
 // From the switch: starts following the player (and the activity, the app being in front) or ends both.
 void SGSetLiveActivityEnabled(BOOL on);
 
 @class UIViewController;
-// The Live Activity page: its switch, which view it shows, and the lyrics' translation and size.
+// The Live Activity page: a preview of the card (SGLiveActivityPreview.m), its switch, which view it shows, the
+// lyrics' options and the card's.
 UIViewController *SGLiveActivitySettingsPage(void);

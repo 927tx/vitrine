@@ -323,7 +323,13 @@ Shared:
                   is tinted with the cover's colour and shows the cover itself, a JPEG of a few dozen pixels inside
                   the state, which ActivityKit caps at 4 KB (the bridge sends it without the cover when it would
                   not fit); the colour is darkened to a luminance of 0.04 at most, so the white text keeps 4.5:1 on any
-                  cover, and the cover is read only once the now playing title is the new track's. Taps are
+                  cover, and the cover is read only once the now playing title is the new track's. The page's options
+                  ride in the state too, read on every tick, so they apply within a tick: the lines' alignment, what the
+                  lyrics view shows on a track with no timed lyrics (a note under the track, or the track large), the
+                  colours (Spotify's green; Artwork, the cover's colour lightened to about the green's luminance in its
+                  place; Plain, white on the system's own background), and the progress bar. Artwork off sends no
+                  cover at all. The page's preview (SGLiveActivityPreview.m) is a mock of the card in UIKit, not the
+                  widget, checked in the simulator against harness/live-activity-page/. Taps are
                   LiveActivityIntents run inside Spotify and take a second or two to show on the card. The widget is extension/LiveActivity; ActivityKit pairs the two
                   by the attributes' type in LiveActivityShared.swift, compiled into both. It starts only with Spotify
                   in front; its settings apply at once. It ends when Spotify is swiped away while running; killed
@@ -660,8 +666,13 @@ Follows, greyed out the same way, Everything (a tap on each kick and snare and a
 taps without the rumble) or Bass (the kicks' taps and the rumble); In the Background a Status row (Paused, Waiting,
 Checking, Ready, Playing or Unavailable) while it is on, or, while Music Haptics is off in Settings > Accessibility, a
 row saying so whose tap opens its ⓘ, all applying straight away. Live Activity, on iOS 17 and up under either look: its switch and which view it
-shows, Lyrics, Queue or Control menu, and for Lyrics its Translations (off until switched on) and Text
-size (Small, Medium or Large), all applying straight away, the row reading out the view or Off. Audio effects, in either look (Shared/AudioEffects/AudioEffectsPage.m):
+shows, Lyrics, Queue or Control menu, and for Lyrics its Without lyrics (Note or Track), Alignment (Center, or Left),
+Translations (off until switched on) and Text size (Small, Medium or Large); then for every view a Card section of
+Artwork and Progress bar (both on until switched off) and Colors (Spotify, Artwork or Plain), with a note that the
+card shows on a paired Apple Watch and in CarPlay too, all applying straight away, the row reading out the view or
+Off. At its top a preview, a slice of the lock screen with a mock of the card with a made-up song, follows the
+options as they change and steps every 3 s through the picked view, the lines being sung or the menu's tabs, with
+a crossfade; under Reduce Motion it rests and a tap moves it on, and it stops while the page is off screen. Audio effects, in either look (Shared/AudioEffects/AudioEffectsPage.m):
 the effects' switch with what the engine is doing under it, Presets (built-in ones and your own, saved, loaded
 and deleted there) and Headphones (AutoEq's corrections, searched and applied to the Graphic EQ, with Use for <the
 output playing now> keeping the pick for that output and the remembered outputs listed, a swipe removing one), either of which
