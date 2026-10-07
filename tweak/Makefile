@@ -1,6 +1,9 @@
 TARGET := iphone:clang:latest:16.0
 ARCHS := arm64
 FINALPACKAGE := 1
+# Logos's .x.m output is kept: an .x object depends on it, and Theos otherwise deletes it after compiling,
+# so every .x file would compile again on every build.
+KEEP_LOGOS_INTERMEDIATES := 1
 
 # version.txt at the repo root is the one version, bumped by Release Please's release PR. Theos
 # stamps PACKAGE_VERSION into the .deb (control has no Version line) and reads it while common.mk

@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Signs an IPA with your own certificate and installs it on the iPhone plugged into this Mac.
+# Signs an IPA, or an app folder, with your own certificate and installs it on the paired iPhone, over USB
+# or the network, through Xcode's devicectl.
 #
 #   scripts/install.sh out/<name>.ipa
+#   scripts/install.sh out/quick/Payload/Spotify.app    # signed in place; scripts/quick.sh does this
 #
 # Put the certificate details in .signing.env (gitignored):
 #   SIGN_P12=/path/to/cert.p12
 #   SIGN_PROFILE=/path/to/profile.mobileprovision
 #   SIGN_P12_PASSWORD=...
-# WIFI=1 installs over Wi-Fi instead of USB (the phone must be paired for wireless sync).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,11 +16,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 : "${SIGN_P12:?set SIGN_P12 in .signing.env}" "${SIGN_PROFILE:?set SIGN_PROFILE in .signing.env}" "${SIGN_P12_PASSWORD:?set SIGN_P12_PASSWORD in .signing.env}"
 
-IN="${1:?usage: $0 <ipa>}"
-SIGNED="${IN%.ipa}-signed.ipa"
+IN="${1:?usage: $0 <ipa or .app folder>}"
+# A folder is signed where it is, and zsign then re-signs only what changed since its last signing.
+if [ -d "$IN" ]; then SIGNED="$IN"; else SIGNED="${IN%.ipa}-signed.ipa"; fi
 
 command -v zsign >/dev/null || { echo "missing zsign -> brew install zsign" >&2; exit 1; }
-command -v ideviceinstaller >/dev/null || { echo "missing ideviceinstaller -> brew install ideviceinstaller" >&2; exit 1; }
 
 # The bundle id has to equal the App ID of the profile. iOS may well install a mismatched pair, but
 # MediaRemote launches the now playing app by its application-identifier entitlement rather than by
@@ -33,7 +34,11 @@ APP_ID="${APP_ID#*.}"
 
 sign() {  # sign [bundle id]
   echo "==> signing${1:+ as $1}"
-  zsign -k "$SIGN_P12" -p "$SIGN_P12_PASSWORD" -m "$SIGN_PROFILE" ${1:+-b "$1"} -z 1 -o "$SIGNED" "$IN" >/dev/null
+  if [ -d "$IN" ]; then
+    zsign -k "$SIGN_P12" -p "$SIGN_P12_PASSWORD" -m "$SIGN_PROFILE" ${1:+-b "$1"} "$IN" >/dev/null
+  else
+    zsign -k "$SIGN_P12" -p "$SIGN_P12_PASSWORD" -m "$SIGN_PROFILE" ${1:+-b "$1"} -z 1 -o "$SIGNED" "$IN" >/dev/null
+  fi
 }
 
 if [ -n "$APP_ID" ] && [ "$APP_ID" != "*" ]; then sign "$APP_ID"; else sign; fi
@@ -43,8 +48,7 @@ phone() { xcrun devicectl list devices 2>/dev/null | awk '/physical/ && /iPhone/
 # An install waits on the app while it runs, so a copy already on the phone is quit first.
 quit_app() {
   [ -n "$APP_ID" ] && [ "$APP_ID" != "*" ] || return 0
-  local udid apps procs pid
-  udid="$(phone)"; [ -n "$udid" ] || return 0
+  local udid="$UDID" apps procs pid
   apps="$(mktemp)"; procs="$(mktemp)"
   xcrun devicectl device info apps --device "$udid" --bundle-id "$APP_ID" --json-output "$apps" >/dev/null 2>&1 || true
   xcrun devicectl device info processes --device "$udid" --json-output "$procs" >/dev/null 2>&1 || true
@@ -64,18 +68,9 @@ PY
   xcrun devicectl device process terminate --device "$udid" --pid "$pid" >/dev/null 2>&1 || true
 }
 
+UDID="$(phone)"
+[ -n "$UDID" ] || { echo "no paired iPhone over USB or the network" >&2; exit 1; }
 quit_app
-echo "==> installing $SIGNED"
-# USB through libimobiledevice when a cable is in, given three minutes, since it can stall for good partway;
-# otherwise, or after a stall, Xcode's devicectl, which reaches a paired phone over USB or Wi-Fi.
-limited() { if command -v timeout >/dev/null; then timeout 180 "$@"; else "$@"; fi; }
-usb=; { [ -n "$(idevice_id -l)" ] || [ -n "${WIFI:-}" ]; } && usb=1
-if [ -n "$usb" ] && out="$(limited ideviceinstaller ${WIFI:+-n} install "$SIGNED" 2>&1)"; then
-  printf '%s\n' "$out" | tail -3
-else
-  if [ -n "$usb" ]; then echo "==> ideviceinstaller stalled or failed, using devicectl"; fi
-  UDID="$(phone)"
-  [ -n "$UDID" ] || { echo "no iPhone over USB or the network" >&2; exit 1; }
-  echo "==> installing through devicectl to $UDID"
-  xcrun devicectl device install app --device "$UDID" "$SIGNED" 2>&1 | grep -E "installationURL|error|Error" | tail -3
-fi
+echo "==> installing $SIGNED to $UDID"
+out="$(xcrun devicectl device install app --device "$UDID" "$SIGNED" 2>&1)" || { printf '%s\n' "$out" | grep -iE "error|reason|description" | head -5 >&2; exit 1; }
+printf '%s\n' "$out" | grep -E "installationURL" | tail -1

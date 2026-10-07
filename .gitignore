@@ -22,3 +22,6 @@ vendor/*/build/
 
 # Local research and clean-room specs, kept with the repo but never published.
 notes/
+
+# zsign's signature cache, from signing out/quick/ in place
+.zsign_cache/
