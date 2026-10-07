@@ -1,6 +1,6 @@
 // Album redesign: the header the Music app gives an album (iOS 26.4), the same one the playlist redesign
 // gives a playlist. The cover runs full bleed across the top of the page and dissolves into the page's
-// colour; the title, the artist and the kind and date are centred on the bottom of that dissolve; and under
+// color; the title, the artist and the kind and date are centered on the bottom of that dissolve; and under
 // them one row -- shuffle, a white Play capsule, and add.
 //
 // Tree (trees/clean/album/01.txt:39-152). The header is one element of the page's scrolling stack,
@@ -114,11 +114,11 @@ static void watch(UIView *view, const void *key, void (^laidOut)(UIView *view)) 
 
 // The picture across the top of the page with the field showing through the bottom of it. Two gradients
 // rather than a mask or a blur: a scrim over the top for the status bar, and under it a fade from the
-// picture to the very colour the page's field is drawing, so the two meet with nothing to see.
+// picture to the very color the page's field is drawing, so the two meet with nothing to see.
 @interface SGRAlbumHero : UIView
 @property (nonatomic, readonly) UIImageView *picture;
 @property (nonatomic, copy) UIColor *fieldColor;
-// The cover in Spotify's artwork view, and every cover it puts there afterwards: the hero keeps itself
+// The cover in Spotify's artwork view, and every cover it puts there afterward: the hero keeps itself
 // right, rather than being handed a picture on each of the header's passes and staying empty between them.
 - (void)followCover:(UIImageView *)source;
 // Apple Music's animated cover over the picture, where the album has one. The same album again is a no-op.
@@ -157,7 +157,7 @@ static void *kReadyContext = &kReadyContext;
     _dissolve.zPosition = 2;
     [self.layer addSublayer:_dissolve];
     self.fieldColor = SGRNeutralField();
-    // The colour is read off the main thread, so it can land after the last layout pass of the page.
+    // The color is read off the main thread, so it can land after the last layout pass of the page.
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
     [center addObserver:self selector:@selector(sgr_fieldColorDidChange) name:SGRFieldColorDidChangeNotification object:nil];
     for (NSNotificationName name in @[UIApplicationDidBecomeActiveNotification, UIApplicationWillResignActiveNotification,
@@ -180,8 +180,8 @@ static void *kReadyContext = &kReadyContext;
 - (void)setFieldColor:(UIColor *)color {
     if (!color || [_fieldColor isEqual:color]) return;
     _fieldColor = [color copy];
-    // The clear end is the same colour with no alpha rather than +clearColor, so the fade keeps its hue
-    // instead of going through grey.
+    // The clear end is the same color with no alpha rather than +clearColor, so the fade keeps its hue
+    // instead of going through gray.
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     _dissolve.colors = @[(id)[color colorWithAlphaComponent:0].CGColor,
@@ -306,7 +306,7 @@ static void *kReadyContext = &kReadyContext;
     UIImage *image = source.image;
     if (!image || source.bounds.size.width < kMinCover || _picture.image == image) return;
     _picture.image = image;
-    // The page's field takes its colour from the same picture.
+    // The page's field takes its color from the same picture.
     SGRAlbumSetArtwork(self, image);
     static BOOL logged;
     if (late && !logged) {
@@ -332,7 +332,7 @@ static UIImageView *coverImageIn(UIView *cover) {
 }
 
 // The picture runs from the top of the header down past where its text begins, so the title and the artist
-// sit on the bottom of its dissolve; below that the page's field is already drawing the very colour the
+// sit on the bottom of its dissolve; below that the page's field is already drawing the very color the
 // picture dissolves into, so there is no seam to see.
 //
 // `bottom` is taken from the header at rest, never from where it is mid scroll, and only ever grows: a header
@@ -484,9 +484,9 @@ static void maskOut(UIView *view) {
     view.accessibilityElementsHidden = YES;
 }
 
-// The colour Spotify painted the wash in: the first opaque colour of the gradient layer it draws with,
+// The color Spotify painted the wash in: the first opaque color of the gradient layer it draws with,
 // whether that is the view's own layer or one under it. nil when it draws some other way, or has
-// no colour yet.
+// no color yet.
 static UIColor *washColorOf(UIView *gradient) {
     NSMutableArray<CALayer *> *layers = [NSMutableArray arrayWithObject:gradient.layer];
     [layers addObjectsFromArray:gradient.layer.sublayers ?: @[]];
@@ -495,7 +495,7 @@ static UIColor *washColorOf(UIView *gradient) {
         for (id value in ((CAGradientLayer *)layer).colors) {
             CGColorRef cg = (__bridge CGColorRef)value;
             if (CFGetTypeID(cg) != CGColorGetTypeID() || CGColorGetAlpha(cg) < 0.5) continue;
-            // The page's base surface is what a wash is before Spotify has a colour for it, not a colour.
+            // The page's base surface is what a wash is before Spotify has a color for it, not a color.
             if (SGIsBaseSurface(cg)) return nil;
             return [UIColor colorWithCGColor:cg];
         }
@@ -503,8 +503,8 @@ static UIColor *washColorOf(UIView *gradient) {
     return nil;
 }
 
-// Spotify's colour wash behind the header goes, so the page's field shows through, and the colour it was
-// painted in goes to the field, to show until the cover's own main colour has been read.
+// Spotify's color wash behind the header goes, so the page's field shows through, and the color it was
+// painted in goes to the field, to show until the cover's own main color has been read.
 //
 // The navigation bar's gradient goes too. Hidden at rest, it is shown as the page scrolls under the
 // title, and over the field it was a flat dark band across the top (device, 2026-09-18). What keeps the
@@ -522,7 +522,7 @@ static void applyWash(UIView *page) {
                 static BOOL logged;
                 if (!logged) {
                     logged = YES;
-                    SGLog(@"redesign album: Spotify's wash %@ on %@, colour %@", NSStringFromClass(v.class),
+                    SGLog(@"redesign album: Spotify's wash %@ on %@, color %@", NSStringFromClass(v.class),
                           NSStringFromClass(v.layer.class), color ?: @"not found");
                 }
                 SGRAlbumSetSpotifyColor(page, color);

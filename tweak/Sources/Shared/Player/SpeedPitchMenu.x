@@ -120,7 +120,7 @@ static UIImage *symbol(NSString *name, CGFloat size, UIImageSymbolWeight weight)
     return [UIImage systemImageNamed:name withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:size weight:weight]];
 }
 
-// A glyph with its colour drawn in, so it never passes through a tint on its way to the screen.
+// A glyph with its color drawn in, so it never passes through a tint on its way to the screen.
 static UIImage *paintedSymbol(NSString *name, CGFloat size, UIImageSymbolWeight weight, UIColor *color) {
     return [symbol(name, size, weight) imageWithTintColor:color renderingMode:UIImageRenderingModeAlwaysOriginal];
 }
@@ -146,7 +146,7 @@ static UILabel *makeLabel(UIFont *font, UIColor *color) {
     return button;
 }
 
-// A glyph centred in a box of one size, so both sliders' tracks start and end at the same x.
+// A glyph centered in a box of one size, so both sliders' tracks start and end at the same x.
 static UIImage *endImage(NSString *name, CGFloat size) {
     UIImage *glyph = paintedSymbol(name, size, UIImageSymbolWeightMedium, secondary());
     CGSize box = CGSizeMake(24, 24);
@@ -192,7 +192,7 @@ static void placeTick(UISlider *slider) {
     if (!(self = [super initWithFrame:frame])) return nil;
     self.clipsToBounds = YES;
     self.backgroundColor = UIColor.clearColor;
-    // Nothing here draws in the tint: every colour is set on the view that draws it, and the glyphs have
+    // Nothing here draws in the tint: every color is set on the view that draws it, and the glyphs have
     // theirs painted in rather than tinted. The row came up in the system blue for a moment as the sheet
     // appeared on the phone (issue #68), which is the tint a view inherits when nothing up the sheet sets
     // one. The block's own tint is white as well, for whatever UIKit draws in it (the sliders' parts).

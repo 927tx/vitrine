@@ -31,7 +31,7 @@
 @class SGSingSeparator;
 
 enum {
-    kSGSingEngineHop = 66150,   // 1.5 s between windows, so neighbours share half a second
+    kSGSingEngineHop = 66150,   // 1.5 s between windows, so neighbors share half a second
 };
 
 typedef struct SGSingEngine SGSingEngine;

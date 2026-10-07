@@ -839,7 +839,7 @@ static void checkCrossfeed(void) {
 }
 
 static void checkTube(void) {
-    printf("\nanalog modelling\n");
+    printf("\nanalog modeling\n");
     SGDSPEngine *engine = SGDSPEngineCreate(kRate);
     allOff(engine);
     SGDSPEngineSetTube(engine, true, 6);

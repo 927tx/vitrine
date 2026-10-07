@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the Visualiser's spectrum check for the Mac: SGRSpectrum.m as the tweak compiles it, under main.m.
+# Builds the Visualizer's spectrum check for the Mac: SGRSpectrum.m as the tweak compiles it, under main.m.
 set -e
 cd "$(dirname "$0")"
 mkdir -p build

@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
         NSArray<SGKaraokeWord *> *thai = piecesOf(@"ฉันรักเธอมากกว่าสิ่งใดในโลกนี้");
         CHECK(!thai[0].joined && thai[1].joined);
 
-        // The keys the two catalogues are matched by.
+        // The keys the two catalogs are matched by.
         CHECK([SGLyricsMatchKey(@"晴天（Live版）") isEqualToString:SGLyricsMatchKey(@"晴天 (Live版)")]);
         CHECK([SGLyricsMatchKey(@"Hello,　World!") isEqualToString:@"helloworld"]);
         CHECK([SGLyricsMatchKey(@"《稻香》") isEqualToString:@"稻香"]);

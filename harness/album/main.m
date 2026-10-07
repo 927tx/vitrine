@@ -229,10 +229,10 @@ static NSString *trailingLabel(UIView *root) {
     UIView *page = box(root.view, _TtC28CreativeWorkPlatform_PageKit24CreativeWorkTemplateView.class,
                        CGRectMake(0, 0, W, H), @"CreativeWorkPlatform.CreativeWorkTemplateView");
 
-    // Spotify's colour wash behind the header, the height of the header at rest.
+    // Spotify's color wash behind the header, the height of the header at rest.
     UIView *wash = box(page, _TtCO19LegacyUI_ECMCoreKit5Views10HeaderView.class, CGRectMake(0, 0, W, 486.67), nil);
     UIView *gradient = box(wash, _TtC19LegacyUI_ECMCoreKit12GradientView.class, wash.bounds, nil);
-    // The colour Spotify read off the whole cover, down to its base surface.
+    // The color Spotify read off the whole cover, down to its base surface.
     ((CAGradientLayer *)gradient.layer).colors = @[(id)[UIColor colorWithRed:0.29 green:0.22 blue:0.62 alpha:1].CGColor,
                                                    (id)[UIColor colorWithRed:0.07 green:0.07 blue:0.07 alpha:1].CGColor];
 
@@ -505,8 +505,8 @@ static NSString *trailingLabel(UIView *root) {
         NSLog(@"[harness] the episode page's paint: %@ %@ %@, and the card inside a cell %@",
               episodePaints[0].backgroundColor ?: @"clear", episodePaints[1].backgroundColor ?: @"clear",
               episodePaints[2].backgroundColor ?: @"clear", card.backgroundColor ?: @"clear");
-        // The base-surface album card cleared, the one painted grey left alone.
-        NSLog(@"[harness] album cards: base surface a=%.0f, grey a=%.2f",
+        // The base-surface album card cleared, the one painted gray left alone.
+        NSLog(@"[harness] album cards: base surface a=%.0f, gray a=%.2f",
               CGColorGetAlpha(self->_baseCard.layer.backgroundColor), CGColorGetAlpha(self->_greyCard.layer.backgroundColor));
     });
 

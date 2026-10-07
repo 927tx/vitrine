@@ -8,12 +8,12 @@ A Theos tweak (Objective-C + Logos) injected into the decrypted Spotify iOS app.
 **Redesigned UI** (the first row of Mod Settings) picks one of two looks, read once at launch:
 
 - **Native**: Spotify's own screens with the mod's tweaks on them (hide switches, glass header buttons,
-  Home gradient, AMOLED switch, accent colour...).
+  Home gradient, AMOLED switch, accent color...).
 - **Redesigned**: the mod's own Liquid Glass look, from a clean sheet. It includes the glass tab bar,
   search field and now playing bar, the redesigned player and lyrics page with Apple Music style lyrics
   always on, a decluttered Home, Search's categories on tinted glass, a Library with one large title, the
   playlist, album and artist pages the way the Music app lays them out with one pinned ⋯ over each, black
-  throughout, and its own accent colour. No native tweak runs.
+  throughout, and its own accent color. No native tweak runs.
 
 Anything that doesn't draw on Spotify's screens works the same under both: ads, privacy, lyrics
 sources, gestures, blocked artists, flags, Vibrations, Speed and pitch, and the Live Activity. Those
@@ -31,7 +31,7 @@ Spotify 9.1.78's own.
 
 | Layer | What | Gate at the top of every `%ctor` |
 |---|---|---|
-| `Shared/` | behaviour and data, either look | none |
+| `Shared/` | behavior and data, either look | none |
 | `Native/` | Spotify's screens tweaked | `if (!SGNativeUI()) return;` |
 | `Redesigned/` | the redesign (`Kit/` + parts) | `if (!SGRedesignedUI()) return;` |
 | `App/` | Mod Settings root and combined pages, Mod page, tour | none |
@@ -44,7 +44,7 @@ Rules:
   violation. Don't work around it.
 - Change one look without touching the other. When both need the same thing, each side keeps its own
   copy under its own names (`SG…` native, `SGR…` redesign) and its own keys. Examples are the tab bar
-  composition and editor, AMOLED and the accent colour. Don't merge copies back into
+  composition and editor, AMOLED and the accent color. Don't merge copies back into
   a shared file.
 - A lower layer that needs something from a higher one gets it through a registry in `Core`
   (forced flags: `Core/SGFlagForce.h`) or a function declared low and defined high.

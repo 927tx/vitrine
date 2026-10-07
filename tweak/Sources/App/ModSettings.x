@@ -11,9 +11,9 @@
 // out again.
 //
 // Tree (trees/settings.txt): SettingsListViewController.view > SettingsListCollectionView of
-//   Element_List cells 402x56: 24pt icon at x 12, 13pt white title and 11pt grey subtitle at
+//   Element_List cells 402x56: 24pt icon at x 12, 13pt white title and 11pt gray subtitle at
 //   x 48, 12pt chevron on the right. A pushed page (trees/settings notifications opened.txt) is a
-//   UITableView bg #121212: header with an 11pt grey description at (16, 24), 53pt cells with the
+//   UITableView bg #121212: header with an 11pt gray description at (16, 24), 53pt cells with the
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
 #import "Settings/SGPageStyle.h"
@@ -36,7 +36,7 @@
 static const CGFloat kRowHeight = 56;
 static char kRowKey, kInsetKey;
 
-// Each part of Spotify on a tile of its own colour, as Settings lists its own, so a row is found by its colour.
+// Each part of Spotify on a tile of its own color, as Settings lists its own, so a row is found by its color.
 static SGModRow *pageRow(NSString *title, NSString *symbol, UIColor *color, UIViewController *(^page)(void)) {
     return SGWithTile(SGPageRow(title, page), symbol, color);
 }

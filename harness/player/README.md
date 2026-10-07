@@ -16,7 +16,7 @@ sources, for example an older commit, to see a bug before its fix.
 `build.sh` runs `logos.pl -c generator=internal` over `PlayerLyrics.x`, `PlayerArtwork.x`,
 `PlayerControls.x`, `PlayerFooter.x`, `PlayerScroll.x`, `PlayerField.x`, `PlayerHeader.x` (the glass circles of
 the down arrow and the ⋯, in a mocked `HeaderElementsUnit`, and their press) and the Kit's `SGRBridges.x`, and links them with
-the real `Core/`, `Redesigned/Kit/`, `SGRKaraokeView`, `Settings/`, the Player page and the Visualiser (`PlayerVisualiser.m`, `SGRSpectrum.m`). `stubs.m` stands in for the hooks the harness
+the real `Core/`, `Redesigned/Kit/`, `SGRKaraokeView`, `Settings/`, the Player page and the Visualizer (`PlayerVisualiser.m`, `SGRSpectrum.m`). `stubs.m` stands in for the hooks the harness
 does not compile (the Kit's accent and repaint, the rest of the player, the lyrics store, the haptics,
 Sing's mic) and plays a mock player: `SGRHarnessSetTrack` reports a track, with the image ids Spotify's
 metadata carries, to every state observer. A song of ten timed lines plays on from launch. `main.m` also answers
@@ -31,7 +31,7 @@ come late, out of order, or not at all.
   it logs whether touches on the lowered footer row (issue #54) still reach it.
 - `artwork` is issue #58. Tracks change while the covers on screen lag behind (3.5 s late, past the
   Kit's last look), two skips come in a row with the older picture answering last, and one track plays
-  offline. Each step checks by colour that the Kit and the field show that track's picture, and the log
+  offline. Each step checks by color that the Kit and the field show that track's picture, and the log
   ends with `artwork checks: n of 4 right -- PASS` or `FAIL`. Before the fix it read 1 of 4.
 - `landscape` turns the lyrics sideways at 3 s, puts a line's meanings over them (the real
   `MeaningSheet.m`) at 4 s and takes them away at 9, then pauses at 14.5 and resumes at 15.5. Each step
@@ -45,7 +45,7 @@ come late, out of order, or not at all.
   cancel and when the slider leaves the window, and a pan that was off already left off. The log ends
   with `scrub checks: ... -- PASS` or `FAIL`.
 - `cover` is issue #77. The cover is checked untouched first, then given Spotify's layout for a track with
-  lyrics, a smaller cover over the lyric preview, and must take its room back as a centred square the
+  lyrics, a smaller cover over the lyric preview, and must take its room back as a centered square the
   Kit also reports. The log ends with `cover checks: n of 4 right -- PASS` or `FAIL`.
 - `immersive` opens the lyrics and waits past the rest: only the bottom stack under the title row
   (progress bar, buttons, volume row, footer) fades, the lines grow down only, a touch where the buttons
@@ -84,7 +84,7 @@ come late, out of order, or not at all.
   player at 3 s, with the clip of `motion` in. It checks the card leads the page with the five backgrounds'
   segmented control under it, every name whole, the Mini player section's three rows are on the page, and then,
   as the control picks each in turn, that the card shows Animated (the clip, the sources and Low Data Mode's rows
-  in), Fluid, Colours, Still, Visualiser (the hills over Fluid held still) and Animated again, with a note for
+  in), Fluid, Colors, Still, Visualizer (the hills over Fluid held still) and Animated again, with a note for
   each and the header the same height throughout. The log ends with `settings checks: n of 8 right -- PASS` or
   `FAIL`.
 - `preview` opens the Player page with the background Still at launch, so the player looks up no clip, and picks
@@ -99,11 +99,11 @@ come late, out of order, or not at all.
   long title (gliding), its cover from the picture server and a Canvas of the run's own (`HARNESS_CANVAS_FILE`).
   `HARNESS_BACKGROUND` is the background's index, Fluid if unset. For screenshots: 2026-10-06 on an iPhone 17 Pro,
   iOS 27.0, the card read Not Playing over a dim green field, and Holocene with its cover over Fluid.
-- `visualiser` plays the Visualiser background, fed by `stubs.m`'s stand-in for the audio effects' reader: a song
+- `visualiser` plays the Visualizer background, fed by `stubs.m`'s stand-in for the audio effects' reader: a song
   of its own at 120 beats a minute, handed over in buffers of 1024 at 48 kHz. It checks the hills stand on the
   Fluid field held still with the reader on and the link at up to 60 fps, blur behind the lyrics with the link at
   30, settle and stop with the reader off on a pause, come back on play, and go and come back through the ⋯
-  menu's switch to Fluid and back. The log ends with `visualiser checks: n of 7 right -- PASS` or `FAIL`.
+  menu's switch to Fluid and back. The log ends with `visualizer checks: n of 7 right -- PASS` or `FAIL`.
 
 - `header` is the glass circles' press (`PlayerHeader.x`): a finger (`../tabbar/touch.m`) held half a second on
   the down arrow and then on the ⋯, each a `UIControl` under Spotify's identifier. It checks each has a 44pt glass

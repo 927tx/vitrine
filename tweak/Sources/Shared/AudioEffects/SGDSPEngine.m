@@ -17,7 +17,7 @@ _Static_assert(kSGDSPEngineBlock == kSGDSPConvolverBlock && kSGDSPEngineBlock ==
 // and the one just made, with room to spare.
 enum { kRing = 4 * kSGDSPEngineBlock };
 
-// The order a block goes through the effects: tone, then dynamics and colour, the script, the stereo image,
+// The order a block goes through the effects: tone, then dynamics and color, the script, the stereo image,
 // and the rooms last.
 typedef enum {
     SlotBass, SlotEqualizer, SlotGraphicEq, SlotDDC, SlotCompander, SlotTube, SlotLiveprog, SlotWide, SlotCrossfeed,

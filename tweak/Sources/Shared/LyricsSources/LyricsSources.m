@@ -174,13 +174,13 @@ NSArray<SGLyricsProvider *> *SGLyricsAllProviders(void) {
         };
         all = @[
             make(@"binilyrics", @"BiniLyrics", @"Apple Music word timing", SGBiniLyricsAsk),
-            make(@"musixmatch", @"Musixmatch", @"Spotify's licensed catalogue", SGMusixmatchAsk),
+            make(@"musixmatch", @"Musixmatch", @"Spotify's licensed catalog", SGMusixmatchAsk),
             make(@"unison", @"Unison", @"Hand-timed, few tracks", SGUnisonAsk),
             make(@"netease", @"NetEase", @"Word timing, censored", SGNetEaseAsk),
             make(@"lrclib", @"LRCLIB", @"Line timing, open fallback", SGLrcLibAsk),
             make(SGSpicyLyricsKey, @"Spicy Lyrics", @"Community word syncs, your own key", SGSpicyLyricsAsk),
-            make(@"qqmusic", @"QQ Music", @"Line timing, Chinese catalogue", SGQQMusicAsk),
-            make(@"kugou", @"KuGou", @"Word timing, Chinese catalogue", SGKuGouAsk),
+            make(@"qqmusic", @"QQ Music", @"Line timing, Chinese catalog", SGQQMusicAsk),
+            make(@"kugou", @"KuGou", @"Word timing, Chinese catalog", SGKuGouAsk),
             make(SGImportedLRCKey, @"Imported LRC", @"Your own .lrc files", SGImportedLRCAsk),
         ];
     });
@@ -204,7 +204,7 @@ static NSArray<NSString *> *fromLegacyKeys(void) {
 }
 
 // With nothing stored and nothing to carry over, every source is on: the user's own files first, word
-// timing ahead of line timing, and the two Chinese catalogues last, asked only once the rest have missed.
+// timing ahead of line timing, and the two Chinese catalogs last, asked only once the rest have missed.
 // Spicy Lyrics passes straight on without its key.
 static NSArray<NSString *> *defaultOrder(void) {
     return @[SGImportedLRCKey, SGSpicyLyricsKey, @"binilyrics", @"musixmatch", @"unison", @"netease", @"lrclib", @"qqmusic", @"kugou"];

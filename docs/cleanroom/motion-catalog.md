@@ -25,7 +25,7 @@ It may use:
 
 Every `done` block runs on the main queue, exactly once.
 
-## Behaviour
+## Behavior
 
 ### Name keys
 

@@ -59,7 +59,7 @@ static __weak UIView *sgJamStrip;
         host.backgroundColor = album;
         [self.view addSubview:host];
     }
-    // The card, 386x56 at {8,0} with the album colour, the artwork, two lines and the progress line
+    // The card, 386x56 at {8,0} with the album color, the artwork, two lines and the progress line
     // (trees/clean/home/01.txt, SPTNowPlayingBar).
     UIView *card = [UIView new];
     card.accessibilityIdentifier = @"SPTNowPlayingBar";
@@ -180,7 +180,7 @@ static __weak UIView *sgJamStrip;
 - (UIView *)tabBarView { return self.bar; }
 - (void)setSelectedViewController:(UIViewController *)controller {}
 
-// A tap on a mock item does what Spotify's does to the bar: its label goes white and the others grey.
+// A tap on a mock item does what Spotify's does to the bar: its label goes white and the others gray.
 + (void)tapped:(UITapGestureRecognizer *)tap {
     for (UIView *item in tap.view.superview.subviews) {
         for (UIView *sub in item.subviews) {

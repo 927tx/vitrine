@@ -2,7 +2,7 @@
 
 Mod Settings > Audio effects (`tweak/Sources/Shared/AudioEffects/`) in a navigation controller, the way Mod
 Settings pushes it: the real page, curve and file pages, the real `Settings/` framework,
-`AudioEffectsSettings.m` and the engine's curve maths (`SGDSPFilters.m`), with `stubs.m` standing in for the
+`AudioEffectsSettings.m` and the engine's curve math (`SGDSPFilters.m`), with `stubs.m` standing in for the
 rest of the engine (a made-up status that changes every three seconds, fake libraries in the app's temporary
 directory, and an error for any chosen file with "broken" in its name).
 

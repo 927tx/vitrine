@@ -62,7 +62,7 @@ static NSString *importedFamily(void) {
 }
 
 // A face iOS already carries under the same name (Chalkduster, say) is refused as a duplicate and is there
-// all the same, so what counts is whether the family has faces afterwards. Files that are gone are skipped.
+// all the same, so what counts is whether the family has faces afterward. Files that are gone are skipped.
 NSString *SGRegisterCustomFont(void) {
     NSString *family = importedFamily();
     for (NSURL *url in storedFiles()) {

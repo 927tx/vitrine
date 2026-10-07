@@ -48,7 +48,7 @@ picked at 3.5 s, which forgets the lit tab, and the selection at 4.5 s should be
 
 `mini` minimizes the bar at 1 s through `SGRSetTabBarMinimized`, logs at 2.5 s and expands it again at 3.5 s,
 logging at 5 s. Minimized, the platters should be two 62 pt circles 21 pt in from each side, the card
-between them 8 pt from each, centred on them, and a touch at the card's middle should land in the now
+between them 8 pt from each, centered on them, and a touch at the card's middle should land in the now
 playing bar (through the hook on the page's `TouchPassthroughView`); expanded again, all as `none` has
 it. Every report also gives the frame of the fade under the bars. The mock card's labels have fixed
 frames, so how Spotify's own content takes the narrower card is not shown here.
@@ -97,7 +97,7 @@ stretches run one after another and time their turns from their own start: dispa
 tenth of its delay late, so steps timed from the launch, as `names` times its quick turns and `tap` its tap and
 the report after it, can fall together (one `tap` run in three reported the bar before the tap's touch-up).
 A critically damped spring moving the platter's 298 pt peaks at some 50 pt a frame over 0.34 s; more is a jump.
-A single sample off its neighbours at a turn is one read in the turn's own run loop pass, before its animations
+A single sample off its neighbors at a turn is one read in the turn's own run loop pass, before its animations
 are committed.
 
 2026-10-06, iPhone 17 Pro on iOS 27.0. Before the fix, every minimize laid the circle's one item out in the
@@ -113,7 +113,7 @@ com.apple.Accessibility ReduceMotionEnabled` in the simulator) the bar and the c
     cc -I../../tweak/Sources/Redesigned/Navbar minimize-check.c -o build/minimize-check && build/minimize-check
 
 `jam` plays a Jam: a strip under the class name of Spotify's (a SwiftUI hosting view of
-`Jam_AttachmentsImpl.JamHatElement`, 44 pt) over the card, both in a view painted the album colour too,
+`Jam_AttachmentsImpl.JamHatElement`, 44 pt) over the card, both in a view painted the album color too,
 the bar 44 pt taller, and the strip gone again at 3.5 s. The log then lists the bar's glass panes. The
 card's glass should be the track card's (386x56), the strip's pane 36 pt above it with a 4 pt gap, and
 once the Jam is over the card's glass should still be 386x56 and the strip's pane should have no effect.

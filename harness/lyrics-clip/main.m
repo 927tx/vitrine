@@ -13,7 +13,7 @@ static void check(BOOL ok, NSString *what) {
     if (!ok) failures++;
 }
 
-// A stand-in cover: two coloured halves and a light disc, so the blur and the darkening show.
+// A stand-in cover: two colored halves and a light disc, so the blur and the darkening show.
 static CGImageRef newCover(void) {
     CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
     CGContextRef context = CGBitmapContextCreate(NULL, 640, 640, 8, 0, space, kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);

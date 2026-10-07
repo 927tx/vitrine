@@ -6,7 +6,7 @@
 //             while it tracks, back at its end, at a cancel and when the slider leaves the window, a pan
 //             that was off already left off, and a sideways list between them left alone
 //     cover   Spotify's layout for a track with lyrics, a smaller cover over the preview (issue #77):
-//             untouched with Lyrics preview shown, the cover a centred square of its room with it hidden,
+//             untouched with Lyrics preview shown, the cover a centered square of its room with it hidden,
 //             and a small cover and a tilt view outside the cover cell untouched
 #import <UIKit/UIKit.h>
 #import "Native/Player/NowPlaying.h"

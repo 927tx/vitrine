@@ -364,7 +364,7 @@ static BOOL hasSound(Format *format, AudioUnitRenderActionFlags flags, const Aud
 
 // The gain asked for (main thread writes, render thread reads) and the one the sound is at (the music's render
 // thread only). The sound moves toward the one asked for by at most the whole way in kGainSlew seconds, so a
-// fade that starts late, a timer cancelled halfway or more time added never steps.
+// fade that starts late, a timer canceled halfway or more time added never steps.
 static const double kGainSlew = 0.5;
 static atomic_uint sg_gainBits;
 static float sg_gainNow = 1;

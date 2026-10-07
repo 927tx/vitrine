@@ -1,5 +1,5 @@
-// LRCLIB, the floor of the order. It is an open library with no key and no catalogue to license, so
-// it holds what the rest cannot: the tracks Apple's word by word programme never reached, and the
+// LRCLIB, the floor of the order. It is an open library with no key and no catalog to license, so
+// it holds what the rest cannot: the tracks Apple's word by word program never reached, and the
 // ones Musixmatch may show nobody. It times lines and not words, which is the whole point of putting
 // it last — the estimate inside a line is still a sweep, where Spotify's own lyrics only scroll.
 //

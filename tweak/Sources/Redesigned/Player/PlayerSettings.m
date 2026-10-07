@@ -6,11 +6,11 @@
 // card shows the last one played (Shared/Player/SGLastTrack.h), its cover fetched and its Canvas looked up
 // as the playing one's would be, and with none ever played, Not Playing over a gradient of the accent.
 //
-// The background is the player's own: a field of the same kind (Still, Colours, Fluid), for Animated
+// The background is the player's own: a field of the same kind (Still, Colors, Fluid), for Animated
 // the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or, while the player has
 // none, the playing track's clip looked up for the card while it is on screen, Fluid until it comes in and
 // for a track with none, as in the player; the clip crosses over the field as it arrives, its poster first
-// while its video decodes. And for Visualiser the hills over Fluid held still (SGRPlayerVisualiserPreview),
+// while its video decodes. And for Visualizer the hills over Fluid held still (SGRPlayerVisualiserPreview),
 // moving with the song. It moves under the field's own conditions (in a window, Spotify in front, Reduce
 // Motion and Low Power Mode off). Under the card a segmented control picks the background, all five of
 // them: the names are one word each, each segment as wide as its name, so they fit side by side at an iPhone's
@@ -40,10 +40,10 @@ static const CGFloat kCardPadding = 16, kCoverSide = 64;
 static NSArray<NSString *> *backgroundNotes(void) {
     return @[
         @"The cover, blurred and held still.",
-        @"The cover's colours, drifting slowly.",
+        @"The cover's colors, drifting slowly.",
         @"The cover itself, blurred and slowly turning. It rests while a song is paused.",
-        @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between this, Fluid and Visualiser.",
-        @"The song's sound as gentle hills in the cover's colours, over Fluid held still. They settle while a song is paused.",
+        @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between this, Fluid and Visualizer.",
+        @"The song's sound as gentle hills in the cover's colors, over Fluid held still. They settle while a song is paused.",
     ];
 }
 
@@ -333,9 +333,9 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
                        @"Apple Music style moves the now playing bar in between two tabs as you scroll down."), nil];
     [sections addObjectsFromArray:more];
-    // Fluid, Animated and Visualiser share the field (PlayerMotion.x reads the choice on every track, PlayerVisualiser.m
-    // on the field's layout); Still and Colours are a field of another kind, made once a launch (PlayerField.x).
-    NSString *footer = @"Fluid, Animated and Visualiser change with the next song. Still, Colours and Hide on the player apply after you restart Spotify.";
+    // Fluid, Animated and Visualizer share the field (PlayerMotion.x reads the choice on every track, PlayerVisualiser.m
+    // on the field's layout); Still and Colors are a field of another kind, made once a launch (PlayerField.x).
+    NSString *footer = @"Fluid, Animated and Visualizer change with the next song. Still, Colors and Hide on the player apply after you restart Spotify.";
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:footer];
     page.showcase = showcase;
     page.backgrounds = backgrounds;

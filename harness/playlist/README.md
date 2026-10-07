@@ -20,7 +20,7 @@ The page opens mid load, with the cover smaller and the block higher than they s
 picture has to grow to its final height and then hold it. Then it plays the three states the header is ever in, with the frames Spotify sets in each
 (`trees/continuous/1.txt`, `2.txt` and `4.txt`): at rest at 4 s, collapsed at 8 s, pulled down past the
 top at 12 s (block moved down and grown, as on the phone). Each logs where the hero landed in the window; collapsed it belongs off the top of the
-screen, not pinned to it. At 16 s it fades Spotify's cover square and colour wash back in the way a
+screen, not pinned to it. At 16 s it fades Spotify's cover square and color wash back in the way a
 scroll does, with nothing laid out, and reports what the redesign's scroll pass made of them.
 Back at rest the hero must be the height it had at 4 s: a hero that kept its pulled height is clipped by the plane and loses its dissolve.
 
@@ -67,7 +67,7 @@ a plain UICollectionViewCell straight in the list: "plain heading a=0" once the 
 
 The owner's picture is an image view inside the creator button's facepile, filled at 1.5 s, after the header has
 laid out. At 2.2 s the log line "owner picture" says where the redesign drew it: round, a line high, just before
-the name, the two centred together. "none" means the late image was missed.
+the name, the two centered together. "none" means the late image was missed.
 
 "whole page" lines, in every mode: just after launch the page is under the field's veil, below the pinned ⋯, and at
 3 s there is "no veil". The redesign's own line says why it lifted (`log stream`, "page shown whole"): "its artwork

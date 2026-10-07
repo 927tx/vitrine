@@ -1,13 +1,13 @@
-// The redesign's design tokens: every redesigned screen takes its colours, type, spacing, radii and
+// The redesign's design tokens: every redesigned screen takes its colors, type, spacing, radii and
 // motion from here, so the screens read as one app and nothing is tuned per screen by hand.
 //
-// Colours are white over the artwork field (SGRField.h), whose colour is kept dark enough that
+// Colors are white over the artwork field (SGRField.h), whose color is kept dark enough that
 // SGRPrimary and SGRSecondary both pass WCAG AA on it. Type is the system font (SF Pro) sized by the
 // text style and capped, since Spotify's pages lay out for a fixed header height. Motion is springs,
 // critically damped for layout and a little bounce for press feedback; under Reduce Motion both
 // become instant, while crossfades, responses and exits stay, a fade not being motion.
 //
-// Threading: the constants and the colours are safe anywhere; fonts, SGRAnimate and the
+// Threading: the constants and the colors are safe anywhere; fonts, SGRAnimate and the
 // accessibility reads are main thread only.
 #import <UIKit/UIKit.h>
 
@@ -21,13 +21,13 @@ extern const CGFloat SGRGlassCircleSize; // 44, a round glass behind a top bar b
 extern const CGFloat SGRActionHeight;    // 48, a button of the action row under a hero
 extern const CGFloat SGRActionSpacing;   // 12, between the buttons of an action row
 extern const CGFloat SGRGlassSpacing;    // 16, how near two glass shapes merge in one container
-extern const NSTimeInterval SGRCrossfade;   // 0.35, a new image or field colour fading in
+extern const NSTimeInterval SGRCrossfade;   // 0.35, a new image or field color fading in
 
 UIColor *SGRPrimary(void);      // white
 UIColor *SGRSecondary(void);    // white 65%, 80% with Increase Contrast
 UIColor *SGRTertiary(void);     // white 40%, 60% with Increase Contrast
-UIColor *SGRAccent(void);       // the accent colour of Appearance, else Spotify's green
-UIColor *SGRNeutralField(void); // #121212, the field before a colour arrives; SGRAmoled.x turns it black
+UIColor *SGRAccent(void);       // the accent color of Appearance, else Spotify's green
+UIColor *SGRNeutralField(void); // #121212, the field before a color arrives; SGRAmoled.x turns it black
 // Where glass cannot be (Reduce Transparency), the shape it would have had: white 16% over the field.
 UIColor *SGRSolidGlassFill(void);
 // A content surface on the field (a card), a step lighter than the field it sits on.
@@ -51,7 +51,7 @@ typedef NS_ENUM(NSInteger, SGRMotion) {
     SGRMotionPress,    // a spring with a little bounce, for press feedback
     SGRMotionFade,     // an ease in and out over SGRCrossfade, kept under Reduce Motion
     // A strong ease out over 0.2 s, for what comes back or opens at a touch: the eye is on it from the
-    // first frame. Kept under Reduce Motion like a fade, so only alpha, colour and a glass effect go in it.
+    // first frame. Kept under Reduce Motion like a fade, so only alpha, color and a glass effect go in it.
     SGRMotionRespond,
     // An ease out over 0.15 s, for what goes once the finger has let it go (the hold's 2x badge): nothing is
     // watched on its way out. Kept under Reduce Motion like a fade.
@@ -61,5 +61,5 @@ typedef NS_ENUM(NSInteger, SGRMotion) {
     SGRMotionBar,
 };
 // Runs `animations` with the motion's timing, or at once under Reduce Motion (except a fade, a response or an exit), and
-// always calls `completion`. Only transform, alpha and colour belong in it while a page scrolls.
+// always calls `completion`. Only transform, alpha and color belong in it while a page scrolls.
 void SGRAnimate(SGRMotion motion, void (^animations)(void), void (^completion)(BOOL finished));

@@ -10,7 +10,7 @@ NSNotificationName const SGRFieldColorDidChangeNotification = @"spotifyglass.red
 
 static const CGFloat kFallbackHeight = 874;   // a window-less field sizes for an iPhone 17 Pro
 
-// Where the colour starts fading to black and where it is black, as shares of the window's height:
+// Where the color starts fading to black and where it is black, as shares of the window's height:
 // the redesign is AMOLED throughout (SGRAmoled.x).
 static const CGFloat kBlackFrom = 0.55, kBlackTo = 1;
 
@@ -20,7 +20,7 @@ static CGFloat windowHeight(UIView *view) {
 }
 
 // The field paints on sublayers of its own rather than on the view's layer: a repaint hook only clears
-// the paint of a view's own layer, so the neutral colour cannot be taken for Spotify's base surface.
+// the paint of a view's own layer, so the neutral color cannot be taken for Spotify's base surface.
 static NSDictionary *noActions(void) {
     static NSDictionary *none;
     static dispatch_once_t once;
@@ -33,7 +33,7 @@ static NSDictionary *noActions(void) {
 
 const NSTimeInterval SGRFieldHoldLimit = 1.0;
 
-// The veil over a held page: black, the redesign's field before a colour arrives (SGRAmoled.x), painted on a
+// The veil over a held page: black, the redesign's field before a color arrives (SGRAmoled.x), painted on a
 // sublayer for the reason the field is, so the repaint hook does not take it for Spotify's base surface.
 @interface SGRFieldVeil : UIView
 @end
@@ -245,7 +245,7 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     if (animated && from) {
         CABasicAnimation *fade = [CABasicAnimation animationWithKeyPath:@"backgroundColor"];
         fade.fromValue = from;
-        // Read back rather than the colour asked for: SGRAmoled.x may have swapped it for black.
+        // Read back rather than the color asked for: SGRAmoled.x may have swapped it for black.
         fade.toValue = (__bridge id)_solid.backgroundColor;
         fade.duration = SGRCrossfade;
         fade.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
@@ -319,13 +319,13 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 
 - (void)applyPalette:(SGRPalette *)palette animated:(BOOL)animated {
     _read = YES;
-    // Under the veil the colour goes in at once, and the page fades in with it.
+    // Under the veil the color goes in at once, and the page fades in with it.
     if (_veil) animated = NO;
     if (_flows && palette.flowColors) {
         [_flow setColors:palette.flowColors animated:animated && !_flow.hidden];
         _flow.hidden = NO;
         [self updateMotion];
-        // Past the moving field's edges (the pull that dismisses the player) the colour under it goes on.
+        // Past the moving field's edges (the pull that dismisses the player) the color under it goes on.
         [self applyColor:_flow.baseColor animated:animated];
         return;
     }

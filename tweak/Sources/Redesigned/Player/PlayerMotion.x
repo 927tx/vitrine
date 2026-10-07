@@ -1,7 +1,7 @@
 // Player redesign: Animated artwork, the track's Canvas or Apple Music's animated cover behind the player,
 // the way the Music app draws it. The clip runs edge to edge from the top, sharp to near its foot, where
 // it dissolves into its own last rows drawn on down to the bottom of the field, so it ends in its own
-// colour rather than on the Fluid field. A blur comes in from the seam (from above the controls for a
+// color rather than on the Fluid field. A blur comes in from the seam (from above the controls for a
 // Canvas as tall as the screen) and lies under the controls; behind the lyrics the whole clip is blurred.
 // The player's square cover goes while a clip plays, so a track without one keeps its cover over Fluid
 // (PlayerField.x keeps the field Fluid for this choice). The player's ⋯ menu switches between Animated
@@ -16,7 +16,7 @@
 // while the player opens or closes, and while the song is paused. Under Reduce Motion and in Low Power Mode
 // no clip plays at all: the cover stays over Fluid, as for a track without one, until both are off again.
 // While a clip is showing, the Fluid field under it is held still too, and once the clip has faded in it is
-// hidden (the field's covered): the field's colour is what shows above the clip on the pull that dismisses.
+// hidden (the field's covered): the field's color is what shows above the clip on the pull that dismisses.
 //
 // The clip is dimmed by how bright it is (SGRPlayerClipDim): three of its frames are measured as it comes in,
 // so a white Canvas is drawn darker than a black one and the white text over it keeps its contrast.
@@ -227,7 +227,7 @@ static UIBlurEffect *blurEffect(void) {
 
 - (void)playFile:(NSURL *)file poster:(UIImage *)poster {
     _aspect = poster.size.height / poster.size.width;
-    // The poster's last rows, stretched from the seam to the bottom: the clip goes on down in its own colour.
+    // The poster's last rows, stretched from the seam to the bottom: the clip goes on down in its own color.
     CGFloat rows = MAX(kFootRows, 1 / MAX(1, poster.size.height * poster.scale));
     _foot.contents = (__bridge id)poster.CGImage;
     _still.contents = (__bridge id)poster.CGImage;
@@ -610,7 +610,7 @@ static BOOL beginTrack(NSString *track) {
 
 #pragma mark - the ⋯ menu's switch (Shared/Player/SpeedPitch.h)
 
-// Fluid, Animated and the Visualiser share the field, so the menu moves between them without a restart. The
+// Fluid, Animated and the Visualizer share the field, so the menu moves between them without a restart. The
 // other backgrounds are a field of another kind, chosen on the Player page (PlayerSettings.m).
 BOOL SGPlayerMenuOffersAnimatedArtwork(void) {
     return sg_follower && SGRPlayerBackground() >= SGRPlayerBackgroundFluid;
@@ -627,7 +627,7 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
     // The playing track is let go, and looked up again when switched on.
     clear(YES);
     [sg_follower restart];
-    // From the Visualiser, whose hills go.
+    // From the Visualizer, whose hills go.
     SGRPlayerVisualiserUpdate();
 }
 

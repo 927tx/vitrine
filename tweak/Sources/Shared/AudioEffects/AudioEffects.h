@@ -4,7 +4,7 @@
 //
 // What it offers: output gain and limiter, a multiband compander, dynamic bass boost, a 15 band equalizer,
 // the Graphic EQ (any curve, as AutoEq writes them), the convolver (impulse responses), ViPER DDC files,
-// Liveprog (EEL2 scripts), reverb, stereo widening, crossfeed and analog modelling. Each effect has a switch
+// Liveprog (EEL2 scripts), reverb, stereo widening, crossfeed and analog modeling. Each effect has a switch
 // and its own values, kept under its own keys.
 //
 // Unlike the mod's other switches these apply as they change, not at launch: every setter below stores the

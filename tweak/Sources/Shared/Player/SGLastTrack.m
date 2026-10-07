@@ -129,8 +129,8 @@ UIImage *SGPlaceholderArtwork(UIColor *tint) {
     format.scale = 1;
     format.opaque = YES;
     return [[[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side) format:format] imageWithActions:^(UIGraphicsImageRendererContext *context) {
-        // The tint, muted and dim, at the top left to near black at the bottom right, so the fields made from it (Colours,
-        // Fluid) have two calm colours to move between rather than the accent at full strength.
+        // The tint, muted and dim, at the top left to near black at the bottom right, so the fields made from it (Colors,
+        // Fluid) have two calm colors to move between rather than the accent at full strength.
         CGFloat h = 0, s = 0, b = 0, a = 0;
         [tint getHue:&h saturation:&s brightness:&b alpha:&a];
         UIColor *light = [UIColor colorWithHue:h saturation:s * 0.55 brightness:b * 0.5 alpha:1];

@@ -408,7 +408,7 @@ static void answerHeld(id delegate, NSURLSession *session, NSURLSessionDataTask 
     }
     if (ended || cancelled) {
         SGLog(@"lyrics: the request for %@ ended before the sources answered, nothing delivered", state.track);
-        // URLSession holds the end of a cancelled task back until it has a disposition.
+        // URLSession holds the end of a canceled task back until it has a disposition.
         if (cancelled) handler(NSURLSessionResponseCancel);
         return;
     }
@@ -476,7 +476,7 @@ static void finishDonor(id delegate, NSURLSession *session, NSURLSessionDataTask
         forward(error);
         return;
     }
-    // The donor's colours are the track's own only when they were worked out from its artwork.
+    // The donor's colors are the track's own only when they were worked out from its artwork.
     NSData *page = decide(state.track, chain, nil, YES, state.artwork ? coloursIn(body) : nil);
     if (!page) {
         SGLog(@"lyrics: no source has lyrics for %@ any more, its request fails", state.track);

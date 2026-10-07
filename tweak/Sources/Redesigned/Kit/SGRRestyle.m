@@ -337,7 +337,7 @@ SGRShadowPlate *SGRShadowPlateIn(UIView *host, const void *key) {
 // disc is 26pt and an avatar's ring the same.
 static const CGFloat kPaintedShare = 0.75;
 
-// The layer's colour, not the view's. -[UIView backgroundColor] answers only what was set through the
+// The layer's color, not the view's. -[UIView backgroundColor] answers only what was set through the
 // view; a view painted straight on its layer reads back nil there, and the first pass of this left the
 // playlist's Refresh band black while everything beside it cleared (device, trees/continuous/1.txt
 // 2026-09-20). The layer is where the paint really is, and where the Kit's repaint hook watches for it.
@@ -350,7 +350,7 @@ static void clearPaint(UIView *view, UIView *cell, CGFloat wide) {
     if (view != cell && !full && [view isKindOfClass:UICollectionViewCell.class]) return;
     if (full) {
         // Read off the layer, written through the view, so the two are left saying the same thing: the
-        // clear colour lands on both, and reads back with an alpha the next pass does not take for paint.
+        // clear color lands on both, and reads back with an alpha the next pass does not take for paint.
         CGColorRef color = view.layer.backgroundColor;
         if (color && SGIsBaseSurface(color)) view.backgroundColor = UIColor.clearColor;
         if (!view.layer.mask && [NSStringFromClass(view.class) containsString:@"GradientView"]) view.layer.mask = [CALayer layer];

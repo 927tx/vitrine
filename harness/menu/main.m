@@ -12,7 +12,7 @@
 // contentSize by KVO, a loading spinner) and hands it its rows only 4 s after it is up, as Spotify does
 // once its item factories have answered; `stuck` never hands them over. `open` opens the block on a first
 // menu, closes it, and brings up a second one with the block open, as it stays for the session. Every frame of the first second the block is on screen
-// is checked for a colour of the system tint on anything it draws, and what the sheet shows is reported.
+// is checked for a color of the system tint on anything it draws, and what the sheet shows is reported.
 // `animated` offers the redesign's Animated artwork switch: it is flipped, then the block opened and
 // closed, and where the switch's row sits is reported each time.
 #import <UIKit/UIKit.h>
@@ -243,7 +243,7 @@ static NSArray<UISlider *> *sliders(UIView *root) {
 
 #pragma mark - the tint check
 
-// A colour is the system tint's when it resolves, in the view's own traits, to the system blue.
+// A color is the system tint's when it resolves, in the view's own traits, to the system blue.
 static BOOL isTint(UIColor *color, UIView *view) {
     if (!color) return NO;
     UIColor *resolved = [color resolvedColorWithTraitCollection:view.traitCollection];
@@ -253,7 +253,7 @@ static BOOL isTint(UIColor *color, UIView *view) {
     return a > 0.05 && fabs(r - br) < 0.08 && fabs(g - bg) < 0.08 && fabs(b - bb) < 0.08;
 }
 
-// Everything the block draws in a colour of its own: labels' text, buttons' titles, and whatever takes the
+// Everything the block draws in a color of its own: labels' text, buttons' titles, and whatever takes the
 // tint (templated glyphs, sliders' thumbs and tracks).
 static void tintedViews(UIView *view, NSMutableArray<NSString *> *out) {
     if (view.isHidden || view.alpha < 0.01) return;
@@ -262,7 +262,7 @@ static void tintedViews(UIView *view, NSMutableArray<NSString *> *out) {
     if ([view isKindOfClass:UIImageView.class]) {
         UIImage *image = ((UIImageView *)view).image;
         // Drawn in the tint when templated, or left automatic on a symbol; a bitmap left automatic keeps
-        // its own colours (the sliders' end images).
+        // its own colors (the sliders' end images).
         BOOL templated = image.renderingMode == UIImageRenderingModeAlwaysTemplate
             || (image.renderingMode == UIImageRenderingModeAutomatic && image.isSymbolImage);
         if (templated && isTint(view.tintColor, view)) [out addObject:[name stringByAppendingString:@" glyph"]];

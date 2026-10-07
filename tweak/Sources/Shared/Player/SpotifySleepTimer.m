@@ -7,7 +7,7 @@
 // gone off; a player state observer starts and stops it. Over the last seconds before the time, or before
 // the end of the track, the gain comes down. Once the timer is up (its time came, the track it ended changed,
 // Spotify paused or dropped the timer within a couple of seconds of its end) the gain stays down until
-// Spotify's pause has landed and comes back a second later, or 5 s on without a pause. A timer cancelled or
+// Spotify's pause has landed and comes back a second later, or 5 s on without a pause. A timer canceled or
 // moved later brings the gain back at once. The core may keep a timer that went off in its state for a while,
 // so one that went off is not followed again.
 //
@@ -149,7 +149,7 @@ static void check(void) {
     } else if (sg_following) {
         if (!key && sg_left >= 0 && sg_left < kUpWithin) wentOff(@"timer cleared at its end");
         else {
-            SGLog(@"sleep timer: Spotify's cancelled%@", sg_lowered ? @", gain back" : @"");
+            SGLog(@"sleep timer: Spotify's canceled%@", sg_lowered ? @", gain back" : @"");
             sg_following = nil;
             sg_left = -1;
             if (sg_lowered) restoreGain(YES);

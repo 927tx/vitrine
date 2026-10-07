@@ -1,5 +1,5 @@
 // Temporary diagnostics (debug builds only): what the player core says about the track it is on,
-// for the reports that songs cannot be paused or scrubbed while podcasts can. Spotify greys its
+// for the reports that songs cannot be paused or scrubbed while podcasts can. Spotify grays its
 // pause button and its scrubber from the state's restrictions, and nothing about them reaches the
 // system log, so the state object is read out here: every property and object ivar of it, the
 // restrictions inside it one level deeper, and the track's metadata, which names an ad.
@@ -102,7 +102,7 @@ id SGDiagnosticsPlayer(void) {
 }
 %end
 
-// Who greys the button out: Encore draws it disabled at half alpha, and the caller says which of
+// Who grays the button out: Encore draws it disabled at half alpha, and the caller says which of
 // Spotify's units decided it.
 %hook _TtC28EncoreConsumerMobile_BaseKit14PlayButtonView
 - (void)setEnabled:(BOOL)enabled {

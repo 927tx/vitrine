@@ -36,7 +36,7 @@ UIView *SGTabIconView(NSString *name, BOOL symbol, UIColor *color) {
     return encoreView(name, color) ?: symbolView(symbolImage(@"star.fill"), color);
 }
 
-#pragma mark - the catalogues
+#pragma mark - the catalogs
 
 // Methods every class answers, which are not glyphs and some of which must not be called bare.
 static BOOL notAGlyph(NSString *name) {
@@ -110,7 +110,7 @@ static BOOL scriptVariant(NSString *name) {
     return dot.location != NSNotFound && [scripts containsObject:[name substringFromIndex:dot.location + 1]];
 }
 
-// UIKit lists no symbol names. The system's own catalogue does, in CoreGlyphs (a link in CoreServices to
+// UIKit lists no symbol names. The system's own catalog does, in CoreGlyphs (a link in CoreServices to
 // SFSymbols.framework's bundle on iOS 26 and 27, checked against the iOS 27 simulator runtime): its
 // symbol_order.plist names each symbol once, in the SF Symbols app's order.
 static NSArray<NSString *> *systemSymbolNames(void) {

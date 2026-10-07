@@ -315,7 +315,7 @@ static NSArray<SGUpdateRelease *> *releasesToShow(void) {
     [table deselectRowAtIndexPath:path animated:YES];
     SGUpdateRow *row = [self rowAt:path];
     if (row.action) row.action();
-    // Check now goes grey to "checking…" the moment it is tapped rather than on the next tick.
+    // Check now goes gray to "checking…" the moment it is tapped rather than on the next tick.
     if (row.value) [self readStatus];
 }
 

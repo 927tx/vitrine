@@ -5,7 +5,7 @@
 // volume. The Live Activity's Timer tab, the Sleep Timer shortcut and its Control Center control set it
 // (Shared/LiveActivity), and the card reads it back.
 //
-// It lasts until it is up or cancelled, or Spotify quits; nothing is stored but the fade's length. While one
+// It lasts until it is up or canceled, or Spotify quits; nothing is stored but the fade's length. While one
 // is set a timer checks it four times a second, on the main thread, playing or paused.
 //
 // Threading: main thread only.

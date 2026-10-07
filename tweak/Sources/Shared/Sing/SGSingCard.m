@@ -55,7 +55,7 @@ static CGFloat height(float rms) {
 
 - (instancetype)initWithFrame:(CGRect)frame {
     if (!(self = [super initWithFrame:frame])) return nil;
-    // Glass over the card's flat grey shows little of itself, so a light wash gives the track its shape.
+    // Glass over the card's flat gray shows little of itself, so a light wash gives the track its shape.
     UIVisualEffectView *glass = SGGlassFor(self, @selector(initWithFrame:));
     glass.userInteractionEnabled = NO;
     self.backgroundColor = [UIColor colorWithWhite:1 alpha:0.1];
@@ -391,7 +391,7 @@ static CGFloat height(float rms) {
     [CATransaction begin];
     [CATransaction setDisableActions:!settle];
     if (settle) [CATransaction setAnimationDuration:0.4];
-    // Calm also in colour: the vocals' line dims while there is nothing to trace.
+    // Calm also in color: the vocals' line dims while there is nothing to trace.
     _vocals.strokeColor = [SGGreen() colorWithAlphaComponent:heard ? 1 : 0.35].CGColor;
     _vocals.path = [self pathFor:vocals count:kHistory + 1 step:step].CGPath;
     _rest.path = [self pathFor:rest count:kHistory + 1 step:step].CGPath;

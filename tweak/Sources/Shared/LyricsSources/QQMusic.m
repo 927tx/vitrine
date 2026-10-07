@@ -46,7 +46,7 @@ static void ask(NSString *name, NSDictionary *request, void (^done)(id reply)) {
     });
 }
 
-// The first recording on the page that is the track: QQ ranks its own catalogue well, so the first
+// The first recording on the page that is the track: QQ ranks its own catalog well, so the first
 // that fits is taken rather than the closest in length.
 static NSNumber *songFor(id data, SGLyricsQuery *query) {
     NSString *title = SGLyricsMatchKey(query.title);

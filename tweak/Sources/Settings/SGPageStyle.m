@@ -73,7 +73,7 @@ UIImageView *SGSymbolView(NSString *name, CGFloat size, UIImageSymbolWeight weig
     return view;
 }
 
-// A grey note in a wrapper view, for the table header and footer.
+// A gray note in a wrapper view, for the table header and footer.
 UIView *SGNote(NSString *text) {
     UILabel *label = [UILabel new];
     label.text = text;
@@ -126,7 +126,7 @@ void SGInsetForBars(UITableView *table) {
     table.verticalScrollIndicatorInsets = inset;
 }
 
-// The pages follow the running look's accent colour, read here by its key so the page framework depends on no
+// The pages follow the running look's accent color, read here by its key so the page framework depends on no
 // layer: the native look's (Native/Appearance) or the redesign's (Redesigned/Kit/SGRAccent.h).
 static NSString *const kAccentKey = @"spotifyglass.accent";
 static NSString *const kRedesignAccentKey = @"spotifyglass.redesign.accent";
@@ -169,7 +169,7 @@ UIImage *SGTileImageTinted(NSString *symbol, UIColor *color) {
     UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium];
     UIImage *glyph = [[UIImage systemImageNamed:symbol withConfiguration:config] imageWithTintColor:UIColor.whiteColor renderingMode:UIImageRenderingModeAlwaysOriginal];
     CGRect box = CGRectMake(0, 0, 29, 29);
-    // A system colour is drawn in its dark appearance, the one the pages wear, whatever the phone's.
+    // A system color is drawn in its dark appearance, the one the pages wear, whatever the phone's.
     color = [color resolvedColorWithTraitCollection:[UITraitCollection traitCollectionWithUserInterfaceStyle:UIUserInterfaceStyleDark]];
     UIImage *tile = [[[UIGraphicsImageRenderer alloc] initWithSize:box.size] imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
         [color setFill];
@@ -194,7 +194,7 @@ UIImageView *SGChevronView(void) {
 CGFloat SGSectionHeaderHeight(void) { return MAX(38, ceil(SGSubtitleFont().lineHeight) + 14); }
 const CGFloat SGSectionGap = 20;
 
-// Every page below draws the same row: a 13pt white title over an 11pt grey subtitle in Spotify's typeface,
+// Every page below draws the same row: a 13pt white title over an 11pt gray subtitle in Spotify's typeface,
 // with an optional symbol in the leading slot.
 void SGFillCell(UITableViewCell *cell, NSString *title, NSString *subtitle, UIColor *color, NSString *symbolName) {
     UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];

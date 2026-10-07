@@ -1,4 +1,4 @@
-// The redesign's now playing bar: the album-coloured card becomes a glass card with round artwork and the
+// The redesign's now playing bar: the album-colored card becomes a glass card with round artwork and the
 // progress line under the text. Spotify's own labels, buttons and gestures stay in place.
 //
 // The full screen player morphs the bar's own card and artwork into the cover art. The bar was

@@ -33,7 +33,7 @@ static char kCustomKey, kOrderKey, kApartKey;
 static const CGFloat kSplitGap = 10;
 
 // Where Spotify's own items keep their icon and label, read off one of them every pass, so an item of
-// the mod's own sits on the same line as its neighbours.
+// the mod's own sits on the same line as its neighbors.
 static CGRect sg_iconBox = {{0, kIconTop}, {kIconSize, kIconSize}};
 static CGRect sg_labelBox = {{0, kLabelTop}, {0, kLabelHeight}};
 
@@ -106,8 +106,8 @@ static UIView *iconView(NSDictionary *entry) {
     [self addSubview:_icon];
 }
 
-// Both boxes come off a neighbour, so whatever Spotify does to the row's line-up is copied rather than
-// guessed at; only the horizontal centring is the item's own.
+// Both boxes come off a neighbor, so whatever Spotify does to the row's line-up is copied rather than
+// guessed at; only the horizontal centering is the item's own.
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat width = self.bounds.size.width;
@@ -280,8 +280,8 @@ void SGRComposeTabBar(UIView *tabBar) {
 }
 
 // Spotify placed the icon and the label for the width it measured (trees/test5.txt: x 28 in a
-// 134pt slot, the centre of the 80pt it had with five tabs) and lays the item out no further
-// once the slot changes. Assigning the centres back sends them through the hooks below.
+// 134pt slot, the center of the 80pt it had with five tabs) and lays the item out no further
+// once the slot changes. Assigning the centers back sends them through the hooks below.
 static void centreContents(UIView *item) {
     SGForEachView(item, ^(UIView *v) {
         if ([v isKindOfClass:%c(SPTEncoreIconView)] || [v isKindOfClass:%c(SPTEncoreLabel)]) v.center = v.center;
@@ -318,7 +318,7 @@ static void placeRow(UIStackView *stack) {
 // Spotify's element layout places the icon and the label from the width it measured, not from
 // the slot above (trees/test5.txt: x 38 in a 134pt element in a 126pt slot), and a view placed by
 // its parent gets no layout pass of its own. So the placement itself is bent: on the bar, whatever
-// x Spotify sets, the view lands centred on its slot.
+// x Spotify sets, the view lands centered on its slot.
 static CGFloat slotCentreX(UIView *view) {
     UIStackView *row = sg_row;
     if (!row) return NAN;

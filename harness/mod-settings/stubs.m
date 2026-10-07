@@ -45,7 +45,7 @@ NSArray<SGModRow *> *SGEnvironmentWarningRows(void) {
     if (!SGHarnessWarning) return @[];
     return @[SGWarningRow(@"EeveeSpotify is injected too", @"Tap to see what that changes", ^{})];
 }
-// The Lyrics page's Romanised lyrics row (Shared/Lyrics/Romanise.m).
-SGModRow *SGLyricsRomanisedRow(void) { return SGOptionRow(@"Romanised lyrics", nil, @"spotifyglass.harness.romanised"); }
+// The Lyrics page's Romanized lyrics row (Shared/Lyrics/Romanise.m).
+SGModRow *SGLyricsRomanisedRow(void) { return SGOptionRow(@"Romanized lyrics", nil, @"spotifyglass.harness.romanised"); }
 // The lock screen's source order row (MotionSources.m), for AnimatedArtworkSettings.m.
 SGModRow *SGMotionSourcesRow(void) { return SGStatRow(@"Sources", ^NSString *{ return @"Canvas, Apple Music"; }); }

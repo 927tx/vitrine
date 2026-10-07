@@ -1,5 +1,5 @@
-// Player redesign: the Visualiser background, a calm spectrum of what is playing behind the player, in the
-// cover's colours, over the Fluid field held still (PlayerField.x keeps the field Fluid for this choice, as for
+// Player redesign: the Visualizer background, a calm spectrum of what is playing behind the player, in the
+// cover's colors, over the Fluid field held still (PlayerField.x keeps the field Fluid for this choice, as for
 // Animated, so the ⋯ menu moves between the three without a restart).
 //
 // The sound is Spotify's output as it plays, read on the render thread through the audio effects' notify
@@ -8,7 +8,7 @@
 // the last few seconds at the top, so a quiet track moves as much as a loud one), eases each band up quickly
 // and down slowly, and draws two soft hills across the foot of the screen, mirrored about its middle, the bass
 // in the middle and the treble at either edge: a slow one behind, a quicker one in front. Each is a gradient of
-// the cover's colours (SGRPalette's flow colours, kept dark enough that white text on them stays over 5.5:1)
+// the cover's colors (SGRPalette's flow colors, kept dark enough that white text on them stays over 5.5:1)
 // masked by a shape layer, so the render server does the drawing and the app only hands it two paths a frame.
 //
 // It moves only while it is in a window, Spotify is in front, the player is not opening or closing, Low Power
@@ -35,9 +35,9 @@ enum { kBands = SGRSpectrumBands, kPoints = 2 * kBands - 1 };
 // The loudness a band is drawn against: the loudest band of late at the top, kRange dB under it at the floor,
 // the top falling kPeakFall dB a second after a loud passage and never under kPeakFloor, so silence stays flat.
 static const float kRange = 40, kPeakFall = 4, kPeakFloor = -60;
-// A rise towards the treble, in dB a band (three bands an octave), since music has less there: a tuning knob.
+// A rise toward the treble, in dB a band (three bands an octave), since music has less there: a tuning knob.
 static const float kTilt = 0.6f;
-// How quickly a band eases towards its level, up and down, in seconds; the hill behind is slower. With Reduce
+// How quickly a band eases toward its level, up and down, in seconds; the hill behind is slower. With Reduce
 // Motion both ease over kStillEase.
 static const double kFrontUp = 0.08, kFrontDown = 0.4, kBackUp = 0.3, kBackDown = 0.9, kStillEase = 3;
 // No new bands for this long reads as silence (a pause, a stall, a tap that never ran).
@@ -46,13 +46,13 @@ static const double kStale = 0.3;
 static const CGFloat kFrontHeight = 0.24, kBackHeight = 0.3, kRestHeight = 0.012;
 // Below this every band has settled (under 2 pt at the top of the front hill), and a paused song's link can stop.
 static const float kSettled = 0.02f;
-// Each band shares this much with either neighbour, twice over, so one loud band is a hill and not a spike.
+// Each band shares this much with either neighbor, twice over, so one loud band is a hill and not a spike.
 static const float kSpread = 0.25f;
 static const NSTimeInterval kTransitionSlack = 0.05;
 
 static NSUInteger sg_readers;
 
-// The reader on while any view is moving, so nothing is analysed while none is.
+// The reader on while any view is moving, so nothing is analyzed while none is.
 static void needReader(BOOL need) {
     if (need) {
         if (sg_readers++ == 0) {
@@ -151,7 +151,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     if (_reading) needReader(NO);
 }
 
-#pragma mark - colour
+#pragma mark - color
 
 // Bottom left, the whole cover and bottom right in front, the top two behind, so the hills read as the cover's
 // lower half under its upper.
@@ -174,7 +174,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
             [view applyColors:palette.flowColors];
             return;
         }
-        // The colours cross over as the field's do.
+        // The colors cross over as the field's do.
         [CATransaction begin];
         [CATransaction setAnimationDuration:SGRCrossfade];
         [CATransaction setAnimationTimingFunction:[CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut]];
@@ -433,7 +433,7 @@ void SGRPlayerVisualiserUpdate(void) {
     if (made) {
         [sg_view setBlurred:SGRPlayerLyricsOpen() animated:NO];
         [sg_view appear:field.window != nil];
-        SGLog(@"redesign player: visualiser on the field");
+        SGLog(@"redesign player: visualizer on the field");
     } else {
         BOOL open = SGRPlayerLyricsOpen();
         if (open != sg_view.blurred) [sg_view setBlurred:open animated:sg_view.window != nil];

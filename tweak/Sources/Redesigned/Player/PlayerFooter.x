@@ -247,7 +247,7 @@ static void lowerRow(UIView *row) {
     UIView *connect = SGRFindByIdentifier(host, @"Components.ConnectButtonOutputSwitcher", &kConnectKey);
     // The unit lays out before Connect has sized its glyph, the first time the player opens: Connect is laid
     // out first so the glyph is there to move to the middle. Should it still be missing, Connect stays where
-    // Spotify put it, since centring the whole control would leave the glyph well off the middle, and the unit
+    // Spotify put it, since centering the whole control would leave the glyph well off the middle, and the unit
     // looks again on the next turn of the run loop.
     [connect layoutIfNeeded];
     UIView *glyph = connectGlyphIn(connect);

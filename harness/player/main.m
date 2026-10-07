@@ -13,7 +13,7 @@
 //     immersive the lyrics left alone: what fades, where the lines go, the tap that brings the controls
 //              back, a scroll and the thumbnail; the log says PASS or FAIL
 //     artwork  issue #58: tracks change while the covers on screen and the picture server lag behind,
-//              checked by colour at the end of each step; the log says PASS or FAIL
+//              checked by color at the end of each step; the log says PASS or FAIL
 //     landscape the landscape lyrics at 3 s, a line's meanings over them, a pause and a resume; each
 //              step logs whether the controls are up and what a touch on the lines lands on
 //     motion   Animated artwork: a clip (HARNESS_CANVAS_FILE, an mp4) that comes in before the player has
@@ -22,16 +22,16 @@
 //     catalog  Apple Music's catalog behind a stub: the search term without the edition, the album of the same
 //              name first, and the pause after a 429; the log says PASS or FAIL
 //     settings the redesign's Player page (PlayerSettings.m) over the player with the clip of `motion`: the
-//              card over Animated, then Fluid, Colours, Still and Visualiser as the segmented control picks
+//              card over Animated, then Fluid, Colors, Still and Visualizer as the segmented control picks
 //              them, and Animated again, the note under it changing and the rows under the header holding
 //              still; each step checked, the log ends with settings checks n of m right -- PASS or FAIL
 //     preview  the Player page's card picking Animated while the player has no clip (the background Still at
 //              launch): the card looks the track's clip up itself, shows Fluid until it comes in 2 s late, then
 //              the clip; the clip is in the store for the player, and asked for only while the page shows;
 //              the log ends with preview checks n of m right -- PASS or FAIL
-//     visualiser the Visualiser background (PlayerVisualiser.m) fed a song of the harness's own (stubs.m):
+//     visualiser the Visualizer background (PlayerVisualiser.m) fed a song of the harness's own (stubs.m):
 //              the hills moving, blurred behind the lyrics, settling and stopping on a pause, back on play,
-//              and the ⋯ menu's switch to Fluid and back; the log ends with visualiser checks n of m right
+//              and the ⋯ menu's switch to Fluid and back; the log ends with visualizer checks n of m right
 //              -- PASS or FAIL
 // HARNESS_VOLUME=0 leaves out the volume row the phone has (trees/clean/player/01.txt has none).
 #import <AVFoundation/AVFoundation.h>
@@ -122,7 +122,7 @@ static void serve(NSString *imageURI, UIImage *image, NSTimeInterval delay, BOOL
     if ([self.request.URL.host isEqualToString:@"canvas.harness"]) {
         const char *file = getenv("HARNESS_CANVAS_FILE"), *delay = getenv("HARNESS_CANVAS_DELAY");
         NSData *data = file ? [NSData dataWithContentsOfFile:@(file)] : nil;
-        // HARNESS_CANVAS_FAILS=n: the first n requests for it fail on the way, as a download iOS cancelled.
+        // HARNESS_CANVAS_FAILS=n: the first n requests for it fail on the way, as a download iOS canceled.
         static int failing = -1;
         if (failing < 0) failing = getenv("HARNESS_CANVAS_FAILS") ? atoi(getenv("HARNESS_CANVAS_FAILS")) : 0;
         if (failing > 0) {
@@ -187,7 +187,7 @@ static UIImage *solid(UIColor *color) {
     }];
 }
 
-// The colour a picture is, by the pixel in its middle, named the way the checks name them.
+// The color a picture is, by the pixel in its middle, named the way the checks name them.
 static NSString *colorName(UIImage *image) {
     if (!image.CGImage) return @"none";
     uint8_t px[4] = {0};
@@ -1223,7 +1223,7 @@ static UIView *firstOfClass(UIView *root, NSString *name) {
         UISegmentedControl *segments = control();
         CGRect card = view.frame, header = table().tableHeaderView.frame;
         BOOL shaped = view.window && card.size.width > card.size.height && card.size.width > header.size.width - 48;
-        // Every segment's title whole: the widest, Visualiser's, is not cut short.
+        // Every segment's title whole: the widest, Visualizer's, is not cut short.
         BOOL whole = YES;
         for (UILabel *label in [self labelsIn:segments]) whole = whole && label.intrinsicContentSize.width <= label.bounds.size.width + 0.5;
         [self expect:shaped && segments.numberOfSegments == 5 && whole && CGRectGetMinY(segments.frame) > CGRectGetMaxY(card)
@@ -1237,11 +1237,11 @@ static UIView *firstOfClass(UIView *root, NSString *name) {
         pick(2);
     });
     after(5, ^{ expectBackground(@"Fluid", YES, NO, NO, NO); pick(1); });
-    after(6, ^{ expectBackground(@"Colours", NO, YES, NO, NO); pick(0); });
+    after(6, ^{ expectBackground(@"Colors", NO, YES, NO, NO); pick(0); });
     after(7, ^{ expectBackground(@"Still", NO, NO, NO, NO); pick(4); });
     after(8, ^{
-        expectBackground(@"Visualiser", YES, NO, NO, YES);
-        NSLog(@"[harness] settings: screenshot the Visualiser card now");
+        expectBackground(@"Visualizer", YES, NO, NO, YES);
+        NSLog(@"[harness] settings: screenshot the Visualizer card now");
     });
     // Held a little longer, so the screenshot catches it.
     after(10, ^{ pick(3); });
@@ -1321,7 +1321,7 @@ static UIView *firstOfClass(UIView *root, NSString *name) {
     return labels;
 }
 
-#pragma mark - the Visualiser
+#pragma mark - the Visualizer
 
 BOOL SGRHarnessReading(void);
 
@@ -1349,7 +1349,7 @@ static CGFloat hillHeight(UIView *view, NSString *ivar) {
               detail:[NSString stringWithFormat:@"hills %@, field fluid %d held %d, link %@ at up to %.0f fps, reader %@, front %.0f pt, back %.0f pt",
                       hills ? @"on the field" : @"missing", SGRPlayerField().fluid, SGRPlayerField().motionHeld, link ? @"running" : @"stopped",
                       link.preferredFrameRateRange.maximum, SGRHarnessReading() ? @"on" : @"off", front, back]];
-        NSLog(@"[harness] visualiser: screenshot the hills now");
+        NSLog(@"[harness] visualizer: screenshot the hills now");
     });
     after(4, ^{ SGRPlayerToggleLyrics(); });
     after(5.5, ^{
@@ -1359,7 +1359,7 @@ static CGFloat hillHeight(UIView *view, NSString *ivar) {
         [self expect:SGRPlayerLyricsOpen() && blur.effect && link.preferredFrameRateRange.maximum == 30 step:@"behind the lyrics"
               detail:[NSString stringWithFormat:@"lyrics %@, blur %@, link at up to %.0f fps", SGRPlayerLyricsOpen() ? @"up" : @"down",
                       blur.effect ? @"on" : @"off", link.preferredFrameRateRange.maximum]];
-        NSLog(@"[harness] visualiser: screenshot the lyrics now");
+        NSLog(@"[harness] visualizer: screenshot the lyrics now");
     });
     after(6.5, ^{ SGRPlayerToggleLyrics(); });
     after(7.5, ^{ SGRHarnessSetTrack(@"spotify:track:harnessA", imageURI(@"aaaa"), YES); });
@@ -1374,7 +1374,7 @@ static CGFloat hillHeight(UIView *view, NSString *ivar) {
         CGFloat front = hillHeight(hills, @"_frontShape");
         [self expect:!link && !SGRHarnessReading() && front < 15 step:@"paused, settled"
               detail:[NSString stringWithFormat:@"link %@, reader %@, front %.0f pt", link ? @"running" : @"stopped", SGRHarnessReading() ? @"on" : @"off", front]];
-        NSLog(@"[harness] visualiser: screenshot the paused hills now");
+        NSLog(@"[harness] visualizer: screenshot the paused hills now");
         SGRHarnessSetTrack(@"spotify:track:harnessA", imageURI(@"aaaa"), NO);
     });
     after(13.5, ^{
@@ -1395,7 +1395,7 @@ static CGFloat hillHeight(UIView *view, NSString *ivar) {
         [self expect:hills && SGRPlayerField().motionHeld && SGRHarnessReading() && hillHeight(hills, @"_frontShape") > 40 step:@"back from the menu"
               detail:[NSString stringWithFormat:@"hills %@, field %@, front %.0f pt", hills ? @"on the field" : @"missing",
                       SGRPlayerField().motionHeld ? @"held" : @"moving", hillHeight(hills, @"_frontShape")]];
-        NSLog(@"[harness] visualiser checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
+        NSLog(@"[harness] visualizer checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
               self->_failures ? @"FAIL" : @"PASS");
     });
 }

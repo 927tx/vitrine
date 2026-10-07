@@ -3,7 +3,7 @@
 // core only, so the STFT around it is done here, as the checkpoint's reference implementation does it
 // (its configs/config_vocals_mel_band_roformer.yaml, and model.mil read for the layout):
 //
-//   44.1 kHz stereo, n_fft 2048, hop 441, a periodic Hann window of 2048, unnormalized, centred with
+//   44.1 kHz stereo, n_fft 2048, hop 441, a periodic Hann window of 2048, unnormalized, centered with
 //   reflect padding (torch.stft's defaults), so two seconds (88200 frames) make 201 frames of 1025 bins.
 //   The model's `spectrum` and `vocals_spectrum` are float32 [1, 2050, 201, 2]: axis 1 is bin-major with
 //   the two channels interleaved (bin f of channel c at 2f + c, which its band split's gather indices
@@ -52,7 +52,7 @@ typedef struct {
 // The faster copy, already warm, and the name the log gives it; nil takes it away.
 - (void)setFastModel:(MLModel *)model named:(NSString *)name;
 - (SGSingSeparatorStats)stats;
-// One prediction of silence on `model`, which Core ML spends allocating and specialising, so the first real window
+// One prediction of silence on `model`, which Core ML spends allocating and specializing, so the first real window
 // does not; its time in seconds, or a negative number and `error` when the model failed or answered in a shape the
 // separator does not read.
 + (double)warmUp:(MLModel *)model error:(NSError **)error;

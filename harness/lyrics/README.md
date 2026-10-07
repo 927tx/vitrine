@@ -5,7 +5,7 @@ harness's own, so lines sung over each other, instrumental breaks, pronunciation
 be looked at on the Mac without the phone. The songs are TTML read by the real `SGTTML.m`, or LRC timed
 by the real estimate in `KaraokeTiming.m`.
 
-    ./build.sh                  # this checkout; ./build.sh old builds HEAD's for a before and after, OPT=-O2 optimised
+    ./build.sh                  # this checkout; ./build.sh old builds HEAD's for a before and after, OPT=-O2 optimized
     xcrun simctl install <udid> build/new/LyricsHarness.app
     xcrun simctl launch <udid> com.vojta.lyricsharness.new -song duet -at 114000 -pauseAt 117600
     xcrun simctl io <udid> screenshot shot.png
@@ -42,7 +42,7 @@ A real file goes in with `-file /path/song.ttml`: the simulator reads the Mac's 
 
 `-perf LABEL` logs the view's per frame cost (its display link's `tick`) every 240 frames; run with
 `simctl launch --console` to read it. `-dump 1` prints the lines as read, with their pronunciations,
-translations and romanised readings, and quits. `-romanise 1` asserts the romanised readings
+translations and romanized readings, and quits. `-romanise 1` asserts the romanized readings
 (`Shared/Lyrics/Romanise.m`) and quits with the number that failed. `-openMenu 3` opens the pronunciation and translation menu three seconds in,
 `-toggleAt 3` switches both over as the menu would, and `-light 1` puts the window in light mode.
 

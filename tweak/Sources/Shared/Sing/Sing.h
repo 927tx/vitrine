@@ -51,7 +51,7 @@ typedef NS_ENUM(NSInteger, SGSingState) {
     SGSingStateNoModel,       // the model is not downloaded
     SGSingStateDownloading,
     SGSingStateOff,
-    SGSingStatePreparing,     // the model loading (only while Spotify is active), which Core ML specialises the first time
+    SGSingStatePreparing,     // the model loading (only while Spotify is active), which Core ML specializes the first time
     SGSingStateWaiting,       // on, the model ready, Spotify not playing through the chain yet; or resting at As sung
                               // (SGSingStatusText says which)
     SGSingStateBuffering,     // on, the lead filling: what plays is dry

@@ -71,7 +71,7 @@
 @end
 @implementation MockRequestToken
 - (void)cancel {
-    NSLog(@"[harness] collection subscription cancelled");
+    NSLog(@"[harness] collection subscription canceled");
     if (self.onCancel) self.onCancel();
 }
 @end

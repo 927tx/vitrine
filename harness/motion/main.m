@@ -83,7 +83,7 @@ static int framesIn(NSURL *file) {
     return count;
 }
 
-// The colour at `y`, a share of the shown picture's height, in its middle column: 'r', 'g', 'b' or '?'.
+// The color at `y`, a share of the shown picture's height, in its middle column: 'r', 'g', 'b' or '?'.
 static char colourAt(NSURL *file, double y) {
     AVAssetImageGenerator *generator = [AVAssetImageGenerator assetImageGeneratorWithAsset:[AVURLAsset assetWithURL:file]];
     generator.appliesPreferredTrackTransform = YES;

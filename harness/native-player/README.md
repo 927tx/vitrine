@@ -18,7 +18,7 @@ It checks, a line each with `ok` or `WRONG`:
   at its end, at a cancel and when the slider leaves the window, a pan off already left off, and a sideways
   list between the slider and the player's list left alone.
 - the cover's room (issue #77): with Lyrics preview shown nothing moves; with it hidden the preview takes
-  no room and the cover is the centred square of the view it sits in, again after a later pass of
+  no room and the cover is the centered square of the view it sits in, again after a later pass of
   Spotify's; a small cover and a tilt view outside the player's cover cell are left alone.
 
 The log ends with `native player checks: n of 11 right -- PASS` or `FAIL`. On main before the fixes it

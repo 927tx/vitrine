@@ -546,7 +546,7 @@
                         const e = Math.exp(-(dx * dx + dy * dy) / (L.r * L.r) * 1.7) * L.k;
                         r += L.c[0] * e; g += L.c[1] * e; b += L.c[2] * e;
                     }
-                    // The disc: a warm face shading to the first colour at its edge, cut by grooves
+                    // The disc: a warm face shading to the first color at its edge, cut by grooves
                     // around a plain label, with a halo past its rim.
                     const dx = u - ox, dy = v - oy;
                     const d = Math.sqrt(dx * dx + dy * dy) / orbR;

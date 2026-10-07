@@ -396,7 +396,7 @@ void SGLocalFilePresentEditor(UIViewController *presenter, NSString *uri) {
     if (!(self = [super initWithFrame:frame])) return nil;
     UIColor *secondary = [UIColor colorWithWhite:1 alpha:UIAccessibilityDarkerSystemColorsEnabled() ? 0.80 : 0.65];
     UIImage *glyph = [UIImage systemImageNamed:@"pencil" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightRegular]];
-    // Colours drawn in, so nothing passes through the sheet's tint.
+    // Colors drawn in, so nothing passes through the sheet's tint.
     _icon = [[UIImageView alloc] initWithImage:[glyph imageWithTintColor:secondary renderingMode:UIImageRenderingModeAlwaysOriginal]];
     _icon.contentMode = UIViewContentModeCenter;
     _title = [UILabel new];

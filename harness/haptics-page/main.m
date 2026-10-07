@@ -160,7 +160,7 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
                 NSMutableArray<UILabel *> *labels = [NSMutableArray array];
                 if (!title) findViews(cell.contentView, UILabel.class, labels);
                 [rows addObject:[NSString stringWithFormat:@"%@ (%.0fpt%@)", title ?: labels.firstObject.text ?: @"?", [table rectForRowAtIndexPath:[NSIndexPath indexPathForRow:row inSection:section]].size.height,
-                                 cell.contentView.alpha < 1 ? @", greyed" : @""]];
+                                 cell.contentView.alpha < 1 ? @", grayed" : @""]];
             }
             NSLog(@"[harness] section %ld: %@", (long)section, [rows componentsJoinedByString:@", "]);
         }

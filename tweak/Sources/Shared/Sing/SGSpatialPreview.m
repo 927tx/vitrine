@@ -1,5 +1,5 @@
 // The Spatial voice page's preview (Sing.h): the listener in the middle of a disc of dots seen from just behind
-// and above the head, the voice a point of the accent colour in front with its light on the floor under it.
+// and above the head, the voice a point of the accent color in front with its light on the floor under it.
 // The disc is the room and the camera is the head: as the head turns the disc turns the other way under it, so
 // the voice keeps its place in the room and comes round to the side, by the angle SGSpatialVoiceAngle hands the
 // engine (SGSingEngine.h). Rings go out slowly from the voice, as sound does. With no head to follow, the disc
@@ -146,7 +146,7 @@ static CAGradientLayer *floorLight(CGPoint at, CGFloat size, UIColor *color, CGF
     _field.frame = _plane.bounds;
     [_field setValue:@(_angle) forKeyPath:@"transform.rotation.z"];
     [_plane addSublayer:_field];
-    // Rings of dots spaced evenly along each, dimmer outwards, one layer a ring.
+    // Rings of dots spaced evenly along each, dimmer outward, one layer a ring.
     for (int ring = 1; ring <= kRings; ring++) {
         CGFloat r = _radius * ring / kRings;
         int count = (int)round(2 * M_PI * r / kDotSpacing);

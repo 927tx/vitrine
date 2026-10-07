@@ -84,7 +84,7 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.blackColor;
 
-    // The player's own field behind the screen, so the colours carry over from the portrait player.
+    // The player's own field behind the screen, so the colors carry over from the portrait player.
     _field = [[SGRArtworkField alloc] initWithFrame:self.view.bounds];
     _field.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     _field.showsBackdrop = YES;
@@ -192,7 +192,7 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
     NSString *identity = nil;
     UIImage *art = SGRNowPlayingArtwork(NULL, &identity);
     if (!art) return;
-    // On the field's clock, so the cover and the colours behind it change as one.
+    // On the field's clock, so the cover and the colors behind it change as one.
     UIImageView *cover = _cover;
     [UIView transitionWithView:cover duration:SGRCrossfade options:UIViewAnimationOptionTransitionCrossDissolve
                     animations:^{ cover.image = art; } completion:nil];

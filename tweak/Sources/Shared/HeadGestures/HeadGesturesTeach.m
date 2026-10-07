@@ -112,7 +112,7 @@ static BOOL headOffset(double *pitch, double *yaw) {
     NSArray<CAShapeLayer *> *_ticks;
     double _levels[kTicks];
     CALayer *_dot;
-    CGPoint _dotAt;   // from the centre
+    CGPoint _dotAt;   // from the center
     UIImageView *_check;
     CADisplayLink *_link;
     CFTimeInterval _lastFrame;
@@ -339,7 +339,7 @@ static BOOL headOffset(double *pitch, double *yaw) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    // iOS 26 gives a sheet its own material; before it the sheet takes the mod's page colour.
+    // iOS 26 gives a sheet its own material; before it the sheet takes the mod's page color.
     if (@available(iOS 26.0, *)) {} else self.view.backgroundColor = SGPageBackground();
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel target:self action:@selector(cancel)];
 
@@ -415,7 +415,7 @@ static BOOL headOffset(double *pitch, double *yaw) {
     NSInteger landed = (NSInteger)_samples.count;
     _count.text = [NSString stringWithFormat:@"%ld of %ld", (long)landed, (long)kSamples];
     _dial.accessibilityValue = _count.text;
-    // Landed dots full, the one being recorded dim, the rest grey: a colour change, so Reduce Motion keeps it.
+    // Landed dots full, the one being recorded dim, the rest gray: a color change, so Reduce Motion keeps it.
     [UIView animateWithDuration:kFade delay:0 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState animations:^{
         for (NSInteger i = 0; i < kSamples; i++) {
             BOOL recording = i == landed && self->_listening;

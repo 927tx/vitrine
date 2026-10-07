@@ -6,7 +6,7 @@
 //         Playback Speed      0.5× to 2× in the steps Podcasts offers, the current one checked
 //         Pitch               Pitch Follows Speed, then three semitones down to three up, Original between them
 //         Reverb              Off and a quarter at a time up to 100%, the audio effects' reverb
-//     Show Fluid Artwork, Show Animated Artwork, Show Visualiser
+//     Show Fluid Artwork, Show Animated Artwork, Show Visualizer
 //                             a button for each of the two the background is not, while it is one of the
 //                             three, named for what it switches to
 //
@@ -124,7 +124,7 @@ static NSArray<UIMenuElement *> *playerItems(void) {
         NSArray<NSArray *> *backgrounds = @[
             @[@(SGRPlayerBackgroundFluid), @"Show Fluid Artwork", @"drop"],
             @[@(SGRPlayerBackgroundAnimated), @"Show Animated Artwork", @"play.rectangle.on.rectangle"],
-            @[@(SGRPlayerBackgroundVisualiser), @"Show Visualiser", @"waveform"],
+            @[@(SGRPlayerBackgroundVisualiser), @"Show Visualizer", @"waveform"],
         ];
         SGRPlayerBackgroundKind current = SGRPlayerBackground();
         for (NSArray *background in backgrounds) {

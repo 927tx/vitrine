@@ -1,4 +1,4 @@
-// The Visualiser's spectrum (Redesigned/Player/SGRSpectrum.m, as the tweak compiles it) on the Mac: tones and
+// The Visualizer's spectrum (Redesigned/Player/SGRSpectrum.m, as the tweak compiles it) on the Mac: tones and
 // noise handed over in IO buffers of 1024 at an output's rate, the way PlayerVisualiser.x gets them through
 // AudioEffects.x's reader, and each check printed with ok or WRONG.
 //
@@ -38,7 +38,7 @@ static uint64_t feed(double hz, float amplitude, double rate, double seconds) {
 }
 
 // The loudest band, its level, and the loudest more than one band away from it (a tone near an edge spills into
-// its neighbour).
+// its neighbor).
 static int loudest(const float *levels, float *level, float *outside) {
     int best = 0;
     for (int i = 1; i < SGRSpectrumBands; i++) if (levels[i] > levels[best]) best = i;
@@ -61,7 +61,7 @@ static void tone(double hz, float amplitude, double rate, int band, float expect
 int main(void) {
     @autoreleasepool {
         float levels[SGRSpectrumBands];
-        check(feed(1000, 1, 48000, 0.5) == 0, @"nothing analysed before SGRSpectrumPrepare");
+        check(feed(1000, 1, 48000, 0.5) == 0, @"nothing analyzed before SGRSpectrumPrepare");
         SGRSpectrumPrepare();
         SGRSpectrumPrepare();
         SGRSpectrumRead(levels);
@@ -82,7 +82,7 @@ int main(void) {
         SGRSpectrumRead(levels);
         float loudestSilence = SGRSpectrumFloor;
         for (int i = 0; i < SGRSpectrumBands; i++) loudestSilence = fmaxf(loudestSilence, levels[i]);
-        check(after > before && loudestSilence == SGRSpectrumFloor, @"silence: still analysed, every band at the floor");
+        check(after > before && loudestSilence == SGRSpectrumFloor, @"silence: still analyzed, every band at the floor");
 
         // White noise has as much power per hertz, so a band's level rises with its width: about 3 dB an octave,
         // and bands 8 to 20 span about 3.9 octaves. One analysis of noise over a narrow band swings by a few dB,

@@ -37,7 +37,7 @@ static NSString *iconSummary(SGTabDraft *draft) {
     return [NSString stringWithFormat:@"%@ · %@", draft.symbols ? @"SF Symbols" : @"Spotify Encore", draft.icon];
 }
 
-// An icon at `size`, centred in a box of that size, for the right of a row.
+// An icon at `size`, centered in a box of that size, for the right of a row.
 static UIView *previewOf(NSString *name, BOOL symbols, CGFloat size) {
     UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, size, size)];
     UIView *icon = SGTabIconView(name, symbols, UIColor.whiteColor);

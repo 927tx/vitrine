@@ -27,9 +27,9 @@ UIView *SGRArtistPageOf(UIView *view);
 
 // ArtistField.x. The field belongs to the page `view` is on.
 //
-// The colour the page's field is showing, SGRNeutralField() before one has been read.
+// The color the page's field is showing, SGRNeutralField() before one has been read.
 UIColor *SGRArtistFieldColor(UIView *view);
-// The artist's photo, for the page's field to take its colour from. The same image again is a no-op.
+// The artist's photo, for the page's field to take its color from. The same image again is a no-op.
 void SGRArtistSetArtwork(UIView *view, UIImage *image);
 
 // ArtistFollow.x. YES once Spotify's collection has said whether the user follows the page's artist, with

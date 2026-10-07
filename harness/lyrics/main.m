@@ -5,7 +5,7 @@
 // Launch arguments (the argument domain of NSUserDefaults, so a setting's key works as one too):
 //   -song NAME     fixtures/NAME.ttml, .lrc, .json (Spotify's own) or .txt (plain) in the app, or rtl,
 //                  built here (default duet); scripts (built here) is a line in each of many alphabets
-//                  and two in English, the second line of each script translated, for romanised lyrics
+//                  and two in English, the second line of each script translated, for romanized lyrics
 //   -file PATH     a TTML or LRC file on the Mac instead
 //   -at MS         where the clock starts (default 0)
 //   -rate X        how fast it runs (default 1)
@@ -15,7 +15,7 @@
 //   -light 1       the window in light mode, for the glass's appearance
 //   -perf LABEL    logs the cost of the view's frames every 240 of them, under LABEL
 //   -dump 1        prints the lines as read, with their pronunciations and translations, and quits
-//   -romanise 1    asserts romanised lyrics' readings (Shared/Lyrics/Romanise.m), prints PASS and FAIL
+//   -romanise 1    asserts romanized lyrics' readings (Shared/Lyrics/Romanise.m), prints PASS and FAIL
 //                  lines and quits with the number of failures
 //   -openMenu S    opens the pronunciation and translation menu S seconds in, as a tap on its button would
 //   -toggleAt S    switches the pronunciation and the translation over S seconds in, as the menu would
@@ -101,7 +101,7 @@ static NSArray<SGKaraokeLine *> *rightToLeftSongWithExtras(void) {
     return lines;
 }
 
-// A line in each of the alphabets romanised lyrics reads, among English ones, written here: every
+// A line in each of the alphabets romanized lyrics reads, among English ones, written here: every
 // other one translated, to see the order of the three; a Hebrew and an Arabic line keep their edge.
 static NSArray<SGKaraokeLine *> *scriptsSong(void) {
     NSArray<NSArray<NSString *> *> *texts = @[

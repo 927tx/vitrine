@@ -5,9 +5,9 @@
 #import <CoreImage/CoreImage.h>
 #import "SGFluidClip.h"
 
-// Each copy, as in SGRFluid.m: its side as a share of the clip's longer side, its centre as shares of the
+// Each copy, as in SGRFluid.m: its side as a share of the clip's longer side, its center as shares of the
 // clip, its opacity, and its resting angle. Over the loop it sways by kSway either side of that angle and
-// its centre circles kDrift of the clip, a quarter cycle after the copy before it.
+// its center circles kDrift of the clip, a quarter cycle after the copy before it.
 static const struct { CGFloat side, x, y, opacity, angle; } kCopy[] = {
     {2.2, 0.25, 0.20, 1.0, 0.0},
     {2.0, 0.80, 0.35, 0.7, 1.1},
@@ -20,7 +20,7 @@ static const CGFloat kSway = 0.35, kDrift = 0.06;
 static const CGFloat kBlurSide = 128, kBlurRadius = 10, kSaturation = 1.5, kBrightness = -0.08, kFieldScale = 0.125;
 // The shade over the bottom, where the lock screen's controls are.
 static const CGFloat kShadeFrom = 0.55, kShadeAlpha = 0.45;
-// The cover's side as a share of the clip's width, and its centre's height from the top. The lock screen
+// The cover's side as a share of the clip's width, and its center's height from the top. The lock screen
 // cuts a 3:4 clip's sides off on a phone's taller screen, so the cover keeps to the middle.
 // ponytail: guessed from the screen's shape, as SGLyricsClip.m's column is; tune both on a device.
 static const CGFloat kCoverSide = 0.5, kCoverY = 0.45, kCoverRadius = 0.035, kShadowBlur = 0.08;

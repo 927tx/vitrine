@@ -1,4 +1,4 @@
-// The Visualiser's spectrum (SGRSpectrum.h): a ring of the last kSize samples, analysed every kHop.
+// The Visualizer's spectrum (SGRSpectrum.h): a ring of the last kSize samples, analyzed every kHop.
 #import <Accelerate/Accelerate.h>
 #import <math.h>
 #import <stdatomic.h>

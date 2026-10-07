@@ -7,12 +7,12 @@
 // (setProgress: at 0x109815464). There it sets the player's frame to the container's bounds moved down by
 // the bar's bottom edge times (1 - progress), and the player's alpha, and moves and fades the bar's stand-in.
 //
-// The morph rides on that progress, after Spotify's own, so taps, drags and cancelled drags follow:
+// The morph rides on that progress, after Spotify's own, so taps, drags and canceled drags follow:
 //   the sheet   a rounded rect from the card's frame and radius to the screen's, filled with the
-//               field's colour, under the player, showing at once;
+//               field's color, under the player, showing at once;
 //   the player  masked to the sheet, its content scaled and moved so its top left is the sheet's
 //               (sublayerTransform, and the frame's top moved to the sheet's; Spotify's gesture code
-//               reads back only the frame's height), its own background colour lifted off meanwhile
+//               reads back only the frame's height), its own background color lifted off meanwhile
 //               (a sublayerTransform does not move it), and faded in over the first part of the growth;
 //   the bar     Spotify's stand-in riding the sheet's top edge, gone by a quarter of the way;
 //   the cover   a copy flown from the card's artwork to the player's cover, moved within the sheet,

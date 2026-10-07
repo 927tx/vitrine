@@ -1,10 +1,10 @@
 // The look of every page of the mod's, in the dark appearance: cards of #1C1C1E on black, 13pt titles over 11pt
-// grey subtitles in Spotify's typeface, 11pt uppercase section headers and notes, a white symbol on a coloured
-// rounded square leading a row, white chevrons, switches in the look's accent colour. The text follows Dynamic
+// gray subtitles in Spotify's typeface, 11pt uppercase section headers and notes, a white symbol on a colored
+// rounded square leading a row, white chevrons, switches in the look's accent color. The text follows Dynamic
 // Type through the accessibility sizes, and the app font of Shared/Fonts.
 #import <UIKit/UIKit.h>
 
-UIColor *SGGrey(void);   // the secondary label's grey
+UIColor *SGGrey(void);   // the secondary label's gray
 UIColor *SGGreen(void);
 UIColor *SGOnAccent(void); // black or white text on the accent
 UIColor *SGAccentMark(void); // a visible accent mark on a dark card
@@ -28,14 +28,14 @@ void SGAdoptFonts(UIView *list, UIView *exclude);
 UIFont *SGSpotifyListFont(void);
 
 UIImageView *SGSymbolView(NSString *name, CGFloat size, UIImageSymbolWeight weight, CGFloat box);
-// A white symbol on a rounded square of `color`, the leading icon of a row; SGTileImage's square is grey.
+// A white symbol on a rounded square of `color`, the leading icon of a row; SGTileImage's square is gray.
 UIImage *SGTileImageTinted(NSString *symbol, UIColor *color);
 UIImage *SGTileImage(NSString *symbol);
-// The chevron of a row that opens a page, in the tertiary label's grey.
+// The chevron of a row that opens a page, in the tertiary label's gray.
 UIImageView *SGChevronView(void);
 // The separator inset of a row led by a tile, so the hairline starts under the title as in Settings.
 extern const CGFloat SGTileRowInset;
-// A grey note in a wrapper view, for a table header or footer; SGFitNote sizes it to its text.
+// A gray note in a wrapper view, for a table header or footer; SGFitNote sizes it to its text.
 UIView *SGNote(NSString *text);
 void SGFitNote(UITableView *table, UIView *wrapper, CGFloat top, CGFloat bottom);
 // The now playing bar and the tab bar float over the content, so a page insets itself under them.

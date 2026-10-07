@@ -204,7 +204,7 @@ int main(void) {
         SGSleepTimerAdd(15 * 60);
         CHECK(fabs(SGSleepTimerEnd().timeIntervalSinceNow - 930) < 1 && sg_gain == 1, "15 minutes more: the end moves on and the gain is back");
         SGSetSleepTimer(SGSleepTimerOff, 0);
-        CHECK(SGSleepTimerCurrentMode() == SGSleepTimerOff && sg_gain == 1, "cancelled");
+        CHECK(SGSleepTimerCurrentMode() == SGSleepTimerOff && sg_gain == 1, "canceled");
         SGSleepTimerAdd(15 * 60);
         CHECK(fabs(SGSleepTimerEnd().timeIntervalSinceNow - 900) < 1, "15 minutes more with none set: 15 minutes from now");
         SGSetSleepTimer(SGSleepTimerOff, 0);
@@ -302,7 +302,7 @@ int main(void) {
         SGSetSleepTimer(SGSleepTimerAtTime, 15);
         CHECK(near(sg_gain, SGSleepTimerGain(15, 30)) && near(sg_gain, 0.0316f), "a time, 30 s fade, 15 s to go: 30 dB down");
         SGSetSleepTimer(SGSleepTimerOff, 0);
-        CHECK(sg_gain == 1, "cancelled: full volume");
+        CHECK(sg_gain == 1, "canceled: full volume");
 
         // Spotify's own timer (SpotifySleepTimer.m), read off the state; the core pauses, never the mod.
         CHECK(sg_observer != nil, "Spotify's timer: an observer of the player's state is added at load");
@@ -324,7 +324,7 @@ int main(void) {
         CHECK(sg_gain < 0.1f, "Spotify's 15 s on: 30 dB down or so");
         sg_player.state.sleepTimer = nil;
         runFor(0.4);
-        CHECK(sg_gain == 1, "Spotify's cancelled mid fade: the gain is back at once");
+        CHECK(sg_gain == 1, "Spotify's canceled mid fade: the gain is back at once");
 
         sg_player.state.sleepTimer = spotifyTimer(1, 1.5);
         runFor(0.4);
@@ -415,10 +415,10 @@ int main(void) {
         CHECK(sg_gain == 1, "the mod's own timer running (300 s): it has the gain, Spotify's is not faded");
         SGSetSleepTimer(SGSleepTimerOff, 0);
         runFor(0.4);
-        CHECK(sg_gain < 0.1f, "the mod's own cancelled: Spotify's, 10 s on, is faded");
+        CHECK(sg_gain < 0.1f, "the mod's own canceled: Spotify's, 10 s on, is faded");
         sg_player.state.sleepTimer = nil;
         runFor(0.4);
-        CHECK(sg_gain == 1 && sg_player.pauses == pauses, "and cancelled: full volume; the mod sent no pause for Spotify's");
+        CHECK(sg_gain == 1 && sg_player.pauses == pauses, "and canceled: full volume; the mod sent no pause for Spotify's");
     }
     printf("%s\n", sg_failures ? "FAILED" : "all held");
     return sg_failures ? 1 : 0;

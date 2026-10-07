@@ -3,9 +3,9 @@
 #import "Settings/SGPageStyle.h"
 #import "Appearance.h"
 
-// The preset is read off the colour stored, so the hooks keep the one key they read and a colour set before
-// presets existed stays in effect: Apple Music's red reads as Apple Music, any other colour as Custom, none
-// as Spotify. The custom colour is put aside while a preset is in place, so Custom brings it back.
+// The preset is read off the color stored, so the hooks keep the one key they read and a color set before
+// presets existed stays in effect: Apple Music's red reads as Apple Music, any other color as Custom, none
+// as Spotify. The custom color is put aside while a preset is in place, so Custom brings it back.
 static NSArray<NSString *> *presets(void) {
     return @[@"Spotify", @"Apple Music", @"Custom"];
 }
@@ -23,13 +23,13 @@ static void choosePreset(NSInteger index) {
     SGSetInt(SGKeyAccent, index == 0 ? -1 : index == 1 ? SGAppleMusicRed : custom);
 }
 
-// The native look's rows of the Appearance page (App/Pages.m): the preset from a menu, then the colour in
-// effect, which opens the picker; a colour stored from there is Custom.
+// The native look's rows of the Appearance page (App/Pages.m): the preset from a menu, then the color in
+// effect, which opens the picker; a color stored from there is Custom.
 NSArray<SGModRow *> *SGNativeAppearanceRows(void) {
-    SGModRow *menu = SGMenuRow(@"Accent colour preset", presets(), ^NSString *{ return presets()[(NSUInteger)preset()]; },
+    SGModRow *menu = SGMenuRow(@"Accent color preset", presets(), ^NSString *{ return presets()[(NSUInteger)preset()]; },
                                ^(NSInteger index) { choosePreset(index); });
-    SGModRow *colour = SGStatActionRow(@"Accent colour", nil, ^NSString *{ return [NSString stringWithFormat:@"#%06lX", (long)SGAccentRGB()]; }, ^{
-        SGPickColor(@"Accent colour", SGAccentRGB(), ^(NSInteger rgb) {
+    SGModRow *colour = SGStatActionRow(@"Accent color", nil, ^NSString *{ return [NSString stringWithFormat:@"#%06lX", (long)SGAccentRGB()]; }, ^{
+        SGPickColor(@"Accent color", SGAccentRGB(), ^(NSInteger rgb) {
             SGSetInt(SGKeyAccent, rgb);
             SGSetInt(SGKeyAccentCustom, rgb);
         });

@@ -1,5 +1,5 @@
 // Rings of dots seen from above, like a drop on still water: a tap presses the middle and a crest runs out
-// ring by ring, pushing each ring's dots out a few points and lighting them in the look's accent colour as it
+// ring by ring, pushing each ring's dots out a few points and lighting them in the look's accent color as it
 // passes, the Taptic Engine playing on the same frame. The stronger the feature's Strength, the higher the
 // crest and the further it carries; at the lowest it dies out a few rings in. Music Haptics' taps, while it
 // is on and the page shows, send out a low crest of their own that fades within the inner rings.
@@ -21,7 +21,7 @@ static const CGFloat kDot = 2.5, kMiddle = 6;
 static const CGFloat kField = 2 * (kFirstRadius + (kRings - 1) * kRingGap) + 24;
 static const CGFloat kCaptionGap = 6, kBottom = 14;
 // How far a full-strength crest pushes the first ring out, how long it takes to reach the next ring, how
-// long a ring takes to settle, and how long it stays lit: short, so the light reads as one ring travelling.
+// long a ring takes to settle, and how long it stays lit: short, so the light reads as one ring traveling.
 static const CGFloat kCrest = 6;
 static const CFTimeInterval kRingDelay = 0.05, kCrestLength = 0.6, kLightLength = 0.34;
 // Music Haptics' taps are felt at their own strength; their crest is this much of a tapped one.
@@ -99,7 +99,7 @@ static CAKeyframeAnimation *keyframes(NSString *path, NSArray *values, NSArray<N
         replicator.instanceTransform = CATransform3DMakeRotation(2 * M_PI / count, 0, 0, 1);
         // Every other ring turned half a step, so the dots weave rather than line up in spokes.
         replicator.transform = CATransform3DMakeRotation(ring % 2 ? M_PI / count : 0, 0, 0, 1);
-        // Fainter outwards, so the field has no hard edge.
+        // Fainter outward, so the field has no hard edge.
         CGFloat rest = 0.46 - 0.34 * ring / (kRings - 1);
         CALayer *dot = [self dotOfSize:kDot colour:UIColor.whiteColor];
         dot.position = CGPointMake(centre.x + radius, centre.y);

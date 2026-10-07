@@ -3,7 +3,7 @@
 // other way. A request for an ad is answered empty. With Spoof Premium on, the bootstrap
 // and customize bodies are rewritten by Premium.m before the client sees them, the endpoints the
 // server would use to log the account out are answered as if they succeeded, and past the first
-// thirty seconds the re-fetches that could bring the real state back are cancelled before they
+// thirty seconds the re-fetches that could bring the real state back are canceled before they
 // leave. Feeds go through Feeds.m. Everything here is EeveeSpotify's, less its Ably hooks, which
 // it does not turn on for 9.1 either.
 #import "Core/SGCore.h"
@@ -218,7 +218,7 @@ static void complete(id<NSURLSessionDataDelegate> delegate, NSURLSession *sessio
 #pragma mark - before a request leaves
 
 // The re-fetches that could put the real product state back, or drop the push token, use sessions
-// of their own that the delegate hooks do not see; they are cancelled at the task. login5 and the
+// of their own that the delegate hooks do not see; they are canceled at the task. login5 and the
 // Google token stay: blocking those was a crash loop.
 %group Premium
 %hook NSURLSessionTask
@@ -229,7 +229,7 @@ static void complete(id<NSURLSessionDataDelegate> delegate, NSURLSession *sessio
     if (spotify && elapsed() > 30 && (has(path, @"deletetoken") || has(path, @"signup/public") || has(path, @"pses/screenconfig")
                                       || isCustomize(path) || has(host, @"apresolve"))) {
         SGAdBlockCountOne(@"Requests");
-        SGLog(@"cancelled %@%@ before it left", host, path);
+        SGLog(@"canceled %@%@ before it left", host, path);
         [self cancel];
         return;
     }

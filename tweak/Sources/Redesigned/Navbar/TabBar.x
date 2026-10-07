@@ -346,7 +346,7 @@ static void logBarOnce(UITabBar *bar) {
 
 #pragma mark - the fade under the bars
 
-// The pages darken towards the bottom of the screen under the glass bar and the now playing bar, from clear
+// The pages darken toward the bottom of the screen under the glass bar and the now playing bar, from clear
 // a little above the now playing card to half black at the screen's foot, so a row going under the glass
 // reads as passing behind it. Never darker than half: the glass still has the page to lens. The fade is the
 // stock bar's own subview, behind the glass, so it slides away with the bar when a page hides it; Spotify's
@@ -523,7 +523,7 @@ static void syncBar(UIView *stockBar) {
 
     NSArray<UIView *> *sources = tabItems(stockBar);
     if (!sources.count) return;
-    // An item with no title is drawn by UIKit as its glyph alone, centred, on a bar of the same height.
+    // An item with no title is drawn by UIKit as its glyph alone, centered, on a bar of the same height.
     BOOL hideLabels = SGHidden(SGRKeyNavbarHideLabels);
     SGRSystemTabBar *apartBar = objc_getAssociatedObject(stockBar, &kApartBarKey);
     UIView *active = SGRNavbarLitTab();
@@ -651,7 +651,7 @@ void SGRSetTabBarMinimized(BOOL minimized, BOOL animated) {
 // buttons that went fade out from where they were.
 typedef struct {
     NSMapTable<UIView *, NSArray<NSValue *> *> *frames; // every view of the host: its frame, the frame shown, moving
-    NSMutableDictionary<NSString *, NSValue *> *glyphs; // the selected tab's glyph centre in the host (buttonKey)
+    NSMutableDictionary<NSString *, NSValue *> *glyphs; // the selected tab's glyph center in the host (buttonKey)
     NSMapTable<UIView *, UIView *> *buttons;            // each tab button, a picture of it
 } SGRBarState;
 
@@ -741,7 +741,7 @@ static void moveFrom(UIView *host, SGRBarState before, void (^along)(void), void
         NSValue *was = key ? before.glyphs[key] : nil;
         if (was) {
             [moved addObject:v];
-            [starts addObject:was];   // a centre in the host, placed once the views above it are back
+            [starts addObject:was];   // a center in the host, placed once the views above it are back
             [targets addObject:[NSValue valueWithCGRect:v.frame]];
             [taken addObject:key];
         } else if (isTabButton(v) && v.alpha > 0.01) {
@@ -755,14 +755,14 @@ static void moveFrom(UIView *host, SGRBarState before, void (^along)(void), void
     }
 
     [UIView performWithoutAnimation:^{
-        // Top down, so a button's centre is placed in its platter where the platter starts.
+        // Top down, so a button's center is placed in its platter where the platter starts.
         for (NSUInteger i = 0; i < moved.count; i++) {
             UIView *v = moved[i];
             if (strcmp(starts[i].objCType, @encode(CGPoint)) != 0) {
                 v.frame = starts[i].CGRectValue;
                 continue;
             }
-            // Its glyph where the old one's was: the button moved by as much as its glyph is off its centre.
+            // Its glyph where the old one's was: the button moved by as much as its glyph is off its center.
             UIImageView *glyph = glyphView(v);
             CGPoint inButton = [v convertPoint:glyph.center fromView:glyph.superview], to = [host convertPoint:starts[i].CGPointValue toView:v.superview];
             v.center = CGPointMake(to.x - (inButton.x - CGRectGetMidX(v.bounds)), to.y - (inButton.y - CGRectGetMidY(v.bounds)));

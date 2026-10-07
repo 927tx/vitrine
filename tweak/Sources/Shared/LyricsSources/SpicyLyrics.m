@@ -204,7 +204,7 @@ static NSArray<SGKaraokeLine *> *staticLines(NSArray *rows, NSArray<NSString *> 
 }
 
 // What the credit reads, and the pages it links to. A community sync names the people who made it,
-// each linked where the API gives an address; a catalogue's is named as the provider it is, reached
+// each linked where the API gives an address; a catalog's is named as the provider it is, reached
 // through Spicy Lyrics.
 static NSString *creditFor(NSDictionary *body, NSArray<SGLyricsLink *> **links) {
     *links = nil;

@@ -1,7 +1,7 @@
 // Player redesign: the artwork field behind the full screen player, and what the switch forces.
 //
 // Tree (trees/clean/player/01.txt:449): NPVBackgroundViewController's view is a plane inside the NPV's
-// own list (scrolling_npv_collection_view), painted the album colour with Spotify's gradients
+// own list (scrolling_npv_collection_view), painted the album color with Spotify's gradients
 // (NPVGradientView) stacked on it. Its top stays at the top of the content and it grows as the list
 // scrolls (874 at rest, 1495 and 2144 further down, 02.txt:757, 03.txt:861), so a field inside it
 // scrolls with the cards and is laid out again on every scroll frame: the hook only compares a frame.
@@ -9,13 +9,13 @@
 // fought over, and nothing depends on a repaint hook.
 //
 // With Moving background on (SGRKeyPlayerMotion, the default) the field is the Kit's moving field of the
-// artwork's colours (SGRFlow.h) rather than the still blurred artwork; a paused song holds it still.
+// artwork's colors (SGRFlow.h) rather than the still blurred artwork; a paused song holds it still.
 //
 // The picture comes from the Kit's now playing artwork, keyed on the picture the playing track names
 // (SGRBridges.h, issue #58): the Kit's own fetch of it, the now playing bar's 40pt cover, published by
 // the Kit, and the player's own 354pt cover, published here from the cell in the middle of the
 // sideways list of covers (AccessibleCollectionView, 01.txt:28, one CoverArtCellImpl per queued track,
-// the ones out of view hidden). Until the first picture has been read the field takes the colour
+// the ones out of view hidden). Until the first picture has been read the field takes the color
 // Spotify already has for the player, from -[NPVBackgroundViewController
 // backgroundViewModel:didChangeColor:playerState:] (objc-methods.txt:57949).
 #import "Core/SGCore.h"
@@ -34,7 +34,7 @@ static __weak SGRArtworkField *sg_field;
 static __weak UIScrollView *sg_coverList;
 static __weak UIImage *sg_lastCover;
 static NSString *sg_lastCoverURI;
-// Spotify's colour for the player, which can arrive before the plane has laid out once.
+// Spotify's color for the player, which can arrive before the plane has laid out once.
 static UIColor *sg_spotifyColor;
 
 SGRArtworkField *SGRPlayerField(void) {
@@ -47,11 +47,11 @@ SGRPlayerBackgroundKind SGRPlayerBackground(void) {
 }
 
 NSArray<NSString *> *SGRPlayerBackgroundNames(void) {
-    return @[@"Still", @"Colours", @"Fluid", @"Animated", @"Visualiser"];
+    return @[@"Still", @"Colors", @"Fluid", @"Animated", @"Visualizer"];
 }
 
-// A paused song holds the colours still, the way it rests the cover (PlayerArtwork.x), and so does what lies over
-// the field: an animated artwork's clip, which covers it (PlayerMotion.x), or the Visualiser's hills, which are
+// A paused song holds the colors still, the way it rests the cover (PlayerArtwork.x), and so does what lies over
+// the field: an animated artwork's clip, which covers it (PlayerMotion.x), or the Visualizer's hills, which are
 // the one thing moving.
 static BOOL fieldHeld(void) {
     return SGPlayerState().isPaused || SGRPlayerMotionShowing() || SGRPlayerVisualiserShowing();
@@ -106,7 +106,7 @@ static SGRArtworkField *fieldIn(UIView *plane) {
 - (void)backgroundViewModel:(id)model didChangeColor:(id)color playerState:(id)state {
     %orig;
     static dispatch_once_t once;
-    dispatch_once(&once, ^{ SGLog(@"redesign player: Spotify's colour %@ (%@), state %@", color, [color class], [state class]); });
+    dispatch_once(&once, ^{ SGLog(@"redesign player: Spotify's color %@ (%@), state %@", color, [color class], [state class]); });
     if (![color isKindOfClass:UIColor.class]) return;
     sg_spotifyColor = color;
     UIView *plane = ((UIViewController *)self).viewIfLoaded;

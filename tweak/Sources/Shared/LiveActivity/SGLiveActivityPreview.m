@@ -25,7 +25,7 @@ static UIFont *font(CGFloat size, UIFontWeight weight) { return [UIFont systemFo
 static const CGFloat kHeadline = 17, kTitle3 = 20, kTitle2 = 22, kSubheadline = 15, kFootnote = 13, kCaption = 12, kCaption2 = 11;
 
 // A made-up song.
-static NSString *const kTitle = @"Paper Lanterns", *const kArtist = @"The Quiet Harbour";
+static NSString *const kTitle = @"Paper Lanterns", *const kArtist = @"The Quiet Harbor";
 static NSString *const kQuietTitle = @"Low Tide (Interlude)";
 typedef struct { __unsafe_unretained NSString *line, *next, *translation; } Line;
 static const Line kLines[] = {
@@ -36,7 +36,7 @@ static const Line kLines[] = {
 static const NSInteger kLineCount = 3;
 static NSString *const kQueue[][2] = {
     {@"Salt and Static", @"Mira Vale"},
-    {@"Northbound Lights", @"The Quiet Harbour"},
+    {@"Northbound Lights", @"The Quiet Harbor"},
     {@"Glasshouse", @"Juniper & Cole"},
 };
 

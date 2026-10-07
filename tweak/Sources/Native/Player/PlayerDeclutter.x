@@ -1,7 +1,7 @@
 // Player declutter: hides parts of the full screen player, one switch each on the Player page. Cards
 // under the player are Element_List cells; a hidden one reports zero height when the list sizes it,
 // so the list closes up around it (the 24pt gap between cards stays). Player buttons go invisible but
-// keep their place, so their row stays centred. A hidden lyric preview gives its room to the cover.
+// keep their place, so their row stays centered. A hidden lyric preview gives its room to the cover.
 //
 // Trees (trees/now-playing*.txt): every card is a CollectionViewCell whose content view names the
 // page (NowPlaying_ScrollAPI) and whose subtree names the card. Player rows are the UIStackView of each NowPlaying_ModesImpl unit: playback controls
@@ -147,8 +147,8 @@ static void finish(UIViewController *unit, BOOL changed) {
 // The bar's cover has a tilt view of its own, 40pt; the player's is about 354.
 static const CGFloat kCoverMinWidth = 200;
 
-// The tilt view takes the largest square of the plain view it sits in with the preview, centred on whole
-// points, the way the Music app's cover fills its square. Bounds and a centre, not a frame, since the tilt
+// The tilt view takes the largest square of the plain view it sits in with the preview, centered on whole
+// points, the way the Music app's cover fills its square. Bounds and a center, not a frame, since the tilt
 // view carries Spotify's tilt while the cover is inspected. A square under kCoverMinWidth is left alone.
 static void fillRoom(UIView *tilt) {
     CGRect room = tilt.superview.bounds;

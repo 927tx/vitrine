@@ -18,7 +18,7 @@
 //     PlayerGestures.x   the gestures' hookup
 //     PlayerMorph.x      the open and close grown out of the now playing bar's card, the cover flown
 //     PlayerMotion.x     Animated artwork: the Canvas or Apple Music's animated cover behind the player
-//     PlayerVisualiser.m the Visualiser background: a calm spectrum of the song in the cover's colours, read
+//     PlayerVisualiser.m the Visualizer background: a calm spectrum of the song in the cover's colors, read
 //                        through SGRSpectrum.m from the audio effects' tap on Spotify's output
 //     PlayerMenu.m       the more button's system menu: Share, Add to playlist and Add to queue on top, then
 //                        speed, pitch and reverb, the backgrounds it can switch to, and Spotify's other rows
@@ -37,12 +37,12 @@
 @class SGRArtworkField;
 
 // What is behind the player, chosen on the Player page (PlayerSettings.m).
-// SGRKeyPlayerMotion is the switch the choice replaced: until a choice is stored, it picks Still or Colours.
+// SGRKeyPlayerMotion is the switch the choice replaced: until a choice is stored, it picks Still or Colors.
 #define SGRKeyPlayerBackground @"spotifyglass.redesign.player.background"
 #define SGRKeyPlayerMotion @"spotifyglass.redesign.player.movingBackground"
 typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
     SGRPlayerBackgroundStill,      // the artwork blurred and held still
-    SGRPlayerBackgroundColours,    // the artwork's colours drifting (SGRFlow.h)
+    SGRPlayerBackgroundColours,    // the artwork's colors drifting (SGRFlow.h)
     SGRPlayerBackgroundFluid,      // the artwork itself blurred and turning (SGRFluid.h)
     SGRPlayerBackgroundAnimated,   // the track's Canvas or Apple Music's animated cover, over Fluid (PlayerMotion.x)
     SGRPlayerBackgroundVisualiser, // a spectrum of the song over Fluid held still (PlayerVisualiser.m)
@@ -55,7 +55,7 @@ NSArray<NSString *> *SGRPlayerBackgroundNames(void);
 // The field behind the player, nil until the player has laid out once (PlayerField.x).
 SGRArtworkField *SGRPlayerField(void);
 // Holds the field still, or lets it move, for what is over it now: a paused song, an Animated artwork clip, the
-// Visualiser (PlayerField.x).
+// Visualizer (PlayerField.x).
 void SGRPlayerHoldField(void);
 
 #pragma mark - the cover (PlayerArtwork.x)
@@ -115,9 +115,9 @@ UIView *SGRPlayerMotionPreview(void (^arrived)(void));
 // luminance; between 0.10 and 0.80, 0.15 more while the lyrics are up.
 CGFloat SGRPlayerClipDim(CGFloat luminance, BOOL contrast, BOOL lyrics);
 
-#pragma mark - the Visualiser (PlayerVisualiser.m)
+#pragma mark - the Visualizer (PlayerVisualiser.m)
 
-// The background is the Visualiser.
+// The background is the Visualizer.
 BOOL SGRPlayerVisualiserShowing(void);
 // Puts the hills on the field or takes them off as the background says, lays them out, and blurs them while the
 // lyrics are open. Called on every layout pass of the field (PlayerField.x), when the lyrics come or go
@@ -126,7 +126,7 @@ BOOL SGRPlayerVisualiserShowing(void);
 void SGRPlayerVisualiserUpdate(void);
 // A view of its own drawing the same hills, for the Player page's showcase. It moves only in a window.
 UIView *SGRPlayerVisualiserPreview(void);
-// Switches the background to `kind` from the ⋯ menu, at once: Fluid, Animated or Visualiser, while it is one of
+// Switches the background to `kind` from the ⋯ menu, at once: Fluid, Animated or Visualizer, while it is one of
 // them (SGPlayerMenuOffersAnimatedArtwork); nothing otherwise.
 void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind);
 

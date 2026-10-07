@@ -146,7 +146,7 @@ static NSArray<SGDSPEffect *> *effects(void) {
         effect(SGKeyDSPCrossfeed, @"Crossfeed", @"Softer stereo on headphones", @[
             choice(@"Preset", SGKeyDSPCrossfeedMode, SGDSPCrossfeedModeNames()),
         ]),
-        effect(SGKeyDSPTube, @"Analog modelling", @"Tube amplifier warmth", @[
+        effect(SGKeyDSPTube, @"Analog modeling", @"Tube amplifier warmth", @[
             slider(@"Drive", SGKeyDSPTubeDrive, @" dB"),
         ]),
     ];
@@ -221,7 +221,7 @@ static UIFont *tabular(UIFont *font) {
 
 @end
 
-// The title and the value over a slider in the accent colour, storing each step as the thumb reaches it.
+// The title and the value over a slider in the accent color, storing each step as the thumb reaches it.
 @interface SGDSPSliderCell : UITableViewCell
 - (void)showRow:(SGDSPRow *)row;
 @end
@@ -409,7 +409,7 @@ static UIFont *tabular(UIFont *font) {
     self.tableView.tableFooterView = _credits;
 }
 
-// The libraries two of the effects run on, in the grey of a note with the names as links.
+// The libraries two of the effects run on, in the gray of a note with the names as links.
 - (void)buildCredits {
     NSDictionary *grey = @{NSFontAttributeName: SGSubtitleFont(), NSForegroundColorAttributeName: SGGrey()};
     NSMutableAttributedString *text = [[NSMutableAttributedString alloc] initWithString:@"Crossfeed is " attributes:grey];
@@ -458,7 +458,7 @@ static UIFont *tabular(UIFont *font) {
     // A choice, a file or the GraphicEQ text may have changed on the page this one opened.
     [self readState];
     [self.tableView reloadData];
-    // A cancelled back swipe appears the page again without it ever disappearing, so the old timer goes first.
+    // A canceled back swipe appears the page again without it ever disappearing, so the old timer goes first.
     [_ticker invalidate];
     _ticker = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(tick) userInfo:nil repeats:YES];
 }

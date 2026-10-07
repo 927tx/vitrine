@@ -1,5 +1,5 @@
 // Fluid artwork: the cover itself, blurred and slowly warped behind the player. Four copies of a
-// blurred, saturated cover, each far larger than the screen, turn about different centres at different
+// blurred, saturated cover, each far larger than the screen, turn about different centers at different
 // speeds, two each way; where they overlap the picture seems to flow. A shade over the bottom keeps the
 // controls legible.
 //

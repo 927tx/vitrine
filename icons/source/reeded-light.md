@@ -5,15 +5,15 @@ glass's account of it: bent, sliced and lit along its edges. Reeded Light is a g
 that account. It never draws the thing on show. It draws a field of light, sets fluted glass in front of
 it, and lets refraction decide the picture.
 
-The process starts as an invisible scene: a few soft sources of coloured light, placed by the seed, their
+The process starts as an invisible scene: a few soft sources of colored light, placed by the seed, their
 shapes slowly warped by layered noise so that no two glows share an edge. Among them rests one brighter
-disc, set off the centre at the golden section, its surface cut with grooves too fine to see directly.
+disc, set off the center at the golden section, its surface cut with grooves too fine to see directly.
 This scene is computed once, in full, and kept out of sight. Everything the viewer sees is a reading of
 it through glass.
 
 The glass is a row of cylindrical flutes, each one a small lens. A flute gathers a strip of the scene
 wider than itself, turns it over and squeezes it into its own width, so a soft glow becomes a set of
-sharp bands and the hidden disc breaks into a stack of bright staves. Each colour channel is bent by a
+sharp bands and the hidden disc breaks into a stack of bright staves. Each color channel is bent by a
 slightly different amount, so dispersion fringes every flute's edge with the spectrum, the way real glass
 does when light crosses it at an angle. The ridges darken where the curve turns away and carry a thin
 specular line where it faces the light. The pane is inset from the frame like glass in a cabinet, its rim

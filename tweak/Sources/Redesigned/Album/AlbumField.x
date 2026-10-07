@@ -1,23 +1,23 @@
 // Album redesign: the artwork field behind the whole page, and what the switch forces.
 //
 // Tree (trees/clean/album/01.txt:22). The page is CreativeWorkPlatform.CreativeWorkTemplateView, and it
-// holds, in this order: the header's colour wash (a LegacyUI HeaderView the height of the header, with
+// holds, in this order: the header's color wash (a LegacyUI HeaderView the height of the header, with
 // Spotify's GradientView in it), CreativeWorkPlatform.Tab with the scrolling list inside it, the sticky
 // HeaderNavigationBar, and the two controls Spotify floats over the page, shuffle and play. Nothing of it
 // scrolls except what is inside the Tab, so a field put behind the lot stays still while the cover at the
-// top of the header slides up over it -- which is what the Music app does with the page colour.
+// top of the header slides up over it -- which is what the Music app does with the page color.
 //
 // So the field is the page's bottom-most view, the size of the view and bleeding past it, with no backdrop
 // of its own: the sharp cover at the top of the header is the picture, and AlbumHeader.x fades it into
-// exactly this field's colour, and conceals Spotify's wash so the field is what shows. What Spotify paints
+// exactly this field's color, and conceals Spotify's wash so the field is what shows. What Spotify paints
 // over the field -- the list and every row, all of them the base surface -- is kept clear by the Kit's
 // repaint hook while sgr_albumRoot is this page, and by the list's own pass below, which paints itself
 // rather than through a layer the repaint hook would hear about.
 //
-// The colour is the cover's main colour, as the playlist's and the artist's are. Read off the bottom edge
-// it was a scanned cover's pale border, which turned the field grey where the cover is blue (device,
-// 2026-09-18); for a while Spotify's own colour, read off the wash it paints behind the header, won over
-// it for that reason. That colour is now only what shows until the cover has been read (AlbumHeader.x
+// The color is the cover's main color, as the playlist's and the artist's are. Read off the bottom edge
+// it was a scanned cover's pale border, which turned the field gray where the cover is blue (device,
+// 2026-09-18); for a while Spotify's own color, read off the wash it paints behind the header, won over
+// it for that reason. That color is now only what shows until the cover has been read (AlbumHeader.x
 // hands it over as it conceals the wash), and before either the field is the neutral one.
 //
 // The page is the album's by its identifier, which is how Native/Album/Album.x has told it apart since it
@@ -128,7 +128,7 @@ static SGRArtworkField *fieldIn(UIView *page) {
 
 // An album card of a discovery section switched back on (More by, You might also like) paints the base surface
 // behind its caption, a black box on the field. Only the card's own paint goes: its artwork, badges and
-// placeholder are views of their own. Spotify paints it before the card is attached, so no colour hook hears it;
+// placeholder are views of their own. Spotify paints it before the card is attached, so no color hook hears it;
 // it is cleared on the pass of the cell it is in, which a card has to itself when it is reused.
 static void clearCards(UIView *cell) {
     SGForEachView(cell, ^(UIView *v) {

@@ -233,7 +233,7 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
     float vocalsStep = (vocalsTo - engine->vocalsGain) / frames, otherStep = (otherTo - engine->otherGain) / frames;
     float fade = 1.0f / (kFadeSeconds * kSGSingRate), amountTo = on && mixing ? 1 : 0;
 
-    // The voice's angle glides the short way round towards the one set, and lands on it; within the buffer
+    // The voice's angle glides the short way round toward the one set, and lands on it; within the buffer
     // each ear's gain, delay and low-pass move in a straight line from where the angle was to where it is.
     float angleTo = loadFloat(&engine->voiceAngleBits), angleFrom = engine->voiceAngle;
     float turn = remainderf(angleTo - angleFrom, 2 * (float)M_PI);

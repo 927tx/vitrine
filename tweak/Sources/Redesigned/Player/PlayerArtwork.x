@@ -244,8 +244,8 @@ static void watchHold(UIView *tilt) {
 
 // Spotify's cell keeps room under the cover for the lyric preview even with the preview gone, so a track
 // with lyrics had a smaller cover with a blank band under it (issue #77). The preview takes no room
-// (below), and the tilt view takes the largest square of the plain view it sits in (01.txt:35), centred.
-// Bounds and a centre, not a frame, since the tilt view carries Spotify's tilt while the cover is inspected.
+// (below), and the tilt view takes the largest square of the plain view it sits in (01.txt:35), centered.
+// Bounds and a center, not a frame, since the tilt view carries Spotify's tilt while the cover is inspected.
 // A square under kCoverMinWidth is left as it is, so no small cover grows.
 static void fillRoom(UIView *tilt) {
     CGRect room = tilt.superview.bounds;

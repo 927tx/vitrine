@@ -1,10 +1,10 @@
-// The artwork field: one continuous colour taken from the artwork (SGRPalette.h) behind a whole
+// The artwork field: one continuous color taken from the artwork (SGRPalette.h) behind a whole
 // redesigned page, with no card and no seam anywhere. The player's field also carries the
-// artwork itself at the top, blurred and dimmed and dissolving into the colour (showsBackdrop).
+// artwork itself at the top, blurred and dimmed and dissolving into the color (showsBackdrop).
 //
-// Nothing is blurred live and nothing is masked: the view draws a solid colour layer, a black gradient
-// layer (the redesign is AMOLED throughout, fading the colour to black down the page) and at most one
-// bitmap layer rendered off the main thread, so it costs a few composited layers while the page moves. A new colour or bitmap crossfades over
+// Nothing is blurred live and nothing is masked: the view draws a solid color layer, a black gradient
+// layer (the redesign is AMOLED throughout, fading the color to black down the page) and at most one
+// bitmap layer rendered off the main thread, so it costs a few composited layers while the page moves. A new color or bitmap crossfades over
 // SGRCrossfade; the same image again is a no-op.
 //
 // Ownership: the screen that installs a field owns it (usually retained by its superview and an
@@ -12,16 +12,16 @@
 // Threading: main thread only; the palette work it starts runs off it.
 #import <UIKit/UIKit.h>
 
-// Posted on the main thread by a field whose colour changed, with the field as the object and the
-// new colour under "color".
+// Posted on the main thread by a field whose color changed, with the field as the object and the
+// new color under "color".
 extern NSNotificationName const SGRFieldColorDidChangeNotification;
 
 @interface SGRArtworkField : UIView
-// Where the colour, the fade to black and the backdrop reach past the bounds (overscroll, a plane
+// Where the color, the fade to black and the backdrop reach past the bounds (overscroll, a plane
 // that does not clip): positive values draw outside. The field never clips.
 @property (nonatomic) UIEdgeInsets bleed;
 @property (nonatomic) BOOL showsBackdrop;
-// The player's moving field instead of the still backdrop (SGRFlow.h): the artwork's colours drifting
+// The player's moving field instead of the still backdrop (SGRFlow.h): the artwork's colors drifting
 // over the whole of the bounds, with no fade to black. It moves only while the field is in a window,
 // the app is in front, the player is not opening or closing, Reduce Motion and Low Power Mode are off
 // and nothing holds it (motionHeld); otherwise it stays still where it was.
@@ -38,15 +38,15 @@ extern NSNotificationName const SGRFieldColorDidChangeNotification;
 @property (nonatomic) BOOL covered;
 // The backdrop's height in points from the top of the bounds; 0 is the window's height.
 @property (nonatomic) CGFloat backdropHeight;
-// SGRNeutralField until a colour arrives.
+// SGRNeutralField until a color arrives.
 @property (nonatomic, readonly) UIColor *fieldColor;
 
-// The colour from the artwork's main colour rather than its bottom edge (SGRPaletteRequest's mainColor): a
+// The color from the artwork's main color rather than its bottom edge (SGRPaletteRequest's mainColor): a
 // playlist, album or artist page, whose cover dissolves into the field. The player keeps the edge, where its
-// backdrop meets the colour. Set before the first artwork.
+// backdrop meets the color. Set before the first artwork.
 @property (nonatomic) BOOL mainColor;
 
-// A colour Spotify already has for the page (the player's background colour, the album's wash), made fit
+// A color Spotify already has for the page (the player's background color, the album's wash), made fit
 // to be a field and shown until the first artwork has been read; ignored after that.
 - (void)setProvisionalColor:(UIColor *)color;
 // Reads the artwork off the main thread and crossfades the result in (without animation when
@@ -57,7 +57,7 @@ extern NSNotificationName const SGRFieldColorDidChangeNotification;
 
 // A page that comes in whole rather than a piece at a time: until the field has read its first artwork, a veil
 // of the neutral field lies over everything `page` holds but its pinned ⋯ (SGRPinnedMore), and then fades away
-// at once, with the cover, the colour and the text that arrived under it. The back button is the navigation
+// at once, with the cover, the color and the text that arrived under it. The back button is the navigation
 // bar's, outside the page, and stays. A page whose artwork never comes is shown after SGRFieldHoldLimit, and
 // one that knows it has none releases itself (-showPage). Called from the page's own pass, which keeps the
 // veil on top; nothing once the page has been shown, so a page coming back is never held again.

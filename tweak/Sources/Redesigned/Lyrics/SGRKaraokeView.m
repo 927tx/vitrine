@@ -240,7 +240,7 @@ static UIView *lettersOf(NSArray<NSString *> *letters, NSArray<NSNumber *> *xs, 
     free(_letterLift);
 }
 
-// The cursor is in line units and the feathered edge is centred on it, so the edge runs on through
+// The cursor is in line units and the feathered edge is centered on it, so the edge runs on through
 // the space into the next word instead of starting over at each one. Right to left, the mask is the
 // same one turned around: white from the word's right edge, the feather `local` in from it.
 - (void)fillTo:(CGFloat)cursor {
@@ -346,7 +346,7 @@ static double heldStrength(double held) {
 @property (nonatomic, readonly) NSArray<NSNumber *> *order;   // SGRLyricsText, largest first, shown ones only
 @property (nonatomic, readonly) UIFont *lyrics, *pronunciation, *translation;   // nil for a text not shown
 @property (nonatomic, readonly) SGRKaraokeStyle *backing;   // the backing row's: smaller, its translation read with the line's
-// The line again in Latin letters (Shared/Lyrics' romanised lyrics), at the pronunciation's place in the
+// The line again in Latin letters (Shared/Lyrics' romanized lyrics), at the pronunciation's place in the
 // order, since it is one (the second place's while that is the first); nil while the Lyrics page has
 // it off. A backing row has none.
 @property (nonatomic, readonly) UIFont *romanised;
@@ -537,7 +537,7 @@ static CGFloat layPair(NSArray<SGKaraokeWord *> *lead, UIFont *leadFont, NSArray
         }
         bottom = y + leadHigh;
         // Under the row, each word at the start of its own, pushed along past the one before it, and the
-        // pieces of one word flush together, the way the row above has them. A row spelt out wider than
+        // pieces of one word flush together, the way the row above has them. A row spelled out wider than
         // it is written, as Korean is, cannot keep to its words and still fit: it is set as plain words
         // from the edge instead, in as many rows as it takes.
         NSUInteger from = j, until = j;
@@ -593,7 +593,7 @@ static CGRect blockFrame(NSString *text, UIFont *font, CGFloat width, CGFloat to
 
 // The texts a line has, in the style's order, the lyrics and their pronunciation set as a pair where
 // the order has them side by side, the line in Latin letters right under the lyrics where it is not
-// already spelt out by the pronunciation, and the backing row after that. `right` is the side a backing
+// already spelled out by the pronunciation, and the backing row after that. `right` is the side a backing
 // row keeps to, its line's; -1 for a line of its own, which takes its side from its voice and script.
 static SGRKaraokeLayout *layOut(SGKaraokeLine *line, CGFloat width, SGRKaraokeStyle *style, NSInteger right) {
     SGRKaraokeLayout *layout = [SGRKaraokeLayout new];
@@ -792,7 +792,7 @@ static double secant(SGSweepKnot *knots, NSUInteger i) {
 @property (nonatomic, readonly) CGRect bubbleTarget;
 @end
 
-// The translation and the romanised line of a line being sung, brighter than a line waiting but never
+// The translation and the romanized line of a line being sung, brighter than a line waiting but never
 // as bright as the words.
 static const CGFloat kTranslationLit = 0.6;
 
@@ -1505,7 +1505,7 @@ typedef struct {
     for (SGRKaraokeLineView *view in _shown.allValues) view.blur = 0;
 }
 
-// In the caller's animation: the glass dematerialises by its effect and the glyph fades by its alpha, the
+// In the caller's animation: the glass dematerializes by its effect and the glyph fades by its alpha, the
 // one view of the two with no glass in it.
 - (void)setExtrasHidden:(BOOL)hidden {
     _extrasHidden = hidden;

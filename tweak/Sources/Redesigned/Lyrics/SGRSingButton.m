@@ -88,7 +88,7 @@ static char kButtonGlassKey, kPanelGlassKey;
     if (_panel) SGRShowGlass([self placePanel], _panelShown);
 }
 
-// Goes with the host's controls, in the host's animation: the glass dematerialises, the glyph and the ring
+// Goes with the host's controls, in the host's animation: the glass dematerializes, the glyph and the ring
 // fade, and an open slider goes with them.
 - (void)setTucked:(BOOL)tucked {
     _tucked = tucked;
@@ -131,7 +131,7 @@ static char kButtonGlassKey, kPanelGlassKey;
         case SGSingStateFailed: glyph = @"exclamationmark.triangle.fill"; tint = UIColor.systemYellowColor; break;
     }
     // One glyph replaces the other in place, as the Kit's download glyph does (none under Reduce Motion),
-    // and the colour crossfades. Set only on a change: the download's progress refreshes many times a second.
+    // and the color crossfades. Set only on a change: the download's progress refreshes many times a second.
     if (![glyph isEqualToString:_glyph]) {
         _glyph = glyph;
         UIButtonConfiguration *config = _button.configuration;
@@ -302,7 +302,7 @@ static void tell(NSString *message, NSString *action, void (^then)(void)) {
     [self letPanelGo];
 }
 
-// Bounds and a centre rather than a frame, since the capsule can be under its entering scale.
+// Bounds and a center rather than a frame, since the capsule can be under its entering scale.
 - (UIView *)placePanel {
     CGFloat width = self.bounds.size.width, top = -kPanelGap - kPanelHeight;
     _panel.bounds = CGRectMake(0, 0, width, kPanelHeight);
@@ -310,7 +310,7 @@ static void tell(NSString *message, NSString *action, void (^then)(void)) {
     UIView *glass = SGRGlassCapsuleInside(_panel, &kPanelGlassKey, _panel.bounds.size, NO);
     _slider.bounds = CGRectMake(0, 0, kPanelHeight - 24, 31);
     _slider.center = CGPointMake(width / 2, kPanelHeight / 2);
-    // The slider is centred, so As sung, the middle of its range, is the capsule's middle.
+    // The slider is centered, so As sung, the middle of its range, is the capsule's middle.
     _mark.frame = CGRectMake((width - kMarkWidth) / 2, kPanelHeight / 2 - 0.5, kMarkWidth, 1);
     _level.frame = CGRectMake(width - kLevelWidth, top - kLevelHeight - 4, kLevelWidth, kLevelHeight);
     return glass;

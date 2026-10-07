@@ -54,13 +54,13 @@ UIView *SGRAlbumPageOf(UIView *view);
 // AlbumField.x. The field belongs to the page `view` is on, found by walking up from it, so two album pages
 // on the navigation stack keep a field each.
 //
-// The colour the page's field is showing, SGRNeutralField() before one has been read: what the header's
+// The color the page's field is showing, SGRNeutralField() before one has been read: what the header's
 // cover has to dissolve into for there to be no seam.
 UIColor *SGRAlbumFieldColor(UIView *view);
-// The cover of the page `view` is on, for its field to take its colour from. The same image again is a no-op.
+// The cover of the page `view` is on, for its field to take its color from. The same image again is a no-op.
 void SGRAlbumSetArtwork(UIView *view, UIImage *image);
-// The colour Spotify picked for the album, read off the wash it paints behind the header: the field shows it
-// until the cover's own main colour has been read, and not after.
+// The color Spotify picked for the album, read off the wash it paints behind the header: the field shows it
+// until the cover's own main color has been read, and not after.
 void SGRAlbumSetSpotifyColor(UIView *view, UIColor *color);
 // The page comes in whole once its cover has been read (Kit/SGRField.h). Called from the album header's pass
 // only, so a podcast's episode page, the same template with no cover for the field to read, is never held.

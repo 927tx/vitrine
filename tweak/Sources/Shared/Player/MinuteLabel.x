@@ -11,7 +11,7 @@ static void fixMinute(UIView *cell) {
         if (![view isKindOfClass:UILabel.class]) return;
         UILabel *label = (UILabel *)view;
         if (label.text.length != 9 || ![label.text isEqualToString:@"1 minutes"]) return;
-        // Through the attributed text, so the label keeps the font and colour Spotify gave it.
+        // Through the attributed text, so the label keeps the font and color Spotify gave it.
         NSMutableAttributedString *text = [label.attributedText mutableCopy];
         [text replaceCharactersInRange:NSMakeRange(0, text.length) withString:@"1 minute"];
         label.attributedText = text;

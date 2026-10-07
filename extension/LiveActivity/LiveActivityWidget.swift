@@ -643,7 +643,7 @@ private struct ChipButton: View {
     let symbol: String
     let label: String
     var lit = false
-    // What VoiceOver and Voice Control say, where the short label on the chip would read wrong: "15m" as 15 metres.
+    // What VoiceOver and Voice Control say, where the short label on the chip would read wrong: "15m" as 15 meters.
     var spoken: String?
     @Environment(\.accent) private var accent
 

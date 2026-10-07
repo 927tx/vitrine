@@ -9,7 +9,7 @@
     tweak/Sources/Headers/      reverse-engineered Spotify classes, one header each, only the selectors used
     tweak/Sources/Settings/     the Mod Settings framework: SGPage (a page on Spotify's stack), SGModPage (sections
                                 of rows: switches, choices, sliders, links, rows shown only while a choice
-                                asks for them, and rows greyed out while the switch they wait on is off, a tap
+                                asks for them, and rows grayed out while the switch they wait on is off, a tap
                                 on one nudging that switch), SGPageStyle (the system Settings look), SGGlowSwitch,
                                 SGMarquee (a title that glides side to side when it is too long, for every layer)
     tweak/Sources/Shared/       what works the same with either look, see Layers below
@@ -61,7 +61,7 @@ is left alone on iOS 26, so a phone that updates gets its redesign back.
 The two looks never run together, so each hooks the same Spotify class in its own way, and a part of
 the look is edited on its own side without touching the other: where both need the same thing, each
 has its own copy (the tab bar's composition and its editor, the lyrics page's glass, the soft top edge,
-AMOLED, the accent colour), under its own names (SG… native, SGR… redesign) and its own keys. The imports run
+AMOLED, the accent color), under its own names (SG… native, SGR… redesign) and its own keys. The imports run
 one way, Core <- Settings <- Shared <- Native | Redesigned <- App, and `scripts/check-layers.sh`, run
 by tweak/Makefile before every build, fails on any other. A layer below that needs something from one
 above takes it through a registry in Core (forced flags, SGFlagForce.h) or a function declared low and
@@ -219,7 +219,7 @@ Shared:
     AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): a render
                   notify on the music's RemoteIO unit (SGPlayerMusicOutput, Shared/Player) runs each finished buffer through the mod's own engine, re-blocked to 1024 frames one block late,
                   in place (AudioEffects.x, SGDSPEngine.m), then hands it, mixed to mono, to one reader that only
-                  reads it, switch on or off (SGAudioSetOutputReader: the player's Visualiser). The buffers are in the unit's output format, the
+                  reads it, switch on or off (SGAudioSetOutputReader: the player's Visualizer). The buffers are in the unit's output format, the
                   hardware's, not the client format Spotify sets. The effects are the SGDSP*.m files, on Accelerate,
                   Apple's Reverb2 unit, libbs2b and EEL2 (vendor/audio). Settings apply as they change, on a queue of
                   its own; the file effects read their files from Documents/Vitrine/Audio effects
@@ -320,13 +320,13 @@ Shared:
                   the mod's own (Player/SleepTimer.m: 15 min, 30 min, 1 hour, End of track, End of album) that fades
                   the sound out and pauses Spotify, and stays set when the card is switched off (LiveActivity.h lists its files): a timer polls the player and
                   sends a new state only when what the view shows changes, local updates only, no push. The card
-                  is tinted with the cover's colour and shows the cover itself, a JPEG of a few dozen pixels inside
+                  is tinted with the cover's color and shows the cover itself, a JPEG of a few dozen pixels inside
                   the state, which ActivityKit caps at 4 KB (the bridge sends it without the cover when it would
-                  not fit); the colour is darkened to a luminance of 0.04 at most, so the white text keeps 4.5:1 on any
+                  not fit); the color is darkened to a luminance of 0.04 at most, so the white text keeps 4.5:1 on any
                   cover, and the cover is read only once the now playing title is the new track's. The page's options
                   ride in the state too, read on every tick, so they apply within a tick: the lines' alignment, what the
                   lyrics view shows on a track with no timed lyrics (a note under the track, or the track large), the
-                  colours (Spotify's green; Artwork, the cover's colour lightened to about the green's luminance in its
+                  colors (Spotify's green; Artwork, the cover's color lightened to about the green's luminance in its
                   place; Plain, white on the system's own background), and the progress bar. Artwork off sends no
                   cover at all. The page's preview (SGLiveActivityPreview.m) is a mock of the card in UIKit, not the
                   widget, checked in the simulator against harness/live-activity-page/. Taps are
@@ -362,7 +362,7 @@ Shared:
 
 Native:
 
-    Appearance/   AMOLED (Amoled.x), the accent colour (Accent.x), the soft top edge (EdgeEffect.x), and Repaint.x, which
+    Appearance/   AMOLED (Amoled.x), the accent color (Accent.x), the soft top edge (EdgeEffect.x), and Repaint.x, which
                   keeps what the native tweaks stripped transparent
     Navbar/       Spotify's tab bar composed (Navbar.x, NavbarLayout.m, hooked from TabBarHooks.x), the Navbar and Add a tab pages
     NowPlayingBar/ the device button hidden, the bar's flags
@@ -386,8 +386,8 @@ Redesigned:
 
     Kit/          what the redesign builds on (SGRKit.h lists it), the flags it forces (SGRedesign.h, SGRGlassDesign.x for
                   Spotify's own glass design), its repaint hook (SGRRepaint.x), soft top edge, AMOLED black (always on,
-                  SGRAmoled.x) and its own accent colour (SGRAccent.x, stored apart from the native look's). The
-                  playlist, album and artist pages take their field's colour from the cover's main colour (checked on
+                  SGRAmoled.x) and its own accent color (SGRAccent.x, stored apart from the native look's). The
+                  playlist, album and artist pages take their field's color from the cover's main color (checked on
                   the Mac by harness/palette/), and come in whole: a black veil over the page until the cover has
                   been read, at most SGRFieldHoldLimit (1 s), then faded away (SGRField.h)
     Navbar/       the glass tab bar (TabBar.x) over its own composition (Navbar.x, NavbarLayout.m) and editor, the glass search field.
@@ -421,7 +421,7 @@ Redesigned:
                   from the presented controller's viewWillAppear: on, and the menu comes from an invisible button
                   inside the ⋯ that takes touches only while it is up, opened with -performPrimaryAction (else
                   UIContextMenuInteraction's private _presentMenuAtLocation:). Spotify's rows, read off the sheet's
-                  cells (words, glyph, greyed out), and the mod's own rows in its header and footer (Sort, Mix, Edit
+                  cells (words, glyph, grayed out), and the mod's own rows in its header and footer (Sort, Mix, Edit
                   info) are fired on the hidden sheet once the menu is gone, through the row's own control (scrolled
                   to when it is below the fold); a row that pushes a page shows the sheet on that page, one that
                   presents a sheet of its own (Sleep timer) leaves that sheet as Spotify's and the card goes unseen,
@@ -439,7 +439,7 @@ Redesigned:
                   from the seam under the controls and over the whole clip behind the lyrics. The clip and the cover
                   cross over as one comes and the other goes, the clip from its poster frame before the video has
                   decoded one, and the Fluid field under a clip holds still and, once the clip has faded in, is hidden
-                  (SGRArtworkField's covered); the menu switches between Animated, Fluid and the Visualiser without
+                  (SGRArtworkField's covered); the menu switches between Animated, Fluid and the Visualizer without
                   a restart. The clip holds its frame while the song is paused, goes while
                   Spotify's music video shows, is given up when it has drawn nothing in 5 s on screen, and on a skip
                   stays a moment for the next track's to cross over it. Under Reduce Motion and in Low Power Mode no
@@ -447,9 +447,9 @@ Redesigned:
                   percentile of the linear luminance of three frames), so white text keeps 4.5:1 (7:1 with Increase
                   Contrast), from 0.10 to 0.80 and 0.15 more behind the lyrics. A track that changes while the player
                   cannot be seen (no window, or the app not in front) takes the last clip away at once. Checked in the simulator against
-                  harness/player/ (`motion`). The Visualiser
+                  harness/player/ (`motion`). The Visualizer
                   (PlayerVisualiser.m) draws two soft hills of the song's spectrum across the foot of the player in the
-                  cover's flow colours, over the Fluid field held still, blurred behind the lyrics: the audio effects'
+                  cover's flow colors, over the Fluid field held still, blurred behind the lyrics: the audio effects'
                   render notify on the music's output hands what it plays, mixed to mono, to one reader (SGAudioSetOutputReader), and
                   SGRSpectrum.m cuts it into 24 bands with Accelerate's FFT on the render thread, without allocating or
                   locking, and publishes them atomically; a display link of at most 60 Hz (30 behind the lyrics, 15
@@ -463,7 +463,7 @@ Redesigned:
                   that breathe and fill over its length on a Core Animation timeline laid against the song's clock; and
                   a line's pronunciation (under the words it spells) and translation, switched on from a glass button in
                   the lyrics' corner that shows only for a song that has them, in the order of sizes the Lyrics page sets
-                  (LyricsText.h). With the Lyrics page's Romanised lyrics on, a line in another alphabet has the same
+                  (LyricsText.h). With the Lyrics page's Romanized lyrics on, a line in another alphabet has the same
                   again in Latin letters right under its words (the source's own pronunciation where it is hidden, none
                   where it shows), before the translation, at the pronunciation's size, lit with its line but never swept.
                   A word held 0.9 s or more glows and its letters rise in a wave as the sweep reaches
@@ -478,7 +478,7 @@ Redesigned:
                   frames and the hooks' time (Home.h lists its files)
     Search/       the Browse page decluttered to its category cards (an allow list of the list's cells: the watch feed
                   carousels and promos collapse, and the cards move up by the spacing they leave), the header the way Home
-                  has it without the camera, and each card as Liquid Glass tinted by its own colour, read off the Box's
+                  has it without the camera, and each card as Liquid Glass tinted by its own color, read off the Box's
                   shape layer (Search.h lists its files)
     Library/      Your Library the way Home and Search have their headers: a large title at the leading edge, the avatar
                   at the trailing edge with the search and create buttons before it, the header's scrim gone, each row's
@@ -489,7 +489,7 @@ Redesigned:
                   system's own glass
     Playlist/     the playlist page (Liked Songs and one's own too, all three being the same page) the way the Music
                   app lays one out: the cover full bleed across the top dissolving into the page's field with no seam,
-                  the title, the creator and the length centred under it, one row of glass controls (shuffle, a
+                  the title, the creator and the length centered under it, one row of glass controls (shuffle, a
                   prominent Play capsule taking its glyph and its word from Spotify's own button, add), the find bar
                   and the curation pills gone, and the track rows on the field with a hairline between them
                   (Playlist.h lists its files). Sort and Mix, the two of those pills the ⋯ menu does not already offer,
@@ -499,7 +499,7 @@ Redesigned:
                   playlist's, so it shares nothing with Playlist/ but the Kit: the cover full bleed dissolving into the
                   field (Apple Music's animated cover over it where the album has one, fading in once its first frame
                   is decoded and moving only in front of the app with Reduce Motion and Low Power Mode off and Auto-Play
-                  Video Previews on), the title, the artist and the kind and date centred under it, and the same row of glass
+                  Video Previews on), the title, the artist and the kind and date centered under it, and the same row of glass
                   controls -- play and shuffle float over the album page outside its header, so they are concealed
                   there and the row carries the Kit's stand-ins, which draw their glyph and fire them. A track's artist line
                   goes where it only repeats the album's artist (with the guests the title names after "feat." and the
@@ -536,7 +536,7 @@ which makes every unset switch read off, so a reset is stock Spotify whatever sw
 
 A hook reads its switch when it runs (`SGEnabled`, `SGHidden`, `SGFlag` from Core/SGPrefs.h), so a
 change shows after Spotify restarts; the tab editor on the Navbar page is the exception and applies as soon as the bar lays
-out again, as are the Home gradient's colour, strength and height, but not the switch that turns it on, and Vibrations
+out again, as are the Home gradient's color, strength and height, but not the switch that turns it on, and Vibrations
 and Live Activity. The root page in `App/ModSettings.x` links the Appearance page and the page of each part of Spotify, and only the stored look's.
 
 ## Make targets
@@ -596,7 +596,7 @@ the simulator by harness/driver/.
 Mod Settings, opened by holding Home on the tab bar or from the first row of the side drawer and the
 last row of Spotify's Settings, looks like the system Settings app in its dark appearance under either look:
 cards of #1C1C1E on black, 17pt rows that follow Dynamic Type up to xxxLarge and the app font, each part of
-Spotify behind a symbol on a tile of its own colour, grey chevrons and footnote headers. It has no account
+Spotify behind a symbol on a tile of its own color, gray chevrons and footnote headers. It has no account
 page. It sorts every
 setting by the part of Spotify it changes, so a part's glass, its hide switches and its flags sit on
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
@@ -604,10 +604,10 @@ they change. Its main page groups the rows by what they are, in cards with no he
 under the signing and environment warnings: Redesigned UI, Appearance and Tab bar; Player, Lyrics and Albums &
 artists (Home & Library in the native look); Karaoke, Spatial voice (where the iPhone reads headphone motion), Audio
 effects, Vibrations, Live Activity, AirPods gestures and Listening stats; Lock screen and Premium, ads & privacy; Labs and All flags; Mod. It is checked in the simulator
-against harness/mod-settings/. The Appearance page has, in the native look, AMOLED (the redesign is always black), then the stored look's Accent colour
-preset, a pull-down of Spotify, Apple Music and Custom read off the colour stored (a colour set before the presets
-existed reads as Custom, Apple Music's red as Apple Music), and Accent colour, the hex and a swatch of the colour in
-effect, which opens the system picker in a sheet that stores only from its checkmark, as Custom. The custom colour is
+against harness/mod-settings/. The Appearance page has, in the native look, AMOLED (the redesign is always black), then the stored look's Accent color
+preset, a pull-down of Spotify, Apple Music and Custom read off the color stored (a color set before the presets
+existed reads as Custom, Apple Music's red as Apple Music), and Accent color, the hex and a swatch of the color in
+effect, which opens the system picker in a sheet that stores only from its checkmark, as Custom. The custom color is
 kept aside while a preset is in place, so Custom brings it back. Last come the Font, under either look and on any
 iOS, below 26 too, a page of its own with each choice drawn in itself: Default (Spotify's), San Francisco, SF
 Rounded, New York and SF Mono; More fonts, the families iOS carries of a fixed few (Avenir Next to American
@@ -623,7 +623,7 @@ Albums & artists as it is flipped. Tab bar: the tab editor of the stored look, e
 its own list of tabs. Lyrics, on the main page of its own: in the redesign a live preview of the lyrics first, with the presets of their look
 under it and their sliders in a sheet (Text size, Line spacing, Blur, Glow, Wave), applying at once; then Karaoke, then the ordered list of lyrics sources,
 lyrics for every track, naming the source in the redesign, the lock screen, and glass lyrics in the native look; in
-the redesign also which of the lyrics, their pronunciation and their translation is set largest, Romanised lyrics
+the redesign also which of the lyrics, their pronunciation and their translation is set largest, Romanized lyrics
 (applied at once), and the translation's language. Karaoke, under either look, on the main page and as Lyrics' first row, the row reading out On,
 Off or how far the voice model's download has come, kept up to date while the page shows: Karaoke's switch, which turns
 the mic on and off at once, a card at its top (SGSingCard.m: the song, what Karaoke is doing, a tap saying more, the vocals
@@ -645,13 +645,13 @@ PlayerSettings.m): the background chosen edge to edge, and over its foot the cov
 for Animated while the player has no clip, the card looks the playing track's up itself while it is on screen
 (SGMotionClipFor, the player's sources, size and Low Data Mode, into the store the player reads), Fluid until it
 is in, then the clip over it, poster first (harness/player/ `preview`);
-under it a segmented control of the five backgrounds (Still, Colours, Fluid, Animated, Visualiser, changing the card at once)
+under it a segmented control of the five backgrounds (Still, Colors, Fluid, Animated, Visualizer, changing the card at once)
 with a note on what the one picked does, Artwork sources and Download in Low Data Mode while Animated is chosen,
 and Mini player: Apple Music style (the tab bar's minimize on scroll), Device button (the now playing bar keeps
 Spotify's device button in that minimized row, off by default) and the device button hidden on the full bar,
 checked in the simulator against harness/player/ (`settings`). Vibrations, a page of its own under either
 look opened from the main page (the row reads out which of the two are on), leads with a preview (Shared/Haptics/SGVibrationsPreview.m): rings of dots that a tap sends a crest across, out
-from the middle in the accent colour, higher and further the stronger the Strength, while the first of Controls and
+from the middle in the accent color, higher and further the stronger the Strength, while the first of Controls and
 Music Haptics that is on plays its own tap through its own path (Controls' add tap, or one kick of Music Haptics'
 with its rumble unless it follows Beat), the line under it naming which, or saying why there is none. While the page
 shows, each tap Music Haptics plays sends a low crest too. Nothing runs between crests, and with Reduce Motion the
@@ -660,9 +660,9 @@ Controls (on until switched off) and one for Music Haptics, which holds two swit
 each with an ⓘ: Music Haptics, the mod's own from the sound while Spotify is in front, and In the Background
 (left out below iOS 18), the song named to iOS's own Music Haptics. The one choice of before moves to them once
 (Generated to Music Haptics, Native iOS to In the Background, None to neither). Controls
-has its Strength under it, greyed out while the switch is off (10 to 100%, a tap at the new strength with each step);
+has its Strength under it, grayed out while the switch is off (10 to 100%, a tap at the new strength with each step);
 Music Haptics its Strength (20 to 200%, 100% being how it first shipped, a kick at the new strength with each step) and
-Follows, greyed out the same way, Everything (a tap on each kick and snare and a rumble under the bass), Beat (the
+Follows, grayed out the same way, Everything (a tap on each kick and snare and a rumble under the bass), Beat (the
 taps without the rumble) or Bass (the kicks' taps and the rumble); In the Background a Status row (Paused, Waiting,
 Checking, Ready, Playing or Unavailable) while it is on, or, while Music Haptics is off in Settings > Accessibility, a
 row saying so whose tap opens its ⓘ, all applying straight away. Live Activity, on iOS 17 and up under either look: its switch and which view it
@@ -679,7 +679,7 @@ output playing now> keeping the pick for that output and the remembered outputs 
 turns the effects on, then a card per effect, each opening out into its sliders, choices, curve or file library
 while its switch is on (Reverb has its Room and its Amount, the amount the player's ⋯ menu also sets), everything
 applying as it changes; the row reads out Off, On or how many effects are on. Home & Library, in the native look only:
-the Gradient page (the wash behind the top of Home in one of eight colours, at three strengths and
+the Gradient page (the wash behind the top of Home in one of eight colors, at three strengths and
 four heights) and the Home flags, the parts of Home to hide including the DJ button and badge, the
 playlist header, buttons and pills to hide, and the Library flags. Then Premium, ads & privacy
 (EeveeSpotify's Hide ads and Hide upsells, in the native look hiding the video carousel in Search, and

@@ -32,8 +32,8 @@ fading in under a switch (`slow`); Controls at 40%, Music Haptics at 150% then 1
 under their keys and read back by the hooks. The Audio effects page and an SGModPage without shown-while rows
 (`harness/audio-effects-page`, `push=reference`) draw the same pixels as before the slider and visibility were added.
 
-2026-10-05, iPhone 17 Pro on iOS 27.0: with `controls-off` the Strength row stays under Controls, greyed (`dump` marks
-it), `select=2.1` on it leans the Controls switch 6pt towards on and springs it back, and `toggle=2.0` brings
+2026-10-05, iPhone 17 Pro on iOS 27.0: with `controls-off` the Strength row stays under Controls, grayed (`dump` marks
+it), `select=2.1` on it leans the Controls switch 6pt toward on and springs it back, and `toggle=2.0` brings
 Strength back to full strength without a row moving.
 
 What it does not cover: a real finger on the slider, and how any strength feels, which only a phone can tell.
@@ -41,7 +41,7 @@ What it does not cover: a real finger on the slider, and how any strength feels,
 2026-10-06, iPhone 17 Pro on iOS 27.0: the page opens on the preview, its line reading Tap to feel Controls, Tap to
 feel Music Haptics (`controls-off music`), the Native iOS note (`controls-off native`, now `controls-off background`) or what to turn on
 (`controls-off`), and Tap to feel Controls again once `toggle=0.0` turns Controls on; with `slow tap`, six shots
-1.3 s apart show the middle dipping and one lit ring travelling out to the edge and the field settling back to
+1.3 s apart show the middle dipping and one lit ring traveling out to the edge and the field settling back to
 rest; with Reduce Motion on (`simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool
 true`) every ring lights at once and fades, nothing moving. With Generated, `tap` asks the engine for its preview kick
 at the stored strength with the rumble, and each step of `slide=1.1:150` asks again at the new strength. The line
@@ -51,7 +51,7 @@ Not covered here: how the taps feel, whether the preview kick reaches a running 
 music's pulses with real music playing (`pulse` stands in for them).
 
 2026-10-06, iPhone 17 Pro on iOS 27.0, the two switches: with nothing stored both read off, Strength and Follows
-greyed under Music Haptics and In the Background below them. `mode=0`, `mode=1`, `mode=2` and `mode=7`, each with
+grayed under Music Haptics and In the Background below them. `mode=0`, `mode=1`, `mode=2` and `mode=7`, each with
 `expect=` and `dump`, move the old choice to off/off, on/off, off/on and off/off and leave it unstored. `background`
 shows Status under In the Background; with `ios-off` the row "Music Haptics is off in iOS" takes its place, `ios=on`
 and `ios=off` swap them while the page shows, and `select=1.4 alert` opens In the Background's ⓘ from it. `toggle=1.0`

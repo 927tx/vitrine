@@ -1,4 +1,4 @@
-// The player's Visualiser background (PlayerVisualiser.x) reads the sound through this: what Spotify's
+// The player's Visualizer background (PlayerVisualiser.x) reads the sound through this: what Spotify's
 // output plays, cut into SGRSpectrumBands bands spaced evenly in pitch from kLowest to kHighest Hz (SGRSpectrum.m),
 // each band's level in dB, 0 dB being a full scale sine in it.
 //

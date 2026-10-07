@@ -71,7 +71,7 @@ SGModRow *SGActionRow(NSString *title, NSString *subtitle, void (^action)(void))
 }
 
 // Red, with a warning symbol. SGFillCell tints the title and the symbol; the cell below takes the
-// colour down to the subtitle too, so the whole row reads as the warning it is.
+// color down to the subtitle too, so the whole row reads as the warning it is.
 SGModRow *SGWarningRow(NSString *title, NSString *subtitle, void (^action)(void)) {
     SGModRow *row = SGActionRow(title, subtitle, action);
     row.color = SGRed();
@@ -207,9 +207,9 @@ SGModRow *SGMenuRow(NSString *title, NSArray<NSString *> *choices, NSString *(^v
     return row;
 }
 
-#pragma mark - the colour sheet
+#pragma mark - the color sheet
 
-// Holds the picker's callback for as long as the sheet is up: the checkmark is the one way a colour is stored.
+// Holds the picker's callback for as long as the sheet is up: the checkmark is the one way a color is stored.
 @interface SGColorSheet : NSObject
 @property (nonatomic, weak) UIColorPickerViewController *picker;
 @property (nonatomic, copy) void (^picked)(NSInteger rgb);
@@ -233,7 +233,7 @@ SGModRow *SGMenuRow(NSString *title, NSArray<NSString *> *choices, NSString *(^v
 @end
 
 // Made from a CGColor: either look's accent hooks swap Spotify's green as UIColor makes it from components, and
-// this colour has to stay the one asked for, Spotify's green included, to show what a preset is.
+// this color has to stay the one asked for, Spotify's green included, to show what a preset is.
 UIColor *SGColorRGB(NSInteger rgb) {
     CGColorRef cg = CGColorCreateSRGB(((rgb >> 16) & 0xFF) / 255.0, ((rgb >> 8) & 0xFF) / 255.0, (rgb & 0xFF) / 255.0, 1);
     UIColor *color = [UIColor colorWithCGColor:cg];
@@ -329,8 +329,8 @@ static UIView *valueAndChevron(NSString *text) {
     return box;
 }
 
-// What a row with a value and no page shows on the right: the value, after a swatch of the row's colour
-// when it has one, rounded like the cards and edged with a hairline so a dark colour still shows on them.
+// What a row with a value and no page shows on the right: the value, after a swatch of the row's color
+// when it has one, rounded like the cards and edged with a hairline so a dark color still shows on them.
 // The swatch is drawn into an image, past the accent hooks on layer backgrounds (see SGColorRGB).
 static UIView *valueView(SGModRow *row) {
     UILabel *label = [UILabel new];
@@ -416,7 +416,7 @@ static UIFont *tabular(UIFont *font) {
 @end
 
 // The Audio effects page's slider row (Shared/AudioEffects/AudioEffectsPage.m), for any page: the title and the
-// value over a slider in the accent colour, a subtitle between them when there is one, each step stored
+// value over a slider in the accent color, a subtitle between them when there is one, each step stored
 // as the thumb reaches it.
 @interface SGModSliderCell : UITableViewCell
 + (CGFloat)heightFor:(SGModRow *)row width:(CGFloat)width;
@@ -695,7 +695,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     if (path) [self nudgeAt:path];
 }
 
-// The switch leans 6pt towards on and springs back, with a light tap, so the eye and the finger find what to
+// The switch leans 6pt toward on and springs back, with a light tap, so the eye and the finger find what to
 // turn on first. Each nudge starts from wherever the last one has the switch, so taps in a row never jump it.
 // With Reduce Motion nothing moves: the switch's row lights up for a moment instead.
 - (void)nudgeAt:(NSIndexPath *)path {
@@ -758,7 +758,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     [self.tableView reloadData];
     if (!_live) return;
     // The counters climb while the page is open; the labels are written straight into the cells so
-    // that a reload never lands under a switch being dragged. A cancelled back swipe appears the
+    // that a reload never lands under a switch being dragged. A canceled back swipe appears the
     // page again without it ever disappearing, so the old timer goes first.
     [_ticker invalidate];
     _ticker = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(tick) userInfo:nil repeats:YES];
@@ -943,7 +943,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     [self readValues];
 }
 
-// A menu row's value as a pop-up button, the way Settings draws one: the name in grey over the up and down
+// A menu row's value as a pop-up button, the way Settings draws one: the name in gray over the up and down
 // chevrons, the menu opening on the first touch and anchored to the button, so it points at the row on iPad.
 // A pick runs the row's block and every row is read again, the ones that follow from it with it.
 - (UIButton *)menuButtonFor:(SGModRow *)row {
@@ -975,7 +975,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     return button;
 }
 
-// The ⓘ to the left of the switch (or of a choice's name and chevron), the grey of a subtitle, 30pt across
+// The ⓘ to the left of the switch (or of a choice's name and chevron), the gray of a subtitle, 30pt across
 // so it is easy to hit next to it.
 - (UIView *)infoButtonBeside:(UIView *)toggle {
     UIButton *info = [UIButton buttonWithType:UIButtonTypeSystem];

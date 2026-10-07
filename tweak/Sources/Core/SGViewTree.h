@@ -11,7 +11,7 @@ UIStackView *SGRowIn(UIView *host);
 // Whether any view under `root` has `marker` in its class name.
 BOOL SGHasClass(UIView *root, NSString *marker);
 
-// Artwork, glyphs, text and thin lines (progress bar) keep their colour, everything else goes clear.
+// Artwork, glyphs, text and thin lines (progress bar) keep their color, everything else goes clear.
 BOOL SGKeepsColor(UIView *view);
 void SGStripBackgrounds(UIView *view);
 BOOL SGIsVisibleColor(CGColorRef color);

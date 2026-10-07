@@ -9,7 +9,7 @@
 // where the text starts.
 //
 // The row's paint is cleared here rather than left to the Kit's repaint hook, which only hears about a
-// colour when Spotify sets it and not when a reused cell already carries one.
+// color when Spotify sets it and not when a reused cell already carries one.
 //
 // Spotify's type and its spacing are left alone: the row is 56pt for a title of 13pt, and a larger font of
 // the Kit's would be cut off by the box the element framework measured for it.
@@ -97,7 +97,7 @@ static UILabel *onlyLabel(UIView *view) {
     return count == 1 ? found : nil;
 }
 
-// The badge as it draws, rendered the moment before it goes: an unplayable row's is greyed, so it is not cached.
+// The badge as it draws, rendered the moment before it goes: an unplayable row's is grayed, so it is not cached.
 static UIImage *pictureOf(UIView *badge) {
     UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat formatForTraitCollection:badge.traitCollection];
     UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:badge.bounds.size format:format];

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the Audio effects page harness for the simulator: Shared/AudioEffects' page, the Settings/ framework,
-# AudioEffectsSettings.m and the engine's curve maths (SGDSPFilters.m) as they are in the tweak, stubs.m for
+# AudioEffectsSettings.m and the engine's curve math (SGDSPFilters.m) as they are in the tweak, stubs.m for
 # the rest of the engine.
 set -e
 SRC=$(cd "$(dirname "$0")/../../tweak/Sources" && pwd)

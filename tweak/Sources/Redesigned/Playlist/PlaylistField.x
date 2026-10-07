@@ -5,14 +5,14 @@
 // the size of the window) and, after it and so over it, the header (id=PL.Header). Neither scrolls the
 // other: the list keeps its frame and the header's y runs from -134 at rest to -529 scrolled, so a field
 // put behind both stays still while the cover at the top of the header slides up over it -- which is what
-// the Music app does with the page colour.
+// the Music app does with the page color.
 //
 // So the field is the page's bottom-most view, the size of the view and bleeding past it, with no backdrop
 // of its own: the sharp cover at the top of the header is the picture, and PlaylistHeader.x fades it into
-// exactly this field's colour. What Spotify paints over the field -- the page, the list and every row, all
+// exactly this field's color. What Spotify paints over the field -- the page, the list and every row, all
 // of them the base surface -- is kept clear by the Kit's repaint hook while sgr_playlistRoot is this page.
 //
-// The colour is the main colour of the cover the header shows (PlaylistHeader.x hands it over), not its
+// The color is the main color of the cover the header shows (PlaylistHeader.x hands it over), not its
 // bottom edge, and until that has loaded the field is the neutral one, as it is for a playlist with no
 // cover at all.
 #import "Core/SGCore.h"

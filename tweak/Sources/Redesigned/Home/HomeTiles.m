@@ -1,6 +1,6 @@
 // Home redesign: a shortcut tile the way an Apple list row holds artwork. The cover sits inset from the tile's
-// edges with its own corners, the title follows it in, and the tile is a dark surface tinted faintly towards the
-// cover's dominant colour (Kit/SGRPalette.h, +tintForImage:), so the grid is not one grey and white text always
+// edges with its own corners, the title follows it in, and the tile is a dark surface tinted faintly toward the
+// cover's dominant color (Kit/SGRPalette.h, +tintForImage:), so the grid is not one gray and white text always
 // reads. Until the cover has loaded, the tile is the untinted surface.
 //
 // The surface sits behind Spotify's stack, over the tile's own fill, so the title, the playing indicator and
@@ -72,7 +72,7 @@ static UIView *surfaceIn(UIView *tile, UIView *fill) {
     return surface;
 }
 
-// The square scaled about its centre so it clears the tile's edges by kInset, and everything after it in the
+// The square scaled about its center so it clears the tile's edges by kInset, and everything after it in the
 // row moved in by what that took off its trailing side.
 static void inset(UIView *square) {
     CGFloat side = square.bounds.size.height;

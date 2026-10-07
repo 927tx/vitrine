@@ -34,7 +34,7 @@ sheet is the player's, and that the sheet is in the mod's window under the app's
 - `timing`: ten taps, each closed again; logs the time from the touch down to the menu view in the hierarchy
   (UIKit presents it inside the touch's delivery, so 2 to 4 ms warm), and the median, best and worst of the last
   nine (the first pays for UIKit's menu classes loading).
-- `rows`: More holds Go to album, the greyed-out Lyrics and Sleep timer (below the sheet's fold), not the rows
+- `rows`: More holds Go to album, the grayed-out Lyrics and Sleep timer (below the sheet's fold), not the rows
   the quick row has; picking Go to album taps Spotify's row and the sheet goes.
 - `loading`: the first menu ever, its rows 1.5 s late: More shows the system's loading row, then the rows come
   into the open More, and Go to album fires.

@@ -63,8 +63,8 @@ static SGRGlyphView *glyphFor(UIView *owner, NSString *symbol, CGFloat size) {
     return glyph;
 }
 
-// Centred by the autoresizing mask as well as here: the unit lays out before the buttons in its row
-// have a size, so a centre set then is the middle of nothing, (0, 0), and no later pass of the unit's
+// Centered by the autoresizing mask as well as here: the unit lays out before the buttons in its row
+// have a size, so a center set then is the middle of nothing, (0, 0), and no later pass of the unit's
 // comes to move it (trees/continuous/1.txt, 2026-09-17: glyphs at {-23.7, -14.7} in 56pt buttons).
 static void keepOnTop(UIView *view, UIView *host) {
     if (view.superview != host) {
@@ -180,7 +180,7 @@ static void playGlyph(UIView *host) {
     %orig;
     UIView *host = ((UIViewController *)self).viewIfLoaded;
     if (!host) return;
-    // The unit lays out before its row does, and the glyphs are centred on the buttons in it.
+    // The unit lays out before its row does, and the glyphs are centered on the buttons in it.
     [SGRowIn(host) layoutIfNeeded];
     sg_controlsHost = host;
     skipGlyph(host, @"SPTNowPlayingPreviousTrackButton", &kPreviousKey, @"backward.fill");

@@ -5,7 +5,7 @@
 // follows (a choice that also says whether the rumble plays, rather than a switch of its own that one choice would
 // leave with nothing to do) under it; and In the Background, which names the song to iOS's own Music Haptics, with
 // what iOS's own is doing under it, or, while Music Haptics is off in Settings > Accessibility, a row saying so.
-// The rows under a switch stay where they are, greyed, while it is off. Each strength's slider plays a tap at the
+// The rows under a switch stay where they are, grayed, while it is off. Each strength's slider plays a tap at the
 // new strength with each step, and the preview ripples with it.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"

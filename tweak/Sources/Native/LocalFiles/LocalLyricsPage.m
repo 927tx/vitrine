@@ -1,5 +1,5 @@
 // The lyrics page for a local file in the native look (LocalLyrics.h): the title and the artist, then
-// the lines on black, the one being sung white and a little larger, the rest grey, scrolled to keep it
+// the lines on black, the one being sung white and a little larger, the rest gray, scrolled to keep it
 // in the middle. Read four times a second from the player's state, which is plenty for lines; the clock
 // stops when the page goes. A new track while it is open brings its lines, or says it has none.
 #import "Core/SGCore.h"
@@ -10,7 +10,7 @@
 
 static const NSTimeInterval kTick = 0.25;
 static const CGFloat kSide = 24;
-// The line being sung grows this much; the rest are dimmed to grey, #808080 on black, 5.3:1.
+// The line being sung grows this much; the rest are dimmed to gray, #808080 on black, 5.3:1.
 static const CGFloat kCurrentScale = 1.06, kOtherAlpha = 0.5;
 
 @interface SGLocalLyricsViewer : UIViewController

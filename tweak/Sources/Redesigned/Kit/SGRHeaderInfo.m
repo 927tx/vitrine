@@ -84,7 +84,7 @@ UIImageView *SGRCreatorPicture(UIView *root) {
 
     _shuffle = [[SGRMirrorButton alloc] initWithFrame:CGRectZero];
     _shuffle.fallbackGlyph = [UIImage systemImageNamed:@"shuffle"];
-    // White like the buttons beside it while off -- Spotify's off grey read as a disabled button next to the
+    // White like the buttons beside it while off -- Spotify's off gray read as a disabled button next to the
     // white download (issue #65) -- and the accent while on, so its state still shows.
     _shuffle.glyphColor = SGRPrimary();
     _shuffle.onGlyphColor = SGRAccent();
@@ -172,7 +172,7 @@ UIImageView *SGRCreatorPicture(UIView *root) {
     return changed;
 }
 
-// The creator line, tappable. The label is as wide as the view and centred, so the target is narrowed to
+// The creator line, tappable. The label is as wide as the view and centered, so the target is narrowed to
 // the text itself -- a tap either side of a short name belongs to the page under it, which a pull down
 // starts on. Spotify's own control stays concealed where it is and only fires.
 - (void)showCreatorLink:(UIView *)control {
@@ -290,7 +290,7 @@ UIImageView *SGRCreatorPicture(UIView *root) {
         CGFloat height = ceil(size.height);
         label.frame = CGRectMake(kSide, y, text, height);
         // The name at its own width, so a tap beside it is the page's (-sgr_creatorHit:), and before it the
-        // picture, a line high so the line keeps its height, the two centred together. The picture leads, so it
+        // picture, a line high so the line keeps its height, the two centered together. The picture leads, so it
         // is on the right in a right-to-left language.
         if (label == _creator) {
             CGFloat picture = _picture.hidden ? 0 : height + kPictureGap;

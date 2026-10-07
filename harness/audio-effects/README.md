@@ -47,7 +47,7 @@ switch on and -12 dB, a Liveprog script from the library swapping the channels, 
 source stops, a file missing from the library and its error, then a 16-bit interleaved client at 48 kHz, then a
 second chain at 44.1 kHz started beside it: the effects move to the second chain and the first plays untouched,
 and when the second stops they move back. SpeedPitch.x is compiled in, since it names the output the effects
-follow. At each step the output's reader (`SGAudioSetOutputReader`, the player's Visualiser's tap) is checked too:
+follow. At each step the output's reader (`SGAudioSetOutputReader`, the player's Visualizer's tap) is checked too:
 the mono mix it gets is the measured level 6 dB down, the sine being in one channel, at the output's rate.
 
     THEOS=$HOME/theos ./build-sim.sh

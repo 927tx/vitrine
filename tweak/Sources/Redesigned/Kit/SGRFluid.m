@@ -3,7 +3,7 @@
 #import "SGRFluid.h"
 #import "SGRTokens.h"
 
-// Each copy: its side as a share of the visible rect's longer side, its centre as shares of that rect, and
+// Each copy: its side as a share of the visible rect's longer side, its center as shares of that rect, and
 // one turn's length in seconds (negative turns the other way).
 static const struct { CGFloat side, x, y; CFTimeInterval turn; } kCopy[] = {
     {2.2, 0.25, 0.20, 46},

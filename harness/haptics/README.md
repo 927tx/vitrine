@@ -29,13 +29,13 @@ and the vocals.
 The rumble is over its start level 76% of the time in Everything and Bass, and never plays in Beat.
 
 A Vocals choice was tried and left out. Without a separation model the one cheap handle on a voice is that it is
-mixed in the middle: per FFT bin (2048 at 44.1 kHz, hops of 512) the centre was kept by L/R similarity, 250 Hz to
+mixed in the middle: per FFT bin (2048 at 44.1 kHz, hops of 512) the center was kept by L/R similarity, 250 Hz to
 4 kHz, broadband rises (a drum lifts every bin at once) held down, onsets picked from SuperFlux-style flux,
 causally. Against the onsets of demucs' vocal stem it scored, at its best, precision 0.53 and recall 0.59 on
 `song.mp3` (3.4 taps a second; at random 0.26 and 0.29), 0.35 / 0.55 on a sung line (`say -v Cellos` over a
 beat; at random 0.19) and 0.66 / 0.65 on a spoken one; the same picker on the vocal stem alone scores 0.72 / 0.74,
 so what fails is the separation, not the picking. Of the taps that hit no syllable, 47% fell where nobody sings,
-and no cheap cue told those stretches apart (the best, the share of the sound in the centre, AUC 0.6). It needs
+and no cheap cue told those stretches apart (the best, the share of the sound in the center, AUC 0.6). It needs
 a real separation model.
 
 ## The hook in the simulator (`sim/`)

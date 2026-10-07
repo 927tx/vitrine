@@ -134,7 +134,7 @@ static NSString *identifierIn(UIView *root) {
     return found;
 }
 
-// The row's glyph as a template, for the menu to draw in its own colour: an image view's picture, else the
+// The row's glyph as a template, for the menu to draw in its own color: an image view's picture, else the
 // small view at the row's leading edge drawn into one (Encore draws its icons into a view of its own,
 // Redesigned/Playlist/PlaylistMenu.x).
 static UIImage *glyphIn(UIView *root) {
@@ -160,7 +160,7 @@ static UIImage *glyphIn(UIView *root) {
     return [picture imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
 }
 
-// Spotify greys a row out (lyrics for a track no source has them for) rather than leaving it out.
+// Spotify grays a row out (lyrics for a track no source has them for) rather than leaving it out.
 static BOOL rowEnabled(UITableView *table, NSIndexPath *path, UITableViewCell *cell, UILabel *title) {
     if (!cell.userInteractionEnabled) return NO;
     id<UITableViewDelegate> delegate = table.delegate;
@@ -322,7 +322,7 @@ static UIMenu *inlineGroup(NSArray<UIMenuElement *> *children) {
     // completion never ran), so every pick and close waited out a 3 s limit with the hidden sheet over the
     // player. The pick fires a turn later, which the sheet takes while the menu is still fading.
     [session menuEnded];
-    // The player's ⋯ is pressed for as long as its menu is up (the touch that opened it was cancelled at once,
+    // The player's ⋯ is pressed for as long as its menu is up (the touch that opened it was canceled at once,
     // as the menu came): its targets for the press (PlayerHeader.x's circle) are told now that it is let go.
     if ([self isKindOfClass:SGRMenuFront.class]) [self sendActionsForControlEvents:UIControlEventTouchUpOutside];
 }
@@ -353,7 +353,7 @@ static UIMenu *inlineGroup(NSArray<UIMenuElement *> *children) {
 }
 
 // UIKit cancels the touch as the menu comes up, and the press holds until the menu ends (willEndForConfiguration:).
-// A touch cancelled with no menu up is a touch let go.
+// A touch canceled with no menu up is a touch let go.
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     [super touchesCancelled:touches withEvent:event];
     if (!self.session) [self sendActionsForControlEvents:UIControlEventTouchUpOutside];
@@ -765,7 +765,7 @@ static NSString *storedKey(NSString *kind) {
         }];
         if (row && !row.enabled) action.attributes = UIMenuElementAttributesDisabled;
         [actions addObject:action];
-        [shown appendFormat:@"%@%@; ", quick, row && !row.enabled ? @" (greyed out)" : @""];
+        [shown appendFormat:@"%@%@; ", quick, row && !row.enabled ? @" (grayed out)" : @""];
     }
     _quickShown = shown;
     if (!actions.count) return nil;

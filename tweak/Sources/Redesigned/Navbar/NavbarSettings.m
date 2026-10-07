@@ -254,7 +254,7 @@ static NSArray<UITabBarItem *> *itemsFor(NSArray<NSDictionary *> *entries, BOOL 
 @implementation SGRLabelCard {
     UIView *_picture;
     NSMutableArray<UIImageView *> *_glyphs;
-    NSMutableArray<UIView *> *_bars;   // a grey bar under each glyph stands for its name
+    NSMutableArray<UIView *> *_bars;   // a gray bar under each glyph stands for its name
     UILabel *_title;
     UIImageView *_check;
 }
@@ -592,7 +592,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
             break;
         }
         case SGRNavbarSectionLinks:
-            // Links in the accent colour, as the system's own actions in a list are.
+            // Links in the accent color, as the system's own actions in a list are.
             SGFillCell(cell, path.row == 0 ? @"Add a tab" : @"Use Spotify's tabs", nil, SGRAccent(), nil);
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
             cell.accessibilityTraits = UIAccessibilityTraitButton;

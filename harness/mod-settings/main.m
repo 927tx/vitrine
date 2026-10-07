@@ -139,7 +139,7 @@ static UIViewController *gatedPage(void) {
         [self.nav pushViewController:gatedPage() animated:NO];
     } else if ([verb isEqualToString:@"rows"]) {
         // The row ModSettings.x adds to Spotify's settings list and to the side drawer's list, each emptied of its
-        // subviews afterwards as Spotify can do, then laid out again.
+        // subviews afterward as Spotify can do, then laid out again.
         NSUInteger (^count)(UIView *) = ^NSUInteger(UIView *list) {
             NSUInteger n = 0;
             for (UIView *sub in list.subviews) n += [NSStringFromClass(sub.class) isEqualToString:@"SGModSettingsRow"];

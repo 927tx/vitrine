@@ -1,5 +1,5 @@
 // Artist redesign: the header the playlist and album pages have. The photo runs full bleed across the top
-// of the page and dissolves into the page's colour; the name and the monthly listeners are centred on the
+// of the page and dissolves into the page's color; the name and the monthly listeners are centered on the
 // bottom of that dissolve; and under them one row -- shuffle, a white Play capsule, and Follow.
 //
 // Tree (trees/clean/artist/01.txt:37-170). The header is TemplateKit's HeaderContainer, 568pt, the first view
@@ -101,11 +101,11 @@ static UIView *containerOf(UIView *header) {
 #pragma mark - the photo, full bleed
 
 // The picture across the top of the page with the field showing through the bottom of it: a scrim over the
-// top for the status bar, and under it a fade to the very colour the page's field is drawing.
+// top for the status bar, and under it a fade to the very color the page's field is drawing.
 @interface SGRArtistHero : UIView
 @property (nonatomic, readonly) UIImageView *picture;
 @property (nonatomic, copy) UIColor *fieldColor;
-// The photo in Spotify's artwork view, and every photo it puts there afterwards: the hero keeps itself
+// The photo in Spotify's artwork view, and every photo it puts there afterward: the hero keeps itself
 // right, rather than being handed a picture on each of the header's passes and staying empty between them.
 // The same view again only re-reads it.
 - (void)followArtwork:(UIImageView *)source;
@@ -137,7 +137,7 @@ static UIView *containerOf(UIView *header) {
     _dissolve.zPosition = 2;
     [self.layer addSublayer:_dissolve];
     self.fieldColor = SGRNeutralField();
-    // The colour is read off the main thread, so it can land after the last layout pass of the page.
+    // The color is read off the main thread, so it can land after the last layout pass of the page.
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(sgr_fieldColorDidChange)
                                                name:SGRFieldColorDidChangeNotification object:nil];
     return self;
@@ -154,7 +154,7 @@ static UIView *containerOf(UIView *header) {
 - (void)setFieldColor:(UIColor *)color {
     if (!color || [_fieldColor isEqual:color]) return;
     _fieldColor = [color copy];
-    // The clear end is the same colour with no alpha, so the fade keeps its hue instead of going through grey.
+    // The clear end is the same color with no alpha, so the fade keeps its hue instead of going through gray.
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     _dissolve.colors = @[(id)[color colorWithAlphaComponent:0].CGColor,
@@ -191,7 +191,7 @@ static UIView *containerOf(UIView *header) {
     UIImage *image = source.image;
     if (!image || _picture.image == image) return;
     _picture.image = image;
-    // The page's field takes its colour from the same picture.
+    // The page's field takes its color from the same picture.
     SGRArtistSetArtwork(self, image);
     static BOOL logged;
     if (late && !logged) {

@@ -50,7 +50,7 @@ static char kToolbarKey, kSortKey, kBlockKey, kDecidedKey;
 // The SPTEncoreIcon an Encore icon view was built with, which knows its own name. Encore keeps it in a
 // Swift ivar with no getter, as Redesigned/Navbar/TabBar.x found -- but not always the same one: the view
 // holds both `icon` and `experimentalIcon` (nm on SpotifyShared), and reading `icon` alone left the Sort
-// pill unrecognised on the phone while Mix, which is known by its identifier, came through
+// pill unrecognized on the phone while Mix, which is known by its identifier, came through
 // (device 2026-09-20). So every object ivar the view has is asked, and the first that knows a name answers.
 static NSString *glyphName(UIView *iconView) {
     unsigned int count = 0;

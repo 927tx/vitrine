@@ -4,7 +4,7 @@
 #import "Redesigned/Kit/SGRTokens.h"
 
 static const CGFloat kSide = 24, kTop = 28, kGap = 12;
-// The footer's row is drawn 22pt tall; its buttons take touches over 44, centred on it.
+// The footer's row is drawn 22pt tall; its buttons take touches over 44, centered on it.
 static const CGFloat kRow = 22, kTouch = 44;
 
 static NSString *authorName(SGLyricsMeaningAuthor author) {

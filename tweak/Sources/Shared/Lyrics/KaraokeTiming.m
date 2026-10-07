@@ -150,7 +150,7 @@ static void appendWords(NSMutableArray<SGKaraokeWord *> *pieces, NSString *token
 
 // The line split into what the sweep lights one at a time: words where the script spaces them, a
 // syllable at a time where it does not, so a Japanese line sweeps instead of lighting up whole, and
-// the dictionary's words in Thai and its neighbours, so a long line wraps between them.
+// the dictionary's words in Thai and its neighbors, so a long line wraps between them.
 // Everything a token holds past its first piece is joined to the one before it.
 static NSArray<SGKaraokeWord *> *piecesOf(NSString *line) {
     NSMutableArray<SGKaraokeWord *> *pieces = [NSMutableArray array];

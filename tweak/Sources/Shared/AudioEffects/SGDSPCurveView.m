@@ -81,7 +81,7 @@ static NSString *signedNumber(double value, int decimals) {
 
     NSInteger _touched;   // the band under the finger that went down, -1 for none
     NSInteger _dragging;  // the band being dragged, -1 for none
-    CGFloat _offset;      // from the finger to the handle's centre, kept through the drag
+    CGFloat _offset;      // from the finger to the handle's center, kept through the drag
     UISelectionFeedbackGenerator *_detent;
 }
 
@@ -331,7 +331,7 @@ static NSString *signedNumber(double value, int decimals) {
     [self paint];
 }
 
-// The accent colour is read each time the row shows, so a colour picked since shows here too.
+// The accent color is read each time the row shows, so a color picked since shows here too.
 - (void)paint {
     UIColor *accent = SGGreen();
     _curve.strokeColor = accent.CGColor;

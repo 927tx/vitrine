@@ -6,7 +6,7 @@
 #import "SGLyricsClip.h"
 
 // The lock screen fills the screen with a 3:4 clip, so a phone's taller screen cuts its sides off: the
-// words keep to this middle share of the width. The centre of the words sits this far down, clear of
+// words keep to this middle share of the width. The center of the words sits this far down, clear of
 // the clock above and the controls below.
 // ponytail: guessed from the screen's shape, not measured on a lock screen; tune both on a device.
 static const CGFloat kColumn = 0.56;

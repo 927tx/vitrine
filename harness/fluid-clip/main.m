@@ -15,7 +15,7 @@ static void check(BOOL ok, NSString *what) {
     if (!ok) failures++;
 }
 
-// A stand-in cover: two coloured halves and a light disc in the middle.
+// A stand-in cover: two colored halves and a light disc in the middle.
 static CGImageRef newCover(void) {
     CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
     CGContextRef context = CGBitmapContextCreate(NULL, 640, 640, 8, 0, space, kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
@@ -78,7 +78,7 @@ static double difference(CGImageRef a, CGImageRef b, CGFloat fromY, CGFloat toY,
     return count ? sum / count : 255;
 }
 
-// The colour at a point, given as shares from the top left.
+// The color at a point, given as shares from the top left.
 static void colourAt(CGImageRef image, CGFloat sx, CGFloat sy, int rgb[3]) {
     size_t w, h;
     NSData *data = pixelsOf(image, &w, &h);

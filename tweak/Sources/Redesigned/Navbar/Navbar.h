@@ -47,7 +47,7 @@ BOOL SGRTabBarMinimized(void);
 // animation, on the main queue's next turn (SGRTabBarMinimized changes then too). `animated` NO is a cut, made
 // at once.
 void SGRSetTabBarMinimized(BOOL minimized, BOOL animated);
-// The room between the minimized bar's two tabs, `height` high and centred on them, in `host`'s
+// The room between the minimized bar's two tabs, `height` high and centered on them, in `host`'s
 // coordinates: where the now playing card goes. CGRectNull while the bar is not minimized or not on screen.
 CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height);
 

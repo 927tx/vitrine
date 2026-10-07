@@ -245,7 +245,7 @@ static NSInteger sg_nodBefore;
     return ((UILabel *)[self teachValue:key]).text;
 }
 
-// The ring's dot and its centre, in the ring's own coordinates, and one tick's light: 0 is the top, 15 the
+// The ring's dot and its center, in the ring's own coordinates, and one tick's light: 0 is the top, 15 the
 // right, 30 the bottom, 45 the left.
 - (CGPoint)ringDot {
     return ((CALayer *)[[self teachValue:@"dial"] valueForKey:@"dot"]).position;
@@ -438,7 +438,7 @@ static Step waitFor(double seconds) {
         waitFor(0.4),
         ^BOOL {
             CGPoint dot = [self ringDot], centre = [self ringCentre];
-            check(dot.y > centre.y + 30 && fabs(dot.x - centre.x) < 4, [NSString stringWithFormat:@"a nod's dip takes the dot down: %.0f, %.0f from the centre", dot.x - centre.x, dot.y - centre.y]);
+            check(dot.y > centre.y + 30 && fabs(dot.x - centre.x) < 4, [NSString stringWithFormat:@"a nod's dip takes the dot down: %.0f, %.0f from the center", dot.x - centre.x, dot.y - centre.y]);
             check([self tick:30] > 0.4 && [self tick:0] == 0 && [self tick:15] == 0,
                   [NSString stringWithFormat:@"the ticks below light, not above or beside: below %.2f, above %.2f, right %.2f", [self tick:30], [self tick:0], [self tick:15]]);
             hold(1.5);
@@ -523,7 +523,7 @@ static Step waitFor(double seconds) {
             check([sg_calls isEqualToArray:@[@"add spotify:track:4uLU6hMCjMI75M1A2tKUQC toast"]],
                   [NSString stringWithFormat:@"the smallest taught nod likes the song: %@", [sg_calls componentsJoinedByString:@", "]]);
             [sg_calls removeAllObjects];
-            // Teaching again, cancelled after one nod: the stored nod stays, and the motion stops.
+            // Teaching again, canceled after one nod: the stored nod stays, and the motion stops.
             [self setPlaying:NO];
             self.feeds = [@[^{ doubleNod(0.2, 0.45); }, ^{}] mutableCopy];
             [self tapRow:0 section:2];
@@ -547,7 +547,7 @@ static Step waitFor(double seconds) {
         ^BOOL {
             self.feeds = nil;
             check(SGInt(SGKeyHeadNod, 0) == sg_nodBefore, [NSString stringWithFormat:@"Cancel keeps the nod %ld: %ld", (long)sg_nodBefore, (long)SGInt(SGKeyHeadNod, 0)]);
-            check(!sg_active, @"cancelled, paused: stopped");
+            check(!sg_active, @"canceled, paused: stopped");
             [self tapRow:3 section:2];
             return YES;
         },

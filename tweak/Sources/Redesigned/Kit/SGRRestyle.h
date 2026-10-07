@@ -59,11 +59,11 @@ SGRShadowPlate *SGRShadowPlateIn(UIView *host, const void *key);
 // The base surface a list cell paints over a page's field, cleared: the #121212 the redesign's AMOLED
 // black has already turned black, on the cell and on everything under it nearly as wide as the cell, and
 // the full-width fade a "see more" draws over its last row, which the black makes a dark band. The Kit's
-// repaint hook misses all of it -- it only hears about a colour when Spotify sets it, and a cell is painted
+// repaint hook misses all of it -- it only hears about a color when Spotify sets it, and a cell is painted
 // before it is inside the page and brings its old paint with it when it is reused -- so this runs from the
 // cell's own layout pass, and is cheap enough to.
 //
-// Only what is nearly as wide as the cell: a badge's black disc, a card's grey and an image's placeholder
+// Only what is nearly as wide as the cell: a badge's black disc, a card's gray and an image's placeholder
 // are their own. A cell nested inside the cell and narrower than that (a card in a carousel) is not walked
 // into: its own row decides for it.
 void SGRClearCellPaint(UIView *cell);

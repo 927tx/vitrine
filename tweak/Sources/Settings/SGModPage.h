@@ -22,7 +22,7 @@
 @property (nonatomic, copy) void (^changed)(BOOL on);   // after the switch is stored; the page reloads
 @property (nonatomic, strong) UIColor *color;   // title, subtitle and symbol, for a warning row
 @property (nonatomic, copy) NSString *symbol;
-@property (nonatomic, strong) UIColor *tint;   // the square under the symbol, grey when nil (SGWithTile)
+@property (nonatomic, strong) UIColor *tint;   // the square under the symbol, gray when nil (SGWithTile)
 // A switch row that changes the whole app draws SGGlowSwitch instead of a UISwitch.
 @property (nonatomic) BOOL glows;
 // An ⓘ button beside the row's switch, whose tap reads this out under the row's title.
@@ -32,7 +32,7 @@
 // it sits. Nil shows it always. A row that only waits on a switch takes `waitsOn` instead.
 @property (nonatomic, copy) BOOL (^visible)(void);
 // The key of a switch row on the same page this row works under: while that switch is off the row stays
-// where it is, greyed out, and a tap on it nudges the switch.
+// where it is, grayed out, and a tap on it nudges the switch.
 @property (nonatomic, copy) NSString *waitsOn;
 // A choice row's: a line under each name in its list, in the same order, and what runs once one is stored.
 @property (nonatomic, copy) NSArray<NSString *> *choiceNotes;
@@ -46,7 +46,7 @@
 @property (nonatomic, copy) NSString *(^format)(double value);
 // A menu row's (SGMenuRow): the names its pull-down menu offers, the current one being whichever `value` reads.
 @property (nonatomic, copy) NSArray<NSString *> *menu;
-// A small rounded square of this colour before the row's value.
+// A small rounded square of this color before the row's value.
 @property (nonatomic, copy) UIColor *(^swatch)(void);
 @end
 
@@ -60,7 +60,7 @@
 - (instancetype)initWithTitle:(NSString *)title intro:(NSString *)intro sections:(NSArray<SGModSection *> *)sections footer:(NSString *)footer;
 // Asks every row's `visible` again, after something other than a switch on the page changed what it reads.
 - (void)refreshVisibility;
-// Rows draw their symbol on a coloured tile; off, the default, they show none. Mod Settings' main page has them.
+// Rows draw their symbol on a colored tile; off, the default, they show none. Mod Settings' main page has them.
 @property (nonatomic) BOOL tiles;
 @end
 
@@ -92,7 +92,7 @@ SGModRow *SGSliderRow(NSString *title, NSString *subtitle, double minimum, doubl
 // lists `choices`, a checkmark against the one `value` reads, and picking one runs `chosen` with its index,
 // after which the page reads every row again.
 SGModRow *SGMenuRow(NSString *title, NSArray<NSString *> *choices, NSString *(^value)(void), void (^chosen)(NSInteger index));
-// The system colour picker in a page sheet, opaque colours only: the checkmark hands 0xRRGGBB to `picked`,
+// The system color picker in a page sheet, opaque colors only: the checkmark hands 0xRRGGBB to `picked`,
 // closing or swiping the sheet away keeps what was there.
 void SGPickColor(NSString *title, NSInteger initial, void (^picked)(NSInteger rgb));
 UIColor *SGColorRGB(NSInteger rgb);   // 0xRRGGBB, opaque
@@ -100,7 +100,7 @@ SGModRow *SGLinkRow(NSString *title, NSString *subtitle, NSString *url);
 SGModRow *SGStatActionRow(NSString *title, NSString *subtitle, NSString *(^value)(void), void (^action)(void));
 SGModSection *SGSection(NSString *title, NSArray<SGModRow *> *rows);
 SGModSection *SGNotedSection(NSString *title, NSArray<SGModRow *> *rows, NSString *footer);
-// Gives a row its leading symbol, drawn on a grey tile unless the row has a colour of its own.
+// Gives a row its leading symbol, drawn on a gray tile unless the row has a color of its own.
 SGModRow *SGWithSymbol(SGModRow *row, NSString *symbol);
-// The same on a tile of `color`, the way Settings colours the icon of each of its rows.
+// The same on a tile of `color`, the way Settings colors the icon of each of its rows.
 SGModRow *SGWithTile(SGModRow *row, NSString *symbol, UIColor *color);

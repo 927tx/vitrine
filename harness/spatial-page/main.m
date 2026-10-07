@@ -8,7 +8,7 @@
 // Setup: keep (the stored Sing keys stay; otherwise they are cleared first), on (spatial voice on), allowed or
 // denied (what Motion & Fitness answers; unasked otherwise, so the preview never listens), head=sweep (the head
 // turning 45 degrees each way every 6 s), head=<degrees> (still, then turned that far left at 2 s and held), width=<points>
-// (the window that narrow, centred), slow (animations at a tenth of their speed).
+// (the window that narrow, centered), slow (animations at a tenth of their speed).
 // Actions: spatial (the Spatial voice row tapped), toggle=<section>.<row> (that row's switch flipped the way a tap
 // does), pop, dump (the rows, the header's height and what VoiceOver reads on the preview, to the log), lag (how far
 // the disc on screen trails the head over the next 3 s, to the log), lines (how the Sing card's lines move over the

@@ -1,5 +1,5 @@
-// The field colour a page takes from its cover: the main colour, not the bottom edge. A blue cover with a
-// pale scanner border along its foot, which read by the edge turned the album page grey (device, 2026-09-18).
+// The field color a page takes from its cover: the main color, not the bottom edge. A blue cover with a
+// pale scanner border along its foot, which read by the edge turned the album page gray (device, 2026-09-18).
 #import <UIKit/UIKit.h>
 #import "Redesigned/Kit/SGRPalette.h"
 
@@ -25,7 +25,7 @@ int main(void) {
                 CGFloat r, g, b, a;
                 [palette.fieldColor getRed:&r green:&g blue:&b alpha:&a];
                 BOOL blue = b > r + 0.05 && b > g;
-                printf("%s: field %.3f %.3f %.3f, %s\n", main ? "main colour" : "bottom edge", r, g, b, blue ? "blue" : "grey");
+                printf("%s: field %.3f %.3f %.3f, %s\n", main ? "main color" : "bottom edge", r, g, b, blue ? "blue" : "gray");
                 if (blue != (BOOL)main) fails++;
                 done++;
             }];

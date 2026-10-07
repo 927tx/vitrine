@@ -1,6 +1,6 @@
 # Add a Tab harness
 
-The Add a Tab sheet (`Shared/Navigation/AddTabSheet.m`) and the icon catalogues (`TabIcons.m`) run for
+The Add a Tab sheet (`Shared/Navigation/AddTabSheet.m`) and the icon catalogs (`TabIcons.m`) run for
 real in the simulator, over a stand-in for Spotify's `SPTEncoreIcon` (eight glyphs drawn as SF Symbols,
 plus class methods that are not glyphs) and `SPTEncoreIconView`. `Links.x` is compiled as it is; with no
 link dispatcher every route is "unknown", which lets a link through as it does before Spotify sets the

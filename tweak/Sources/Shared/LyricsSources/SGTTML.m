@@ -12,7 +12,7 @@
 // syllable continues a word rather than starting one.
 //
 // The head can carry the lines again in two more ways, each keyed to its line by the itunes:key of
-// the <p>: Apple's translations, as text, and its pronunciations (transliterations), spelt in the
+// the <p>: Apple's translations, as text, and its pronunciations (transliterations), spelled in the
 // Latin alphabet and timed by spans that start with the words of the line they spell out.
 //
 // <iTunesMetadata><translations><translation xml:lang="en-US"><text for="L1">I'm so drunk …
@@ -65,7 +65,7 @@ static NSInteger msOfClock(NSString *clock) {
 @implementation SGTTMLText
 @end
 
-// What a <text> of the head is: a line again, in another language or spelt out.
+// What a <text> of the head is: a line again, in another language or spelled out.
 typedef NS_ENUM(NSInteger, SGTTMLPart) {
     SGTTMLPartNone,
     SGTTMLPartTranslation,
@@ -265,7 +265,7 @@ typedef NS_ENUM(NSInteger, SGTTMLPart) {
 #pragma mark - what the head adds to the lines
 
 // The letters and digits alone, lowercased: a pronunciation or a translation that reads the same as its
-// line is the line again, as an English line of a Japanese song is spelt out as itself.
+// line is the line again, as an English line of a Japanese song is spelled out as itself.
 NSString *SGLyricsBareText(NSString *text) {
     NSMutableString *bare = [NSMutableString string];
     NSCharacterSet *kept = NSCharacterSet.alphanumericCharacterSet;
@@ -307,7 +307,7 @@ SGKaraokeLine *SGLyricsPronunciation(NSArray<SGKaraokeWord *> *words, NSString *
         line = [SGKaraokeLine new];
         line.words = words;
     } else if (said.length) {
-        // Spelt out without spans: its words are estimated across the time of the line they spell.
+        // Spelled out without spans: its words are estimated across the time of the line they spell.
         line = [SGKaraokeEstimatedLines(@[@(of.start), @(MAX(of.end, of.start))], @[said, @""]) firstObject];
     }
     if (!line || [SGLyricsBareText(SGKaraokeLineText(line)) isEqualToString:SGLyricsBareText(SGKaraokeLineText(of))]) return nil;

@@ -9,7 +9,7 @@
 // place: the way the first version of Pitch worked on the phone. A notify stays on a unit that was the music's
 // once and does nothing there, so one engine never runs on two render threads. Speed and pitch feeds the
 // unit's input, so its sound reaches the notify changed. After the engine, with the switch on or off, the notify
-// hands the music's buffer mixed to mono to one reader (SGAudioSetOutputReader), the player's Visualiser, which
+// hands the music's buffer mixed to mono to one reader (SGAudioSetOutputReader), the player's Visualizer, which
 // only reads it.
 //
 // The engine is made the first time the output starts with the master switch on, at the output's rate,
@@ -293,7 +293,7 @@ static NSString *effectName(NSString *effect) {
     NSDictionary<NSString *, NSString *> *names = @{
         SGKeyDSPCompander: @"compander", SGKeyDSPBass: @"bass boost", SGKeyDSPEqualizer: @"equalizer", SGKeyDSPGraphicEq: @"graphic EQ",
         SGKeyDSPConvolver: @"convolver", SGKeyDSPDDC: @"DDC", SGKeyDSPLiveprog: @"Liveprog", SGKeyDSPReverb: @"reverb",
-        SGKeyDSPStereoWide: @"stereo widening", SGKeyDSPCrossfeed: @"crossfeed", SGKeyDSPTube: @"analog modelling",
+        SGKeyDSPStereoWide: @"stereo widening", SGKeyDSPCrossfeed: @"crossfeed", SGKeyDSPTube: @"analog modeling",
     };
     return names[effect] ?: effect;
 }
@@ -434,7 +434,7 @@ static void applyEffect(SGDSPEngine *engine, NSString *effect) {
     } else if ([effect isEqualToString:SGKeyDSPTube]) {
         double drive = SGDSPNumber(SGKeyDSPTubeDrive);
         SGDSPEngineSetTube(engine, on, drive);
-        what = [NSString stringWithFormat:@"analog modelling %@, %.1f dB", onOff(on), drive];
+        what = [NSString stringWithFormat:@"analog modeling %@, %.1f dB", onOff(on), drive];
     } else {
         return;
     }

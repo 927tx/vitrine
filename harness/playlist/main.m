@@ -97,7 +97,7 @@
 @interface MockElementContentView : UICollectionViewCell @end
 @implementation MockElementContentView @end
 
-// A card inside a carousel: a cell too, but its own width, and its own colour to keep.
+// A card inside a carousel: a cell too, but its own width, and its own color to keep.
 @interface MockCardCell : UICollectionViewCell @end
 @implementation MockCardCell @end
 
@@ -142,7 +142,7 @@
 @implementation MockRightHost
 - (void)layoutSubviews {
     [super layoutSubviews];
-    // As Auto Layout does it: centre and bounds, never the frame or the transform.
+    // As Auto Layout does it: center and bounds, never the frame or the transform.
     self.subviews.firstObject.bounds = CGRectMake(0, 0, 48, 48);
     self.subviews.firstObject.center = CGPointMake(76, 24);
 }
@@ -209,8 +209,8 @@ static UIView *actionButton(UIView *row, CGRect frame, NSString *identifier, NSS
     UIImageView *glyph = [[UIImageView alloc] initWithFrame:CGRectInset(button.bounds, 12, 12)];
     NSDictionary *glyphs = @{@"Components.UI.AddToButton": @"plus", @"Components.UI.ContextMenuButton": @"ellipsis",
                              @"DownloadButton.Granular.None": @"arrow.down.circle", @"Components.UI.WatchFeedEntityExplorerButton": @"play.rectangle"};
-    // Encore bakes the colour into what it draws, and ⋯ sits in a Tertiary button, which draws it grey
-    // (device 2026-09-20): drawn as an image of that colour, not as a template to be tinted.
+    // Encore bakes the color into what it draws, and ⋯ sits in a Tertiary button, which draws it gray
+    // (device 2026-09-20): drawn as an image of that color, not as a template to be tinted.
     BOOL tertiary = [identifier isEqualToString:@"Components.UI.ContextMenuButton"];
     UIImage *symbol = [UIImage systemImageNamed:glyphs[identifier] ?: @"circle"];
     if (tertiary) {
@@ -444,7 +444,7 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
     badge.backgroundColor = UIColor.blackColor;
     badge.layer.cornerRadius = 13;
 
-    // A card in a carousel: a cell of its own inside the row, narrower than the page, whose colour is its own
+    // A card in a carousel: a cell of its own inside the row, narrower than the page, whose color is its own
     // and stays.
     UIView *card = box(extenderRow, MockCardCell.class, CGRectMake(16, 8, 140, 48), @"PlaylistExtender.Card");
     card.layer.backgroundColor = UIColor.blackColor.CGColor;
@@ -522,8 +522,8 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
     }
 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        // Cleared means an alpha of 0, whether the colour was taken off the layer or the view: the clear
-        // colour lands on both and reads back with no alpha at all.
+        // Cleared means an alpha of 0, whether the color was taken off the layer or the view: the clear
+        // color lands on both and reads back with no alpha at all.
         CGFloat (^alpha)(UIView *) = ^(UIView *v) {
             return v.layer.backgroundColor ? CGColorGetAlpha(v.layer.backgroundColor) : 0;
         };
@@ -812,7 +812,7 @@ static void buildLikedSongs(UIViewController *page, CGFloat W) {
         });
     }
 
-    // Spotify fading its cover square and its colour wash back in as the header opens, which it does on the
+    // Spotify fading its cover square and its color wash back in as the header opens, which it does on the
     // scroll itself with nothing laid out: only the hook on that scroll sees it.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(16 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         setState(@"rest");

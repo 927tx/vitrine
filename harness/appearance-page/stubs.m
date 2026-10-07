@@ -1,4 +1,4 @@
-// What the Logos files hold for the page: the accent colours as Accent.x and SGRAccent.x read them, and the
+// What the Logos files hold for the page: the accent colors as Accent.x and SGRAccent.x read them, and the
 // font choice as Fonts.x reads it.
 #import "Core/SGCore.h"
 #import "Native/Appearance/Appearance.h"

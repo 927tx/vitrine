@@ -68,7 +68,7 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) { sg_animated = on; NSLog(@"[harnes
 static NSUInteger sg_marked;
 void SGPlayerMenuMarkPlayers(void) { sg_marked++; }
 // The player's background (Redesigned/Player/Player.h's SGRPlayerBackgroundKind): Fluid, so the menu offers
-// Animated and the Visualiser; Show Animated Artwork switches it on.
+// Animated and the Visualizer; Show Animated Artwork switches it on.
 NSInteger SGRPlayerBackground(void) { return sg_background; }
 void SGRPlayerMenuSetBackground(NSInteger kind) { sg_background = kind; SGPlayerMenuSetAnimatedArtwork(kind == 3); }
 @class SPTPlayerState;
@@ -217,7 +217,7 @@ static SGHarnessPlayer *sg_player;
     [control addSubview:glyph];
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(56, 0, 280, 64)];
     title.text = row[1];
-    // Lyrics greyed out, as for a track no source has them for.
+    // Lyrics grayed out, as for a track no source has them for.
     title.textColor = [row[1] isEqualToString:@"Lyrics"] ? [UIColor colorWithWhite:1 alpha:0.3] : UIColor.whiteColor;
     [control addSubview:title];
     [cell.contentView addSubview:control];
@@ -495,7 +495,7 @@ static NSArray<NSString *> *quickTitles(void) {
                 check(self.arrowTaps == 1, @"the arrow's action did not run again");
                 // The finger lifted 0.08 s after the touch down; the press holds while the menu is up.
                 after(0.5, ^{
-                    check(self.frontUps == 0, [NSString stringWithFormat:@"with the menu up the press holds: no touch up yet (cancelled %lu)", (unsigned long)self.frontCancels]);
+                    check(self.frontUps == 0, [NSString stringWithFormat:@"with the menu up the press holds: no touch up yet (canceled %lu)", (unsigned long)self.frontCancels]);
                     [self.front.contextMenuInteraction dismissMenu];
                     waitFor(^BOOL { return self.frontUps > 0; }, 2, ^{
                         check(self.frontUps == 1, [NSString stringWithFormat:@"the menu's end lets the press go (%lu)", (unsigned long)self.frontUps]);

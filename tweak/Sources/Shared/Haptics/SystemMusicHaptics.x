@@ -32,7 +32,7 @@
 // ponytail: the identifier rides on Spotify's info by title, as NowPlayingExtras matches it, so a next track
 // with the same title can carry the last one's for the moment before the player reports it. Matching by the
 // info's external content identifier would close that, in NowPlayingExtras for every owner.
-// ponytail: an answer for an earlier track is dropped rather than its request cancelled; the lookups are
+// ponytail: an answer for an earlier track is dropped rather than its request canceled; the lookups are
 // kept and shared, and a cancel would take the answer from another asker waiting on it.
 #import <MediaAccessibility/MediaAccessibility.h>
 #import <MediaPlayer/MediaPlayer.h>

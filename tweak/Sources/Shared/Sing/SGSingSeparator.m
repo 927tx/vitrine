@@ -6,7 +6,7 @@
 #import "SGSingSeparator.h"
 
 enum {
-    kPad = kSGSingFFT / 2,                            // the centring's reflect padding on each side
+    kPad = kSGSingFFT / 2,                            // the centering's reflect padding on each side
     kPadded = kSGSingWindowFrames + 2 * kPad,
     kHalf = kSGSingFFT / 2,
 };

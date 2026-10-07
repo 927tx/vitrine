@@ -1,4 +1,4 @@
-// Lyrics from Musixmatch. It is the catalogue Spotify licenses, and for part of it Musixmatch also
+// Lyrics from Musixmatch. It is the catalog Spotify licenses, and for part of it Musixmatch also
 // has the time of every word (richsync), which Spotify never sends. The token is an anonymous one
 // asked for as Musixmatch's iOS app, so Musixmatch learns the track's id and nothing of the Spotify
 // account. It is the one source that matches by Spotify's own track id, so it never has to guess at

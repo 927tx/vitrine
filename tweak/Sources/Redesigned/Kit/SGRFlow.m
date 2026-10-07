@@ -20,10 +20,10 @@ static const SGRDisc kDisc[kDiscs] = {
     {0.78, 0.84, 0.80, 0.26, 0.09, 41, YES, 11},
     {0.50, 0.50, 0.75, 0.18, 0.14, 53, YES, 23},
 };
-// How far a breath takes a disc's size either way, and how long new colours take to blend in.
+// How far a breath takes a disc's size either way, and how long new colors take to blend in.
 static const CGFloat kBreathSmall = 0.85, kBreathLarge = 1.18;
 static const CFTimeInterval kRecolor = 1.2;
-// The colour under the discs is the artwork's main colour at this share of its light.
+// The color under the discs is the artwork's main color at this share of its light.
 static const CGFloat kBaseShade = 0.55;
 // The shade over everything: clear down to this share of the height, then this much black at the bottom.
 static const CGFloat kShadeFrom = 0.45, kShadeBottom = 0.35;
@@ -74,7 +74,7 @@ static NSArray *discColors(UIColor *color) {
         disc.endPoint = CGPointMake(1, 1);
         disc.locations = @[@0, @0.45, @1];
         disc.colors = discColors(UIColor.clearColor);
-        // The whole artwork's colour lies under the four quarters', so it fills between them rather than over them.
+        // The whole artwork's color lies under the four quarters', so it fills between them rather than over them.
         if (i == kDiscs - 1) [self insertSublayer:disc above:_base];
         else [self addSublayer:disc];
         _discs[i] = disc;
@@ -127,7 +127,7 @@ static NSArray *discColors(UIColor *color) {
     CGPoint rest = [self restOf:i];
     CGFloat rx = size.width * kDisc[i].driftX, ry = size.height * kDisc[i].driftY;
     CGMutablePathRef path = CGPathCreateMutable();
-    // Round about a centre one radius to the side, so the loop starts and ends at the resting place.
+    // Round about a center one radius to the side, so the loop starts and ends at the resting place.
     CGPathAddArc(path, NULL, 0, 0, 1, M_PI, M_PI + (kDisc[i].clockwise ? -2 : 2) * M_PI, kDisc[i].clockwise);
     CGAffineTransform place = CGAffineTransformMake(rx, 0, 0, ry, rest.x + rx, rest.y);
     CGPathRef loop = CGPathCreateCopyByTransformingPath(path, &place);
@@ -190,7 +190,7 @@ static NSArray *discColors(UIColor *color) {
     }
 }
 
-#pragma mark - colours
+#pragma mark - colors
 
 - (void)setColors:(NSArray<UIColor *> *)colors animated:(BOOL)animated {
     if (colors.count < kDiscs) return;

@@ -178,7 +178,7 @@ NSArray<SGKaraokeLine *> *SGLyricsPieceLines(NSString *body, BOOL krc);
 NSString *SGLyricsMatchKey(NSString *text);
 NSString *SGLyricsLeadArtist(NSString *artist);
 BOOL SGLyricsSameArtist(NSString *credited, NSString *artist);
-// What the two catalogues are asked as: a browser.
+// What the two catalogs are asked as: a browser.
 #define SGLyricsBrowserAgent @"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
 // KuGou.m. A download's base64 content as lines, nil when it is not KRC or holds no timed line.
 NSArray<SGKaraokeLine *> *SGKuGouLines(NSString *content);

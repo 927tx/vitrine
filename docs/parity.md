@@ -63,7 +63,7 @@ fixed in the commits that follow `956e65c`.
 |---|---|
 | 73, 74 | AirPods gestures: double nod likes, shake skips, learns your motion |
 | 97 | Music Haptics through iOS in the background and on the lock screen |
-| 90, 105 | Live Activity: the cover, its colour, progress, centred and translated lyrics, and a small layout on Apple Watch and CarPlay from iOS 18 |
+| 90, 105 | Live Activity: the cover, its color, progress, centered and translated lyrics, and a small layout on Apple Watch and CarPlay from iOS 18 |
 | 89 | Listening stats, with Spotify's export imported |
 | 79, 98 | Apple Music red accent, one font for the whole app |
 | 17 | Beta builds update to the next beta, then the release. Mod > Include betas lets a release build opt in |
@@ -84,7 +84,7 @@ fixed in the commits that follow `956e65c`.
 | 21, 33, 68, 132, 133 | Tab bar minimizes on scroll, the now playing bar in its row |
 | 14, 113, 128, 44 | Add a tab sheet, own names and SF Symbol or Encore icons, Split tabs |
 | 45, 59 | Fades under the tab bar |
-| 41, 43, 34, 134 | Pages come in whole, cover colour, owner pictures, section cards |
+| 41, 43, 34, 134 | Pages come in whole, cover color, owner pictures, section cards |
 | 71, 119 | Album track rows drop the artist line that repeats the album's |
 | 101 | Save turns into download on someone else's playlist, for accounts that can download |
 | 62 | Playlist Mix can be turned off again |
@@ -93,16 +93,16 @@ fixed in the commits that follow `956e65c`.
 | 48, 58, 118, 126 | Lyrics fixes |
 | 57 | No freeze with EeveeSpotify's lyrics on |
 | 95 | Mod Settings in the system Settings' style, Appearance on its own page |
-| 70 | A dependent setting greys out instead of vanishing |
+| 70 | A dependent setting grays out instead of vanishing |
 | 72 | What's new sheet (empty until the fork's first release) |
 | 116, 117, 37 | Tour: glass logo, redesign below iOS 26 after a warning |
 | 25, 26 | Say when EeveeSpotify is injected, or Spotify's version differs |
 | 127, 135, 52 | Settings fixes |
 | 66 | Less main-thread work for the flags Spotify reads at launch |
 
-### Beta gaps (0.23.0-beta, described by behaviour)
+### Beta gaps (0.23.0-beta, described by behavior)
 
-A separate describer compared upstream's beta branch with Vitrine by behaviour only (local notes, not in the
+A separate describer compared upstream's beta branch with Vitrine by behavior only (local notes, not in the
 repo). Rounds 3 and 4 closed most of it: Spicy Lyrics' key, credit, pronunciations and back-off; the paused cover;
 the clip's pause, Spotify's video, late Canvas, next-track fetch and give-up; the lyrics left alone; tap to seek;
 the lock screen's Canvas shape, late Canvas and Canvas service; the lit custom tab; the update check; EeveeSpotify
@@ -131,7 +131,7 @@ Not gaps: Hide social proof (both flags ship off), recvmsg (Spotify 9.1.78 does 
 
 ### From upstream pull requests
 
-Rebuilt from behaviour-only descriptions; each commit credits the PR's author.
+Rebuilt from behavior-only descriptions; each commit credits the PR's author.
 
 | PR | Item |
 |---|---|

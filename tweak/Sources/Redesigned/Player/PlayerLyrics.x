@@ -10,7 +10,7 @@
 // paging list of them, and the two pictures are the same one, so the swap is not seen. The title row
 // is Spotify's own unit translated, the way PlayerFooter.x moves the footer's controls -- a transform
 // survives the stack view laying its arranged views out again -- with a mask over it where the controls
-// it moved towards begin, so a long title fades out before them instead of running under them. The row
+// it moved toward begin, so a long title fades out before them instead of running under them. The row
 // of chips over it (Switch to video) goes while the lines are up, since they take the room it sits in.
 //
 // Tree (trees/clean/player/01.txt): SPTNowPlayingView (:26) holds the content layers, the header row
@@ -127,7 +127,7 @@ static __weak UIGestureRecognizer *sg_wake; // on the player, on while alone: th
     return inRow == row ? nil : inRow;
 }
 
-// Made on the first tap and kept afterwards: it measures the song for its width before it can place a
+// Made on the first tap and kept afterward: it measures the song for its width before it can place a
 // line, so a view built again on every tap would show nothing for the first frames. Out of the window
 // it costs nothing -- its display link only runs while it is in one.
 - (SGRKaraokeView *)lyrics {
@@ -254,7 +254,7 @@ static void placeTitleRow(SGRLyricsLayout l) {
     if (!title) return;
     CGAffineTransform slide = CGAffineTransformMakeTranslation(round(shift), 0);
     if (!CGAffineTransformEqualToTransform(title.transform, slide)) title.transform = slide;
-    // Closed it reaches as far as Spotify meant it to; moved, only as far as the controls it moved towards.
+    // Closed it reaches as far as Spotify meant it to; moved, only as far as the controls it moved toward.
     CGFloat room = CGFLOAT_MAX;
     if (sg_open) room = trailingEdgeIn(info) - kTitleGap - (CGRectGetMinX(untransformed(title, info)) + shift);
     clipTitle(title, room);
@@ -274,7 +274,7 @@ BOOL SGRPlayerLyricsOpen(void) {
 // Puts the overlay's own views where the measurements say, without animating. The thumbnail is laid out
 // at the size and place Spotify draws its cover at and moved by its transform alone, so a pass that
 // runs while it is up leaves it exactly where the eye has it: the two are worked out from one
-// measurement. Bounds and a centre, not a frame, since both views can be under a transform.
+// measurement. Bounds and a center, not a frame, since both views can be under a transform.
 static void place(SGRPlayerLyricsOverlay *overlay, UIView *host, SGRLyricsLayout l) {
     overlay.frame = CGRectUnion(l.cover, CGRectUnion(l.thumb, l.stage));
     CGRect cover = [overlay convertRect:l.cover fromView:host], stage = [overlay convertRect:l.stage fromView:host];
@@ -288,7 +288,7 @@ static void place(SGRPlayerLyricsOverlay *overlay, UIView *host, SGRLyricsLayout
     overlay.stage.center = CGPointMake(CGRectGetMidX(stage), CGRectGetMidY(stage));
 }
 
-// Where the thumbnail's view has to go to land on `l.thumb`, as a transform about its own centre: the
+// Where the thumbnail's view has to go to land on `l.thumb`, as a transform about its own center: the
 // shadow and the corners travel with it that way, instead of a shadow redrawn on every frame.
 static CGAffineTransform thumbTransform(SGRLyricsLayout l) {
     CGFloat scale = l.cover.size.width > 0 ? l.thumb.size.width / l.cover.size.width : 1;
