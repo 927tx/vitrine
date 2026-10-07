@@ -13,11 +13,13 @@
 // what each reads beside its chevron, to the log), gated (a page of a switch, ten rows, a headed and noted
 // section of twelve rows shown only while the switch is on, and a row that comes by itself), later (that row
 // let come; the page's ticker brings it), top (scrolled to the start), layout (the scroll offset, and each
-// section's rows and heading and note heights, to the log).
+// section's rows and heading and note heights, to the log), needs (the Lock screen artwork section below iOS
+// 26), tap=<section>.<row> (that row selected, and the alert it brings up logged).
 #import <UIKit/UIKit.h>
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
 #import "Settings/SGModPage.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 
 // Spotify's page protocol, so SGRegisterPages finds one and the page is pushed as on the phone.
 @protocol SPTPageController <NSObject>
@@ -122,6 +124,15 @@ static UIViewController *gatedPage(void) {
         [table setContentOffset:CGPointMake(0, MAX(-table.adjustedContentInset.top, table.contentSize.height - table.bounds.size.height + table.adjustedContentInset.bottom)) animated:NO];
     } else if ([verb isEqualToString:@"gated"]) {
         [self.nav pushViewController:gatedPage() animated:NO];
+    } else if ([verb isEqualToString:@"needs"]) {
+        [self.nav pushViewController:[[SGModPage alloc] initWithTitle:@"Lock screen" intro:nil sections:@[
+            SGSection(@"Lock screen artwork", @[SGLockScreenArtworkNeedsRow()]),
+        ] footer:nil] animated:NO];
+    } else if ([verb isEqualToString:@"tap"]) {
+        NSIndexPath *path = [self pathFrom:value];
+        [table.delegate tableView:table didSelectRowAtIndexPath:path];
+        UIAlertController *alert = (UIAlertController *)self.nav.presentedViewController;
+        if ([alert isKindOfClass:UIAlertController.class]) NSLog(@"[harness] alert \"%@\": %@", alert.title, alert.message);
     } else if ([verb isEqualToString:@"top"]) {
         [table setContentOffset:CGPointMake(0, -table.adjustedContentInset.top) animated:NO];
     } else if ([verb isEqualToString:@"later"]) {

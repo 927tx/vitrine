@@ -26,6 +26,10 @@ switch brings it in with its 38 pt heading and 28 pt note and scrolls 362 pt, ha
 ticker brings the later row within a second without moving the page; the switch off takes the heading and note
 away again.
 
+`needs` pushes the Lock screen page's artwork section as iOS 18 to 25 get it (the real
+`AnimatedArtworkSettings.m`'s `SGLockScreenArtworkNeedsRow`), and `tap=<section>.<row>` selects a row and logs the
+alert it brings up: "Full-screen artwork", "Needs iOS 26", and an alert naming the iOS version.
+
 2026-10-06, iPhone 17 Pro on iOS 27.0: the warning row leads; then Redesigned UI (glowing, with its ⓘ), Appearance
 and Tab bar; Player, Lyrics and Albums & artists (Home & Library in the native look); Sing, Spatial voice, Audio
 effects, Vibrations, Live Activity, AirPods gestures and Listening stats; Lock screen and Premium, ads & privacy; Labs and
