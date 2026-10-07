@@ -15,6 +15,17 @@ Make a simulator of your own (`xcrun simctl create`) and address it by UDID. `ma
 (`redesign`, `warning`, `keep`) and the actions: `toggle=<section>.<row>` flips a switch the way a tap does,
 `cancel` closes the alert it brings up, `bottom` scrolls to the end, and `dump` logs the rows of every section.
 
+`gated` pushes a page of `SGModPage` itself: a switch over ten rows, then a section with a heading and a note
+whose twelve rows show only while the switch is on, then a row that `later` lets come by itself. `layout` logs
+the scroll offset and each section's rows, heading and note heights; `top` scrolls back up.
+
+    xcrun simctl launch --console-pty <udid> com.vitrine.modsettingsharness gated layout toggle=0.0 layout later dump layout top toggle=0.0 layout
+
+2026-10-06, iPhone 17 Pro on iOS 27.0: with the switch off the gated section has 0 pt of heading and note; the
+switch brings it in with its 38 pt heading and 28 pt note and scrolls 362 pt, half the 724 pt of room; the
+ticker brings the later row within a second without moving the page; the switch off takes the heading and note
+away again.
+
 2026-10-06, iPhone 17 Pro on iOS 27.0: the warning row leads; then Redesigned UI (glowing, with its ⓘ), Appearance
 and Tab bar; Player, Lyrics and Albums & artists (Home & Library in the native look); Sing, Spatial voice, Audio
 effects, Vibrations, Live Activity, AirPods gestures and Listening stats; Lock screen and Premium, ads & privacy; Labs and

@@ -414,6 +414,8 @@ static UIFont *tabular(UIFont *font) {
 @interface SGModSliderCell : UITableViewCell
 + (CGFloat)heightFor:(SGModRow *)row;
 - (void)showRow:(SGModRow *)row;
+// The number again, after something else on the page changed it (a Reset row); never under a finger.
+- (void)readNumber;
 @end
 
 @implementation SGModSliderCell {
@@ -512,6 +514,15 @@ static CGFloat subtitleLine(void) { return ceil(SGSubtitleFont().lineHeight); }
     [_slider setValue:(float)_shown animated:YES];
 }
 
+- (void)readNumber {
+    if (!_row.number || _slider.isTracking) return;
+    double value = snapped(_row, _row.number());
+    if (value == _shown) return;
+    _shown = value;
+    [_slider setValue:(float)value animated:YES];
+    [self showValue];
+}
+
 @end
 
 #pragma mark - rows waiting on a switch
@@ -562,9 +573,10 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     _shown = [self rowsToShow];
     _intro = intro ? SGNote(intro) : nil;
     _footer = footer ? SGNote(footer) : nil;
-    // Any row with a value keeps a ticker running: a page row's can move while the page shows (a download's
-    // percentage beside the chevron).
-    for (SGModSection *s in sections) for (SGModRow *row in s.rows) _live |= row.value != nil;
+    // Any row with a value, a test of when it shows, a number or a menu keeps a ticker running: a page row's
+    // value can move while the page shows (a download's percentage beside the chevron), a row can come or go
+    // by itself (a download that finished brings its Remove row), and a Reset row can move a slider.
+    for (SGModSection *s in sections) for (SGModRow *row in s.rows) _live |= row.value || row.visible || row.number;
     return self;
 }
 
@@ -579,14 +591,27 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
 }
 
 // The rows that are to show now fade in where they sit and the others fade out, and whatever came in is
-// scrolled into view: it opens under the switch that brought it, which may be the page's last row. Answers
-// whether anything moved; `done` runs once it has, and only then.
+// scrolled toward, by half a screen at most: it opens under the switch that brought it, which may be the page's
+// last row, and a long run of rows does not carry the page far from that switch. A section whose rows all go takes its heading and note with it, and
+// they come back with its first row, so the whole section is faded rather than its rows. Answers whether
+// anything moved; `done` runs once it has, and only then.
 - (BOOL)showRowsThen:(void (^)(void))done {
+    return [self showRows:YES then:done];
+}
+
+// The same, scrolling only when `scroll`: rows that come by themselves do not move the page under the eye.
+- (BOOL)showRows:(BOOL)scroll then:(void (^)(void))done {
     NSArray<NSArray<SGModRow *> *> *next = [self rowsToShow];
     if ([next isEqualToArray:_shown]) return NO;
     NSMutableArray<NSIndexPath *> *gone = [NSMutableArray array], *coming = [NSMutableArray array];
+    NSMutableIndexSet *flipped = [NSMutableIndexSet indexSet];
     [_sections enumerateObjectsUsingBlock:^(SGModSection *s, NSUInteger section, BOOL *stop) {
         NSArray<SGModRow *> *before = self->_shown[section], *after = next[section];
+        if ((before.count == 0) != (after.count == 0)) {
+            [flipped addIndex:section];
+            for (NSUInteger i = 0; i < after.count; i++) [coming addObject:[NSIndexPath indexPathForRow:(NSInteger)i inSection:(NSInteger)section]];
+            return;
+        }
         [before enumerateObjectsUsingBlock:^(SGModRow *row, NSUInteger i, BOOL *stop) {
             if (![after containsObject:row]) [gone addObject:[NSIndexPath indexPathForRow:(NSInteger)i inSection:(NSInteger)section]];
         }];
@@ -594,22 +619,39 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
             if (![before containsObject:row]) [coming addObject:[NSIndexPath indexPathForRow:(NSInteger)i inSection:(NSInteger)section]];
         }];
     }];
+    NSPredicate *notFlipped = [NSPredicate predicateWithBlock:^BOOL(NSIndexPath *path, NSDictionary *bindings) {
+        return ![flipped containsIndex:(NSUInteger)path.section];
+    }];
     UITableView *table = self.tableView;
     [table performBatchUpdates:^{
         self->_shown = next;
-        [table deleteRowsAtIndexPaths:gone withRowAnimation:UITableViewRowAnimationFade];
-        [table insertRowsAtIndexPaths:coming withRowAnimation:UITableViewRowAnimationFade];
+        // A section is reloaded whole, or its rows moved, never both in one batch.
+        [table reloadSections:flipped withRowAnimation:UITableViewRowAnimationFade];
+        [table deleteRowsAtIndexPaths:[gone filteredArrayUsingPredicate:notFlipped] withRowAnimation:UITableViewRowAnimationFade];
+        [table insertRowsAtIndexPaths:[coming filteredArrayUsingPredicate:notFlipped] withRowAnimation:UITableViewRowAnimationFade];
     } completion:^(BOOL finished) {
-        if (coming.count) {
+        if (scroll && coming.count) {
             CGRect rows = CGRectNull;
             for (NSIndexPath *path in coming) rows = CGRectUnion(rows, [table rectForRowAtIndexPath:path]);
-            CGFloat room = table.bounds.size.height - table.adjustedContentInset.top - table.adjustedContentInset.bottom;
-            rows.size.height = MIN(rows.size.height, room);
-            [table scrollRectToVisible:rows animated:YES];
+            [self scrollToward:rows];
         }
         if (done) done();
     }];
     return YES;
+}
+
+// By as much as brings `rows` into view, but half the room at most either way, and never past the content.
+- (void)scrollToward:(CGRect)rows {
+    UITableView *table = self.tableView;
+    UIEdgeInsets inset = table.adjustedContentInset;
+    CGFloat room = table.bounds.size.height - inset.top - inset.bottom;
+    CGFloat top = table.contentOffset.y + inset.top, bottom = top + room, move = 0;
+    if (CGRectGetMaxY(rows) > bottom) move = MIN(CGRectGetMaxY(rows) - bottom, CGRectGetMinY(rows) - top);
+    else if (CGRectGetMinY(rows) < top) move = CGRectGetMinY(rows) - top;
+    move = MAX(-room / 2, MIN(move, room / 2));
+    CGFloat most = MAX(-inset.top, table.contentSize.height + inset.bottom - table.bounds.size.height);
+    CGFloat y = MAX(-inset.top, MIN(table.contentOffset.y + move, most));
+    if (fabs(y - table.contentOffset.y) >= 1) [table setContentOffset:CGPointMake(table.contentOffset.x, y) animated:YES];
 }
 
 - (void)refreshVisibility {
@@ -723,7 +765,23 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     // that a reload never lands under a switch being dragged. A cancelled back swipe appears the
     // page again without it ever disappearing, so the old timer goes first.
     [_ticker invalidate];
-    _ticker = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(readValues) userInfo:nil repeats:YES];
+    _ticker = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(tick) userInfo:nil repeats:YES];
+}
+
+// Each second: the rows that come and go by themselves, then every value, slider and menu in view.
+- (void)tick {
+    [self showRows:NO then:nil];
+    [self readValues];
+    for (UITableViewCell *cell in self.tableView.visibleCells) {
+        NSIndexPath *path = [self.tableView indexPathForCell:cell];
+        if (!path) continue;
+        SGModRow *row = [self rowAt:path];
+        if ([cell isKindOfClass:SGModSliderCell.class]) [(SGModSliderCell *)cell readNumber];
+        UIButton *menu = (UIButton *)cell.accessoryView;
+        if (row.menu && [menu isKindOfClass:UIButton.class] && ![menu.accessibilityValue isEqualToString:row.value()] && !menu.isTracking) {
+            cell.accessoryView = [self menuButtonFor:row];
+        }
+    }
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
@@ -734,6 +792,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
 
 - (void)readValues {
     for (UITableViewCell *cell in self.tableView.visibleCells) {
+        if (![self.tableView indexPathForCell:cell]) continue;   // a row fading out
         SGModRow *row = [self rowAt:[self.tableView indexPathForCell:cell]];
         if (row.page && row.value) {
             // valueAndChevron is sized to its text, so a new text gets a new one.
@@ -774,23 +833,29 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     return row.number ? [SGModSliderCell heightFor:row] : UITableViewAutomaticDimension;
 }
 
+// A section with no row showing has no heading, note or gap: they would sit over no card.
+- (BOOL)isEmpty:(NSInteger)section {
+    return _shown[(NSUInteger)section].count == 0;
+}
+
 - (UIView *)tableView:(UITableView *)table viewForHeaderInSection:(NSInteger)section {
     NSString *title = _sections[(NSUInteger)section].title;
-    return title ? SGSectionHeader(table, title) : nil;
+    return title && ![self isEmpty:section] ? SGSectionHeader(table, title) : nil;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
+    if ([self isEmpty:section]) return CGFLOAT_MIN;
     return _sections[(NSUInteger)section].title ? SGSectionHeaderHeight : SGSectionGap;
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {
     NSString *footer = _sections[(NSUInteger)section].footer;
-    return footer ? SGSectionFooter(table, footer) : nil;
+    return footer && ![self isEmpty:section] ? SGSectionFooter(table, footer) : nil;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {
     NSString *footer = _sections[(NSUInteger)section].footer;
-    return footer ? SGSectionFooterHeight(table, footer) : CGFLOAT_MIN;
+    return footer && ![self isEmpty:section] ? SGSectionFooterHeight(table, footer) : CGFLOAT_MIN;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {

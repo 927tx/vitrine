@@ -10,7 +10,10 @@
 // look stays; otherwise it is cleared first).
 // Actions: toggle=<section>.<row> (that row's switch flipped the way a tap does), cancel (the alert that
 // switch brings up closed with Later), bottom (scrolled to the end), dump (the rows of each section and
-// what each reads beside its chevron, to the log).
+// what each reads beside its chevron, to the log), gated (a page of a switch, ten rows, a headed and noted
+// section of twelve rows shown only while the switch is on, and a row that comes by itself), later (that row
+// let come; the page's ticker brings it), top (scrolled to the start), layout (the scroll offset, and each
+// section's rows and heading and note heights, to the log).
 #import <UIKit/UIKit.h>
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
@@ -25,6 +28,29 @@ BOOL SGHarnessWarning;
 static void findViews(UIView *root, Class kind, NSMutableArray *found) {
     if ([root isKindOfClass:kind]) [found addObject:root];
     for (UIView *sub in root.subviews) findViews(sub, kind, found);
+}
+
+// The `gated` page: a switch, ten rows of filler, then a headed and noted section whose twelve rows show only
+// while the switch is on, and a row that comes by itself once `later` is played.
+static BOOL sg_later;
+static NSString *const kGate = @"spotifyglass.harness.gate";
+
+static UIViewController *gatedPage(void) {
+    SGSetEnabled(kGate, NO);
+    NSMutableArray<SGModRow *> *filler = [NSMutableArray array], *gated = [NSMutableArray array];
+    for (int i = 0; i < 10; i++) [filler addObject:SGStatRow([NSString stringWithFormat:@"Filler %d", i + 1], ^NSString *{ return @"-"; })];
+    for (int i = 0; i < 12; i++) {
+        SGModRow *row = SGStatRow([NSString stringWithFormat:@"Gated %d", i + 1], ^NSString *{ return @"on"; });
+        row.visible = ^BOOL { return SGFlag(kGate, NO); };
+        [gated addObject:row];
+    }
+    SGModRow *later = SGStatRow(@"Came by itself", ^NSString *{ return @"later"; });
+    later.visible = ^BOOL { return sg_later; };
+    return [[SGModPage alloc] initWithTitle:@"Gated" intro:nil sections:@[
+        SGSection(@"Gate", [@[SGOptionRow(@"Show the gated rows", nil, kGate)] arrayByAddingObjectsFromArray:filler]),
+        SGNotedSection(@"Gated", gated, @"A note under the gated rows, which goes with them."),
+        SGSection(@"Later", @[later]),
+    ] footer:nil];
 }
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate>
@@ -94,6 +120,19 @@ static void findViews(UIView *root, Class kind, NSMutableArray *found) {
         [alert dismissViewControllerAnimated:YES completion:nil];
     } else if ([verb isEqualToString:@"bottom"]) {
         [table setContentOffset:CGPointMake(0, MAX(-table.adjustedContentInset.top, table.contentSize.height - table.bounds.size.height + table.adjustedContentInset.bottom)) animated:NO];
+    } else if ([verb isEqualToString:@"gated"]) {
+        [self.nav pushViewController:gatedPage() animated:NO];
+    } else if ([verb isEqualToString:@"top"]) {
+        [table setContentOffset:CGPointMake(0, -table.adjustedContentInset.top) animated:NO];
+    } else if ([verb isEqualToString:@"later"]) {
+        sg_later = YES;
+    } else if ([verb isEqualToString:@"layout"]) {
+        UIEdgeInsets inset = table.adjustedContentInset;
+        NSLog(@"[harness] offset %.0f of room %.0f", table.contentOffset.y + inset.top, table.bounds.size.height - inset.top - inset.bottom);
+        for (NSInteger section = 0; section < table.numberOfSections; section++) {
+            NSLog(@"[harness] section %ld: %ld rows, heading %.0f pt, note %.0f pt", (long)section, (long)[table numberOfRowsInSection:section],
+                  [table rectForHeaderInSection:section].size.height, [table rectForFooterInSection:section].size.height);
+        }
     } else if ([verb isEqualToString:@"dump"]) {
         NSLog(@"[harness] Redesigned UI stored %d", SGRedesignedUIStored());
         for (NSInteger section = 0; section < table.numberOfSections; section++) {
