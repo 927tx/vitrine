@@ -15,6 +15,8 @@
 //               reads back only the frame's height), its own background color lifted off meanwhile
 //               (a sublayerTransform does not move it), and faded in over the first part of the growth;
 //   the bar     Spotify's stand-in riding the sheet's top edge, gone by a quarter of the way;
+//   the tab bar Spotify's stand-in hidden, since the real one stays in view around the sheet
+//               and the stand-in would be a second tab bar;
 //   the cover   a copy flown from the card's artwork to the player's cover, moved within the sheet,
 //               the player's own cover and shadow hidden meanwhile.
 // All of it is taken down in -destroyTransitioningContext, which Spotify calls from -animationEnded:.
@@ -30,6 +32,7 @@
 - (id<UIViewControllerContextTransitioning>)transitioningContext;
 - (UIView *)overlayView;
 - (UIView *)barSnapshotView;
+- (UIView *)tabBarSnapshotView;
 - (CGRect)barFrame;
 - (double)progress;
 @end
@@ -240,7 +243,9 @@ static SGRPlayerMorph *morphFor(SPTBarOverlayPresentationTransition *transition,
 %hook SPTBarOverlayPresentationTransition
 - (void)setProgress:(double)progress {
     %orig;
-    [morphFor(self, YES) apply:[self progress]];
+    SGRPlayerMorph *morph = morphFor(self, YES);
+    [morph apply:[self progress]];
+    if (morph) [self tabBarSnapshotView].alpha = 0;
 }
 
 - (void)destroyTransitioningContext {

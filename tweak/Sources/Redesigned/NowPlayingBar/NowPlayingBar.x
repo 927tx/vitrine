@@ -236,9 +236,13 @@ static NSHashTable<UIView *> *sg_tucked;
 
 static void tuckExtras(UIView *bar, BOOL tuck) {
     if (!sg_tucked) sg_tucked = [NSHashTable weakObjectsHashTable];
+    // A stack hides an item only once the animation it was hidden in ends, so the buttons also fade on
+    // their own, out as the card heads for the row and back in after it leaves.
     if (!tuck) {
-        for (UIView *item in sg_tucked) item.hidden = NO;
+        NSArray<UIView *> *items = sg_tucked.allObjects;
         [sg_tucked removeAllObjects];
+        for (UIView *item in items) item.hidden = NO;
+        SGRAnimate(SGRMotionRespond, ^{ for (UIView *item in items) item.alpha = 1; }, nil);
         return;
     }
     BOOL keepConnect = SGHidden(SGRKeyBarInlineConnect);
@@ -251,6 +255,7 @@ static void tuckExtras(UIView *bar, BOOL tuck) {
         while (item.superview && item.superview != bar && ![item.superview isKindOfClass:UIStackView.class]) item = item.superview;
         if (![item.superview isKindOfClass:UIStackView.class] || item.hidden) return;
         item.hidden = YES;
+        SGRAnimate(SGRMotionExit, ^{ item.alpha = 0; }, nil);
         [sg_tucked addObject:item];
     });
 }

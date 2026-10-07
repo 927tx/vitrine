@@ -398,14 +398,16 @@ Redesigned:
                   between them, and a scroll back up, its top, another tab or the player brings it back
                   (TabBarMinimize.x, MinimizeStep.h; the Player page's Apple Music style). Spotify's container is no
                   UITabBarController, so UIKit's tabBarMinimizeBehavior and bottomAccessory cannot do it. The bars,
-                  their circles and the card move as one, on one spring of their own (SGRMotionBar, 0.34 s, no
+                  their circles and the card move as one, on one spring of their own (SGRMotionBar, 0.26 s, no
                   overshoot; at once under Reduce Motion), from what is on screen, so a change turned back half way
-                  carries on from there. Laid out on
+                  carries on from there. Each glass tab carries its name for VoiceOver and the large content viewer, labels
+                  hidden or not, and the leading circle says it shows all tabs. Laid out on
                   the Mac against harness/tabbar/ (`mini`; a tap on the leading circle `tap`, real flings that turn
                   the bar half way `turns`, a minimize from inside Spotify's own animations `nested`, every frame of
                   the move sampled `motion`), the scroll's steps checked by harness/tabbar/minimize-check.c
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
-                  (BarConnect.x, its own key and its own row on the Player page, apart from the native look's). In a Jam the
+                  (BarConnect.x, its own key and its own row on the Player page, apart from the native look's). In the minimized row
+                  the card drops its device and add buttons, faded out as it heads there and back in as it leaves. In a Jam the
                   glass stays on the track and Spotify's Jam strip gets a pane of its own above it (harness/tabbar/, jam)
     ContextMenu/  the ⋯ of the player and the ⋯ pinned over the playlist, album and artist pages open the system menu,
                   always (ContextMenu.h). The player's ⋯ is a pull-down button of the mod's over Spotify's: the menu
@@ -543,8 +545,9 @@ and Live Activity. The root page in `App/ModSettings.x` links the Appearance pag
 
     make build      # out/vitrine-<version>.ipa with FLEX in it
     make release    # the same without FLEX
-    make install    # build without FLEX, sign with your certificate, install over USB
+    make install    # build without FLEX, sign with your certificate, install over USB or Wi-Fi
     make install FLEX=1   # the same with FLEX, which is what make trees reads through
+    make quick      # rebuild only the tweak into the app the last make install made, sign, install (seconds)
     make trees      # record view trees screen by screen (FLEX build open on the phone, USB)
     make session    # clean trees, as many snapshots per screen as you like: Enter saves, n goes to the next screen
                     # (SCREENS="playlist artist" for some); every snapshot says whether the mod was at stock
