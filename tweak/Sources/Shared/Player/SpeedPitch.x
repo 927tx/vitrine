@@ -194,6 +194,8 @@ static OSStatus pullSource(Output *output, AudioUnit source, const AudioTimeStam
         OSStatus status = AudioUnitRender(source, &flags, &time, output->sourceBus, count, target);
         output->sourceTime += count;
         if (status != noErr) return status;
+        // A buffer marked silent may still hold what was in it before; nothing after this reads the mark.
+        if (flags & kAudioUnitRenderAction_OutputIsSilence) silence(target);
         done += count;
     }
     return noErr;
@@ -222,9 +224,13 @@ static OSStatus pullChain(Output *output, AudioUnit source, const AudioTimeStamp
     return stage(frames, data, pullMixer, &mixer);
 }
 
+// Whether the time and pitch unit pulled the mixer during the render under way. The music's render thread only.
+static bool sg_unitPulled;
+
 // The time and pitch unit's input. It renders only on the music's output, and a change of music takes the
 // unit out first (disengage), so the music here is the output rendering it.
 static OSStatus pullForUnit(void *context, UInt32 frames, AudioBufferList *data) {
+    sg_unitPulled = true;
     Output *output = music();
     AudioUnit source = output ? atomic_load(&output->source) : NULL;
     if (!source) {
@@ -256,13 +262,20 @@ static OSStatus feed(void *refCon, AudioUnitRenderActionFlags *flags, const Audi
         // Another chain plays as Spotify made it.
         status = pullSource(output, source, timestamp, frames, data);
     } else {
-        status = -1;
         SGTimePitch *unit = atomic_load(&sg_pull);
         // A unit made for another rate passes the sound as it is, until the main thread makes one for the new rate.
-        if (atomic_load(&sg_engaged) && unit && fitsUnit(data, frames, unit) && SGTimePitchSampleRate(unit) == rateOf(&output->client)) {
-            status = SGTimePitchRender(unit, frames, data);
+        BOOL tried = atomic_load(&sg_engaged) && unit && fitsUnit(data, frames, unit) && SGTimePitchSampleRate(unit) == rateOf(&output->client);
+        sg_unitPulled = false;
+        status = tried ? SGTimePitchRender(unit, frames, data) : -1;
+        if (status != noErr && tried && sg_unitPulled) {
+            // The failed render took the mixer's sound already: a second pull would skip a buffer of the song,
+            // so this one is silent instead.
+            silence(data);
+            *flags |= kAudioUnitRenderAction_OutputIsSilence;
+            status = noErr;
+        } else if (status != noErr) {
+            status = pullChain(output, source, timestamp, frames, data);
         }
-        if (status != noErr) status = pullChain(output, source, timestamp, frames, data);
     }
     atomic_store(&output->busy, false);
     return status;
