@@ -12,11 +12,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CACHE="$ROOT/out/quick"
 IPA="$(ls -t "$ROOT"/out/*.ipa 2>/dev/null | grep -v -- '-signed\.ipa$' | head -1 || true)"
-[ -n "$IPA" ] || { echo "no IPA in out/: run the full build once (make install)" >&2; exit 1; }
+REF="$IPA"
+# With the IPA moved away, the app already unpacked from it still serves.
+if [ -z "$IPA" ]; then
+  [ -f "$CACHE/.from" ] || { echo "no IPA in out/: run the full build once (make install)" >&2; exit 1; }
+  IPA="$(cat "$CACHE/.from")"
+  REF="$CACHE/.from"
+fi
 
 # What only the full pipeline builds: the Live Activity widget (its Swift, some of it beside the tweak's
 # sources), the App Group shim, the plist overlay and the icons. Changed since that build, it is stale here.
-stale="$(find "$ROOT/extension" "$ROOT/plist" "$ROOT/icons" "$ROOT/tweak/Sources" \( -name '*.swift' -o -path "$ROOT/extension/*" -o -path "$ROOT/plist/*" -o -path "$ROOT/icons/*" \) -type f -newer "$IPA" 2>/dev/null | head -3)"
+stale="$(find "$ROOT/extension" "$ROOT/plist" "$ROOT/icons" "$ROOT/tweak/Sources" \( -name '*.swift' -o -path "$ROOT/extension/*" -o -path "$ROOT/plist/*" -o -path "$ROOT/icons/*" \) -type f -newer "$REF" 2>/dev/null | head -3)"
 if [ -n "$stale" ]; then
   printf 'changed since the last full build, which make quick does not rebuild:\n%s\nrun make install once\n' "$stale" >&2
   exit 1

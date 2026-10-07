@@ -59,13 +59,13 @@ masked in the log and the result stays in your fork.
 Theos in `~/theos` and Xcode with an iPhoneOS 26+ SDK (`xcode-select` it). An SDK in `~/theos/sdks`
 alone builds too, but without the Live Activity. Then:
 
-    brew install make ldid dpkg zsign ideviceinstaller libimobiledevice
+    brew install make ldid dpkg zsign libimobiledevice
     uv tool install "cyan @ git+https://github.com/asdfzxcvbn/pyzule-rw"
 
 Put the decrypted `.ipa` in `ipa/`, then:
 
     make release    # out/vitrine-<version>.ipa, ready to sign
-    make install    # the same, signed with your certificate and pushed over USB
+    make install    # the same, signed with your certificate and installed over USB or Wi-Fi
 
 `make install` reads `SIGN_P12`, `SIGN_PROFILE` and `SIGN_P12_PASSWORD` from `.signing.env`; copy
 `.signing.env.example` and fill it in.

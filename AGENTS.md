@@ -55,7 +55,7 @@ Rules:
 
 ## Working on it
 
-- Build: `make install` (signs and pushes to the phone), `make release` (IPA only). Tweak only:
+- Build: `make install` (signs and pushes to the phone), `make quick` (a tweak-only change, in seconds), `make release` (IPA only). Tweak only:
   `env -u MAKELEVEL gmake -C tweak clean package`.
 - Look at Spotify's views through recorded trees (`make session` records clean ones into
   `trees/clean/`) before hooking anything. Prove every class and selector against the tree or the binary.

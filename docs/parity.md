@@ -169,4 +169,7 @@ Rebuilt from behavior-only descriptions; each commit credits the PR's author.
 
 ## Still open
 
-- Device checks: nothing above has run on a phone. Each commit body lists what to check.
+- Device checks: Settings, the player footer and the Lyrics Style sheet were checked on an iPhone 15 Pro
+  (iOS 27) for beta.1. Still unchecked: Karaoke with a freshly downloaded model, Delay with AirPods, the Live
+  Activity options and preview, the font families, Settings at the largest accessibility text size, and
+  VoiceOver. Each commit body lists what to check.
