@@ -33,7 +33,7 @@ static const CGFloat kBackingScale = 0.62, kBackingAlpha = 0.8, kBackingGap = 4;
 // for anyone else's.
 static const CGFloat kBubbleSide = 22, kBubbleGap = 8, kBubbleGlyph = 11, kBubbleAlpha = 0.75, kBubbleReach = 14;
 static const CGFloat kUnderlineDrop = 1, kUnderlineWidth = 2, kUnderlineAlpha = 0.35;
-// The line naming the source, under the lyrics and outside the fade so it does not dim with them. It
+// The line naming the source, under the lyrics, which fade out above it and the buttons beside it. It
 // wraps onto a second line rather than run under the buttons beside it, and a tap this far around it
 // opens the pages it links to.
 static const CGFloat kCreditSize = 12, kCreditAlpha = 0.4, kCreditBottom = 10, kCreditSlop = 8;
@@ -1282,8 +1282,8 @@ typedef struct {
     _sightArrangement = NSUIntegerMax;
     _fade = [CAGradientLayer layer];
     _fade.colors = @[(id)UIColor.clearColor.CGColor, (id)UIColor.whiteColor.CGColor,
-                     (id)UIColor.whiteColor.CGColor, (id)UIColor.clearColor.CGColor];
-    _fade.locations = @[@0, @(kEdgeFade), @(1 - kEdgeFade), @1];
+                     (id)UIColor.whiteColor.CGColor, (id)UIColor.clearColor.CGColor, (id)UIColor.clearColor.CGColor];
+    _fade.locations = @[@0, @(kEdgeFade), @(1 - kEdgeFade), @1, @1];
     _scroll = [[UIScrollView alloc] initWithFrame:self.bounds];
     _scroll.layer.mask = _fade;
     _scroll.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -1577,6 +1577,7 @@ typedef struct {
         SGRShowGlass(SGRGlassInside(_extrasBox, &kExtrasGlassKey, kExtrasSide), !_extrasHidden);
         _credit.center = CGPointMake(_credit.center.x, _extrasBox.center.y);
     }
+    [self clearBottomRow];
     if (_lines && self.bounds.size.width != _builtWidth) {
         [self rebuild];
     } else if (_tops && self.bounds.size.height != _placedHeight) {
@@ -1587,6 +1588,24 @@ typedef struct {
         [self placeLinesAnimated:NO];
     }
     _placedHeight = self.bounds.size.height;
+}
+
+// The lines fade out above the bottom row (the credit, the mic and the extras button) and stay clear under
+// it, so none is read through the credit; with nothing there they fade out at the bottom edge.
+- (void)clearBottomRow {
+    CGFloat height = self.bounds.size.height;
+    if (height <= 0) return;
+    CGFloat floor = height;
+    for (UIView *view in @[_credit ?: NSNull.null, _sing ?: NSNull.null, _extrasBox ?: NSNull.null]) {
+        if ([view isKindOfClass:UIView.class] && !view.hidden && view.superview) floor = MIN(floor, CGRectGetMinY(view.frame) - 8);
+    }
+    CGFloat clear = MAX(0, MIN(1, (height - floor) / height));
+    NSArray *locations = @[@0, @(kEdgeFade), @(MAX(kEdgeFade, 1 - clear - kEdgeFade)), @(1 - clear), @1];
+    if ([_fade.locations isEqualToArray:locations]) return;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    _fade.locations = locations;
+    [CATransaction commit];
 }
 
 - (void)dropLineViews {
@@ -1728,6 +1747,7 @@ static BOOL hasWords(SGKaraokeLine *line) {
     BOOL offered = _lines && !_sample && (_hasSpoken || _hasTranslation || gemini);
     if (!offered) {
         _extrasBox.hidden = YES;
+        [self setNeedsLayout];
         return;
     }
     if (!_extras) {
