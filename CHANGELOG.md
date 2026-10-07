@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-beta.2](https://github.com/My-Name-Is-Jeff/vitrine/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2026-10-07)
+
+
+### Features
+
+* Vitrine offers to delete what Chroma left in Spotify's storage ([c9e0d21](https://github.com/My-Name-Is-Jeff/vitrine/commit/c9e0d2113d0f3d880f7b21ec667d3b3fc5bf2bc3))
+
+
+### Fixes
+
+* the player closes over one tab bar, and the card moves into the row faster ([d709508](https://github.com/My-Name-Is-Jeff/vitrine/commit/d7095083ae5864c865d087a5b7bd02d821f1e0bf))
+* the welcome tour and the mod's sheets stay dark in light mode ([d58cca4](https://github.com/My-Name-Is-Jeff/vitrine/commit/d58cca4658fcadfdaaa4ceeb9a4eb1afe5244c24))
+
 ## [1.0.0-beta.1](https://github.com/My-Name-Is-Jeff/vitrine/compare/v0.21.1...v1.0.0-beta.1) (2026-10-07)
 
 
