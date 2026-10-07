@@ -80,7 +80,7 @@ static NSString *playingLocalFile(void) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return section == 0 ? SGSectionHeaderHeight : SGSectionGap;
+    return section == 0 ? SGSectionHeaderHeight() : SGSectionGap;
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {

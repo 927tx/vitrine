@@ -1,16 +1,27 @@
 // The look of every page of the mod's, in the dark appearance: cards of #1C1C1E on black, 13pt titles over 11pt
 // grey subtitles in Spotify's typeface, 11pt uppercase section headers and notes, a white symbol on a coloured
 // rounded square leading a row, white chevrons, switches in the look's accent colour. The text follows Dynamic
-// Type up to the largest size before the accessibility ones, and the app font of Shared/Fonts.
+// Type through the accessibility sizes, and the app font of Shared/Fonts.
 #import <UIKit/UIKit.h>
 
 UIColor *SGGrey(void);   // the secondary label's grey
 UIColor *SGGreen(void);
+UIColor *SGOnAccent(void); // black or white text on the accent
+UIColor *SGAccentMark(void); // a visible accent mark on a dark card
 UIColor *SGRed(void);
 UIColor *SGPageBackground(void);
 UIColor *SGCardBackground(void);
 UIFont *SGTitleFont(void);      // a row's title and value, 13pt
 UIFont *SGSubtitleFont(void);   // subtitles, section headers, footers and notes, 11pt
+// Both grow through the accessibility sizes with no cap. A control beside a row's title, or text inside a
+// drawing of fixed size, caps its copy so the title keeps its room.
+UIFont *SGCappedFont(UIFont *font, CGFloat largest);
+BOOL SGAccessibilityTextSize(void);   // an accessibility size, where a row's value goes under its title
+// A slider row's text, laid out by hand: the title with its value at the trailing edge, or at the accessibility
+// sizes the title wrapped across the row with the value under it, then the subtitle when it has one. The
+// layout returns the y under the text; the height is the same text measured at the same width.
+CGFloat SGSliderTextHeight(NSString *title, NSString *subtitle, CGFloat width);
+CGFloat SGLayOutSliderText(UILabel *title, UILabel *value, UILabel *subtitle, CGFloat x, CGFloat y, CGFloat width);
 // Takes the 13pt title font off Spotify's own settings list, once, for the Mod Settings row the mod adds to it
 // (App/ModSettings.x), which reads as one of Spotify's rows; SGSpotifyListFont hands it out.
 void SGAdoptFonts(UIView *list, UIView *exclude);
@@ -30,7 +41,7 @@ void SGFitNote(UITableView *table, UIView *wrapper, CGFloat top, CGFloat bottom)
 // The now playing bar and the tab bar float over the content, so a page insets itself under them.
 void SGInsetForBars(UITableView *table);
 
-extern const CGFloat SGSectionHeaderHeight;
+CGFloat SGSectionHeaderHeight(void);   // grows with the header's text
 extern const CGFloat SGSectionGap;   // above a section with no header, so its card does not touch the one before
 void SGFillCell(UITableViewCell *cell, NSString *title, NSString *subtitle, UIColor *color, NSString *symbolName);
 UIView *SGSectionHeader(UITableView *table, NSString *title);

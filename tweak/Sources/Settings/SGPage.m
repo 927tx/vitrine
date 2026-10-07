@@ -23,6 +23,12 @@ static BOOL sg_pagesConform;
     self.tableView.sectionHeaderTopPadding = 0;
 }
 
+- (void)traitCollectionDidChange:(UITraitCollection *)previous {
+    [super traitCollectionDidChange:previous];
+    if (![previous.preferredContentSizeCategory isEqualToString:self.traitCollection.preferredContentSizeCategory])
+        [self.tableView reloadData];
+}
+
 - (NSString *)spt_pageIdentifier {
     return @"spotifyglass";
 }

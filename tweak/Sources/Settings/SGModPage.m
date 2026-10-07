@@ -304,6 +304,13 @@ SGModRow *SGWithTile(SGModRow *row, NSString *symbol, UIColor *color) {
 // A value never takes more than this much of the row, so a long one ends in "…" and leaves the title its room.
 static const CGFloat kValueMaxWidth = 170;
 
+// At the accessibility sizes a row's value goes under its title (stackedValue), and the accessories that
+// would carry it beside the title show none.
+static NSString *stackedValue(SGModRow *row) {
+    NSString *value = row.value() ?: @"";
+    return row.subtitle.length ? [NSString stringWithFormat:@"%@\n%@", row.subtitle, value] : value;
+}
+
 static UIView *valueAndChevron(NSString *text) {
     UILabel *label = [UILabel new];
     label.font = SGTitleFont();
@@ -412,7 +419,7 @@ static UIFont *tabular(UIFont *font) {
 // value over a slider in the accent colour, a subtitle between them when there is one, each step stored
 // as the thumb reaches it.
 @interface SGModSliderCell : UITableViewCell
-+ (CGFloat)heightFor:(SGModRow *)row;
++ (CGFloat)heightFor:(SGModRow *)row width:(CGFloat)width;
 - (void)showRow:(SGModRow *)row;
 // The number again, after something else on the page changed it (a Reset row); never under a finger.
 - (void)readNumber;
@@ -428,12 +435,9 @@ static UIFont *tabular(UIFont *font) {
 
 static const CGFloat kSliderTop = 12, kSliderGap = 6, kSliderHeight = 28, kSliderBottom = 10;
 
-// The lines are as tall as Dynamic Type makes the fonts.
-static CGFloat titleLine(void) { return ceil(SGTitleFont().lineHeight); }
-static CGFloat subtitleLine(void) { return ceil(SGSubtitleFont().lineHeight); }
-
-+ (CGFloat)heightFor:(SGModRow *)row {
-    return kSliderTop + titleLine() + (row.subtitle ? subtitleLine() : 0) + kSliderGap + kSliderHeight + kSliderBottom;
+// The text is as tall as Dynamic Type makes it at the cell's width, less its 16pt sides.
++ (CGFloat)heightFor:(SGModRow *)row width:(CGFloat)width {
+    return kSliderTop + SGSliderTextHeight(row.title, row.subtitle, width - 32) + kSliderGap + kSliderHeight + kSliderBottom;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)identifier {
@@ -488,16 +492,8 @@ static CGFloat subtitleLine(void) { return ceil(SGSubtitleFont().lineHeight); }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    CGFloat width = self.contentView.bounds.size.width, side = 16, y = kSliderTop;
-    [_value sizeToFit];
-    CGFloat valueWidth = MAX(_value.bounds.size.width, 44);
-    _value.frame = CGRectMake(width - side - valueWidth, y, valueWidth, titleLine());
-    _title.frame = CGRectMake(side, y, CGRectGetMinX(_value.frame) - side - 8, titleLine());
-    y += titleLine();
-    if (_row.subtitle) {
-        _subtitle.frame = CGRectMake(side, y, width - 2 * side, subtitleLine());
-        y += subtitleLine();
-    }
+    CGFloat width = self.contentView.bounds.size.width, side = 16;
+    CGFloat y = SGLayOutSliderText(_title, _value, _subtitle, side, kSliderTop, width - 2 * side);
     _slider.frame = CGRectMake(side, y + kSliderGap, width - 2 * side, kSliderHeight);
 }
 
@@ -794,6 +790,13 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     for (UITableViewCell *cell in self.tableView.visibleCells) {
         if (![self.tableView indexPathForCell:cell]) continue;   // a row fading out
         SGModRow *row = [self rowAt:[self.tableView indexPathForCell:cell]];
+        if (SGAccessibilityTextSize() && row.value && !row.number
+            && [cell.contentConfiguration isKindOfClass:UIListContentConfiguration.class]) {
+            UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
+            content.secondaryText = stackedValue(row);
+            cell.contentConfiguration = content;
+            continue;
+        }
         if (row.page && row.value) {
             // valueAndChevron is sized to its text, so a new text gets a new one.
             NSString *text = row.value();
@@ -830,7 +833,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
 // A slider row is laid out by hand; every other row sizes itself.
 - (CGFloat)tableView:(UITableView *)table heightForRowAtIndexPath:(NSIndexPath *)path {
     SGModRow *row = [self rowAt:path];
-    return row.number ? [SGModSliderCell heightFor:row] : UITableViewAutomaticDimension;
+    return row.number ? [SGModSliderCell heightFor:row width:table.bounds.size.width - table.layoutMargins.left - table.layoutMargins.right] : UITableViewAutomaticDimension;
 }
 
 // A section with no row showing has no heading, note or gap: they would sit over no card.
@@ -845,7 +848,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
     if ([self isEmpty:section]) return CGFLOAT_MIN;
-    return _sections[(NSUInteger)section].title ? SGSectionHeaderHeight : SGSectionGap;
+    return _sections[(NSUInteger)section].title ? SGSectionHeaderHeight() : SGSectionGap;
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {
@@ -870,6 +873,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     UITableViewCell *cell = SGDequeueCell(table, @"row");
     SGFillCell(cell, row.title, row.subtitle, row.color, row.symbol);
     UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
+    if (SGAccessibilityTextSize() && row.value) content.secondaryText = stackedValue(row);
     if (row.color) content.secondaryTextProperties.color = row.color;
     BOOL tile = row.symbol && !row.color && self.tiles;
     if (tile) content.image = row.tint ? SGTileImageTinted(row.symbol, row.tint) : SGTileImage(row.symbol);
@@ -903,13 +907,13 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
         cell.accessoryView = row.info ? [self infoButtonBeside:toggle] : toggle;
         cell.selectionStyle = locked ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
     } else if (row.page) {
-        UIView *link = row.value ? valueAndChevron(row.value()) : SGChevronView();
+        UIView *link = row.value && !SGAccessibilityTextSize() ? valueAndChevron(row.value()) : SGChevronView();
         cell.accessoryView = row.info ? [self infoButtonBeside:link] : link;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else if (row.menu) {
         cell.accessoryView = [self menuButtonFor:row];
     } else if (row.value) {
-        cell.accessoryView = valueView(row);
+        cell.accessoryView = SGAccessibilityTextSize() ? nil : valueView(row);
         cell.selectionStyle = row.action ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
     } else if (row.action) {
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -955,7 +959,8 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
         [items addObject:item];
     }];
     UIButtonConfiguration *look = [UIButtonConfiguration plainButtonConfiguration];
-    look.attributedTitle = [[NSAttributedString alloc] initWithString:current ?: @"" attributes:@{NSFontAttributeName: SGTitleFont()}];
+    NSString *shown = SGAccessibilityTextSize() ? nil : current;   // under the title instead
+    look.attributedTitle = shown ? [[NSAttributedString alloc] initWithString:shown attributes:@{NSFontAttributeName: SGTitleFont()}] : nil;
     look.image = [UIImage systemImageNamed:@"chevron.up.chevron.down" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:11 weight:UIImageSymbolWeightSemibold]];
     look.imagePlacement = NSDirectionalRectEdgeTrailing;
     look.imagePadding = 5;

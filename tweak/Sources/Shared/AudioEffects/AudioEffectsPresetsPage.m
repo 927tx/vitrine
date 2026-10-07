@@ -15,7 +15,7 @@ static void showAlert(UIViewController *owner, NSString *title, NSString *messag
 static void tick(UITableViewCell *cell, BOOL on) {
     if (on) {
         UIImageView *tick = SGSymbolView(@"checkmark", 13, UIImageSymbolWeightSemibold, 16);
-        tick.tintColor = SGGreen();
+        tick.tintColor = SGAccentMark();
         cell.accessoryView = tick;
     }
     cell.accessibilityTraits = on ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
@@ -95,7 +95,7 @@ static NSArray<NSString *> *userPresetNames(void) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return section == 2 ? SGSectionGap : SGSectionHeaderHeight;
+    return section == 2 ? SGSectionGap : SGSectionHeaderHeight();
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {
@@ -364,7 +364,7 @@ static BOOL headphoneInUse(void) {
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
     if (section == SGDSPHeadphoneSearch) return kSearchTop + 44 + 4;
     if ([self tableView:table numberOfRowsInSection:section] == 0) return CGFLOAT_MIN;
-    return section == SGDSPHeadphoneRemembered ? SGSectionHeaderHeight : SGSectionGap;
+    return section == SGDSPHeadphoneRemembered ? SGSectionHeaderHeight() : SGSectionGap;
 }
 
 - (NSString *)outputFooter {

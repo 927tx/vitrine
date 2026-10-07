@@ -31,7 +31,7 @@ UIButton *SGOnboardingButton(NSString *title) {
     else config = [UIButtonConfiguration filledButtonConfiguration];
     config.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
     config.baseBackgroundColor = SGGreen();
-    config.baseForegroundColor = UIColor.blackColor;
+    config.baseForegroundColor = SGOnAccent();
     config.contentInsets = NSDirectionalEdgeInsetsMake(15, 20, 15, 20);
     config.attributedTitle = [[NSAttributedString alloc] initWithString:title attributes:@{NSFontAttributeName: [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold]}];
     UIButton *button = [UIButton buttonWithConfiguration:config primaryAction:nil];

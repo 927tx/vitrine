@@ -255,7 +255,7 @@ static NSArray<SGUpdateRelease *> *releasesToShow(void) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return _groups[(NSUInteger)section].title ? SGSectionHeaderHeight : SGSectionGap;
+    return _groups[(NSUInteger)section].title ? SGSectionHeaderHeight() : SGSectionGap;
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {
@@ -288,7 +288,7 @@ static NSArray<SGUpdateRelease *> *releasesToShow(void) {
         cell.accessoryView = toggle;
     } else if (row.value) {
         UILabel *label = [UILabel new];
-        label.font = SGTitleFont();
+        label.font = SGCappedFont(SGTitleFont(), 18);   // beside the title, which keeps its room
         label.textColor = SGGrey();
         label.text = row.value();
         [label sizeToFit];

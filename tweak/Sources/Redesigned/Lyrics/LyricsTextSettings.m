@@ -45,7 +45,7 @@
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return SGSectionHeaderHeight;
+    return SGSectionHeaderHeight();
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {

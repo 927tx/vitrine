@@ -4,9 +4,10 @@
 #import "AudioEffects.h"
 
 enum { kPoints = 128 };                     // along the curve, log spaced from 20 Hz to 20 kHz
-static const CGFloat kBarHeight = 36;       // the presets and Reset, over the plot
 static const CGFloat kInset = 9;            // above the top line and under the bottom one, where a handle at the limit sits
 static const CGFloat kLabelsHeight = 26;    // the bands' frequencies under the plot
+// The presets and Reset, over the plot: 36pt, or as tall as Dynamic Type makes their text.
+static CGFloat barHeight(void) { return MAX(36, ceil(SGTitleFont().lineHeight) + 12); }
 static const CGFloat kSide = 16;            // the row's margins, the same as the text rows'
 static const CGFloat kGutter = 22;          // the scale's numbers, right of the plot
 static const CGFloat kGrab = 28;            // how far above or below a handle a finger still takes it
@@ -86,7 +87,7 @@ static NSString *signedNumber(double value, int decimals) {
 
 + (CGFloat)heightForKey:(NSString *)key {
     CGFloat plot = [key isEqualToString:SGKeyDSPCompanderGains] ? 112 : 144;
-    return kBarHeight + kInset + plot + kInset + kLabelsHeight;
+    return barHeight() + kInset + plot + kInset + kLabelsHeight;
 }
 
 - (instancetype)initWithKey:(NSString *)key {
@@ -239,7 +240,7 @@ static NSString *signedNumber(double value, int decimals) {
 // Where the grid's top and bottom lines run: the limits.
 - (CGRect)plotRect {
     CGSize size = self.bounds.size;
-    CGFloat top = kBarHeight + kInset, bottom = size.height - kLabelsHeight - kInset;
+    CGFloat top = barHeight() + kInset, bottom = size.height - kLabelsHeight - kInset;
     return CGRectMake(kSide, top, MAX(size.width - kSide - kGutter - kSide, 1), MAX(bottom - top, 1));
 }
 
@@ -271,16 +272,16 @@ static NSString *signedNumber(double value, int decimals) {
     CGFloat width = self.bounds.size.width;
 
     [_reset sizeToFit];
-    _reset.frame = CGRectMake(width - kSide - _reset.bounds.size.width, 0, _reset.bounds.size.width, kBarHeight);
+    _reset.frame = CGRectMake(width - kSide - _reset.bounds.size.width, 0, _reset.bounds.size.width, barHeight());
     // Measured here: a button's configuration catches up with a new title only on its next pass, so
     // sizeToFit would still be fitting the old name.
     if (_presets) {
         NSString *title = _presets.configuration.title ?: @"";
         CGFloat needed = ceil([title sizeWithAttributes:@{NSFontAttributeName: SGTitleFont()}].width) + 5 + 12;
-        _presets.frame = CGRectMake(kSide, 0, MIN(needed, width / 2), kBarHeight);
+        _presets.frame = CGRectMake(kSide, 0, MIN(needed, width / 2), barHeight());
     }
     _name.font = SGTitleFont();
-    _name.frame = CGRectMake(kSide, 0, width / 2, kBarHeight);
+    _name.frame = CGRectMake(kSide, 0, width / 2, barHeight());
 
     [CATransaction begin];
     [CATransaction setDisableActions:YES];

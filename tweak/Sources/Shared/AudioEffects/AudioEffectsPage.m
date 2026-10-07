@@ -279,12 +279,8 @@ static UIFont *tabular(UIFont *font) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat width = self.contentView.bounds.size.width, side = 16;
-    [_value sizeToFit];
-    CGFloat valueWidth = MAX(_value.bounds.size.width, 44);
-    CGFloat line = ceil(_title.font.lineHeight);   // as tall as Dynamic Type makes the title
-    _value.frame = CGRectMake(width - side - valueWidth, 12, valueWidth, line);
-    _title.frame = CGRectMake(side, 12, CGRectGetMinX(_value.frame) - side - 8, line);
-    _slider.frame = CGRectMake(side, 12 + line + 6, width - 2 * side, 28);
+    CGFloat y = SGLayOutSliderText(_title, _value, nil, side, 12, width - 2 * side);
+    _slider.frame = CGRectMake(side, y + 6, width - 2 * side, 28);
 }
 
 - (void)moved {
@@ -534,7 +530,9 @@ static UIFont *tabular(UIFont *font) {
     // The heads, the values and the errors size themselves; a nil row would read as a slider.
     SGDSPRow *row = [self rowAt:path];
     if (!row) return UITableViewAutomaticDimension;
-    if (row.kind == SGDSPRowSlider) return 12 + ceil(SGTitleFont().lineHeight) + 6 + 28 + 10;
+    // As SGDSPSliderCell lays it out: its text at the cell's width, which the table's margins inset, less 16pt sides.
+    CGFloat text = table.bounds.size.width - table.layoutMargins.left - table.layoutMargins.right - 32;
+    if (row.kind == SGDSPRowSlider) return 12 + SGSliderTextHeight(row.title, nil, text) + 6 + 28 + 10;
     if (row.kind == SGDSPRowCurve) return [SGDSPCurveView heightForKey:row.key];
     return UITableViewAutomaticDimension;
 }

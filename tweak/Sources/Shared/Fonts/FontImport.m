@@ -278,7 +278,7 @@ typedef NS_ENUM(NSInteger, SGFontSection) { SGFontBuiltIn, SGFontMore, SGFontYou
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return section == SGFontBuiltIn ? SGSectionGap : SGSectionHeaderHeight;
+    return section == SGFontBuiltIn ? SGSectionGap : SGSectionHeaderHeight();
 }
 
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {

@@ -106,7 +106,7 @@ static void appendTab(NSDictionary *tab) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return SGSectionHeaderHeight;
+    return SGSectionHeaderHeight();
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {
@@ -334,13 +334,20 @@ static const CGFloat kPictureHeight = 76;
         _glyphs[i].frame = CGRectMake(x + (slot - 24) / 2, glyphTop, 24, 24);
         _bars[i].frame = CGRectMake(x + (slot - 20) / 2, glyphTop + 32, 20, 4);
     }
-    CGFloat titleHeight = ceil(_title.font.lineHeight);
+    _title.font = SGSubtitleFont();
+    _title.numberOfLines = [SGRLabelCard titleLines];
+    CGFloat titleHeight = _title.numberOfLines * ceil(_title.font.lineHeight);
     _title.frame = CGRectMake(0, kPictureHeight + 8, width, titleHeight);
     _check.frame = CGRectMake((width - 44) / 2, CGRectGetMaxY(_title.frame) - 6, 44, 44);
 }
 
+// The name takes a second line at the accessibility sizes, where half the row is too narrow for it.
++ (NSInteger)titleLines {
+    return SGAccessibilityTextSize() ? 2 : 1;
+}
+
 + (CGFloat)height {
-    return kPictureHeight + 8 + ceil(SGSubtitleFont().lineHeight) - 6 + 44;
+    return kPictureHeight + 8 + [self titleLines] * ceil(SGSubtitleFont().lineHeight) - 6 + 44;
 }
 
 @end
@@ -498,7 +505,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return [self headerFor:section] ? SGSectionHeaderHeight : SGSectionGap;
+    return [self headerFor:section] ? SGSectionHeaderHeight() : SGSectionGap;
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {

@@ -7,15 +7,61 @@ static UIFont *sg_spotifyFont;
 UIColor *SGGrey(void) { return [UIColor colorWithRed:0xEB / 255.0 green:0xEB / 255.0 blue:0xF5 / 255.0 alpha:0.6]; }
 
 // Spotify's typeface at the sizes of its own lists, asked for by name so the app font of Shared/Fonts follows,
-// and the system font before Spotify has registered it. Grown with Dynamic Type no further than xxxLarge:
-// some rows are laid out by hand from these fonts, and the accessibility sizes would outgrow them.
-static UIFont *scaled(UIFontTextStyle style, CGFloat size, CGFloat largest) {
+// and the system font before Spotify has registered it. Grown with Dynamic Type through the accessibility
+// sizes, with no cap: the rows laid out by hand measure their text from these fonts.
+static UIFont *scaled(UIFontTextStyle style, CGFloat size) {
     UIFont *font = [UIFont fontWithName:@"SpotifyMixUI-Regular" size:size] ?: [UIFont systemFontOfSize:size];
-    return [[UIFontMetrics metricsForTextStyle:style] scaledFontForFont:font maximumPointSize:largest];
+    return [[UIFontMetrics metricsForTextStyle:style] scaledFontForFont:font];
 }
 
-UIFont *SGTitleFont(void) { return scaled(UIFontTextStyleBody, 13, 18); }
-UIFont *SGSubtitleFont(void) { return scaled(UIFontTextStyleFootnote, 11, 15); }
+UIFont *SGTitleFont(void) { return scaled(UIFontTextStyleBody, 13); }
+UIFont *SGSubtitleFont(void) { return scaled(UIFontTextStyleFootnote, 11); }
+UIFont *SGCappedFont(UIFont *font, CGFloat largest) {
+    return font.pointSize > largest ? [font fontWithSize:largest] : font;
+}
+
+BOOL SGAccessibilityTextSize(void) {
+    return UIContentSizeCategoryIsAccessibilityCategory(UIApplication.sharedApplication.preferredContentSizeCategory);
+}
+
+static CGFloat textHeight(NSString *text, UIFont *font, CGFloat width) {
+    if (!text.length) return 0;
+    return ceil([text boundingRectWithSize:CGSizeMake(MAX(1, width), CGFLOAT_MAX) options:NSStringDrawingUsesLineFragmentOrigin
+                                attributes:@{NSFontAttributeName: font} context:nil].size.height);
+}
+
+CGFloat SGSliderTextHeight(NSString *title, NSString *subtitle, CGFloat width) {
+    CGFloat line = ceil(SGTitleFont().lineHeight);
+    CGFloat height = SGAccessibilityTextSize() ? textHeight(title, SGTitleFont(), width) + line : line;
+    return height + textHeight(subtitle, SGSubtitleFont(), width);
+}
+
+CGFloat SGLayOutSliderText(UILabel *title, UILabel *value, UILabel *subtitle, CGFloat x, CGFloat y, CGFloat width) {
+    CGFloat line = ceil(title.font.lineHeight);
+    BOOL stacked = SGAccessibilityTextSize();
+    title.numberOfLines = stacked ? 0 : 1;
+    value.textAlignment = stacked ? NSTextAlignmentNatural : NSTextAlignmentRight;
+    if (stacked) {
+        CGFloat height = textHeight(title.text, title.font, width);
+        title.frame = CGRectMake(x, y, width, height);
+        y += height;
+        value.frame = CGRectMake(x, y, width, line);
+    } else {
+        [value sizeToFit];
+        CGFloat valueWidth = MIN(width, MAX(value.bounds.size.width, 44));
+        value.frame = CGRectMake(x + width - valueWidth, y, valueWidth, line);
+        title.frame = CGRectMake(x, y, MAX(1, CGRectGetMinX(value.frame) - x - 8), line);
+    }
+    y += line;
+    if (subtitle && !subtitle.hidden && subtitle.text.length) {
+        subtitle.numberOfLines = 0;
+        CGFloat height = textHeight(subtitle.text, subtitle.font, width);
+        subtitle.frame = CGRectMake(x, y, width, height);
+        y += height;
+    }
+    return y;
+}
+
 UIFont *SGSpotifyListFont(void) { return sg_spotifyFont ?: [UIFont systemFontOfSize:13 weight:UIFontWeightBold]; }
 
 UIImageView *SGSymbolView(NSString *name, CGFloat size, UIImageSymbolWeight weight, CGFloat box) {
@@ -32,6 +78,7 @@ UIView *SGNote(NSString *text) {
     UILabel *label = [UILabel new];
     label.text = text;
     label.font = SGSubtitleFont();
+    label.adjustsFontForContentSizeCategory = YES;
     label.textColor = SGGrey();
     label.numberOfLines = 0;
     UIView *wrapper = [UIView new];
@@ -44,6 +91,7 @@ UIView *SGNote(NSString *text) {
 // loop forever.
 void SGFitNote(UITableView *table, UIView *wrapper, CGFloat top, CGFloat bottom) {
     UILabel *label = wrapper.subviews.firstObject;
+    label.font = SGSubtitleFont();
     CGFloat inset = table.layoutMargins.left;
     CGFloat width = table.bounds.size.width - 2 * inset;
     CGFloat height = ceil([label sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)].height);
@@ -90,6 +138,24 @@ static UIColor *lookAccent(void) {
 }
 
 UIColor *SGGreen(void) { return lookAccent() ?: [UIColor colorWithRed:0x1E / 255.0 green:0xD7 / 255.0 blue:0x60 / 255.0 alpha:1]; }
+// Relative sRGB luminance, shared by filled controls and small marks on the dark cards.
+static CGFloat luminance(UIColor *color) {
+    CGFloat r = 0, g = 0, b = 0, a = 1;
+    [color getRed:&r green:&g blue:&b alpha:&a];
+    CGFloat (^linear)(CGFloat) = ^CGFloat(CGFloat c) { return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4); };
+    return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+}
+
+UIColor *SGOnAccent(void) {
+    CGFloat light = luminance(SGGreen());
+    return (light + 0.05) / 0.05 >= 1.05 / (light + 0.05) ? UIColor.blackColor : UIColor.whiteColor;
+}
+
+UIColor *SGAccentMark(void) {
+    CGFloat contrast = (luminance(SGGreen()) + 0.05) / (luminance(SGCardBackground()) + 0.05);
+    return contrast >= (UIAccessibilityDarkerSystemColorsEnabled() ? 4.5 : 3) ? SGGreen() : UIColor.whiteColor;
+}
+
 // The dark appearance's system red, and its grouped background and the cards on it, whichever look runs.
 UIColor *SGRed(void) { return [UIColor colorWithRed:0xFF / 255.0 green:0x45 / 255.0 blue:0x3A / 255.0 alpha:1]; }
 UIColor *SGPageBackground(void) { return UIColor.blackColor; }
@@ -125,7 +191,7 @@ UIImageView *SGChevronView(void) {
     return SGSymbolView(@"chevron.right", 13, UIImageSymbolWeightBold, 16);
 }
 
-const CGFloat SGSectionHeaderHeight = 38;
+CGFloat SGSectionHeaderHeight(void) { return MAX(38, ceil(SGSubtitleFont().lineHeight) + 14); }
 const CGFloat SGSectionGap = 20;
 
 // Every page below draws the same row: a 13pt white title over an 11pt grey subtitle in Spotify's typeface,
@@ -155,12 +221,13 @@ UIView *SGSectionHeader(UITableView *table, NSString *title) {
     UILabel *label = [UILabel new];
     label.text = title.uppercaseString;
     label.font = SGSubtitleFont();
+    label.adjustsFontForContentSizeCategory = YES;
     label.textColor = SGGrey();
     // On the header's foot, 7pt over the card, however tall Dynamic Type makes the line.
     CGFloat height = ceil(label.font.lineHeight);
-    label.frame = CGRectMake(16, SGSectionHeaderHeight - 7 - height, table.bounds.size.width - 32, height);
+    label.frame = CGRectMake(16, SGSectionHeaderHeight() - 7 - height, table.bounds.size.width - 32, height);
     label.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, table.bounds.size.width, SGSectionHeaderHeight)];
+    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, table.bounds.size.width, SGSectionHeaderHeight())];
     [header addSubview:label];
     return header;
 }
@@ -181,6 +248,7 @@ UIView *SGSectionFooter(UITableView *table, NSString *text) {
     UILabel *label = [UILabel new];
     label.text = text;
     label.font = SGSubtitleFont();
+    label.adjustsFontForContentSizeCategory = YES;
     label.textColor = SGGrey();
     label.numberOfLines = 0;
     label.frame = CGRectMake(16, kFooterTop, table.bounds.size.width - 32, footerTextHeight(table, text));

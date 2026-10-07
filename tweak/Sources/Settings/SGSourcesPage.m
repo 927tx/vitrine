@@ -87,7 +87,7 @@ typedef NS_ENUM(NSInteger, SGSourcesSection) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return section == SGSourcesSectionOn || _off.count ? SGSectionHeaderHeight : CGFLOAT_MIN;
+    return section == SGSourcesSectionOn || _off.count ? SGSectionHeaderHeight() : CGFLOAT_MIN;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {

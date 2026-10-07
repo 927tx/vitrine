@@ -273,6 +273,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 - (void)viewWillLayoutSubviews {
     [super viewWillLayoutSubviews];
     UITableView *table = self.tableView;
+    _note.font = SGSubtitleFont();
     CGFloat width = table.bounds.size.width, inset = table.layoutMargins.left;
     CGFloat cardWidth = width - 2 * inset;
     CGFloat cardHeight = round(MIN(kCardMaxHeight, MAX(kCardMinHeight, cardWidth * kCardAspect)));

@@ -128,7 +128,7 @@ static BOOL headOffset(double *pitch, double *yaw) {
     NSMutableArray<CAShapeLayer *> *ticks = [NSMutableArray array];
     for (NSInteger i = 0; i < kTicks; i++) {
         CAShapeLayer *tick = [CAShapeLayer layer];
-        tick.strokeColor = SGGreen().CGColor;
+        tick.strokeColor = SGAccentMark().CGColor;
         tick.lineWidth = kTickWidth;
         tick.lineCap = kCALineCapRound;
         tick.opacity = 0;
@@ -146,7 +146,7 @@ static BOOL headOffset(double *pitch, double *yaw) {
     [self.layer addSublayer:_dot];
 
     _check = SGSymbolView(@"checkmark", 34, UIImageSymbolWeightSemibold, 44);
-    _check.tintColor = SGGreen();
+    _check.tintColor = SGAccentMark();
     _check.hidden = YES;
     [self addSubview:_check];
 
@@ -287,7 +287,7 @@ static BOOL headOffset(double *pitch, double *yaw) {
     config.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
     if (prominent) {
         config.baseBackgroundColor = SGGreen();
-        config.baseForegroundColor = UIColor.blackColor;
+        config.baseForegroundColor = SGOnAccent();
     } else {
         config.baseForegroundColor = UIColor.whiteColor;
     }
