@@ -36,7 +36,7 @@ static const CGFloat kUnderlineDrop = 1, kUnderlineWidth = 2, kUnderlineAlpha = 
 // The line naming the source, under the lyrics, which fade out above it and the buttons beside it. It
 // wraps onto a second line rather than run under the buttons beside it, and a tap this far around it
 // opens the pages it links to.
-static const CGFloat kCreditSize = 12, kCreditAlpha = 0.4, kCreditBottom = 10, kCreditSlop = 8;
+static const CGFloat kCreditSize = 12, kCreditBottom = 10, kCreditSlop = 8;
 // The button for the pronunciation and the translation, in the bottom leading corner as Apple Music
 // has it, and the gap between it and the credit beside it.
 static const CGFloat kExtrasSide = 44, kExtrasBottom = 12, kExtrasGlyph = 17, kExtrasCreditGap = 12;
@@ -778,6 +778,7 @@ static double secant(SGSweepKnot *knots, NSUInteger i) {
 // right. A backing row keeps to the edge of the line it hangs under, whatever script each is in.
 @property (nonatomic, readonly) BOOL right;
 @property (nonatomic) BOOL active;
+@property (nonatomic, copy) BOOL (^activate)(void);
 @property (nonatomic) CGFloat blur;
 // under: the line a backing row hangs under, nil for a line of its own. sweepsEstimates: the words of a
 // line timed only by the line are swept on their estimated times, rather than lit whole.
@@ -836,6 +837,9 @@ static double wholeFrom(SGKaraokeLine *run, BOOL sweepsEstimates) {
     self = [super initWithFrame:CGRectZero];
     if (!self) return nil;
     _line = line;
+    self.isAccessibilityElement = under == nil;
+    self.accessibilityLabel = SGKaraokeLineText(line);
+    self.accessibilityTraits = UIAccessibilityTraitButton;
     BOOL backing = under != nil;
     SGRKaraokeLayout *layout = layOut(line, width, style, backing ? under.right : -1);
     _right = layout.right;
@@ -859,6 +863,13 @@ static double wholeFrom(SGKaraokeLine *run, BOOL sweepsEstimates) {
         _backing.frame = CGRectMake(0, layout.backingTop, width, _backing.bounds.size.height);
         [self addSubview:_backing];
     }
+    NSMutableArray<NSString *> *asides = [NSMutableArray array];
+    if (_translation.text.length) [asides addObject:_translation.text];
+    if (_romanised.text.length) [asides addObject:_romanised.text];
+    if (layout.spokenFrames.count && line.pronunciation) [asides addObject:SGKaraokeLineText(line.pronunciation) ?: @""];
+    if (line.backing) [asides addObject:SGKaraokeLineText(line.backing) ?: @""];
+    self.accessibilityValue = [asides componentsJoinedByString:@". "];
+    for (UIView *child in self.subviews) child.accessibilityElementsHidden = YES;
     self.frame = CGRectMake(0, 0, width, layout.height);
 
     // Scales toward the edge its text is aligned to, and a backing row rides its line's blur.
@@ -868,6 +879,10 @@ static double wholeFrom(SGKaraokeLine *run, BOOL sweepsEstimates) {
     CAFilter *blur = [NSClassFromString(@"CAFilter") filterWithType:@"gaussianBlur"];
     if (blur) self.layer.filters = @[blur];
     return self;
+}
+
+- (BOOL)accessibilityActivate {
+    return self.activate ? self.activate() : NO;
 }
 
 // A text of the line set apart from its words, dim until the line is sung.
@@ -905,6 +920,7 @@ static const NSUInteger kLinesPerFrame = 4;
 - (void)setActive:(BOOL)active {
     if (active == _active) return;
     _active = active;
+    self.accessibilityTraits = (self.accessibilityTraits & ~UIAccessibilityTraitSelected) | (active ? UIAccessibilityTraitSelected : 0);
     _backing.active = active;
     NSUInteger generation = ++_generation;
     if (_translation || _romanised) {
@@ -957,6 +973,7 @@ static const NSUInteger kLinesPerFrame = 4;
 }
 
 - (void)showPlain {
+    self.accessibilityTraits = UIAccessibilityTraitStaticText;
     for (SGRKaraokeWordView *word in _words) {
         word.lit.hidden = NO;
         word.lit.alpha = 1;
@@ -971,6 +988,12 @@ static const NSUInteger kLinesPerFrame = 4;
 }
 
 - (void)markMeaning:(NSArray<SGLyricsMeaning *> *)meanings {
+    NSString *text = SGKaraokeLineText(self.line);
+    self.accessibilityCustomActions = meanings.count ? @[[[UIAccessibilityCustomAction alloc]
+        initWithName:@"Show Meaning" actionHandler:^BOOL(UIAccessibilityCustomAction *action) {
+            SGRShowMeanings(text, meanings);
+            return YES;
+        }]] : nil;
     [_bubble removeFromSuperview];
     _bubble = nil;
     [_underline removeFromSuperlayer];
@@ -1206,6 +1229,13 @@ typedef struct {
     NSInteger start, end, line;
 } SGRKaraokeBreak;
 
+@interface SGRCreditLabel : UILabel
+@property (nonatomic, copy) BOOL (^activate)(void);
+@end
+@implementation SGRCreditLabel
+- (BOOL)accessibilityActivate { return self.activate ? self.activate() : NO; }
+@end
+
 @interface SGRKaraokeView () <UIScrollViewDelegate>
 @end
 
@@ -1252,7 +1282,7 @@ typedef struct {
     CGFloat _builtWidth, _placedHeight;
     BOOL _showing;
     CAGradientLayer *_fade;
-    UILabel *_credit;
+    SGRCreditLabel *_credit;
     NSString *_creditSource;   // the source the credit was settled on, nil until the lyrics name one
     NSArray<SGLyricsLink *> *_creditLinks;
     CGFloat _fontSize, _margin, _lineGap, _blurPerLine, _maxBlur;
@@ -1293,14 +1323,23 @@ typedef struct {
     _scroll.scrollsToTop = NO;
     _scroll.delegate = self;
     [self addSubview:_scroll];
-    _credit = [[UILabel alloc] initWithFrame:CGRectZero];
-    _credit.font = [UIFont systemFontOfSize:kCreditSize weight:UIFontWeightSemibold];
-    _credit.textColor = [UIColor colorWithWhite:1 alpha:kCreditAlpha];
+    _credit = [[SGRCreditLabel alloc] initWithFrame:CGRectZero];
+    [self refreshCreditStyle];
+    _credit.adjustsFontForContentSizeCategory = YES;
     _credit.hidden = YES;
     _credit.numberOfLines = 2;
     _crediting = SGFlag(SGKeyLyricsCredit, NO);
     _sweepsEstimates = SGFlag(SGKeyLyricsSimulateWords, NO);
     [self addSubview:_credit];
+    __weak SGRKaraokeView *weakSelf = self;
+    _credit.activate = ^BOOL {
+        SGRKaraokeView *page = weakSelf;
+        if (!page || !page->_creditLinks.count) return NO;
+        SGLyricsOpenCreditLinks(page->_creditLinks, page->_credit);
+        return YES;
+    };
+    for (NSNotificationName name in @[UIContentSizeCategoryDidChangeNotification, UIAccessibilityDarkerSystemColorsStatusDidChangeNotification])
+        [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(creditStyleChanged) name:name object:nil];
     _sing = [SGRSingButton new];
     [self addSubview:_sing];
     [self addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)]];
@@ -1315,6 +1354,19 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationDidBecomeActiveNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationWillResignActiveNotification object:nil];
     return self;
+}
+
+- (void)refreshCreditStyle {
+    _credit.font = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleCaption1]
+        scaledFontForFont:[UIFont systemFontOfSize:kCreditSize weight:UIFontWeightSemibold] maximumPointSize:17];
+    _credit.textColor = SGRSecondary();
+}
+
+- (void)creditStyleChanged {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self refreshCreditStyle];
+        [self setNeedsLayout];
+    });
 }
 
 - (instancetype)initWithSampleLines:(NSArray<SGKaraokeLine *> *)lines length:(NSInteger)length {
@@ -1374,7 +1426,8 @@ typedef struct {
     if (_extrasBox && !_extrasBox.hidden && CGRectContainsPoint(_extrasBox.frame, [tap locationInView:self])) return;
     if (_sing.userInteractionEnabled && [_sing pointInside:[tap locationInView:_sing] withEvent:nil]) return;
     if (_creditLinks.count && !_credit.hidden
-        && CGRectContainsPoint(CGRectInset(_credit.frame, -kCreditSlop, -kCreditSlop), [tap locationInView:self])) {
+        && CGRectContainsPoint(CGRectInset(_credit.frame, -kCreditSlop, -MAX(kCreditSlop, (44 - _credit.frame.size.height) / 2)),
+                               [tap locationInView:self])) {
         SGLyricsOpenCreditLinks(_creditLinks, _credit);
         return;
     }
@@ -1388,14 +1441,19 @@ typedef struct {
     if (_plain) return;   // a line with no time has nowhere to seek to
     for (SGRKaraokeLineView *view in _shown.allValues) {
         if (!CGRectContainsPoint(CGRectInset(view.frame, -_margin, -_lineGap / 2), point)) continue;
-        // The line shows Delay later than the song, so its sound is that much past its start.
-        NSInteger delay = SGKaraokeDelayMs();
-        SGLog(@"lyrics: tapped the line at %ld-%ld ms, the clock at %.0f ms, %ld ms of delay", (long)view.line.start, (long)view.line.end, _clock, (long)delay);
-        SGKaraokeSeek(view.line.start + delay);
-        SGPlayFeedback(SGFeedbackSkip);
-        [self glideTo:view.line.start];
+        [self seekToLine:view.line];
         return;
     }
+}
+
+// A tap on a line, or VoiceOver activating it.
+- (void)seekToLine:(SGKaraokeLine *)line {
+    // The line shows Delay later than the song, so its sound is that much past its start.
+    NSInteger delay = SGKaraokeDelayMs();
+    SGLog(@"lyrics: tapped the line at %ld-%ld ms, the clock at %.0f ms, %ld ms of delay", (long)line.start, (long)line.end, _clock, (long)delay);
+    SGKaraokeSeek(line.start + delay);
+    SGPlayFeedback(SGFeedbackSkip);
+    [self glideTo:line.start];
 }
 
 - (void)held:(UILongPressGestureRecognizer *)hold {
@@ -1880,6 +1938,14 @@ static BOOL hasWords(SGKaraokeLine *line) {
     [UIView performWithoutAnimation:^{
         view = [[SGRKaraokeLineView alloc] initWithLine:self->_lines[index] width:self->_builtWidth - 2 * self->_margin style:self->_style under:nil
                                                 blurred:self->_maxBlur > 0 && !self->_plain sweepsEstimates:self->_sweepsEstimates];
+        __weak SGRKaraokeView *page = self;
+        SGKaraokeLine *line = view.line;
+        view.activate = ^BOOL {
+            SGRKaraokeView *owner = page;
+            if (!owner || owner->_plain || ![owner->_lines containsObject:line]) return NO;
+            [owner seekToLine:line];
+            return YES;
+        };
         if (self->_plain) [view showPlain];
         [view markMeaning:self->_meanings[@(index)]];
         [self->_scroll addSubview:view];
@@ -1903,10 +1969,13 @@ static BOOL hasWords(SGKaraokeLine *line) {
     CGFloat height = self.bounds.size.height;
     CGFloat from = offset - kSightBehind * height, to = offset + (1 + kSightAhead) * height, slack = kSightSlack * height;
     NSMutableArray<NSNumber *> *gone = [NSMutableArray array];
+    id focusedElement = UIAccessibilityIsVoiceOverRunning() ? UIAccessibilityFocusedElement(UIAccessibilityNotificationVoiceOverIdentifier) : nil;
     for (NSNumber *key in _shown) {
         NSInteger index = key.integerValue;
         CGFloat top = [self topOfLine:index], bottom = top + _shown[key].bounds.size.height;
-        if (![self isSung:index] && (bottom < from - slack || top > to + slack)) [gone addObject:key];
+        // Keep the element VoiceOver is reading even when playback moves it out of sight.
+        BOOL focused = focusedElement == _shown[key];
+        if (!focused && ![self isSung:index] && (bottom < from - slack || top > to + slack)) [gone addObject:key];
     }
     for (NSNumber *key in gone) {
         [_shown[key] removeFromSuperview];
@@ -2013,6 +2082,15 @@ static BOOL hasWords(SGKaraokeLine *line) {
     _credit.text = text;
     _credit.hidden = !_showing || !text.length;
     [self setNeedsLayout];
+}
+
+- (NSArray *)accessibilityElements {
+    NSMutableArray *elements = [NSMutableArray array];
+    for (NSNumber *key in [[_shown allKeys] sortedArrayUsingSelector:@selector(compare:)]) [elements addObject:_shown[key]];
+    if (_extrasBox && !_extrasBox.hidden) [elements addObject:_extrasBox];
+    if (!_credit.hidden) [elements addObject:_credit];
+    if (_sing && !_sing.hidden) [elements addObject:_sing];
+    return elements;
 }
 
 - (void)syncSiblings {
