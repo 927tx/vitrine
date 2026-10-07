@@ -66,8 +66,15 @@ come late, out of order, or not at all.
   and the cover crossing over half way through the switch). Then the song pauses and plays (the clip's rate
   0, then 1), a mock of Spotify's video unit attaches and detaches its video (the clip goes and comes back),
   a track comes with no Canvas and then again with one (the clip comes in late), and a skip to a track whose
-  clip is in the store keeps the last clip until the new one is over it, the cover hidden throughout. The log
-  ends with `motion checks: n of 20 right -- PASS` or `FAIL`.
+  clip is in the store keeps the last clip until the new one is over it, the cover hidden throughout. The clip's
+  dim is checked over the clip and 0.15 darker under the lyrics, with the rule at its ends; `HARNESS_DIM` is the
+  dim the clip should get (`ffmpeg -f lavfi -i "color=c=white:s=360x640:d=4"` gives 0.54, black 0.10). Uninstall
+  the app between clips, or the store answers with the last one. Then Low Power Mode, which the process is made
+  to report (the simulator has none; Reduce Motion takes the same path), takes the clip away for the cover over
+  Fluid and gives it back once off, and a track change with the app made to report the background takes the clip
+  away at once, with no fade. The log ends with `motion checks: n of 25 right -- PASS` or `FAIL`.
+  `HARNESS_CANVAS_FAILS=n` fails the first n requests for the clip on the way: with 1 the store tries again and
+  every check passes, with 2 the clip never comes.
 
 - `settings` opens the redesign's Player page (`PlayerSettings.m`, with the real `Settings/` framework) over the
   player at 3 s, with the clip of `motion` in. It checks the card leads the page with the five backgrounds'

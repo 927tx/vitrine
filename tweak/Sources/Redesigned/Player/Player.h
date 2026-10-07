@@ -110,6 +110,10 @@ BOOL SGRPlayerMotionShowing(void);
 // `arrived` runs once on the main queue when a call would return it (never when nothing is found, or the
 // track changed). Without `arrived` it only answers with a clip already in.
 UIView *SGRPlayerMotionPreview(void (^arrived)(void));
+// How dark the clip is drawn (a black layer's opacity) for white text over it to keep 4.5:1, or 7:1 with
+// `contrast` (Increase Contrast), when `luminance` is the clip's bright end, its 75th percentile of linear
+// luminance; between 0.10 and 0.80, 0.15 more while the lyrics are up.
+CGFloat SGRPlayerClipDim(CGFloat luminance, BOOL contrast, BOOL lyrics);
 
 #pragma mark - the Visualiser (PlayerVisualiser.m)
 

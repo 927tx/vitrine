@@ -49,6 +49,37 @@ NSURL *SGMotionMadeFile(NSString *key) {
 
 static NSMutableDictionary<NSURL *, NSMutableArray *> *sg_waiting;
 
+// A download that failed on the way (the lock screen and the player can share one, and iOS can cancel it with
+// the lock screen's request) or met a busy server is tried `retries` more times before its waiters hear nil;
+// an answer that says the file is not there is final.
+static void download(NSURL *remote, NSURL *local, NSUInteger retries) {
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:remote];
+    request.allowsConstrainedNetworkAccess = SGFlag(SGKeyMotionLowData, NO);
+    [[NSURLSession.sharedSession downloadTaskWithRequest:request completionHandler:^(NSURL *temporary, NSURLResponse *response, NSError *error) {
+        NSInteger status = [response isKindOfClass:NSHTTPURLResponse.class] ? ((NSHTTPURLResponse *)response).statusCode : 0;
+        // The temporary file is gone once this handler returns, so it moves before the hop to main.
+        BOOL kept = temporary && status == 200 && [NSFileManager.defaultManager moveItemAtURL:temporary toURL:local error:nil];
+        BOOL again = !kept && retries > 0 && (error || status == 0 || status == 408 || status == 429 || status >= 500);
+        if (kept) {
+            trim();
+            NSNumber *bytes = nil;
+            [local getResourceValue:&bytes forKey:NSURLFileSizeKey error:nil];
+            SGLog(@"motion: %@ kept, %.1f MB", local.lastPathComponent, bytes.doubleValue / 1e6);
+        }
+        else SGLog(@"motion: %@ not downloaded (%ld, %@)%@", remote.lastPathComponent, (long)status, error.localizedDescription,
+                   again ? @", tried again" : @"");
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (again) {
+                download(remote, local, retries - 1);
+                return;
+            }
+            NSArray *waiting = sg_waiting[remote];
+            [sg_waiting removeObjectForKey:remote];
+            for (void (^waiter)(NSURL *) in waiting) waiter(kept ? local : nil);
+        });
+    }] resume];
+}
+
 void SGMotionFile(NSURL *remote, void (^done)(NSURL *file)) {
     if (!remote) {
         done(nil);
@@ -65,25 +96,7 @@ void SGMotionFile(NSURL *remote, void (^done)(NSURL *file)) {
         return;
     }
     sg_waiting[remote] = [NSMutableArray arrayWithObject:[done copy]];
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:remote];
-    request.allowsConstrainedNetworkAccess = SGFlag(SGKeyMotionLowData, NO);
-    [[NSURLSession.sharedSession downloadTaskWithRequest:request completionHandler:^(NSURL *temporary, NSURLResponse *response, NSError *error) {
-        NSInteger status = [response isKindOfClass:NSHTTPURLResponse.class] ? ((NSHTTPURLResponse *)response).statusCode : 0;
-        // The temporary file is gone once this handler returns, so it moves before the hop to main.
-        BOOL kept = temporary && status == 200 && [NSFileManager.defaultManager moveItemAtURL:temporary toURL:local error:nil];
-        if (kept) {
-            trim();
-            NSNumber *bytes = nil;
-            [local getResourceValue:&bytes forKey:NSURLFileSizeKey error:nil];
-            SGLog(@"motion: %@ kept, %.1f MB", local.lastPathComponent, bytes.doubleValue / 1e6);
-        }
-        else SGLog(@"motion: %@ not downloaded (%ld, %@)", remote.lastPathComponent, (long)status, error.localizedDescription);
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSArray *waiting = sg_waiting[remote];
-            [sg_waiting removeObjectForKey:remote];
-            for (void (^waiter)(NSURL *) in waiting) waiter(kept ? local : nil);
-        });
-    }] resume];
+    download(remote, local, 1);
 }
 
 void SGMotionPoster(NSURL *file, void (^done)(UIImage *poster)) {

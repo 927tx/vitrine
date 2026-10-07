@@ -429,7 +429,11 @@ Redesigned:
                   (SGRArtworkField's covered); the menu switches between Animated, Fluid and the Visualiser without
                   a restart. The clip holds its frame while the song is paused, goes while
                   Spotify's music video shows, is given up when it has drawn nothing in 5 s on screen, and on a skip
-                  stays a moment for the next track's to cross over it. Checked in the simulator against
+                  stays a moment for the next track's to cross over it. Under Reduce Motion and in Low Power Mode no
+                  clip plays: the cover stays over Fluid. A black layer dims the clip by its brightness (the 75th
+                  percentile of the linear luminance of three frames), so white text keeps 4.5:1 (7:1 with Increase
+                  Contrast), from 0.10 to 0.80 and 0.15 more behind the lyrics. A track that changes while the player
+                  cannot be seen (no window, or the app not in front) takes the last clip away at once. Checked in the simulator against
                   harness/player/ (`motion`). The Visualiser
                   (PlayerVisualiser.m) draws two soft hills of the song's spectrum across the foot of the player in the
                   cover's flow colours, over the Fluid field held still, blurred behind the lyrics: the audio effects'

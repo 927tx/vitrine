@@ -17,7 +17,7 @@ static const CGFloat kBlurSide = 128, kBlurRadius = 10, kSaturation = 1.5, kBrig
 // The shade over the bottom of the visible rect, where the controls are.
 static const CGFloat kShadeFrom = 0.45, kShadeAlpha = 0.55;
 
-static UIImage *blurred(UIImage *image) {
+static UIImage *blurred(UIImage *image, BOOL contrast) {
     CGImageRef source = image.CGImage;
     if (!source) return nil;
     CIImage *input = [CIImage imageWithCGImage:source];
@@ -32,8 +32,38 @@ static UIImage *blurred(UIImage *image) {
     dispatch_once(&once, ^{ context = [CIContext contextWithOptions:nil]; });
     CGImageRef cg = [context createCGImage:[output imageByCroppingToRect:extent] fromRect:extent];
     if (!cg) return nil;
-    UIImage *result = [UIImage imageWithCGImage:cg];
+    // Each blurred pixel is capped at a linear luminance (0.04 with Increase Contrast) that keeps the player's
+    // white text at about 8.8:1 and its 65% white at about 4.7:1 on the brightest; an average alone would leave
+    // a bright patch of a cover behind the text.
+    size_t width = CGImageGetWidth(cg), height = CGImageGetHeight(cg);
+    CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    CGContextRef bitmap = CGBitmapContextCreate(NULL, width, height, 8, width * 4, space,
+                                                kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    CGColorSpaceRelease(space);
+    if (!bitmap) { CGImageRelease(cg); return nil; }
+    CGContextDrawImage(bitmap, CGRectMake(0, 0, width, height), cg);
     CGImageRelease(cg);
+    unsigned char *pixels = CGBitmapContextGetData(bitmap);
+    CGFloat ceiling = contrast ? 0.04 : 0.07;
+    for (size_t i = 0; i < width * height; i++) {
+        unsigned char *p = pixels + i * 4;
+        CGFloat rgb[3];
+        for (int c = 0; c < 3; c++) {
+            CGFloat v = p[c] / 255.0;
+            rgb[c] = v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
+        }
+        CGFloat light = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+        CGFloat gain = light > ceiling ? ceiling / light : 1;
+        for (int c = 0; c < 3; c++) {
+            CGFloat v = rgb[c] * gain;
+            p[c] = floor(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * pow(v, 1 / 2.4) - 0.055));
+        }
+        p[3] = 255;
+    }
+    cg = CGBitmapContextCreateImage(bitmap);
+    UIImage *result = cg ? [UIImage imageWithCGImage:cg] : nil;
+    if (cg) CGImageRelease(cg);
+    CGContextRelease(bitmap);
     return result;
 }
 
@@ -60,7 +90,21 @@ static UIImage *blurred(UIImage *image) {
     _shade = [CAGradientLayer layer];
     _shade.colors = @[(id)[UIColor colorWithWhite:0 alpha:0].CGColor, (id)[UIColor colorWithWhite:0 alpha:kShadeAlpha].CGColor];
     [self addSublayer:_shade];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(contrastChanged)
+        name:UIAccessibilityDarkerSystemColorsStatusDidChangeNotification object:nil];
     return self;
+}
+
+- (void)dealloc {
+    [NSNotificationCenter.defaultCenter removeObserver:self];
+}
+
+- (void)contrastChanged {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIImage *source = self->_source;
+        self->_source = nil;
+        [self setArtwork:source animated:NO];
+    });
 }
 
 - (BOOL)moving {
@@ -103,9 +147,10 @@ static UIImage *blurred(UIImage *image) {
     if (!image || image == _source) return;
     _source = image;
     NSUInteger generation = ++_generation;
+    BOOL contrast = SGRIncreaseContrast();
     __weak SGRFluidLayer *weakSelf = self;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        UIImage *blur = blurred(image);
+        UIImage *blur = blurred(image, contrast);
         dispatch_async(dispatch_get_main_queue(), ^{
             SGRFluidLayer *layer = weakSelf;
             if (!blur || !layer || generation != layer->_generation) return;

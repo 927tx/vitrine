@@ -100,6 +100,14 @@ static void serve(NSString *imageURI, UIImage *image, NSTimeInterval delay, BOOL
     if ([self.request.URL.host isEqualToString:@"canvas.harness"]) {
         const char *file = getenv("HARNESS_CANVAS_FILE"), *delay = getenv("HARNESS_CANVAS_DELAY");
         NSData *data = file ? [NSData dataWithContentsOfFile:@(file)] : nil;
+        // HARNESS_CANVAS_FAILS=n: the first n requests for it fail on the way, as a download iOS cancelled.
+        static int failing = -1;
+        if (failing < 0) failing = getenv("HARNESS_CANVAS_FAILS") ? atoi(getenv("HARNESS_CANVAS_FAILS")) : 0;
+        if (failing > 0) {
+            failing--;
+            data = nil;
+            NSLog(@"[harness] canvas server: this request fails");
+        }
         NSThread *thread = NSThread.currentThread;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((delay ? atof(delay) : 0) * NSEC_PER_SEC)), dispatch_get_global_queue(0, 0), ^{
             sg_canvasServed++;
@@ -389,6 +397,7 @@ static void loadLyrics(void) {
     UIViewController *_background;
     UIView *_tilt;
     NSUInteger _failures, _checks;
+    float _dimAlone;   // the motion scenario's dim before the lyrics
 }
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)options {
@@ -900,6 +909,17 @@ static BOOL fieldCovered(void) {
         [self expect:seam.effect && !lyrics.effect step:@"the blur from the seam"
               detail:[NSString stringWithFormat:@"seam blur %@, from %@ of the height, lyrics blur %@", seam.effect ? @"on" : @"off",
                       [[seam.maskView.layer.sublayers.firstObject valueForKey:@"locations"] componentsJoinedByString:@" to "], lyrics.effect ? @"on" : @"off"]];
+        // Dimmed by its brightness: HARNESS_DIM is what the clip in HARNESS_CANVAS_FILE should get (0.54 for white,
+        // 0.10 for black); the rule itself is checked at its ends.
+        CALayer *dim = [motion valueForKey:@"_dim"];
+        const char *expected = getenv("HARNESS_DIM");
+        BOOL rule = fabs(SGRPlayerClipDim(1, NO, NO) - 0.54) < 0.01 && fabs(SGRPlayerClipDim(1, YES, NO) - 0.65) < 0.01
+                    && SGRPlayerClipDim(0, NO, NO) == 0.10 && fabs(SGRPlayerClipDim(0, NO, YES) - 0.25) < 1e-6
+                    && fabs(SGRPlayerClipDim(0.5, NO, NO) - 0.37) < 0.01;
+        self->_dimAlone = dim.opacity;
+        [self expect:rule && dim && dim.superlayer == clip.superlayer.superlayer && (!expected || fabs(dim.opacity - atof(expected)) < 0.02)
+                step:@"the dim" detail:[NSString stringWithFormat:@"rule %@, dim %.2f over the clip%@", rule ? @"right" : @"wrong", dim.opacity,
+                                        expected ? [NSString stringWithFormat:@", %s expected", expected] : @""]];
         NSLog(@"[harness] motion: screenshot the clip now");
     });
     after(7, ^{ SGRPlayerToggleLyrics(); });
@@ -910,6 +930,9 @@ static BOOL fieldCovered(void) {
             if ([NSStringFromClass(view.class) isEqualToString:@"SGRPlayerLyricsOverlay"]) thumb = [view valueForKey:@"thumb"];
         }
         BOOL away = thumb && !CGAffineTransformIsIdentity(thumb.transform) && thumb.alpha > 0.99;
+        float dim = ((CALayer *)[motionView() valueForKey:@"_dim"]).opacity;
+        [self expect:fabsf(dim - self->_dimAlone - 0.15f) < 0.01f step:@"the dim under the lyrics"
+              detail:[NSString stringWithFormat:@"%.2f, %.2f without them", dim, self->_dimAlone]];
         [self expect:SGRPlayerLyricsOpen() && lyrics.effect && away step:@"the lyrics"
               detail:[NSString stringWithFormat:@"lyrics %@, clip blurred %@, thumbnail %@ at alpha %.2f", SGRPlayerLyricsOpen() ? @"up" : @"down",
                       lyrics.effect ? @"yes" : @"no", thumb && !CGAffineTransformIsIdentity(thumb.transform) ? @"in its corner" : @"at the cover", thumb.alpha]];
@@ -1017,7 +1040,42 @@ static BOOL fieldCovered(void) {
         [self expect:SGRPlayerMotionShowing() && motionView() != before && mask && mask.opacity == 0 step:@"the next clip over the last"
               detail:[NSString stringWithFormat:@"%@, cover %@", motionView() != before ? @"a new clip" : @"the same clip", mask && mask.opacity == 0 ? @"still hidden" : @"back"]];
     });
-    after(23, ^{
+    // Low Power Mode (Reduce Motion takes the same path): the clip goes for Fluid and the cover, and comes back
+    // once it is off. The simulator has no Low Power Mode, so the process says it is on.
+    __block BOOL lowPower = NO;
+    after(22.5, ^{
+        Class info = object_getClass(NSProcessInfo.processInfo);
+        for (NSString *name in @[@"isLowPowerModeEnabled", @"lowPowerModeEnabled"]) {
+            Method method = class_getInstanceMethod(info, NSSelectorFromString(name));
+            if (method) method_setImplementation(method, imp_implementationWithBlock(^BOOL(id process) { return lowPower; }));
+        }
+        lowPower = YES;
+        [NSNotificationCenter.defaultCenter postNotificationName:NSProcessInfoPowerStateDidChangeNotification object:nil];    });
+    after(23.5, ^{
+        [self expect:!SGRPlayerMotionShowing() && !motionView() && !self->_covers.layer.mask step:@"Low Power Mode"
+              detail:[NSString stringWithFormat:@"clip %@, cover %@", motionView() ? @"still there" : @"gone", self->_covers.layer.mask ? @"hidden" : @"back"]];
+        lowPower = NO;
+        [NSNotificationCenter.defaultCenter postNotificationName:NSProcessInfoPowerStateDidChangeNotification object:nil];
+    });
+    // A track change with the app in the background: the last clip goes at once, with no fade to come back to.
+    __block UIApplicationState state = UIApplicationStateActive;
+    after(24.5, ^{
+        [self expect:SGRPlayerMotionShowing() && self->_covers.layer.mask step:@"Low Power Mode off"
+              detail:SGRPlayerMotionShowing() ? @"the clip back" : @"no clip"];
+        Method method = class_getInstanceMethod(UIApplication.class, @selector(applicationState));
+        method_setImplementation(method, imp_implementationWithBlock(^UIApplicationState(id app) { return state; }));
+        state = UIApplicationStateBackground;
+        unsetenv("HARNESS_CANVAS");
+        SGRHarnessSetTrack(@"spotify:track:harnessD", imageURI(@"dddd"), NO);
+    });
+    after(24.6, ^{
+        CALayer *mask = self->_covers.layer.mask;
+        [self expect:!SGRPlayerMotionShowing() && !motionView() && !mask step:@"a track change in the background"
+              detail:[NSString stringWithFormat:@"clip %@, cover %@", motionView() ? @"still there" : @"gone at once",
+                      mask ? [NSString stringWithFormat:@"hidden, at %.2f", mask.opacity] : @"back at once"]];
+        state = UIApplicationStateActive;
+    });
+    after(25, ^{
         NSLog(@"[harness] motion checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
               self->_failures ? @"FAIL" : @"PASS");
     });

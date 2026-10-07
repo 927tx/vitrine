@@ -13,9 +13,17 @@
 // Spotify built again, gets it.
 //
 // The clip holds still when the moving field does (SGRField.m): out of a window, with the app not in front,
-// while the player opens or closes, under Reduce Motion and in Low Power Mode, and while the song is paused.
+// while the player opens or closes, and while the song is paused. Under Reduce Motion and in Low Power Mode
+// no clip plays at all: the cover stays over Fluid, as for a track without one, until both are off again.
 // While a clip is showing, the Fluid field under it is held still too, and once the clip has faded in it is
 // hidden (the field's covered): the field's colour is what shows above the clip on the pull that dismisses.
+//
+// The clip is dimmed by how bright it is (SGRPlayerClipDim): three of its frames are measured as it comes in,
+// so a white Canvas is drawn darker than a black one and the white text over it keeps its contrast.
+//
+// A track that changes while the player cannot be seen (out of a window, or with the app not in front, which a
+// locked phone's player is while it stays in its window) takes the last clip away at once, without a fade, so
+// the last track's clip does not greet the player as it opens.
 //
 // The clip and the cover cross over: the clip fades in from its first frame (the poster, under the video
 // until the video has decoded one) as the cover fades out, and fades out as the cover comes back. A clip
@@ -47,6 +55,55 @@ static const CGFloat kBlurByControls = 0.6, kBlurRamp = 96;
 static const NSTimeInterval kGiveUp = 5;
 // Seconds the last track's clip stays on a skip for the next one's to come in over it.
 static const NSTimeInterval kHandOver = 0.4;
+// The dim's floor and ceiling, and what the lyrics add to it.
+static const CGFloat kDimLeast = 0.10, kDimMost = 0.80, kDimLyrics = 0.15;
+// The frames measured for the dim besides the poster, in seconds into the clip (one past its end is skipped).
+static const double kMeasuredAt[] = {1, 2};
+
+CGFloat SGRPlayerClipDim(CGFloat luminance, BOOL contrast, BOOL lyrics) {
+    // White is 1, so (1 + 0.05) / (L + 0.05) >= ratio puts the clip's luminance at `most` or under.
+    CGFloat ratio = contrast ? 7 : 4.5, most = 1.05 / ratio - 0.05;
+    // A black layer scales the clip's encoded values, which Core Animation blends, so its linear luminance
+    // goes down by about the 2.2nd power of what the layer leaves.
+    CGFloat dim = luminance > most ? 1 - pow(most / luminance, 1 / 2.2) : 0;
+    dim = MIN(MAX(dim, kDimLeast), kDimMost);
+    return lyrics ? dim + kDimLyrics : dim;
+}
+
+// Each pixel's linear luminance, of the image drawn 16 points square, onto `into` as floats.
+static void addLuminances(CGImageRef image, NSMutableData *into) {
+    if (!image) return;
+    enum { kSide = 16 };
+    uint8_t pixels[kSide * kSide * 4];
+    CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    CGContextRef context = CGBitmapContextCreate(pixels, kSide, kSide, 8, kSide * 4, space, (CGBitmapInfo)kCGImageAlphaNoneSkipLast);
+    CGColorSpaceRelease(space);
+    if (!context) return;
+    CGContextDrawImage(context, CGRectMake(0, 0, kSide, kSide), image);
+    CGContextRelease(context);
+    for (int i = 0; i < kSide * kSide; i++) {
+        float linear[3];
+        for (int c = 0; c < 3; c++) {
+            float v = pixels[i * 4 + c] / 255.0f;
+            linear[c] = v <= 0.04045f ? v / 12.92f : powf((v + 0.055f) / 1.055f, 2.4f);
+        }
+        float luminance = 0.2126f * linear[0] + 0.7152f * linear[1] + 0.0722f * linear[2];
+        [into appendBytes:&luminance length:sizeof luminance];
+    }
+}
+
+// The 75th percentile of the luminances: the bright end the text has to stand out against, past a few
+// highlights.
+static CGFloat brightEnd(NSData *luminances) {
+    NSUInteger count = luminances.length / sizeof(float);
+    if (!count) return 0;
+    NSMutableData *sorted = [luminances mutableCopy];
+    qsort_b(sorted.mutableBytes, count, sizeof(float), ^int(const void *a, const void *b) {
+        float x = *(const float *)a, y = *(const float *)b;
+        return x < y ? -1 : x > y;
+    });
+    return ((const float *)sorted.bytes)[(count - 1) * 3 / 4];
+}
 
 @interface SGRPlayerMotionView : UIView <SGPlayerStateObserver>
 @property (nonatomic) CGFloat screenHeight;
@@ -65,6 +122,9 @@ static const NSTimeInterval kHandOver = 0.4;
     AVPlayerLayer *_clip;
     CAGradientLayer *_clipMask, *_seamMask;
     CALayer *_foot;
+    CALayer *_dim;   // black over the clip and its foot, as dark as the clip is bright
+    NSMutableData *_luminances;   // of the frames measured so far
+    BOOL _lyricsUp;
     UIVisualEffectView *_seamBlur, *_lyricsBlur;
     CGFloat _aspect;
     BOOL _timing;   // the give-up's count is running
@@ -99,6 +159,10 @@ static UIBlurEffect *blurEffect(void) {
     _clipMask.locations = @[@0, @(kFootFrom), @1];
     _still.mask = _clipMask;
     [_picture.layer addSublayer:_still];
+    _dim = [CALayer layer];
+    _dim.backgroundColor = UIColor.blackColor.CGColor;
+    _dim.opacity = kDimLeast;
+    [_picture.layer addSublayer:_dim];
 
     _seamBlur = [[UIVisualEffectView alloc] initWithEffect:nil];
     _seamBlur.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
@@ -117,6 +181,7 @@ static UIBlurEffect *blurEffect(void) {
                                       NSProcessInfoPowerStateDidChangeNotification, UIAccessibilityReduceMotionStatusDidChangeNotification]) {
         [center addObserver:self selector:@selector(updateMotionSoon) name:name object:nil];
     }
+    [center addObserver:self selector:@selector(updateDim) name:UIAccessibilityDarkerSystemColorsStatusDidChangeNotification object:nil];
     SGRObservePlayerTransition(self, ^(id owner) { [owner updateMotion]; }, ^(id owner) { [owner updateMotion]; });
     SGAddPlayerStateObserver(self);
     return self;
@@ -154,6 +219,7 @@ static UIBlurEffect *blurEffect(void) {
     _clip.frame = _still.bounds;
     _clipMask.frame = _still.bounds;
     _foot.frame = CGRectMake(0, seam, width, MAX(0, total - seam));
+    _dim.frame = bounds;
     _seamMask.frame = bounds;
     _seamMask.locations = @[@(MIN(1, blurFrom / total)), @(MIN(1, (blurFrom + kBlurRamp) / total))];
     [CATransaction commit];
@@ -173,6 +239,41 @@ static UIBlurEffect *blurEffect(void) {
     _clip.player = _player;
     [self setNeedsLayout];
     [self updateMotion];
+    [self measure:file poster:poster];
+}
+
+// The poster now, so the clip comes in already dimmed, and two later frames as they are read.
+- (void)measure:(NSURL *)file poster:(UIImage *)poster {
+    _luminances = [NSMutableData data];
+    addLuminances(poster.CGImage, _luminances);
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    [self updateDim];
+    [CATransaction commit];
+    AVAssetImageGenerator *generator = [AVAssetImageGenerator assetImageGeneratorWithAsset:[AVURLAsset assetWithURL:file]];
+    generator.appliesPreferredTrackTransform = YES;
+    generator.maximumSize = CGSizeMake(64, 64);
+    __weak SGRPlayerMotionView *weakSelf = self;
+    NSMutableData *into = _luminances;
+    for (size_t i = 0; i < sizeof kMeasuredAt / sizeof *kMeasuredAt; i++) {
+        [generator generateCGImageAsynchronouslyForTime:CMTimeMakeWithSeconds(kMeasuredAt[i], 600)
+                                      completionHandler:^(CGImageRef image, CMTime actual, NSError *error) {
+            if (!image) return;
+            NSMutableData *frame = [NSMutableData data];
+            addLuminances(image, frame);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                SGRPlayerMotionView *view = weakSelf;
+                if (!view || view->_luminances != into) return;
+                [into appendData:frame];
+                [view updateDim];
+            });
+        }];
+    }
+}
+
+- (void)updateDim {
+    CGFloat dim = SGRPlayerClipDim(brightEnd(_luminances), UIAccessibilityDarkerSystemColorsEnabled(), _lyricsUp);
+    _dim.opacity = (float)dim;
 }
 
 // `done` runs once the clip is opaque, unless something cut the fade in short.
@@ -201,8 +302,15 @@ static UIBlurEffect *blurEffect(void) {
     }, ^(BOOL finished) { done(); });
 }
 
+// The lyrics' blur, and their share of the dim, which a layer's own animation carries over the same fade.
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated {
+    _lyricsUp = blurred;
     void (^apply)(void) = ^{ self->_lyricsBlur.effect = blurred ? blurEffect() : nil; };
+    [CATransaction begin];
+    [CATransaction setDisableActions:!animated];
+    [CATransaction setAnimationDuration:SGRCrossfade];
+    [self updateDim];
+    [CATransaction commit];
     if (animated) SGRAnimate(SGRMotionFade, apply, nil);
     else apply();
 }
@@ -409,7 +517,17 @@ static BOOL videoShowing(void) {
     return sg_videos.allObjects.count > 0;
 }
 
-// The clip fades out over the cover coming back where the player is on screen, and goes at once where not.
+// Reduce Motion asks for no looping clip, and Low Power Mode for no video decoding behind the player.
+static BOOL motionAllowed(void) {
+    return !SGRReduceMotion() && !NSProcessInfo.processInfo.lowPowerModeEnabled;
+}
+
+// The clip can be seen: in a window, with the app in front.
+static BOOL seen(UIView *view) {
+    return view.window && UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
+}
+
+// The clip fades out over the cover coming back where the player is seen, and goes at once where not.
 static void clear(BOOL animated) {
     SGRPlayerMotionView *old = sg_motion;
     sg_motion = nil;
@@ -419,7 +537,7 @@ static void clear(BOOL animated) {
     // Uncovered before the clip starts to fade, so the field is there under it.
     cover(NO);
     holdField();
-    animated = animated && old.window != nil;
+    animated = animated && seen(old);
     setCoverShown(YES, animated);
     if (animated) [old disappear:^{ [old removeFromSuperview]; }];
     else [old removeFromSuperview];
@@ -446,7 +564,7 @@ static void show(NSString *track, NSURL *file) {
         layOut();
         holdField();
         [sg_motion setBlurred:SGRPlayerLyricsOpen() animated:NO];
-        BOOL animated = sg_motion.window != nil;
+        BOOL animated = seen(sg_motion);
         [motion appear:animated then:^{
             if (sg_motion == motion) cover(YES);
         }];
@@ -471,15 +589,16 @@ static void videoSurface(id unit, BOOL attached) {
 }
 
 // A skip on screen leaves the last clip a moment for the next one's to cross over, and the same track
-// walked again (its Canvas came late) keeps its clip until the new one does. Otherwise the clip goes at
-// once: off screen, for Spotify's video, and when the background is not Animated.
+// walked again (its Canvas came late) keeps its clip until the new one does. Otherwise the clip goes: at
+// once where it cannot be seen, with a fade for Spotify's video, under Reduce Motion or Low Power Mode, and
+// when the background is not Animated.
 static BOOL beginTrack(NSString *track) {
     sg_track = track;
     sg_begun++;
     // Read on every track, since the ⋯ menu switches it.
-    BOOL wanted = SGRPlayerBackground() == SGRPlayerBackgroundAnimated && !videoShowing();
+    BOOL wanted = SGRPlayerBackground() == SGRPlayerBackgroundAnimated && !videoShowing() && motionAllowed();
     if (wanted && [track isEqualToString:sg_shown]) return YES;
-    if (!wanted || !sg_motion.window) {
+    if (!wanted || !seen(sg_motion)) {
         clear(YES);
         return wanted;
     }
@@ -552,6 +671,20 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
     if (background < SGRPlayerBackgroundFluid) return;
     sg_videos = [NSHashTable weakObjectsHashTable];
+    // Here rather than on the clip's view, which is gone while they hold it off: the track is walked again
+    // as either changes. The power state is reported off the main thread, which must not wait for main
+    // (AGENTS.md), so the observer takes it where it is posted and hops.
+    __block BOOL allowed = motionAllowed();
+    for (NSNotificationName name in @[NSProcessInfoPowerStateDidChangeNotification, UIAccessibilityReduceMotionStatusDidChangeNotification]) {
+        [NSNotificationCenter.defaultCenter addObserverForName:name object:nil queue:nil usingBlock:^(NSNotification *note) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (motionAllowed() == allowed) return;
+                allowed = !allowed;
+                SGLog(@"redesign player: animated artwork %@", allowed ? @"allowed again, the clip looked up" : @"held off by Reduce Motion or Low Power Mode, Fluid shows");
+                [sg_follower restart];
+            });
+        }];
+    }
     sg_follower = [[SGMotionFollower alloc] initWithBegin:^BOOL(NSString *uri, SPTPlayerState *state) {
         return beginTrack(uri);
     } found:^(NSString *uri, NSURL *file) {
