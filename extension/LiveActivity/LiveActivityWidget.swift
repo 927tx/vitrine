@@ -51,6 +51,7 @@ private struct Cover: View {
             .aspectRatio(contentMode: .fill)
             .frame(width: side, height: side)
             .clipShape(RoundedRectangle(cornerRadius: side / 6, style: .continuous))
+            .accessibilityLabel("Album artwork")
     }
 }
 
@@ -210,23 +211,28 @@ private struct SmallView: View {
 }
 
 // The lock screen's card, and StandBy's: the cover beside what the view shows, and the bar under both.
-// The control menu's five chips need the whole width, so it goes without the cover.
+// The control menu uses the whole width, so it goes without the cover.
 private struct FamilyView: View {
     let state: State
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: state.view == .panel ? 6 : 10) {
             HStack(alignment: .center, spacing: 12) {
                 if state.view != .panel, let image = coverImage(state) {
                     Cover(image: image, side: 52)
                 }
-                ContentView(state: state, upNext: 4)
+                ContentView(state: state, upNext: 3)
             }
             ProgressBar(state: state)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, state.view == .panel ? 12 : 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, state.view == .panel ? 8 : 12)
+        // The tallest view, the menu's Queue, comes to 156 of the 160 points: 16 of padding, 32 of tabs, three
+        // rows of at least 28 with 4 between, two gaps of 6 and the 4 point bar. Text at the accessibility sizes
+        // would grow the rows past the clip, so it stops at the largest size before them, where a footnote
+        // line still fits a 28 point row.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 }
 
@@ -412,7 +418,7 @@ private struct QueueView: View {
     let upNext: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
             Text("Up next")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.6))
@@ -427,7 +433,7 @@ private struct QueueView: View {
                     (Text(track.title).fontWeight(.semibold) + Text("  " + track.artist).foregroundColor(.white.opacity(0.6)))
                         .font(.subheadline)
                         .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -471,13 +477,15 @@ private struct PanelView: View {
     let state: State
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             HStack(spacing: 6) {
                 ForEach(Tab.allCases, id: \.self) { tab in
                     Toggle(isOn: tab == state.tab, intent: SGLiveActivityActionIntent("tab:\(tab.rawValue)")) {
-                        EmptyView()
+                        Text(tab.title)
                     }
                     .toggleStyle(TabStyle(tab: tab))
+                    .accessibilityLabel(tab.title)
+                    .accessibilityValue(tab == state.tab ? "Selected" : "Not selected")
                 }
             }
             Group {
@@ -499,12 +507,12 @@ private struct TabStyle: ToggleStyle {
         HStack(spacing: 4) {
             Image(systemName: tab.symbol)
             if configuration.isOn {
-                Text(tab.title)
+                configuration.label
             }
         }
         .font(.caption.weight(.semibold))
         .frame(maxWidth: .infinity)
-        .frame(height: 24)
+        .frame(height: 32)
         .background(Capsule().fill(configuration.isOn ? green.opacity(0.22) : idle))
         .foregroundStyle(configuration.isOn ? green : .white.opacity(0.7))
     }
@@ -521,10 +529,9 @@ private struct ChipLabel: View {
             Text(label)
                 .font(.caption2.weight(.medium))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 48)
+        .frame(height: 56)
     }
 }
 
@@ -549,6 +556,8 @@ private struct ChipButton: View {
     let symbol: String
     let label: String
     var lit = false
+    // What VoiceOver and Voice Control say, where the short label on the chip would read wrong: "15m" as 15 metres.
+    var spoken: String?
 
     var body: some View {
         Button(intent: SGLiveActivityActionIntent(action)) {
@@ -557,6 +566,7 @@ private struct ChipButton: View {
                 .foregroundStyle(lit ? green : .white)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(spoken ?? label)
     }
 }
 
@@ -574,16 +584,21 @@ private struct ControlsPage: View {
             }
             .lineLimit(1)
             .invalidatableContent()
-            HStack(spacing: 6) {
+            HStack(spacing: 10) {
                 ChipButton(action: "previous", symbol: "backward.fill", label: "Previous")
-                Toggle(isOn: !state.paused, intent: SGLiveActivityActionIntent("toggle")) { EmptyView() }
+                // Named for what it shows, so Voice Control's "Tap Pause" finds it while it plays.
+                Toggle(isOn: !state.paused, intent: SGLiveActivityActionIntent("toggle")) { Text(state.paused ? "Play" : "Pause") }
+                    .accessibilityLabel(state.paused ? "Play" : "Pause")
                     .toggleStyle(ChipStyle(symbol: "play.fill", onSymbol: "pause.fill", label: "Play", onLabel: "Pause", lights: false))
                 ChipButton(action: "next", symbol: "forward.fill", label: "Next")
-                Toggle(isOn: state.shuffle, intent: SGLiveActivityActionIntent("shuffle")) { EmptyView() }
+                Toggle(isOn: state.shuffle, intent: SGLiveActivityActionIntent("shuffle")) { Text("Shuffle") }
+                    .accessibilityLabel("Shuffle")
+                    .accessibilityValue(state.shuffle ? "On" : "Off")
                     .toggleStyle(ChipStyle(symbol: "shuffle", label: "Shuffle"))
                 // Three states, so a button: the new one shows once the render lands.
                 ChipButton(action: "repeat", symbol: state.repeatMode == 2 ? "repeat.1" : "repeat",
                            label: "Repeat", lit: state.repeatMode != 0)
+                    .accessibilityValue(["Off", "All", "One"][min(max(state.repeatMode, 0), 2)])
                     .invalidatableContent()
             }
         }
@@ -616,7 +631,8 @@ private struct QueuePage: View {
                     }
                     .lineLimit(1)
                     .padding(.horizontal, 10)
-                    .frame(height: 28)
+                    .frame(minHeight: 28)
+                    .contentShape(Rectangle())
                     .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(idle))
                 }
                 .buttonStyle(.plain)
@@ -650,7 +666,7 @@ private struct TimerPage: View {
                     Spacer(minLength: 0)
                     HStack(spacing: 8) {
                         if state.timerEnd != nil {
-                            ChipButton(action: "timer:add", symbol: "plus", label: "15 min")
+                            ChipButton(action: "timer:add", symbol: "plus", label: "15m", spoken: "Add 15 minutes")
                         }
                         ChipButton(action: "timer:cancel", symbol: "xmark", label: "Cancel")
                     }
@@ -658,11 +674,11 @@ private struct TimerPage: View {
                 }
             } else {
                 HStack(spacing: 8) {
-                    ChipButton(action: "timer:15", symbol: "moon", label: "15 min")
-                    ChipButton(action: "timer:30", symbol: "moon", label: "30 min")
-                    ChipButton(action: "timer:60", symbol: "moon", label: "1 hour")
-                    ChipButton(action: "timer:track", symbol: "music.note", label: "End of track")
-                    ChipButton(action: "timer:album", symbol: "square.stack", label: "End of album")
+                    ChipButton(action: "timer:15", symbol: "moon", label: "15m", spoken: "15 minutes")
+                    ChipButton(action: "timer:30", symbol: "moon", label: "30m", spoken: "30 minutes")
+                    ChipButton(action: "timer:60", symbol: "moon", label: "1h", spoken: "1 hour")
+                    ChipButton(action: "timer:track", symbol: "music.note", label: "Track", spoken: "End of track")
+                    ChipButton(action: "timer:album", symbol: "square.stack", label: "Album", spoken: "End of album")
                 }
             }
         }

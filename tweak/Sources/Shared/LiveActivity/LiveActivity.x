@@ -52,9 +52,9 @@ static const NSTimeInterval kStartRetry = 10;
 // A card that has not changed for this long is sent again, so its stale date (the bridge's staleAfter,
 // three times this) keeps moving on while Spotify runs, and runs out only once Spotify is gone.
 static const NSTimeInterval kRefresh = 20;
-// Tracks up next: the queue view shows four on the lock screen (three in the Dynamic Island), the
+// Tracks up next: the queue view shows three on the lock screen and in the Dynamic Island, the
 // control menu's queue tab three.
-static const NSUInteger kUpNextQueue = 4;
+static const NSUInteger kUpNextQueue = 3;
 static const NSUInteger kUpNextPanel = 3;
 // The cover goes to the card in the state itself, which ActivityKit caps at 4 KB with everything else in
 // it and encodes as JSON, the cover in base64: this many bytes of JPEG come to about 1.9 KB of it.
