@@ -37,8 +37,8 @@ static NSString *authorSymbol(SGLyricsMeaningAuthor author) {
     if (!self) return nil;
     _lineText = [lineText copy];
     _meanings = [meanings copy];
-    self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     self.modalPresentationStyle = UIModalPresentationPageSheet;
+    SGPresentDark(self);
     UISheetPresentationController *sheet = self.sheetPresentationController;
     sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent, UISheetPresentationControllerDetent.largeDetent];
     sheet.prefersGrabberVisible = YES;

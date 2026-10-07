@@ -71,4 +71,6 @@ Rules:
   for main, and at launch main waits on Spotify's CoreThread, so Spotify hangs and is killed. Use `queue:nil`
   and `dispatch_async` to main. Glass takes the appearance it inherits, and outside Spotify's navigation
   stacks (the tab bar, the now playing bar, the player) that is the system's: set every pane of the
-  mod's to `overrideUserInterfaceStyle = UIUserInterfaceStyleDark`, or it goes light in light mode.
+  mod's to `overrideUserInterfaceStyle = UIUserInterfaceStyleDark`, or it goes light in light mode. Present a
+  controller of the mod's through `SGPresentDark` (`Core/SGGlass.h`): a sheet's glass is its presentation's, and the
+  controller's own override does not reach it.

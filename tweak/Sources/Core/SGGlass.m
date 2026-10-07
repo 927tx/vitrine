@@ -69,3 +69,8 @@ void SGShapeGlass(UIView *glass, CGFloat radius, BOOL capsule) {
         glass.clipsToBounds = YES;
     }
 }
+
+void SGPresentDark(UIViewController *controller) {
+    controller.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    controller.presentationController.overrideTraitCollection = [UITraitCollection traitCollectionWithUserInterfaceStyle:UIUserInterfaceStyleDark];
+}

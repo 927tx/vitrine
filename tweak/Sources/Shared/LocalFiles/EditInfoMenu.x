@@ -372,7 +372,7 @@ void SGLocalFilePresentEditor(UIViewController *presenter, NSString *uri) {
     UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:editor];
     navigation.modalPresentationStyle = UIModalPresentationFormSheet;
     // Outside Spotify's navigation stacks a sheet takes the system's appearance, light in light mode.
-    navigation.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    SGPresentDark(navigation);
     navigation.presentationController.delegate = editor;
     UISheetPresentationController *sheet = navigation.sheetPresentationController;
     sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent, UISheetPresentationControllerDetent.largeDetent];

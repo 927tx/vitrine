@@ -104,7 +104,7 @@ static void presentStyleSheet(UIViewController *owner) {
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:page];
     nav.view.backgroundColor = UIColor.clearColor;
     // Outside Spotify's own stacks the sheet would take the system's appearance, light in light mode.
-    nav.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    SGPresentDark(nav);
     UISheetPresentationController *sheet = nav.sheetPresentationController;
     // As tall as the sliders, half the screen until they are measured, so the preview at the top of the page stays
     // in sight and undimmed, and its buttons live.

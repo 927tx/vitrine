@@ -298,6 +298,8 @@ static const CGFloat kLogoRadius = 22;
     if (!(self = [super initWithNibName:nil bundle:nil])) return nil;
     self.modalPresentationStyle = UIModalPresentationOverFullScreen;
     self.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
+    // Its text is white, and the glass under it would take the system's appearance, light in light mode.
+    SGPresentDark(self);
     return self;
 }
 

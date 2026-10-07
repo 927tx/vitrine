@@ -546,8 +546,8 @@ void SGPresentHeadGesturesTeaching(UIViewController *owner, void (^closed)(void)
     SGTeachController *teach = [[SGTeachController alloc] initWithClosed:closed];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:teach];
     // Outside Spotify's own stacks the sheet would take the system's appearance, light in light mode.
-    nav.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     nav.modalPresentationStyle = UIModalPresentationPageSheet;
+    SGPresentDark(nav);
     nav.sheetPresentationController.prefersGrabberVisible = YES;
     [owner presentViewController:nav animated:YES completion:nil];
 }

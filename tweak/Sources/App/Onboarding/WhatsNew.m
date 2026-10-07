@@ -51,7 +51,7 @@ static UILabel *label(NSString *text, UIFontTextStyle style, UIFontWeight weight
 - (instancetype)init {
     if (!(self = [super initWithNibName:nil bundle:nil])) return nil;
     self.modalPresentationStyle = UIModalPresentationPageSheet;
-    self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    SGPresentDark(self);
     self.sheetPresentationController.prefersGrabberVisible = YES;
     return self;
 }

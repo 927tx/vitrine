@@ -256,7 +256,7 @@ void SGPickColor(NSString *title, NSInteger initial, void (^picked)(NSInteger rg
     picker.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemClose target:sheet action:@selector(cancel)];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:picker];
     nav.modalPresentationStyle = UIModalPresentationPageSheet;
-    nav.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    SGPresentDark(nav);
     objc_setAssociatedObject(nav, @selector(confirm), sheet, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [SGTopController() presentViewController:nav animated:YES completion:nil];
 }

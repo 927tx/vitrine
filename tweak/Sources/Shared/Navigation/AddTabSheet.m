@@ -545,7 +545,7 @@ typedef NS_ENUM(NSInteger, SGAddTabSection) {
 static void presentSheet(UIViewController *owner, SGAddTabPage *page) {
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:page];
     // Outside Spotify's own stacks the sheet would take the system's appearance, light in light mode.
-    nav.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    SGPresentDark(nav);
     UISheetPresentationController *sheet = nav.sheetPresentationController;
     // Tall enough for the name and the two rows under the navigation bar, and Remove Tab while editing; the
     // keyboard lifts it.

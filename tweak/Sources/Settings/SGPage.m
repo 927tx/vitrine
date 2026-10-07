@@ -48,5 +48,9 @@ void SGRegisterPages(void) {
 
 void SGShowPage(UIViewController *owner, UIViewController *page) {
     if (owner.navigationController && sg_pagesConform) [owner.navigationController pushViewController:page animated:YES];
-    else [owner presentViewController:[[UINavigationController alloc] initWithRootViewController:page] animated:YES completion:nil];
+    else {
+        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:page];
+        SGPresentDark(nav);
+        [owner presentViewController:nav animated:YES completion:nil];
+    }
 }
