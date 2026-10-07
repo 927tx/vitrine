@@ -592,9 +592,13 @@ preset, a pull-down of Spotify, Apple Music and Custom read off the colour store
 existed reads as Custom, Apple Music's red as Apple Music), and Accent colour, the hex and a swatch of the colour in
 effect, which opens the system picker in a sheet that stores only from its checkmark, as Custom. The custom colour is
 kept aside while a preset is in place, so Custom brings it back. Last come the Font, under either look and on any
-iOS, below 26 too, with Custom font among its choices (a .ttf or .otf imported from Files by the row under it,
-copied to Application Support/Vitrine/Font and registered again at each launch, Spotify's font coming back when the
-file is gone), and the App icon. Everything on the page applies after a restart. Redesigned UI, the main page's
+iOS, below 26 too, a page of its own with each choice drawn in itself: Default (Spotify's), San Francisco, SF
+Rounded, New York and SF Mono; More fonts, the families iOS carries of a fixed few (Avenir Next to American
+Typewriter), each weight taken as the family's nearest face; and Your fonts, the files of one family (.ttf, .otf, .ttc or .otc, picked
+together) added from Files, refused when their faces name more than one family, copied to Application Support/Vitrine/Font
+and registered again at each launch, each weight taken as the family's nearest face, Spotify's font coming back when
+the files are gone. Swiping the row deletes the family. An import from before families (one file under
+spotifyglass.font.file) moves to spotifyglass.font.files and the family name on first use. Then the App icon. Everything on the page applies after a restart. Redesigned UI, the main page's
 first row, is the one switch between the two looks (see Layers): it glows (Settings/SGGlowSwitch), its ⓘ says what
 it changes, and flipping it offers to restart Spotify. The pages show only what the stored look has: a page opened
 after flipping the switch already shows what the restart will bring, and the main page swaps Home & Library and

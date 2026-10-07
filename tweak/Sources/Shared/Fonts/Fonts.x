@@ -2,13 +2,13 @@
 // script in SpotifyShared's Fonts.bundle), the system's in one of its designs, or a font file imported from
 // Files (FontImport.m). Spotify asks for its fonts by name, so a name from its two families comes back as the
 // system font at the same size, with the weight its name ends in. The rounded, serif and monospaced designs
-// reach the system font too, so the mod's own text follows. An imported font takes the system font's place
-// at the same size; it is one face, so every weight comes out in it. Read at launch.
+// reach the system font too, so the mod's own text follows. An imported family and a family iOS carries
+// take its place at the same size, each weight as the family's nearest face. Read at launch.
 #import "Core/SGCore.h"
 #import "Shared/Fonts/Fonts.h"
 
 static SGAppFont sg_font;
-static NSString *sg_custom;   // the imported font's PostScript name, once Core Text has it for this launch
+static NSString *sg_family;   // the chosen family: one iOS carries, or the imported one once Core Text has it
 
 static BOOL spotifys(NSString *name) {
     return [name hasPrefix:@"CircularSp"] || [name hasPrefix:@"SpotifyMix"] || [name hasPrefix:@"Circular"];
@@ -33,21 +33,25 @@ static UIFontDescriptorSystemDesign designOf(SGAppFont font) {
     }
 }
 
-// Nil if the imported font has gone since launch, so whoever asked gets the font they would have had.
-static UIFont *custom(CGFloat size) {
-    return [UIFont fontWithName:sg_custom size:size];
+// The family's upright face nearest the weight, so an italic file in the family never stands in for regular
+// text. Its name is not Spotify's, so the descriptor hook passes it through.
+static UIFont *family(CGFloat size, UIFontWeight weight) {
+    UIFontDescriptor *descriptor = [UIFontDescriptor fontDescriptorWithFontAttributes:@{
+        UIFontDescriptorFamilyAttribute: sg_family,
+        UIFontDescriptorTraitsAttribute: @{UIFontWeightTrait: @(weight), UIFontSlantTrait: @0},
+    }];
+    return [UIFont fontWithDescriptor:descriptor size:size];
 }
 
 static UIFont *designed(UIFont *font) {
     if (sg_font < SGAppFontRounded || !font) return font;
-    if (sg_font == SGAppFontCustom) return custom(font.pointSize) ?: font;
+    if (sg_font >= SGAppFontCustom) return family(font.pointSize, [font.fontDescriptor.fontAttributes[UIFontDescriptorTraitsAttribute][UIFontWeightTrait] doubleValue]) ?: font;
     UIFontDescriptor *descriptor = [font.fontDescriptor fontDescriptorWithDesign:designOf(sg_font)];
     return descriptor ? [UIFont fontWithDescriptor:descriptor size:font.pointSize] : font;
 }
 
-// Nil only for an imported font that has gone, which leaves Spotify's own in place.
 static UIFont *systemFor(NSString *name, CGFloat size) {
-    if (sg_font == SGAppFontCustom) return custom(size);
+    if (sg_font >= SGAppFontCustom) return family(size, weightOf(name));
     return designed([UIFont systemFontOfSize:size weight:weightOf(name)]);
 }
 
@@ -85,11 +89,18 @@ static UIFont *systemFor(NSString *name, CGFloat size) {
 
 SGAppFont SGAppFontChosen(void) {
     NSInteger font = SGInt(SGKeyAppFont, SGAppFontSpotify);
-    return font >= SGAppFontSpotify && font <= SGAppFontCustom ? font : SGAppFontSpotify;
+    return font >= SGAppFontSpotify && font <= SGAppFontFamily ? font : SGAppFontSpotify;
 }
 
 NSArray<NSString *> *SGAppFontNames(void) {
-    return @[@"Spotify", @"System", @"Rounded", @"Serif", @"Mono", @"Custom font"];
+    return @[@"Default", @"San Francisco", @"SF Rounded", @"New York", @"SF Mono"];
+}
+
+NSArray<NSString *> *SGAppFontFamilies(void) {
+    NSArray<NSString *> *all = @[@"Avenir Next", @"Helvetica Neue", @"Futura", @"Gill Sans", @"Optima", @"Georgia", @"Charter", @"Palatino", @"American Typewriter"];
+    return [all filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(NSString *name, NSDictionary *bindings) {
+        return [UIFont fontNamesForFamilyName:name].count > 0;
+    }]];
 }
 
 %ctor {
@@ -99,13 +110,21 @@ NSArray<NSString *> *SGAppFontNames(void) {
     // runs. A file that is gone (a restored backup, a reinstall) leaves Spotify's font and keeps the choice,
     // so importing again is all it takes; Circular imported as a file of its own needs nothing done either.
     if (sg_font == SGAppFontCustom) {
-        sg_custom = SGRegisterCustomFont();
-        if (!sg_custom || spotifys(sg_custom)) {
+        sg_family = SGRegisterCustomFont();
+        if (!sg_family || spotifys(sg_family)) {
             SGLog(@"fonts: the imported font is not there, Spotify's stays");
             return;
         }
     }
+    if (sg_font == SGAppFontFamily) {
+        NSString *name = [NSUserDefaults.standardUserDefaults stringForKey:SGKeyAppFontFamily];
+        if (![SGAppFontFamilies() containsObject:name]) {
+            SGLog(@"fonts: the family %@ is not on this iPhone, Spotify's stays", name);
+            return;
+        }
+        sg_family = name;
+    }
     %init;
     if (sg_font >= SGAppFontRounded) %init(Designs);
-    SGLog(@"fonts: %@ in place of Spotify's", sg_custom ?: SGAppFontNames()[sg_font]);
+    SGLog(@"fonts: %@ in place of Spotify's", sg_family ?: SGAppFontNames()[sg_font]);
 }

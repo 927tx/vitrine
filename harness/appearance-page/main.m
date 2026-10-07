@@ -10,7 +10,7 @@
 // cleared first), redesign (the redesign's rows), accent=<hex|-1>, raccent=<hex|-1>, font=<n>.
 // Actions: open=<section>.<row> (the row's menu opened as a tap does), menu=<section>.<row>:<n> (its nth item
 // picked), select=<section>.<row> (a tap on the row), color=<hex> (the open picker moved there), confirm (its
-// checkmark), close (the sheet dismissed without it), import=<path> (that file handed to the font import as
+// checkmark), close (the sheet dismissed without it), import=<path,path> (those files handed to the font import as
 // Files would), dismiss (whatever is presented goes), dump (the stored keys and every row with what it reads).
 #import <UIKit/UIKit.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -50,6 +50,13 @@ static NSInteger hex(NSString *text) {
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)options {
     NSArray<NSString *> *args = NSProcessInfo.processInfo.arguments;
     NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+    // The family grouping the font import goes by: one shared name passes, a mix, a missing name or no face does not.
+    NSCAssert([SGFontSingleFamily(@[@"Inter", @"Inter", @"Inter"]) isEqualToString:@"Inter"], @"one family");
+    NSCAssert([SGFontSingleFamily(@[@"Inter"]) isEqualToString:@"Inter"], @"one face");
+    NSCAssert(!SGFontSingleFamily(@[@"Inter", @"Lato"]), @"two families");
+    NSCAssert(!SGFontSingleFamily(@[@"Inter", @""]), @"a face without a family");
+    NSCAssert(!SGFontSingleFamily(@[]), @"no faces");
+    NSLog(@"[harness] family grouping ok");
     if (![args containsObject:@"keep"]) {
         for (NSString *key in store.dictionaryRepresentation.allKeys) {
             if ([key hasPrefix:@"spotifyglass.accent"] || [key hasPrefix:@"spotifyglass.redesign.accent"] || [key hasPrefix:@"spotifyglass.font"] ||
@@ -128,7 +135,13 @@ static NSInteger hex(NSString *text) {
         [self.nav dismissViewControllerAnimated:YES completion:nil];
     } else if ([verb isEqualToString:@"import"]) {
         id picker = [NSClassFromString(@"SGFontPicker") new];
-        [picker documentPicker:[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeFont] asCopy:YES] didPickDocumentsAtURLs:@[[NSURL fileURLWithPath:value]]];
+        NSMutableArray<NSURL *> *urls = [NSMutableArray array];
+        for (NSString *path in [value componentsSeparatedByString:@","]) [urls addObject:[NSURL fileURLWithPath:path]];
+        [picker documentPicker:[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeFont] asCopy:YES] didPickDocumentsAtURLs:urls];
+    } else if ([verb isEqualToString:@"delete"]) {
+        UIContextualAction *action = [table.delegate tableView:table trailingSwipeActionsConfigurationForRowAtIndexPath:[self pathFrom:value]].actions.firstObject;
+        NSLog(@"[harness] swipe on %@ offers %@", value, action.title ?: @"nothing");
+        if (action) action.handler(action, [UIView new], ^(BOOL done) {});
     } else if ([verb isEqualToString:@"dump"]) {
         NSDictionary *all = NSUserDefaults.standardUserDefaults.dictionaryRepresentation;
         for (NSString *key in [all.allKeys sortedArrayUsingSelector:@selector(compare:)]) {

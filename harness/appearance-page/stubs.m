@@ -16,9 +16,13 @@ NSInteger SGRAccentRGB(void) { NSInteger rgb = valid(SGInt(SGRKeyAccent, SGRDefa
 
 SGAppFont SGAppFontChosen(void) {
     NSInteger font = SGInt(SGKeyAppFont, SGAppFontSpotify);
-    return font >= SGAppFontSpotify && font <= SGAppFontCustom ? font : SGAppFontSpotify;
+    return font >= SGAppFontSpotify && font <= SGAppFontFamily ? font : SGAppFontSpotify;
 }
 
 NSArray<NSString *> *SGAppFontNames(void) {
-    return @[@"Spotify", @"System", @"Rounded", @"Serif", @"Mono", @"Custom font"];
+    return @[@"Default", @"San Francisco", @"SF Rounded", @"New York", @"SF Mono"];
+}
+
+NSArray<NSString *> *SGAppFontFamilies(void) {
+    return @[@"Avenir Next", @"Georgia"];
 }
