@@ -140,6 +140,7 @@ static NSString *lyricsLine(NSString *trackID, NSString **next, NSString **trans
     if (lines && SGKaraokeLinesTiming(lines) == SGKaraokeTimingNone) lines = nil;
     NSInteger position = SGKaraokePositionMs();
     if (position >= 0 && !SGPlayerState().isPaused) position += kRenderLeadMs;
+    if (position >= 0) position -= SGKaraokeDelayMs();
     // With two voices at once, the one that came in first, and the one singing over it as the next.
     NSInteger index = SGKaraokeLeadLine(lines, position);
     *next = index + 1 < (NSInteger)lines.count ? SGKaraokeLineText(lines[index + 1]) : @"";

@@ -61,6 +61,7 @@ id SGKaraokePlayer(void) { return sg_player; }
 NSString *SGKaraokePlayingTrack(void) { return @"track"; }
 NSArray<SGKaraokeLine *> *SGKaraokeLinesForTrack(NSString *trackID) { return sg_lines; }
 void SGKaraokeRequestLyrics(NSString *trackID) {}
+NSInteger SGKaraokeDelayMs(void) { return [NSUserDefaults.standardUserDefaults integerForKey:SGKeyLyricsDelay]; }
 
 static SGKaraokeLine *lineOf(NSString *text, NSInteger start, NSInteger end) {
     SGKaraokeWord *word = [SGKaraokeWord new];

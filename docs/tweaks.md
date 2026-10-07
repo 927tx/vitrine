@@ -92,7 +92,12 @@ Shared:
                   for the lock screen and the Live Activity), a line in another alphabet in Latin letters, offline by Apple's
                   transforms, kanji read the Japanese way in a song with kana (Romanise.m; checked on the simulator by
                   harness/lyrics' -romanise), and the Lyrics page's parts. Lines are kept in time order
-                  whatever order a source lists them in. With EeveeSpotify injected (SGEeveeSpotifyInjected), its lyrics
+                  whatever order a source lists them in. The Lyrics page's Delay (Timing, 0 to 1000 ms, either look)
+                  shows every line that much later than the song, for Bluetooth headphones: whatever times lines
+                  against the position takes it off first (the redesign's lyrics view and its word sweep, the lock
+                  screen's line and artwork, the Live Activity, the native look's lyrics page for local files), and a
+                  tap on a line seeks to its start plus the delay. Karaoke's audio, the scrubber and the lyrics preview
+                  are left alone. It is read at every use, so a change applies at once (checked by harness/lyrics' -check). With EeveeSpotify injected (SGEeveeSpotifyInjected), its lyrics
                   answer Spotify's requests and the mod's sources and its own requests stand aside
     LyricsSources/ the sources lyrics come from, asked in the order the Lyrics page puts them in and merged into the
                   best answer (LyricsSources.m, the list to drag in LyricsSourcesPage.m): Apple Music's TTML from

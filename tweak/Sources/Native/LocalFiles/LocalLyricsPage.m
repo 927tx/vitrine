@@ -213,7 +213,7 @@ static UILabel *label(UIFontTextStyle style, UIFontWeight weight, CGFloat size, 
     NSString *uri = SGURIString(state.track.URI);
     if (uri && ![uri isEqualToString:_uri]) [self load:state uri:uri];
     if (!_timed || !_labels.count) return;
-    NSInteger ms = (NSInteger)((state.isPaused ? state.positionAsOfTimestamp : state.position) * 1000);
+    NSInteger ms = (NSInteger)((state.isPaused ? state.positionAsOfTimestamp : state.position) * 1000) - SGKaraokeDelayMs();
     NSInteger current = SGKaraokeLeadLine(_lines, ms);
     if (current != _current && current < (NSInteger)_labels.count) [self light:current];
 }

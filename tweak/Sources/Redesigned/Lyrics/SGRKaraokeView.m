@@ -1356,9 +1356,13 @@ typedef struct {
     [self restyle];
 }
 
-// The preview's lines on its own clock, round and round; everything else the player's.
+// The preview's lines on its own clock, round and round; everything else the player's, less the
+// Lyrics page's Delay (below 0 for the first moments of a song with one).
 - (NSInteger)positionMs {
-    if (!_sample) return SGKaraokePositionMs();
+    if (!_sample) {
+        NSInteger ms = SGKaraokePositionMs();
+        return ms < 0 ? ms : ms - SGKaraokeDelayMs();
+    }
     return (NSInteger)fmod((CACurrentMediaTime() - _sampleEpoch) * 1000, _sampleLength);
 }
 
@@ -1384,8 +1388,10 @@ typedef struct {
     if (_plain) return;   // a line with no time has nowhere to seek to
     for (SGRKaraokeLineView *view in _shown.allValues) {
         if (!CGRectContainsPoint(CGRectInset(view.frame, -_margin, -_lineGap / 2), point)) continue;
-        SGLog(@"lyrics: tapped the line at %ld-%ld ms, the clock at %.0f ms", (long)view.line.start, (long)view.line.end, _clock);
-        SGKaraokeSeek(view.line.start);
+        // The line shows Delay later than the song, so its sound is that much past its start.
+        NSInteger delay = SGKaraokeDelayMs();
+        SGLog(@"lyrics: tapped the line at %ld-%ld ms, the clock at %.0f ms, %ld ms of delay", (long)view.line.start, (long)view.line.end, _clock, (long)delay);
+        SGKaraokeSeek(view.line.start + delay);
         SGPlayFeedback(SGFeedbackSkip);
         [self glideTo:view.line.start];
         return;

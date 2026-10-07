@@ -95,6 +95,8 @@ NSString *SGKaraokePlayingTrack(void) { return @"harness"; }
 NSArray<SGKaraokeLine *> *SGKaraokeLinesForTrack(NSString *trackID) { return sg_lines; }
 void SGKaraokeKeepLines(NSString *trackID, NSArray<SGKaraokeLine *> *lines) { sg_lines = lines; }
 
+NSInteger SGKaraokeDelayMs(void) { return [NSUserDefaults.standardUserDefaults integerForKey:SGKeyLyricsDelay]; }
+
 NSInteger SGKaraokePositionMs(void) {
     if (sg_from < 0) return -1;
     CFTimeInterval now = CACurrentMediaTime();

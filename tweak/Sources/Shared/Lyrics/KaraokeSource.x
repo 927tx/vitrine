@@ -400,6 +400,10 @@ NSInteger SGKaraokePositionMs(void) {
     return (NSInteger)((state.isPaused ? state.positionAsOfTimestamp : state.position) * 1000);
 }
 
+NSInteger SGKaraokeDelayMs(void) {
+    return SGInt(SGKeyLyricsDelay, 0);
+}
+
 void SGKaraokeSeek(NSInteger ms) {
     id player = sg_player;
     if (![player respondsToSelector:@selector(seekTo:)]) {

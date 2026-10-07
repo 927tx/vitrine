@@ -111,14 +111,19 @@ static UIViewController *lyricsPage(void) {
     sing.value = ^NSString *{ return SGSingSummary(); };
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:SGSection(nil, @[SGWithTile(sing, @"music.mic", UIColor.systemRedColor)]),
                                                 SGLyricsSourcesSection(redesigned), nil];
+    SGModSection *timing = SGNotedSection(@"Timing", @[SGLyricsDelayRow()],
+        @"Every line shows this much later than the song, for Bluetooth headphones that play a little behind the lyrics. Applies at once.");
     if (redesigned) {
         [sections addObjectsFromArray:@[
             SGSection(@"Display", @[SGRLyricsTextSizesRow(), SGLyricsWordTimingRow(), SGLyricsRomanisedRow(),
                 SGSwitchRow(@"Hide the controls", @"A few seconds after the last touch, the lyrics take the whole player", SGRKeyLyricsAutoHide),
                 SGSwitchRow(@"Landscape lyrics", @"Turn the phone with the lyrics open", SGRKeyLyricsLandscape)]),
+            timing,
             SGSection(@"Translation", @[SGLyricsTranslationLanguageRow(), SGGeminiKeyRow()]),
             SGSection(nil, @[SGLyricsMeaningsRow()]),
         ]];
+    } else {
+        [sections addObject:timing];
     }
     [sections addObject:SGSection(nil, more)];
     // The redesign's page leads with its lyrics playing in the look the page sets, and that look's presets.

@@ -11,12 +11,13 @@
 // LyricsSettings.m: the Lyrics page's parts (App/Pages.m puts the page together): where lyrics come
 // from, naming the source (read by the redesign's lyrics view only), the lock screen, which
 // language a line's translation is taken in, of those the lyrics come with, and the one Musixmatch's
-// community translations are asked in (the redesign's lyrics being where translations show), whether lines timed only by the line are swept word by word, and whether lines in other alphabets show again in Latin letters.
+// community translations are asked in (the redesign's lyrics being where translations show), whether lines timed only by the line are swept word by word, whether lines in other alphabets show again in Latin letters, and how much later than the song every line shows.
 SGModSection *SGLyricsSourcesSection(BOOL namingSource);
 SGModRow *SGLockScreenLyricsRow(void);
 SGModRow *SGLyricsTranslationLanguageRow(void);
 SGModRow *SGLyricsWordTimingRow(void);
 SGModRow *SGLyricsRomanisedRow(void);
+SGModRow *SGLyricsDelayRow(void);
 
 // Shows a line written in another alphabet (Japanese, Korean, Chinese, Cyrillic, Greek, Thai, Arabic,
 // Hebrew, Devanagari...) again under itself in Latin letters, before its translation. Off by default.
@@ -145,6 +146,11 @@ BOOL SGLyricsStandAsideForEevee(void);
 // The base62 id, a local file's lyrics key (Shared/LocalFiles), nil before the player reported.
 NSString *SGKaraokePlayingTrack(void);
 NSInteger SGKaraokePositionMs(void);     // negative when unknown
+// The Lyrics page's Delay: every line shows this many ms later than the song, for headphones that play
+// behind it. Whatever times lines against the position compares them with the position less this, and a
+// tap on a line seeks to its start plus this. Read at every call, so a change applies at once.
+#define SGKeyLyricsDelay @"spotifyglass.lyricsDelay"
+NSInteger SGKaraokeDelayMs(void);
 void SGKaraokeSeek(NSInteger ms);
 id SGKaraokePlayer(void);                // SPTEsperantoPlayer, nil before the app asked it for its state
 // A track the player has reported, by its base62 id; nil for one it has not played this session.

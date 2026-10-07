@@ -348,6 +348,57 @@ static void checkGlide(SGRKaraokeView *karaoke, dispatch_block_t then) {
     });
 }
 
+// A tap as the view's recognizer reports it, at a point in the window.
+@interface SGHarnessTap : UITapGestureRecognizer
+@property (nonatomic) CGPoint point;
+@end
+
+@implementation SGHarnessTap
+- (CGPoint)locationInView:(UIView *)view {
+    return [view convertPoint:self.point fromView:nil];
+}
+@end
+
+// The Lyrics page's Delay of 500 ms: the view times its lines against the song's position less it, and a
+// tap on a line three ahead seeks to that line's start plus it, so once the seek lands the line tapped is
+// the one sung, on the delayed clock.
+static void checkDelay(SGRKaraokeView *karaoke, dispatch_block_t then) {
+    const NSInteger delay = 500;
+    [NSUserDefaults.standardUserDefaults setInteger:delay forKey:SGKeyLyricsDelay];
+    NSArray<SGKaraokeLine *> *lines = [karaoke valueForKey:@"lines"];
+    NSInteger before = SGKaraokePositionMs();
+    NSInteger shown = ((NSInteger (*)(id, SEL))objc_msgSend)(karaoke, NSSelectorFromString(@"positionMs"));
+    NSInteger later = SGKaraokePositionMs();
+    expect(shown >= before - delay && shown <= later - delay,
+           [NSString stringWithFormat:@"with 500 ms of delay the lines are timed at %ld ms, the song at %ld ms", (long)shown, (long)before]);
+    // Two lines, at 1 s and 3 s: at 3.2 s into the song the line shown is still the first.
+    NSArray<SGKaraokeLine *> *pair = @[timed(1000, @"a", nil), timed(3000, @"b", nil)];
+    expect(SGKaraokeLeadLine(pair, 3200 - delay) == 0 && SGKaraokeLeadLine(pair, 3600 - delay) == 1,
+           @"at 3.2 s the line from 1 s shows, at 3.6 s the one from 3 s");
+
+    NSInteger focus = [[karaoke valueForKey:@"focus"] integerValue], target = focus + 3;
+    UIView *view = [karaoke valueForKey:@"shown"][@(target)];
+    if (!view || target >= (NSInteger)lines.count) {
+        expect(NO, @"a line three ahead has a view to tap");
+        then();
+        return;
+    }
+    SGHarnessTap *tap = [SGHarnessTap new];
+    tap.point = [view convertPoint:CGPointMake(CGRectGetMidX(view.bounds), CGRectGetMidY(view.bounds)) toView:nil];
+    ((void (*)(id, SEL, id))objc_msgSend)(karaoke, NSSelectorFromString(@"tapped:"), tap);
+    NSInteger start = lines[(NSUInteger)target].start;
+    after(0.8, ^{
+        // The player reports the seek -seekLag (0.4 s) after it, so it has run on about 0.4 s since.
+        NSInteger song = SGKaraokePositionMs();
+        expect(song >= start + delay && song <= start + delay + 600,
+               [NSString stringWithFormat:@"a tap on the line at %ld ms seeks the song to %ld ms (now at %ld ms)", (long)start, (long)(start + delay), (long)song]);
+        NSInteger sung = [[karaoke valueForKey:@"focus"] integerValue];
+        expect(sung > focus && sung <= target, [NSString stringWithFormat:@"and the line tapped (or one sung over it) is the one sung (line %ld for %ld)", (long)sung, (long)target]);
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:SGKeyLyricsDelay];
+        then();
+    });
+}
+
 // Scrolled by hand, the page's room grows (the controls go) and the scroll goes on up: the lines made for
 // the view meanwhile keep the room between them that the lines already there have.
 static void checkBrowse(SGRKaraokeView *karaoke, UIView *host, dispatch_block_t then) {
@@ -461,9 +512,11 @@ static void runChecks(SGRKaraokeView *karaoke, UIView *host) {
         after(0.5, ^{
             checkBrowse(karaoke, host, ^{
                 checkGlide(karaoke, ^{
-                    printf("%d failed\n", sg_failures);
-                    fflush(stdout);
-                    exit(sg_failures);
+                    checkDelay(karaoke, ^{
+                        printf("%d failed\n", sg_failures);
+                        fflush(stdout);
+                        exit(sg_failures);
+                    });
                 });
             });
         });

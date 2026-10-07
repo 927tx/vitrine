@@ -108,6 +108,8 @@ SPTPlayerTrack *SGKaraokeTrackFor(NSString *trackID) { return nil; }
 void SGKaraokeRememberTrack(SPTPlayerTrack *track) {}
 
 // The song runs on from the moment the harness started it, so the sweep is alive in a screenshot.
+NSInteger SGKaraokeDelayMs(void) { return [NSUserDefaults.standardUserDefaults integerForKey:SGKeyLyricsDelay]; }
+
 NSInteger SGKaraokePositionMs(void) {
     if (!sg_started) return sg_position;
     return sg_position + (NSInteger)((CACurrentMediaTime() - sg_started) * 1000);

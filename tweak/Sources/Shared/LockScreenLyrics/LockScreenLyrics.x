@@ -73,7 +73,7 @@ static NSString *lineFor(NSDictionary *info, double elapsed) {
     }
     // Plain text has no line being sung to show.
     if (SGKaraokeLinesTiming(lines) == SGKaraokeTimingNone) return nil;
-    NSInteger position = (NSInteger)(elapsed * 1000);
+    NSInteger position = (NSInteger)(elapsed * 1000) - SGKaraokeDelayMs();
     NSInteger index = SGKaraokeLeadLine(lines, position);
     if (index < 0) return nil;
     BOOL nextFarOff = index + 1 == (NSInteger)lines.count || lines[index + 1].start - position > kBreakMs;

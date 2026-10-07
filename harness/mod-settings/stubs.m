@@ -21,7 +21,7 @@ UIViewController *SGRLyricsSettingsPage(NSString *title, NSString *intro, NSArra
 
 #define ROW(name) SGModRow *name(void) { return SGPageRow(@#name, ^UIViewController *{ return nil; }); }
 ROW(SGAppIconRow) ROW(SGGeminiKeyRow) ROW(SGGlassLyricsRow) ROW(SGLockScreenLyricsRow) ROW(SGLyricsMeaningsRow)
-ROW(SGLyricsTranslationLanguageRow) ROW(SGLyricsWordTimingRow) ROW(SGRLyricsTextSizesRow)
+ROW(SGLyricsTranslationLanguageRow) ROW(SGLyricsWordTimingRow) ROW(SGRLyricsTextSizesRow) ROW(SGLyricsDelayRow) ROW(SGLyricsRomanisedRow)
 NSArray<SGModRow *> *SGAppFontRows(void) { return @[]; }
 NSArray<SGModRow *> *SGNativeAppearanceRows(void) { return @[]; }
 NSArray<SGModRow *> *SGRAppearanceRows(void) { return @[]; }

@@ -117,6 +117,7 @@ static void tick(void) {
         }
         NSInteger position = SGKaraokePositionMs();
         if (position < 0) return;
+        position -= SGKaraokeDelayMs();
         NSInteger index = SGKaraokeLeadLine(lines, position);
         BOOL nextFarOff = index + 1 == (NSInteger)lines.count || lines[index + 1].start - position > kBreakMs;
         BOOL resting = index < 0 || (position > SGKaraokeSungEnd(lines[index]) + kBreakMs && nextFarOff);
