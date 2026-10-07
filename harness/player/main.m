@@ -19,6 +19,8 @@
 //     motion   Animated artwork: a clip (HARNESS_CANVAS_FILE, an mp4) that comes in before the player has
 //              laid out, then the field, the lyrics, a field built again, the menu's switch and the player
 //              closed, each step checked; the log ends with motion checks n of m right -- PASS or FAIL
+//     catalog  Apple Music's catalog behind a stub: the search term without the edition, the album of the same
+//              name first, and the pause after a 429; the log says PASS or FAIL
 //     settings the redesign's Player page (PlayerSettings.m) over the player with the clip of `motion`: the
 //              card over Animated, then Fluid, Colours, Still and Visualiser as the segmented control picks
 //              them, and Animated again, the note under it changing and the rows under the header holding
@@ -70,6 +72,11 @@ static NSMutableDictionary<NSString *, SGRHarnessPicture *> *sg_pictures;
 static NSUInteger sg_served;
 // How many times the clip itself was served.
 static NSUInteger sg_canvasServed;
+// The catalog scenario's Apple Music: the addresses asked, in order, what it answers, and the clips' playlists
+// asked for after it.
+static NSMutableArray<NSURL *> *sg_catalogAsked, *sg_canvasAsked;
+static NSInteger sg_catalogStatus = 200;
+static NSData *sg_catalogBody;
 
 static void serve(NSString *imageURI, UIImage *image, NSTimeInterval delay, BOOL fails) {
     if (!sg_pictures) sg_pictures = [NSMutableDictionary dictionary];
@@ -88,6 +95,7 @@ static void serve(NSString *imageURI, UIImage *image, NSTimeInterval delay, BOOL
 }
 
 + (BOOL)canInitWithRequest:(NSURLRequest *)request {
+    if ([request.URL.host isEqualToString:@"amp-api.music.apple.com"]) return sg_catalogAsked != nil;
     return [request.URL.host isEqualToString:@"i.scdn.co"] || [request.URL.host isEqualToString:@"canvas.harness"];
 }
 
@@ -96,6 +104,20 @@ static void serve(NSString *imageURI, UIImage *image, NSTimeInterval delay, BOOL
 }
 
 - (void)startLoading {
+    if ([self.request.URL.host isEqualToString:@"amp-api.music.apple.com"]) {
+        @synchronized (sg_catalogAsked) { [sg_catalogAsked addObject:self.request.URL]; }
+        NSHTTPURLResponse *response = [[NSHTTPURLResponse alloc] initWithURL:self.request.URL statusCode:sg_catalogStatus HTTPVersion:@"HTTP/1.1"
+                                                                headerFields:@{@"Content-Type": @"application/json"}];
+        [self.client URLProtocol:self didReceiveResponse:response cacheStoragePolicy:NSURLCacheStorageNotAllowed];
+        [self.client URLProtocol:self didLoadData:sg_catalogBody ?: [NSData data]];
+        [self.client URLProtocolDidFinishLoading:self];
+        return;
+    }
+    if (sg_canvasAsked && [self.request.URL.path hasSuffix:@".m3u8"]) {
+        @synchronized (sg_canvasAsked) { [sg_canvasAsked addObject:self.request.URL]; }
+        [self answer:nil];
+        return;
+    }
     // The motion scenario's clip, at once, or HARNESS_CANVAS_DELAY seconds late.
     if ([self.request.URL.host isEqualToString:@"canvas.harness"]) {
         const char *file = getenv("HARNESS_CANVAS_FILE"), *delay = getenv("HARNESS_CANVAS_DELAY");
@@ -591,6 +613,7 @@ static void loadLyrics(void) {
     else if ([scenario() isEqualToString:@"scroll"]) [self runScrollChecks];
     else if ([scenario() isEqualToString:@"landscape"]) [self runLandscape];
     else if ([scenario() isEqualToString:@"motion"]) [self runMotionChecks];
+    else if ([scenario() isEqualToString:@"catalog"]) [self runCatalogChecks];
     else if ([scenario() isEqualToString:@"badge"]) [self runBadgeChecks];
     else if ([scenario() isEqualToString:@"cover"]) [self runCoverChecks];
     else if ([scenario() isEqualToString:@"immersive"]) [self runImmersiveChecks];
@@ -1077,6 +1100,76 @@ static BOOL fieldCovered(void) {
     });
     after(25, ^{
         NSLog(@"[harness] motion checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
+              self->_failures ? @"FAIL" : @"PASS");
+    });
+}
+
+#pragma mark - Apple Music's catalog
+
+static NSData *catalogAlbums(NSArray<NSArray<NSString *> *> *albums) {
+    NSMutableArray *data = [NSMutableArray array];
+    for (NSArray<NSString *> *album in albums) {
+        [data addObject:@{@"attributes": @{@"name": album[0], @"artistName": album[1],
+                                           @"editorialVideo": @{@"motionTallVideo3x4": @{@"video": album[2]}}}}];
+    }
+    return [NSJSONSerialization dataWithJSONObject:@{@"results": @{@"albums": @{@"data": data}}} options:0 error:nil];
+}
+
+static NSString *termOf(NSURL *url) {
+    for (NSURLQueryItem *item in [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO].queryItems) {
+        if ([item.name isEqualToString:@"term"]) return item.value;
+    }
+    return nil;
+}
+
+// The album search's term without the edition, the album of the same name before another edition, and the pause
+// after a 429: nothing asked of the catalog for the next album, which finds nothing at once.
+- (void)runCatalogChecks {
+    sg_catalogAsked = [NSMutableArray array];
+    sg_canvasAsked = [NSMutableArray array];
+    // A web player token that has not run out, so no browse page is read.
+    NSString *(^part)(NSString *) = ^NSString *(NSString *json) {
+        NSString *base = [[json dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0];
+        return [[[base stringByReplacingOccurrencesOfString:@"+" withString:@"-"] stringByReplacingOccurrencesOfString:@"/" withString:@"_"]
+                stringByReplacingOccurrencesOfString:@"=" withString:@""];
+    };
+    NSString *token = [NSString stringWithFormat:@"%@.%@.c2ln", part(@"{\"alg\":\"none\"}"), part(@"{\"iss\":\"AMPWebPlay\",\"exp\":4102444800}")];
+    [NSUserDefaults.standardUserDefaults setObject:token forKey:@"spotifyglass.motion.token"];
+
+    NSDictionary<NSString *, NSString *> *names = @{
+        @"Abbey Road (Remastered)": @"Abbey Road", @"Rumours - 2004 Remaster": @"Rumours", @"[Deluxe]": @"[Deluxe]",
+        @"Thriller 25 [Super Deluxe Edition] (Remastered)": @"Thriller 25", @"Midnights": @"Midnights",
+    };
+    __block BOOL namesRight = YES;
+    [names enumerateKeysAndObjectsUsingBlock:^(NSString *name, NSString *searched, BOOL *stop) {
+        if (![SGMotionSearchName(name) isEqualToString:searched]) {
+            namesRight = NO;
+            NSLog(@"[harness] catalog: %@ searched as \"%@\", not \"%@\"", name, SGMotionSearchName(name), searched);
+        }
+    }];
+    [self expect:namesRight step:@"search names" detail:namesRight ? @"editions taken off" : @"see above"];
+
+    sg_catalogBody = catalogAlbums(@[@[@"Midnights", @"Taylor Swift", @"https://canvas.harness/standard.m3u8"],
+                                     @[@"Midnights (3am Edition)", @"Taylor Swift", @"https://canvas.harness/3am.m3u8"]]);
+    after(1, ^{ SGMotionAlbumCover(@"Taylor Swift", @"Midnights (3am Edition)", SGMotionTall, 600, ^(NSURL *file) {}); });
+    after(2.5, ^{
+        NSString *term = termOf(sg_catalogAsked.firstObject), *master = sg_canvasAsked.firstObject.lastPathComponent;
+        [self expect:sg_catalogAsked.count == 1 && [term isEqualToString:@"Taylor Swift Midnights"] step:@"the term"
+              detail:[NSString stringWithFormat:@"%lu asked, \"%@\"", (unsigned long)sg_catalogAsked.count, term]];
+        [self expect:[master isEqualToString:@"3am.m3u8"] step:@"the album of the same name first" detail:master ?: @"none asked"];
+        sg_catalogStatus = 429;
+        SGMotionAlbumCover(@"Artist X", @"Album One", SGMotionTall, 600, ^(NSURL *file) {});
+    });
+    __block BOOL answered = NO;
+    after(4, ^{
+        [self expect:sg_catalogAsked.count == 2 step:@"a 429" detail:[NSString stringWithFormat:@"%lu asked", (unsigned long)sg_catalogAsked.count]];
+        sg_catalogStatus = 200;
+        SGMotionAlbumCover(@"Artist X", @"Album Two", SGMotionTall, 600, ^(NSURL *file) { answered = !file; });
+    });
+    after(5, ^{
+        [self expect:sg_catalogAsked.count == 2 && answered step:@"paused after it"
+              detail:[NSString stringWithFormat:@"%lu asked, the next album %@", (unsigned long)sg_catalogAsked.count, answered ? @"found nothing at once" : @"waits"]];
+        NSLog(@"[harness] catalog checks: %lu of %lu right -- %@", (unsigned long)(self->_checks - self->_failures), (unsigned long)self->_checks,
               self->_failures ? @"FAIL" : @"PASS");
     });
 }
@@ -1735,6 +1828,8 @@ __attribute__((constructor(101))) static void sgr_harnessDefaults(void) {
         }
         [NSURLProtocol registerClass:SGRHarnessPictureServer.class];
     }
+    // The shared session the catalog asks with.
+    if ([scenario() isEqualToString:@"catalog"]) [NSURLProtocol registerClass:SGRHarnessPictureServer.class];
     if ([scenario() isEqualToString:@"motion"] || [scenario() isEqualToString:@"settings"]) {
         [NSUserDefaults.standardUserDefaults setInteger:3 forKey:@"spotifyglass.redesign.player.background"];
         setenv("HARNESS_CANVAS", "https://canvas.harness/clip.mp4", 1);

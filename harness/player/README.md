@@ -75,6 +75,10 @@ come late, out of order, or not at all.
   away at once, with no fade. The log ends with `motion checks: n of 25 right -- PASS` or `FAIL`.
   `HARNESS_CANVAS_FAILS=n` fails the first n requests for the clip on the way: with 1 the store tries again and
   every check passes, with 2 the clip never comes.
+- `catalog` is Apple Music's catalog (`SGMotionCatalog.m`) behind a stub of its search: the names searched
+  without their edition, an album search for "Midnights (3am Edition)" asking "Taylor Swift Midnights" and taking
+  the edition of that same name before the standard album, then a 429 and the next album finding nothing at once
+  with nothing asked. The log ends with `catalog checks: n of 5 right -- PASS` or `FAIL`.
 
 - `settings` opens the redesign's Player page (`PlayerSettings.m`, with the real `Settings/` framework) over the
   player at 3 s, with the clip of `motion` in. It checks the card leads the page with the five backgrounds'

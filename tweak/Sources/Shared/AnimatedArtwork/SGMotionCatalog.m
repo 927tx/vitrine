@@ -61,6 +61,21 @@ NSString *SGMotionNameKey(NSString *name) {
     return bare.length ? bare : plain(name);
 }
 
+// The name as it is searched for: without what Spotify adds for an edition ("(Deluxe)", "[Remastered]",
+// " - 2011 Remaster"), so a search for an edition finds the standard album too, whose cover may be the one
+// that moves. A name that is all edition is searched as it is.
+NSString *SGMotionSearchName(NSString *name) {
+    if (![name isKindOfClass:NSString.class]) return @"";
+    NSString *bare = name;
+    NSRange dash = [bare rangeOfString:@" - "];
+    if (dash.location != NSNotFound) bare = [bare substringToIndex:dash.location];
+    bare = [bare stringByReplacingOccurrencesOfString:@"\\([^)]*\\)|\\[[^\\]]*\\]" withString:@" " options:NSRegularExpressionSearch
+                                               range:NSMakeRange(0, bare.length)];
+    bare = [bare stringByReplacingOccurrencesOfString:@"\\s+" withString:@" " options:NSRegularExpressionSearch range:NSMakeRange(0, bare.length)];
+    bare = [bare stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+    return bare.length ? bare : name;
+}
+
 // Apple Music may credit several artists where Spotify names the lead, so either name may hold the
 // other as a run of whole words.
 static BOOL sameArtist(NSString *a, NSString *b) {
@@ -219,6 +234,12 @@ static void forgetToken(NSString *token) {
 
 #pragma mark - catalog
 
+// After a 403 or a 429 the catalog is left alone this long: each lookup meanwhile finds nothing at once and is
+// not kept, so it is asked again once the pause is over. Without it every skip sent a search to a catalog that
+// had said to stop.
+static const NSTimeInterval kCatalogPause = 600;
+static NSDate *sg_catalogPausedUntil;
+
 static NSString *escaped(NSString *value) {
     NSCharacterSet *unreserved = [NSCharacterSet characterSetWithCharactersInString:
         @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"];
@@ -228,6 +249,10 @@ static NSString *escaped(NSString *value) {
 // The array at `path` in the catalog's answer, empty when it has none; `answered` is NO when the catalog
 // could not be asked, so the caller does not remember the absence. A refused token is read again once.
 static void askCatalog(NSString *address, NSString *path, BOOL renew, void (^done)(NSArray *found, BOOL answered)) {
+    if (sg_catalogPausedUntil.timeIntervalSinceNow > 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{ done(nil, NO); });
+        return;
+    }
     withToken(^(NSString *token) {
         if (!token) {
             done(nil, NO);
@@ -247,6 +272,10 @@ static void askCatalog(NSString *address, NSString *path, BOOL renew, void (^don
                 forgetToken(token);
                 askCatalog(address, path, NO, done);
                 return;
+            }
+            if (status == 403 || status == 429) {
+                sg_catalogPausedUntil = [NSDate dateWithTimeIntervalSinceNow:kCatalogPause];
+                SGLog(@"motion: the catalog answered %ld, not asked for %.0f minutes", (long)status, kCatalogPause / 60);
             }
             done(found, status == 200);
         });
@@ -327,20 +356,25 @@ void SGMotionAlbumCover(NSString *artist, NSString *album, SGMotionShape shape, 
     NSString *key = [NSString stringWithFormat:@"album\n%ld\n%@\n%@", (long)shape, artistKey, albumKey];
     // The remote file is what is kept: the store may drop its local copy later in the launch.
     lookUp(key, ^(NSURL *remote) { SGMotionFile(remote, done); }, ^(void (^answer)(id, BOOL)) {
-        search(@"albums", [NSString stringWithFormat:@"%@ %@", artist, album], @"editorialVideo", YES, ^(NSArray *found, BOOL answered) {
+        NSString *term = [NSString stringWithFormat:@"%@ %@", artist, SGMotionSearchName(album)];
+        search(@"albums", term, @"editorialVideo", YES, ^(NSArray *found, BOOL answered) {
             if (!answered) {
                 answer(nil, NO);
                 return;
             }
             // Editions share a key (Midnights and Midnights (3am Edition), clean and explicit), and only one of
-            // them may have the motion: the first match that has it.
-            NSString *video = nil;
-            for (id result in found) {
-                id attributes = dig(result, @"attributes");
-                if (!sameArtist(artistKey, SGMotionNameKey(dig(attributes, @"artistName")))) continue;
-                if (![SGMotionNameKey(dig(attributes, @"name")) isEqualToString:albumKey]) continue;
-                video = videoOf(dig(attributes, @"editorialVideo"), shape);
-                if (video) break;
+            // them may have the motion: the album of the same name first, then the first edition that has it.
+            NSString *video = nil, *exact = plain(album);
+            for (int pass = 0; pass < 2 && !video; pass++) {
+                for (id result in found) {
+                    id attributes = dig(result, @"attributes");
+                    if (!sameArtist(artistKey, SGMotionNameKey(dig(attributes, @"artistName")))) continue;
+                    id name = dig(attributes, @"name");
+                    if (pass == 0 ? ![name isKindOfClass:NSString.class] || ![plain(name) isEqualToString:exact]
+                                  : ![SGMotionNameKey(name) isEqualToString:albumKey]) continue;
+                    video = videoOf(dig(attributes, @"editorialVideo"), shape);
+                    if (video) break;
+                }
             }
             NSURL *master = video ? [NSURL URLWithString:video] : nil;
             SGLog(@"motion: %@ by %@ has %@", album, artist, master ? @"an animated cover" : @"no animated cover");

@@ -86,5 +86,6 @@ NSArray *SGLockScreenMotionRows(void);
 
 // Pure steps, for the harness.
 NSString *SGMotionNameKey(NSString *name);
+NSString *SGMotionSearchName(NSString *name);
 NSString *SGMotionStreamIn(NSString *master, CGFloat pixels);
 NSString *SGMotionWholeFileIn(NSString *media);

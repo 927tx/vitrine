@@ -128,7 +128,9 @@ Shared:
                   Still (one frame) or Animated. Rendered on the Mac against harness/lyrics-clip/. What reaches the
                   system's now playing through this hook and Player/NowPlayingExtras.x is checked by harness/now-playing/
     AnimatedArtwork/ moving artwork (AnimatedArtwork.h): the track's Canvas, else Apple Music's animated album cover
-                  (SGMotionCatalog.m), kept as local files (SGMotionStore.m), on iOS 26 the lock screen's full-screen
+                  (SGMotionCatalog.m: searched without the album's edition, the edition of the same name first, and
+                  left alone for 10 minutes after a 403 or 429), kept as local files (SGMotionStore.m, a download that
+                  fails on the way tried once more), on iOS 26 the lock screen's full-screen
                   artwork (LockScreenMotion.x). With Every song, a song with neither gets its cover over copies of it
                   blurred and swaying, a seamless 8 s 3:4 loop drawn on the CPU only when the lock screen asks for it
                   and kept per picture (SGFluidClip.m). Rendered on the Mac against harness/fluid-clip/. A track whose
