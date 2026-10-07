@@ -1,3 +1,4 @@
+#import "substrate.h"
 // What the player harness does not compile: the Kit's hooks (SGRAccent.x, SGRRepaint.x), the rest of
 // the player's hooks, the lyrics store and the haptics. Everything here answers the way the phone would
 // for one track with lyrics, so the redesign's own code is what is being looked at. The player itself
@@ -234,3 +235,12 @@ void SGRRefreshTabBar(void) {}
 // the ⋯, and with no button of the mod's over it the ⋯'s own touches press its circle.
 void SGRPlayerMenuWatch(UIView *button) {}
 UIControl *SGRSystemMenuFront(UIView *button) { return nil; }
+
+// Cydia Substrate's hook (substrate.h here), as the runtime does it: the class gets its own copy of an inherited
+// method, so its superclass is left alone.
+void MSHookMessageEx(Class _class, SEL message, IMP hook, IMP *old) {
+    Method method = class_getInstanceMethod(_class, message);
+    if (!method) return;
+    if (old) *old = method_getImplementation(method);
+    if (!class_addMethod(_class, message, hook, method_getTypeEncoding(method))) method_setImplementation(method, hook);
+}
