@@ -530,7 +530,9 @@ App:
                    page offers both again. Environment.m says once per install state, a few seconds in, when
                    EeveeSpotify is injected too (a dyld image named so, or its settings page's Swift class) or Spotify is not the version the mod is
                    made for (SGSpotifyMadeFor), and when a redesign below iOS 26 did not start; the first two stay
-                   as red rows at the top of Mod Settings. Laid out on the simulator by harness/onboarding/
+                   as red rows at the top of Mod Settings. What Chroma left in Spotify's storage when Vitrine
+                   replaced it (its Karaoke model and saved lock screen videos, never its listening history or audio
+                   effects) is offered for deleting once, and stays a row there until it goes. Laid out on the simulator by harness/onboarding/
 
 Every key a feature stores starts with `spotifyglass.`, whatever it holds: Reset all settings on
 the Mod page removes by that prefix and has no list to keep up to date. It leaves `SGKeyStock` behind,
