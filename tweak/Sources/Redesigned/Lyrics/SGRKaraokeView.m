@@ -1359,6 +1359,7 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionEndedNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(restyle) name:SGRLyricsTextDidChangeNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(restyle) name:SGLyricsRomanisedDidChangeNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(translationsChanged) name:SGLyricsTranslationsDidChangeNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(lookChanged) name:SGRLyricsLookDidChangeNotification object:nil];
     // A locked phone leaves the card in its window, so the link has to be put down by the app going
     // away rather than by the view going: see scheduleLink.
@@ -1772,7 +1773,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     _breakCount = 0;
     _hasSpoken = _hasTranslation = _untranslated = NO;
     _plain = SGKaraokeLinesTiming(_lines) == SGKaraokeTimingNone;
-    if (!_sample) SGLyricsApplySavedTranslation(_track, SGLyricsGeminiLanguage(), _lines);
+    if (!_sample) SGLyricsSyncSavedTranslation(_track, SGLyricsGeminiLanguage(), _lines);
     _foreign = inAnotherLanguage(_lines, SGLyricsGeminiLanguage());
     NSInteger sungTo = 0;   // the top of the song counts as where the singing before the first line ends
     for (NSUInteger i = 0; i < count; i++) {
@@ -1980,6 +1981,13 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     });
 }
 
+// The saved translations deleted, or Translate any song switched: the song is synced again and redrawn.
+- (void)translationsChanged {
+    if (!_lines) return;
+    [self timeLines];
+    [self restyle];
+}
+
 // Each line still without a translation takes the one given for it, and translations are switched on so
 // they show. The lines may be another song's by now: they keep the translation, the page is left alone.
 - (void)takeTranslations:(NSArray<NSString *> *)translations into:(NSArray<SGKaraokeLine *> *)lines {
@@ -1987,6 +1995,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     [lines enumerateObjectsUsingBlock:^(SGKaraokeLine *line, NSUInteger i, BOOL *stop) {
         if (i < translations.count && translations[i].length && !line.translation.length) {
             line.translation = translations[i];
+            line.translationMade = YES;
             took = YES;
         }
     }];
