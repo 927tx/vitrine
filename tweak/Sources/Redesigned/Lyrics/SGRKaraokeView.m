@@ -7,6 +7,7 @@
 // Apple Music lights such a line, unless the Lyrics page's "Simulate word-by-word timing" asks for
 // its estimated words to be swept; lyrics with no timing at all are shown as plain text, every line
 // lit, nothing following the clock.
+#import <NaturalLanguage/NaturalLanguage.h>
 #import "Core/SGCore.h"
 #import "SGRKaraokeView.h"
 #import "LyricsText.h"
@@ -1282,7 +1283,8 @@ typedef struct {
     CFTimeInterval _stillSince;   // when the position stopped moving, 0 while it moves
     SGRKaraokeStyle *_style;   // how the lines were laid out
     BOOL _hasSpoken, _hasTranslation;   // whether the song has any line with either
-    BOOL _untranslated;   // whether a line with words has no translation, which Gemini can fill in
+    BOOL _untranslated;   // whether a line with words has no translation, which a translator can fill in
+    BOOL _foreign;        // whether the song is in a language other than the one translations are asked in
     NSArray<SGKaraokeLine *> *_passedOver;   // lines kept for the song that changed nothing here, not looked at again
     UIView *_extrasBox;   // the Kit's glass and _extras over it, which holds none, so its alpha can fade
     UIButton *_extras;
@@ -1722,6 +1724,16 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
     return texts;
 }
 
+// Whether the song's words are mostly in a language other than `language`. A song too short to tell counts as one.
+static BOOL inAnotherLanguage(NSArray<SGKaraokeLine *> *lines, NSString *language) {
+    NSMutableString *words = [NSMutableString string];
+    for (SGKaraokeLine *line in lines) if (hasWords(line)) [words appendFormat:@"%@\n", SGKaraokeLineText(line)];
+    NSString *found = [NLLanguageRecognizer dominantLanguageForString:words];
+    if (!found.length || [found isEqualToString:NLLanguageUndetermined]) return YES;
+    NSString *(^code)(NSString *) = ^NSString *(NSString *tag) { return [tag componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"-_"]].firstObject.lowercaseString; };
+    return ![code(found) isEqualToString:code(language)];
+}
+
 // Whether a line with words is still without a translation.
 static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     for (SGKaraokeLine *line in lines) if (!line.translation.length && hasWords(line)) return YES;
@@ -1739,6 +1751,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     _hasSpoken = _hasTranslation = _untranslated = NO;
     _plain = SGKaraokeLinesTiming(_lines) == SGKaraokeTimingNone;
     if (!_sample) SGLyricsApplySavedTranslation(_track, SGLyricsGeminiLanguage(), _lines);
+    _foreign = inAnotherLanguage(_lines, SGLyricsGeminiLanguage());
     NSInteger sungTo = 0;   // the top of the song counts as where the singing before the first line ends
     for (NSUInteger i = 0; i < count; i++) {
         SGKaraokeLine *line = _lines[i];
@@ -1833,7 +1846,9 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     NSString *language = SGLyricsGeminiLanguage();
     BOOL gemini = SGGeminiKeySet(), onDevice = SGOnDeviceTranslation.translationAvailable;
     BOOL intelligence = [SGOnDeviceTranslation appleIntelligenceAvailable:language];
-    BOOL offered = _lines && !_sample && (_hasSpoken || _hasTranslation || gemini || onDevice || intelligence);
+    // A translator is offered only for a song in another language than the one it would translate into.
+    BOOL translatable = _foreign && _untranslated && (gemini || onDevice || intelligence);
+    BOOL offered = _lines && !_sample && (_hasSpoken || _hasTranslation || translatable);
     if (!offered) {
         _extrasBox.hidden = YES;
         [self setNeedsLayout];
@@ -1881,7 +1896,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     }
     // Also for a song a source translated in part, as Musixmatch's community often has: the rest is filled in.
     // Said in each item: whether the song's words stay on the phone.
-    if (_untranslated && !translating) {
+    if (translatable && !translating) {
         __weak SGRKaraokeView *weakSelf = self;
         void (^offer)(NSString *, NSString *, NSString *, SGRTranslator) = ^(NSString *title, NSString *glyph, NSString *subtitle, SGRTranslator translator) {
             UIAction *action = [UIAction actionWithTitle:title image:[UIImage systemImageNamed:glyph] identifier:nil
