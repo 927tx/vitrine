@@ -200,13 +200,16 @@ UIViewController *SGSingSettingsPage(void) {
     units.choiceNotes = @[@"The Neural Engine, the fastest, with the CPU while it loads", @"Slower and warmer, and a little less memory"];
     units.choiceFooter = @"Karaoke loads the voice model on the CPU first and starts with it. On Automatic a second copy then loads on "
                          @"the Neural Engine and takes over, in the background too. The iPhone prepares it the first time after Vitrine "
-                         @"is installed or updated, for a minute or so, and Karaoke runs on the CPU until then. If it does not load, "
+                         @"is installed or updated, for a minute or so, and Karaoke runs on the CPU until then, unless Prepare after "
+                         @"updates did it already. If it does not load, "
                          @"Karaoke stays on the CPU until Spotify is opened again.";
     units.chosen = ^(NSInteger index) { SGSingComputeUnitsChanged(); };
+    SGModRow *prepare = SGSwitchRow(@"Prepare after updates",
+                                    @"Readies the Neural Engine in the background after Vitrine or iOS updates, so Karaoke starts at full speed", SGKeySingPrepareAhead);
     SGSingPage *made = [[SGSingPage alloc] initWithTitle:@"Karaoke" intro:nil sections:@[
         SGSection(nil, @[sing, heat, model, remove]),
         SGSection(nil, @[spatial]),
-        SGNotedSection(@"Advanced", @[units],
+        SGNotedSection(@"Advanced", @[units, prepare],
                        @"Karaoke turns a song's vocals down to sing over, or the rest down to hear the vocals alone, with a voice model that "
                        @"runs only on this iPhone: no audio leaves it. It listens a few seconds ahead of what plays, so the vocals change a "
                        @"few seconds after a song starts or after a seek."),

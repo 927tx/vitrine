@@ -22,6 +22,7 @@ static const int kStillEvery = 30;
 @interface SGSingLoad : NSObject
 @property (nonatomic) unsigned number;
 @property (nonatomic, copy) NSString *name;   // the copy's, for the log
+@property (nonatomic, copy) NSURL *url;
 @property (nonatomic) CFAbsoluteTime began;
 @property (nonatomic) BOOL finished, abandoned;
 @end
@@ -84,6 +85,7 @@ static SGSingLoad *startLoad(NSURL *url, BOOL neural, double deadline, void (^do
     SGSingLoad *load = [SGSingLoad new];
     load.number = ++sg_attempts;
     load.name = neural ? @"Neural Engine" : @"CPU";
+    load.url = url;
     load.began = CFAbsoluteTimeGetCurrent();
     sg_outstanding++;
     SGLog(@"sing: load %u, the %@ copy of %@, starts (Spotify %@, thermal state %s, %@, %@, %u loads out)", load.number, load.name,
@@ -121,8 +123,31 @@ static SGSingLoad *startLoad(NSURL *url, BOOL neural, double deadline, void (^do
     return load;
 }
 
+static SGSingLoad *sg_prepareLoad;   // SGSingLoaderPrepareNeural's, until it comes back or is taken over
+
+static void fastLoaded(MLModel *model) {
+    sg_fastLoad = nil;
+    sg_fastState = model ? SGSingFastReady : SGSingFastFailed;
+    if (model) [sg_separator setFastModel:model named:@"Neural Engine"];
+    changed();
+}
+
+static void fastLate(void) {
+    sg_fastLoad = nil;
+    sg_fastState = SGSingFastTimedOut;
+    changed();
+}
+
 static void startFast(void) {
     if (!sg_wanted || sg_state != SGSingLoaderReady || !sg_foreground || !sg_neural || sg_fastState != SGSingFastNone) return;
+    // The compile running ahead of the mic is this copy's: a second load would compile it again beside it.
+    if (sg_prepareLoad && [sg_prepareLoad.url isEqual:sg_url] && !sg_prepareLoad.finished && !sg_prepareLoad.abandoned) {
+        sg_fastState = SGSingFastLoading;
+        sg_fastLoad = sg_prepareLoad;
+        SGLog(@"sing: the Neural Engine copy is the one already compiling (load %u)", sg_fastLoad.number);
+        changed();
+        return;
+    }
     if (!roomFor(kNeuralRoom)) {
         sg_fastState = SGSingFastSkipped;
         SGLog(@"sing: no Neural Engine copy: %@, it wants %.1f GB, so Sing stays on the CPU", memoryText(), kNeuralRoom / 1e9);
@@ -131,16 +156,28 @@ static void startFast(void) {
     }
     sg_fastState = SGSingFastLoading;
     sg_fastLoad = startLoad(sg_url, YES, SGSingLoaderNeuralDeadline, ^(MLModel *model, NSError *error) {
-        sg_fastLoad = nil;
-        sg_fastState = model ? SGSingFastReady : SGSingFastFailed;
-        if (model) [sg_separator setFastModel:model named:@"Neural Engine"];
-        changed();
+        fastLoaded(model);
     }, ^{
-        sg_fastLoad = nil;
-        sg_fastState = SGSingFastTimedOut;
-        changed();
+        fastLate();
     });
     changed();
+}
+
+BOOL SGSingLoaderPrepareNeural(NSURL *url, void (^done)(BOOL loaded)) {
+    if (!url || sg_outstanding || sg_state != SGSingLoaderIdle || !sg_foreground || !roomFor(kNeuralRoom)) return NO;
+    __block SGSingLoad *load = startLoad(url, YES, SGSingLoaderNeuralDeadline, ^(MLModel *model, NSError *error) {
+        BOOL taken = sg_fastLoad == load;
+        sg_prepareLoad = nil;
+        if (taken) fastLoaded(model);
+        else if (done) done(model != nil);
+    }, ^{
+        BOOL taken = sg_fastLoad == load;
+        sg_prepareLoad = nil;
+        if (taken) fastLate();
+        else if (done) done(NO);
+    });
+    sg_prepareLoad = load;
+    return YES;
 }
 
 static void startCPU(void) {
@@ -278,4 +315,10 @@ unsigned SGSingLoaderAttempts(void) {
 
 unsigned SGSingLoaderOutstanding(void) {
     return sg_outstanding;
+}
+
+NSTimeInterval SGSingLoaderPreparingSeconds(void) {
+    SGSingLoad *load = sg_prepareLoad;
+    if (!load || load.finished || load.abandoned || sg_fastLoad == load) return -1;
+    return CFAbsoluteTimeGetCurrent() - load.began;
 }

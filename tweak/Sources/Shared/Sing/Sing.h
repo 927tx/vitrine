@@ -39,6 +39,9 @@
 // stored before (2-4), and the earlier key's every value, are Automatic now, carried over at launch.
 #define SGKeySingComputeUnits @"spotifyglass.sing.runsOn"
 #define SGKeySingComputeUnitsBefore @"spotifyglass.sing.computeUnits"
+// Compiles the Neural Engine copy in the background after an install or an iOS update, with the mic off; on unless
+// switched off.
+#define SGKeySingPrepareAhead @"spotifyglass.sing.prepareAhead"
 // Spatial voice: through headphones that track the head, the vocals stay in front as it turns; off until
 // switched on, and at once.
 #define SGKeySingSpatial @"spotifyglass.sing.spatial"

@@ -253,7 +253,11 @@ Shared:
                   Neural Engine copy loads only with 0.5 GB left to the process, its first load after every install
                   compiling it for up to ten minutes while Karaoke runs on the CPU (while it loads, the CPU's falling
                   behind spends none of the 8 s after which Karaoke gives a song up, nor counts toward its three in a
-                  row), and it is dropped for the launch, the CPU copy carrying on, once it fails to load, warm up or
+                  row), unless Prepare after updates (on by default) compiled it already: with the model in and the mic off, 15 s after
+                  Spotify comes to the front and below the thermal state Serious, the Neural Engine copy alone loads once for this
+                  iOS and install and is let go (22 s on a fair iPhone 15 Pro, 48-65 s on a serious one; a want meanwhile takes that
+                  load over), so the mic's copy loads in 0.3 s; Karaoke's status reads "On, Neural Engine" or "On, CPU", and "Off ·
+                  preparing for the Neural Engine" while it compiles ahead, and it is dropped for the launch, the CPU copy carrying on, once it fails to load, warm up or
                   run a window (one that falls behind keeps its place); Runs on is Automatic or CPU only, the GPU and
                   Neural Engine choices stored before read as Automatic; the STFT around it on Accelerate,
                   and an engine that stands in Speed and pitch's chain between Spotify's mixer and its output
@@ -662,7 +666,7 @@ from gone through as sung to the vocals alone, with Sing along, Original and Voc
 follows the head through AirPods, or sways gently without them and holds still under Reduce Motion, a line under it
 saying which, then the switch; its row is on the main page too, under Karaoke's), the voice model's download (Paused and
 Checking among its states) and its removal, Ignore heat warnings, and under Advanced Runs on (Automatic: the Neural Engine
-beside the CPU; CPU only), all applying straight away. Lock screen, on the main
+beside the CPU; CPU only) and Prepare after updates, all applying straight away. Lock screen, on the main
 page under either look, opens the lock screen widget's page, titled Lock screen (Moving artwork, Lyrics or Every song, and the lyrics' style,
 Still or Animated, and Spotify's like and dislike buttons' flag; its podcast, audiobook and artwork flags stay in
 All flags). Player: Gestures and Blocked artists (with the count on the row), which work with either look;

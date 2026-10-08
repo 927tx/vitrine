@@ -40,6 +40,12 @@ void SGSingLoaderSetChanged(void (^changed)(void));
 // without it, any Neural Engine copy is dropped. Another `url` than the last drops the copies of that one (and a
 // Failed) first. Does nothing while Failed. Call it only while Spotify is in the foreground.
 void SGSingLoaderWant(NSURL *url, BOOL neural);
+// Compiles the Neural Engine copy of `url` ahead of the mic, with nothing else loaded or loading and the memory for it,
+// then lets it go: Core ML keeps the compiled form. A Neural Engine copy wanted meanwhile takes this load over. `done`
+// runs on the main thread with whether it loaded, unless the copy wanted took it over. NO when it did not start.
+BOOL SGSingLoaderPrepareNeural(NSURL *url, void (^done)(BOOL loaded));
+// Seconds the compile ahead of the mic has run, -1 when none runs (or the mic's copy took it over).
+NSTimeInterval SGSingLoaderPreparingSeconds(void);
 // The model last wanted, nil before the first want.
 NSURL *SGSingLoaderURL(void);
 // The mic is off: the copies are kept for SGSingLoaderKeepSeconds, then dropped unless wanted again by then.

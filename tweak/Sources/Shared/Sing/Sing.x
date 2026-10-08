@@ -201,8 +201,8 @@ static void announce(void) {
 // until Spotify is opened again or Runs on changes (falling behind is not a failure: that is the budget's, as on any
 // copy). A copy past its deadline is not remembered as failed: Core ML carries on compiling a load given up on and
 // keeps the result, so the next launch may load it at once.
-// The iOS and the folder the Neural Engine copy last loaded on and from: Core ML has kept its compiled form, so it
-// loads in seconds.
+// The iOS, the app's bundle and the model's folder the Neural Engine copy last loaded on and from: Core ML has kept its
+// compiled form, so it loads in seconds. An install moves the bundle (device 2026-10-07: 48-65 s again after each).
 static NSString *const kNeuralReadyOn = @"spotifyglass.sing.neuralReadyOn";
 static NSString *sg_neuralFailed;   // why the Neural Engine copy is not used for the rest of this launch
 
@@ -237,9 +237,9 @@ static BOOL neuralWanted(void) {
     return runsOn() != 1 && hasNeuralEngine() && !sg_neuralFailed && !SGSingModelUpdateAvailable();
 }
 
-// What Core ML keeps the compiled model for: this iOS and the model's folder.
+// What Core ML keeps the compiled model for: this iOS, this install and the model's folder.
 static NSString *neuralCompiled(void) {
-    return [NSString stringWithFormat:@"%@ %@", osBuild(), SGSingModelURL().path];
+    return [NSString stringWithFormat:@"%@ %@ %@", osBuild(), NSBundle.mainBundle.bundlePath, SGSingModelURL().path];
 }
 
 static void wantModel(void) {
@@ -285,6 +285,36 @@ static void loaderChanged(void) {
     }
     holdBudget(engine);
     announce();
+}
+
+// After an install or an iOS update the Neural Engine copy compiles again (48-65 s on an iPhone 15 Pro), a minute in
+// which the mic has only the CPU's copy, which a warm iPhone cannot keep up with. With the model in and the mic off it
+// compiles ahead instead, once Spotify has been in front a while, the iPhone is below Serious and nothing else loads.
+static const NSTimeInterval kPrepareAfter = 15;
+
+static void prepareAhead(void) {
+    NSString *compiled = neuralCompiled();
+    if (!SGEnabled(SGKeySingPrepareAhead) || SGSingOn() || !sg_active || !neuralWanted() || SGSingModelCurrentState() != SGSingModelReady
+        || [[NSUserDefaults.standardUserDefaults stringForKey:kNeuralReadyOn] isEqualToString:compiled]) return;
+    if (NSProcessInfo.processInfo.thermalState >= NSProcessInfoThermalStateSerious) {
+        static BOOL told;
+        if (!told) SGLog(@"sing: the Neural Engine copy waits to be prepared until the iPhone is cooler (thermal state %s)", SGSingThermalName());
+        told = YES;
+        return;
+    }
+    CFAbsoluteTime began = CFAbsoluteTimeGetCurrent();
+    BOOL started = SGSingLoaderPrepareNeural(SGSingModelURL(), ^(BOOL loaded) {
+        if (loaded) [NSUserDefaults.standardUserDefaults setObject:compiled forKey:kNeuralReadyOn];
+        SGLog(@"sing: the Neural Engine copy %@ ahead of the mic in %.0f s, and is let go (thermal state now %s)",
+              loaded ? @"is prepared" : @"was not prepared", CFAbsoluteTimeGetCurrent() - began, SGSingThermalName());
+    });
+    if (started) SGLog(@"sing: prepares the Neural Engine copy ahead of the mic, for this install");
+}
+
+static void prepareAheadSoon(void) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kPrepareAfter * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        prepareAhead();
+    });
 }
 
 #pragma mark - spatial voice
@@ -522,7 +552,7 @@ NSString *SGSingStatusText(void) {
             if (SGSingModelChecking()) return @"Checking the download";
             if (SGSingModelWaitingForNetwork()) return SGSingModelOverCellular() ? @"Waiting for the network" : @"Waiting for Wi-Fi";
             return [NSString stringWithFormat:@"Downloading %.0f%%", SGSingModelProgress() * 100];
-        case SGSingStateOff: return @"Off";
+        case SGSingStateOff: return SGSingLoaderPreparingSeconds() >= 0 ? @"Off · preparing for the Neural Engine" : @"Off";
         case SGSingStatePreparing: {
             NSTimeInterval seconds = SGSingLoaderSeconds();
             return seconds >= 1 ? [NSString stringWithFormat:@"Loading the voice model, %.0f s", seconds] : @"Loading the voice model";
@@ -587,6 +617,12 @@ NSString *SGSingStatusDetail(void) {
                         SGSingModelProgress() * 100, SGSingModelSizeText()];
             }
             return [NSString stringWithFormat:@"The voice model is coming in, %.0f%% of %@. Karaoke starts once it is checked.", SGSingModelProgress() * 100, SGSingModelSizeText()];
+        case SGSingStateOff: {
+            NSTimeInterval seconds = SGSingLoaderPreparingSeconds();
+            if (seconds < 0) return nil;
+            return [NSString stringWithFormat:@"After an update, the iPhone prepares the voice model for the Neural Engine once, which takes about a minute. "
+                                              @"Vitrine does it now, in the background, so Karaoke starts at full speed when it is switched on (%.0f s so far).", seconds];
+        }
         case SGSingStateWaiting:
             if (sg_resting) {
                 return @"The vocals are as sung and Spatial voice is off, so the song plays as it is and the voice model rests. Karaoke starts again "
@@ -1033,6 +1069,7 @@ static void readHeat(void) {
     last = thermal;
     // A cooler iPhone runs the model faster.
     if (cooler) retry([NSString stringWithFormat:@"the iPhone is cooler (%s)", SGSingThermalName()], NO);
+    if (cooler) prepareAhead();
     // Serious and Critical hold; Fair lets it run again.
     BOOL hot = thermal >= NSProcessInfoThermalStateSerious;
     if (hot == sg_hot) return;
@@ -1179,6 +1216,7 @@ static void readHeat(void) {
             sg_active = YES;
             SGSingLoaderSetForeground(YES);
             if (SGSingOn()) apply();
+            prepareAheadSoon();
         }];
         [center addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
             sg_active = NO;
@@ -1210,5 +1248,6 @@ static void readHeat(void) {
         readHeat();
         readRefusal();
         if (SGSingOn()) apply();
+        prepareAheadSoon();
     });
 }
