@@ -16,8 +16,11 @@
 // reported position less the lead held when that line of the clock began, less what was dropped since, and not
 // less the lead now: a lead filling after a report does not move what is heard, and taking it off lagged the lyrics
 // by it. A state stamped again on the same line (the same position run on at the same speed) is the same report, so
-// the lead is looked up by the line, not by the state's stamp (SGSingLeadOf). positionAsOfTimestamp is hooked to take
-// that off: the scrubber, the lyrics, the Live Activity and the lock screen follow what is heard. A seek, a
+// the lead is looked up by the line, not by the state's stamp (SGSingLeadOf). positionAsOfTimestamp and position are
+// hooked to take that off: the scrubber, the lyrics, the Live Activity and the lock screen follow what is heard. Run on
+// (position), the lead comes off after running on and never below 0: the next track is reported as its first frames
+// are handed over, with the last one's end still held, and its clock holds at 0 until that end has played rather than
+// running on from the title change. A seek, a
 // skip or a stop drops the lead (-[SPTEsperantoPlayer seekTo:...] and skipTo...TrackWithOptions:track:loggingParams:
 // in the binary's method list, each returning Spotify's own result for the command; the shorter skips are
 // trampolines into those two through objc_msgSend, 0x1096da9e4-0x1096daa08), and so does a track changing well
@@ -640,9 +643,10 @@ static _Atomic CFAbsoluteTime sg_lastFlush;   // Sing.x's own flushes: each come
 static __thread BOOL sg_rawPosition;   // the hook below hands Spotify's own value back
 
 static double rawPosition(SPTPlayerState *state) {
+    BOOL was = sg_rawPosition;
     sg_rawPosition = YES;
     double position = state.position;
-    sg_rawPosition = NO;
+    sg_rawPosition = was;
     return position;
 }
 
@@ -1038,9 +1042,20 @@ static void readHeat(void) {
 #pragma mark - Spotify's clock and commands
 
 %hook SPTPlayerState
+// For a paused state, which holds still there.
 - (double)positionAsOfTimestamp {
     double position = %orig;
     if (sg_rawPosition || position < 0) return position;
+    double lead = SGSingLeadOf(self);
+    return lead != 0 ? MAX(0, position - lead) : position;
+}
+// Run on, the lead is taken off after, not before: a track reached as the last one ends is reported with less of it
+// handed over than the lead holds, and its clock stays at 0 until its first frame plays rather than running on from the
+// title change.
+- (double)position {
+    if (sg_rawPosition) return %orig;
+    double position = rawPosition(self);
+    if (position < 0) return position;
     double lead = SGSingLeadOf(self);
     return lead != 0 ? MAX(0, position - lead) : position;
 }

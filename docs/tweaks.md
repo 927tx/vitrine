@@ -265,7 +265,9 @@ Shared:
                   taken off (SPTPlayerState's positionAsOfTimestamp): the lead held when that line of the clock began
                   (the same position run on at the same speed, however often a state is stamped again), less what was
                   dropped since, as the player reports on a change and not as it plays (SGSingLeadOf, read by every
-                  correction; every 5 s a "sing: clock:" log line sets Spotify's clock against what the engine pulled
+                  correction); run on (-position), the lead comes off after running on and never below 0, so a track
+                  reached as the last one ends, reported while the lead still holds that end, stays at 0 until its first
+                  frame plays rather than running on from the title change (every 5 s a "sing: clock:" log line sets Spotify's clock against what the engine pulled
                   and played, and every lyrics seek logs where it was sent and where it landed), and a seek, a skip or a stop drops it.
                   Until the seek or skip lands (Spotify reports the target or the new track, or 5 s pass) nothing is
                   read ahead, as Spotify's mixer still hands over what came before it; the queue's next track arriving
@@ -293,7 +295,7 @@ Shared:
                   audio. The Spatial voice page's preview (SGSpatialPreview.m) turns a disc of dots under the listener by
                   the same front (SGSpatialVoiceAngle, SGSingEngine.h), on Core Animation alone and only while the page
                   shows. The mic is on the redesign's lyrics (Redesigned/Lyrics/SGRSingButton.m). Tested on the Mac
-                  against harness/sing/ (the lead, its cap, spatial voice and its front without the model: `build/sing spatial`; the
+                  against harness/sing/ (the lead, its cap, a slow decoder, a track boundary, spatial voice and its front without the model: `build/sing spatial`; the
                   model as both copies with `ane`, as the CPU's alone with `cpu`), the download against its download/
                   (`update` for the old model kept until it, `dev` for the dev folder), the pages in the simulator against harness/spatial-page/
     Haptics/      Vibrations (Haptics.h lists its files): a tap of UIKit's feedback generators for the player's and the now

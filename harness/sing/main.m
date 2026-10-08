@@ -24,6 +24,9 @@
 // - reading ahead of a slow decoder, without the model: past what Spotify has decoded its mixer marks the sound silent;
 //   that is never taken into the lead, reading ahead tries again at the next render, and a stall of the decoder plays
 //   through on the lead, so what plays is the song with no gap, every frame in order.
+// - a track reached as the last one ends, without the model: Spotify reports it a moment after its first frame is
+//   handed over; its position (Sing.x's -position: Spotify's run on less the lead held at the report, never below 0)
+//   starts where its first frame plays, not at the report.
 // - spatial voice, without the model: a separator that hands the whole window back as vocals, so what plays is
 //   the vocals placed. A tone straight ahead plays exactly as it came; at 90 degrees right the right ear has it
 //   louder by the pan's 7.7 dB at the same power and the left ear late by the delay around the head; at 90
@@ -742,6 +745,47 @@ static void checkStarved(void) {
     SGSingEngineDestroy(engine);
 }
 
+// A track reached as the last one ends: Spotify reports it 0.1 s after its first frame is handed over, the last one's
+// end still in the lead. Its position as Sing.x's -position takes it, Spotify's own run on from the report less the lead
+// held then and never below 0, starts at the frame where its audio starts; with the lead taken off before running on,
+// as it was, it ran from the report.
+static void checkBoundary(void) {
+    size_t frames = 14 * kSGSingRate, boundary = 8 * kSGSingRate;
+    Audio tone = makeAudio(frames);
+    for (size_t i = 0; i < frames; i++) tone.left[i] = tone.right[i] = (float)(0.5 * sin(2 * M_PI * (i < boundary ? 440 : 660) * i / kSGSingRate));
+    SGSingEngine *engine = SGSingEngineCreate();
+    SGPacedSeparator *steady = [[SGPacedSeparator alloc] initWithModel:nil];
+    steady.fastWindows = INT_MAX;
+    SGSingEngineSetSeparator(engine, steady);
+    SGSingEngineSetLevel(engine, 1);
+    SGSingEngineSetOn(engine, true);
+    Source source = {tone, 0}, *pulled = &source;
+    __block CFAbsoluteTime reported = 0;
+    __block double handed = 0, leadThen = 0, starts = -1, startedBefore = -1, at2 = -1;
+    play(engine, tone, &source, 1024, 12, ^(double played) {
+        CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+        if (!reported && pulled->pulled >= boundary + kSGSingRate / 10) {
+            reported = now;
+            handed = (double)(pulled->pulled - boundary) / kSGSingRate;
+            // Read soon after the report, as Sing.x's tick reads it.
+            leadThen = SGSingEngineLeadAt(engine, reported);
+        }
+        if (!reported) return;
+        double lead = SGSingEngineLeadAt(engine, reported), since = now - reported;
+        double heard = fmax(0, handed + since - lead), before = fmax(0, handed - lead) + since;
+        if (heard > 0 && starts < 0) starts = played;
+        if (before > 0 && startedBefore < 0) startedBefore = played;
+        if (played >= 10 && at2 < 0) at2 = heard;
+    });
+    double edge = (double)boundary / kSGSingRate;
+    CHECK(fabs(starts - edge) < 0.05, "the next track reported %.2f s into it with %.2f s held: its position starts with %.3f s played, where its "
+          "first frame plays (%.3f s)", handed, leadThen, starts, edge);
+    CHECK(fabs(at2 - 2) < 0.05, "and reads %.3f s as 2 s of it have played", at2);
+    CHECK(startedBefore >= 0 && startedBefore < edge - 2, "with the lead taken off before running on, it started at the report, %.2f s played, "
+          "%.2f s early", startedBefore, edge - startedBefore);
+    SGSingEngineDestroy(engine);
+}
+
 // A model that keeps up for a while and then falls behind: the vocals fade out once, not at every window, and
 // after 8 s short of them the engine gives up and gives the lead back. And a NaN from the model never plays.
 static void checkFallingBehind(void) {
@@ -1065,6 +1109,7 @@ int main(int argc, char **argv) {
             checkHold();
             checkCap();
             checkStarved();
+            checkBoundary();
             checkSpatial();
             checkFront();
             checkFallingBehind();
@@ -1130,6 +1175,7 @@ int main(int argc, char **argv) {
         checkHold();
         checkCap();
         checkStarved();
+        checkBoundary();
         checkSpatial();
         checkFront();
         checkFallingBehind();

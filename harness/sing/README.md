@@ -42,6 +42,10 @@ the CPU copy and the Neural Engine copy. Each check prints a line:
   again at the next render, so the lead still fills; a 2 s stall of the decoder plays through on the lead, which is
   read again after it; what plays is the song with no gap, every frame in order; nothing is allocated on the render
   thread;
+- a track reached as the last one ends, without the model: Spotify reports it 0.1 s after its first frame is handed
+  over, with the last one's end still held; its position as Sing.x's -position takes it (Spotify's own run on from the
+  report, less the lead held then, never below 0) starts where its first frame plays and reads 2 s two seconds on,
+  where the lead taken off before running on, as it was, started it at the report, the lead early;
 - spatial voice, without the model (a separator that hands each window back whole as vocals, so what plays is the
   vocals placed): a 440 Hz tone at level 1 plays exactly as it came straight ahead; set 90 degrees right, the right
   ear has it 7.75 dB louder (the narrowed pan's 7.66 and the far ear's low-pass) at the same power, and the left ear
@@ -84,6 +88,10 @@ then at most 0 frames held, the budget unspent over 12 s capped, 2.75 s built ag
 reading ahead stopped 200 times by 6 s with 2.75 s held, the 2 s stall played through on the lead (down to 1.23 s),
 nothing skipped. The same checks against the engine before the change fail: 66939 frames of silence counted into the
 lead, and a gap in what plays.
+
+2026-10-07, a track boundary: `build/sing spatial` passes, the new checks with it: reported 0.11 s into the next track
+with 2.75 s held, its position starts at 8.011 s played (its first frame at 8.000 s) and reads 2.005 s two seconds on;
+taken off before running on, it started at 5.39 s, 2.61 s early. The simulator harness builds with the hook; not run.
 
 2026-10-05, a MacBook with an M4, macOS 27: everything passes under `gpu` and under ThreadSanitizer.
 
