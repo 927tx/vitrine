@@ -30,6 +30,11 @@ ssize_t (*SGConnectRealRecvfrom)(int, void *, size_t, int, struct sockaddr *, so
 static const uint64_t kMillisecond = NSEC_PER_MSEC;
 static const uint64_t kRoundLength = 1200 * kMillisecond, kQuietRoundLength = 700 * kMillisecond, kSendGap = 450 * kMillisecond;
 static const uint64_t kRecordLife = 15 * NSEC_PER_SEC;
+// The same question is relayed for an address family at most once in this long. Spotify asks it from four sockets
+// every two seconds or so while it plays, and on a busy Wi-Fi each round brings dozens of answers: with no limit
+// the relay passed about fifty a second, keeping the radio awake for a list that changes rarely. A different
+// question (a device's own record) is never held back.
+static const uint64_t kRepeatGap = 3 * NSEC_PER_SEC;
 enum { kMaxRounds = 4, kMaxAddresses = 64, kMaxReplies = 32, kMaxRecords = 64 };
 
 static uint64_t now(void) { return clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW); }
@@ -144,7 +149,9 @@ static void handOver(int spotify, const uint8_t *reply, size_t length, const str
     os_unfair_lock_unlock(&sg_lock);
 
     if (sendto(sender, reply, length, 0, (const struct sockaddr *)loopback, loopback->ss_len) >= 0) {
-        SGLog(@"connect: relayed %zu bytes from %@", length, SGConnectAddressText((const struct sockaddr *)from));
+        // The first few of a launch only: answers come about fifty a second, and a line each filled the log.
+        static _Atomic int logged;
+        if (atomic_fetch_add(&logged, 1) < 5) SGLog(@"connect: relayed %zu bytes from %@", length, SGConnectAddressText((const struct sockaddr *)from));
         return;
     }
     os_unfair_lock_lock(&sg_lock);
@@ -296,6 +303,39 @@ BOOL SGConnectRelayQuery(int socket, const void *query, size_t length) {
     if (!start) return YES;
 
     int family = address.ss_family;
+    // Counted, and said once a minute, so the limit's effect shows in the log.
+    static uint64_t ran, skipped, countedFrom;
+    static NSMutableDictionary<NSData *, NSNumber *> *lastRun;
+    uint64_t time = now();
+    os_unfair_lock_lock(&sg_lock);
+    if (!lastRun) lastRun = [NSMutableDictionary dictionary];
+    // The question for its address family, whatever socket asked it: Spotify sends the same query from two sockets
+    // of each family every two seconds or so, and each started a round of its own to every receiver.
+    NSMutableData *question = [NSMutableData dataWithBytes:&family length:sizeof family];
+    if (length > 2) [question appendBytes:(const uint8_t *)query + 2 length:length - 2];
+    uint64_t was = [lastRun[question] unsignedLongLongValue];
+    BOOL allowed = !was || time - was >= kRepeatGap;
+    if (allowed) {
+        lastRun[question] = @(time);
+        ran++;
+    } else {
+        skipped++;
+        [sg_rounds removeObject:key];
+    }
+    uint64_t saidRan = 0, saidSkipped = 0;
+    BOOL say = NO;
+    if (!countedFrom) countedFrom = time;
+    else if (time - countedFrom >= 60 * NSEC_PER_SEC) {
+        say = YES;
+        saidRan = ran, saidSkipped = skipped;
+        ran = skipped = 0;
+        countedFrom = time;
+        // Questions not asked in the last minute are forgotten.
+        for (NSData *old in lastRun.allKeys) if (time - lastRun[old].unsignedLongLongValue >= 60 * NSEC_PER_SEC) [lastRun removeObjectForKey:old];
+    }
+    os_unfair_lock_unlock(&sg_lock);
+    if (say) SGLog(@"connect: %llu rounds and %llu repeats held back in the last minute", saidRan, saidSkipped);
+    if (!allowed) return YES;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         runRound(socket, family, port, bytes);
         os_unfair_lock_lock(&sg_lock);

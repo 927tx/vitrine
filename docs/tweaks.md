@@ -370,7 +370,9 @@ Shared:
                   pipeline.sh) and the Local Network permission, finds and resolves _spotify-connect._tcp; Spotify's
                   imports of sendto, sendmsg and recvfrom are rebound, a Connect query the system refused is sent by
                   unicast to each receiver's port 5353 instead, and each answer is passed to Spotify's socket over
-                  loopback with recvfrom reporting the receiver as its source. No setting. Tested on the Mac against
+                  loopback with recvfrom reporting the receiver as its source. Spotify asks the same question from four
+                  sockets, two for each address family, every two seconds or so; it is relayed once every 3 s for each
+                  family (on a busy Wi-Fi with 21 receivers, 124 rounds a minute became 31), and a new question goes at once. No setting. Tested on the Mac against
                   harness/connect/
 
 Native:
