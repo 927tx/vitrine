@@ -9,8 +9,6 @@ static NSMutableArray<NSDictionary *> *sg_logLines;
 static uint64_t sg_logSeq;
 
 void SGLogRemember(NSString *line) {
-    // The player's state dumps run to hundreds of parts each and would push every other line out.
-    if ([line hasPrefix:@"player state "] || [line hasPrefix:@"player track metadata"]) return;
     NSTimeInterval now = NSDate.date.timeIntervalSince1970;
     os_unfair_lock_lock(&sg_logLock);
     if (!sg_logLines) sg_logLines = [NSMutableArray array];
