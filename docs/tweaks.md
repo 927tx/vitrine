@@ -331,7 +331,8 @@ Shared:
                   menu of tabs, Controls (previous, play and pause, next, shuffle, repeat), Queue and a sleep Timer of
                   the mod's own (Player/SleepTimer.m: 15 min, 30 min, 1 hour, End of track, End of album) that fades
                   the sound out and pauses Spotify, and stays set when the card is switched off (LiveActivity.h lists its files): a timer polls the player and
-                  sends a new state only when what the view shows changes, local updates only, no push. The card
+                  sends a new state only when what the view shows changes, local updates only, no push, and asks ActivityKit
+                  only then. It ticks four times a second in the lyrics view and once a second in the others. The card
                   is tinted with the cover's color and shows the cover itself, a JPEG of a few dozen pixels inside
                   the state, which ActivityKit caps at 4 KB (the bridge sends it without the cover when it would
                   not fit); the color is darkened to a luminance of 0.04 at most, so the white text keeps 4.5:1 on any

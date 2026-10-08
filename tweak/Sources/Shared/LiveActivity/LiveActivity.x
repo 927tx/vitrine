@@ -43,7 +43,8 @@ typedef NS_ENUM(NSInteger, SGLiveActivityTab) {
 };
 
 static const NSTimeInterval kTick = 0.25;
-// Paused, the only thing on the card that still moves is the sleep timer, and a slower tick shows
+// Paused, or in a view without lyrics, the only thing on the card that moves by itself is the sleep timer
+// (the bar runs from its dates), and a slower tick shows
 // its end well within the second the card shows. Four ticks a second for a still card is a wake up
 // eighty times a minute for a picture that does not change.
 static const NSTimeInterval kPausedTick = 1;
@@ -99,10 +100,21 @@ static void startTimer(NSTimeInterval every) API_AVAILABLE(ios(17.0)) {
 // Sends `shown`, what the activity is to show as one string, unless it is showing that already and was
 // sent within kRefresh; starts the activity when there is none and the app is in front.
 static void send(NSString *shown, void (^show)(void)) API_AVAILABLE(ios(17.0)) {
-    if (SGLiveActivityBridge.isShowing) {
-        if ([shown isEqualToString:sg_shown] && -sg_lastSent.timeIntervalSinceNow < kRefresh) return;
-    } else {
-        if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
+    // ActivityKit is asked only when there is something to send: each question is a round trip to the system,
+    // and this runs four times a second. An activity ended from outside is started again within kRefresh.
+    if ([shown isEqualToString:sg_shown] && -sg_lastSent.timeIntervalSinceNow < kRefresh) return;
+    static NSDate *noneAt;   // when ActivityKit last said none is showing, with the app in the background
+    BOOL background = UIApplication.sharedApplication.applicationState != UIApplicationStateActive;
+    if (background && noneAt && -noneAt.timeIntervalSinceNow < kRefresh) return;
+    noneAt = nil;
+    if (!SGLiveActivityBridge.isShowing) {
+        if (background) {
+            // Nothing to send to, and none can start in the background: asked again after kRefresh.
+            static NSUInteger told;
+            if (told++ < 5) SGLog(@"live activity: none showing, not sent in the background");
+            noneAt = [NSDate date];
+            return;
+        }
         if (sg_lastStart && -sg_lastStart.timeIntervalSinceNow < kStartRetry) return;
         sg_lastStart = [NSDate date];
     }
@@ -254,7 +266,8 @@ static void tick(void) API_AVAILABLE(ios(17.0)) {
 
     NSInteger view = SGInt(SGKeyLiveActivityView, SGLiveActivityLyrics);
     BOOL paused = state.isPaused;
-    NSTimeInterval every = paused ? kPausedTick : kTick;
+    // Only the lyrics follow the song line by line; the other views' bar runs by itself from its dates.
+    NSTimeInterval every = paused || view != SGLiveActivityLyrics ? kPausedTick : kTick;
     if (sg_timer && sg_tickEvery != every) startTimer(every);
     NSString *line = @"", *next = @"", *translation = nil;
     BOOL noLyrics = NO;
