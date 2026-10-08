@@ -41,7 +41,8 @@ static SGProblem version(void) {
 }
 
 // Installed without the app changes Vitrine's IPA build makes (scripts/pipeline.sh: plist/liquid-glass.plist and the
-// Live Activity), as when its .deb is injected by hand: the system keeps its old bars, so the glass tab bar is gone.
+// Live Activity), as when its .deb is injected by hand: the system keeps its old bars, so the glass tab bar is gone, and
+// without MusicHapticsSupported iOS leaves Spotify out of Music Haptics.
 static BOOL withoutAppChanges(void) {
     id compatibility = [NSBundle.mainBundle objectForInfoDictionaryKey:@"UIDesignRequiresCompatibility"];
     return SGRedesignAvailable() && SGRedesignedUIStored() && !([compatibility isKindOfClass:NSNumber.class] && ![compatibility boolValue]);
@@ -49,7 +50,7 @@ static BOOL withoutAppChanges(void) {
 
 static SGProblem appChanges(void) {
     return @[@"Installed without Vitrine's app changes",
-             @"The redesign needs changes to the app that only Vitrine's IPA build makes, so the tab bar stays Spotify's own and the Live Activity is missing. Build the IPA with Vitrine instead of injecting its .deb."];
+             @"The redesign needs changes to the app that only Vitrine's IPA build makes, so the tab bar stays Spotify's own, the Live Activity is missing, and iOS does not list Spotify for Music Haptics, which stops vibrations in the background. Build the IPA with Vitrine instead of injecting its .deb."];
 }
 
 static SGProblem fellBack(void) {

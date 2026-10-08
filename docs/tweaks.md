@@ -302,7 +302,7 @@ Shared:
                   the taps and the rumble for when the sound is heard, at their strength and leaving out what Follows
                   leaves out (MusicHaptics.x). Everything applies at once; nothing plays while Spotify is not the active
                   app. Beside it, In the Background (iOS 18 and up) asks Spotify's extended-metadata for the track's
-                  ISRC with Spotify's own spclient headers, asks Apple Music's catalog for that ISRC, and names the
+                  ISRC with Spotify's own spclient headers, asks Apple Music's catalog for that ISRC (the phone's own country first, then the US), and names the
                   matched song's catalog id (same ISRC, length within 2 s, a haptic track) or else the ISRC in the now
                   playing info for iOS's own Music Haptics, which plays on the lock screen and in other apps too
                   (SystemMusicHaptics.x, its pure steps in SGHapticTrack.m). Both may be on: while it asks and while

@@ -7,7 +7,6 @@
 static NSString *const kTokenKey = @"spotifyglass.motion.token";
 static NSString *const kBrowse = @"https://music.apple.com/us/browse";
 static NSString *const kSearch = @"https://amp-api.music.apple.com/v1/catalog/us/search";
-static NSString *const kSongs = @"https://amp-api.music.apple.com/v1/catalog/us/songs";
 static NSString *const kSafari = @"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15";
 // A token this close to its expiry is read again rather than used.
 static const NSTimeInterval kTokenMargin = 3600;
@@ -479,8 +478,20 @@ void SGMotionSongsWithISRC(NSString *isrc, void (^done)(NSArray *songs)) {
         return;
     }
     lookUp([@"isrc\n" stringByAppendingString:isrc], done, ^(void (^answer)(id, BOOL)) {
+        // The phone's own country first, as Apple sells some recordings only there; then the US catalog.
+        NSString *region = NSLocale.currentLocale.countryCode.lowercaseString;
+        if (![region rangeOfString:@"^[a-z]{2}$" options:NSRegularExpressionSearch].length) region = @"us";
         // filter[isrc] and fields[songs], the brackets escaped: iOS before 17 makes no URL of them bare.
-        NSString *address = [NSString stringWithFormat:@"%@?filter%%5Bisrc%%5D=%@&fields%%5Bsongs%%5D=isrc,durationInMillis,hasHaptics", kSongs, escaped(isrc)];
-        askCatalog(address, @"data", YES, ^(NSArray *found, BOOL answered) { answer(found, answered); });
+        NSString *(^addressIn)(NSString *) = ^NSString *(NSString *storefront) {
+            return [NSString stringWithFormat:@"https://amp-api.music.apple.com/v1/catalog/%@/songs?filter%%5Bisrc%%5D=%@&fields%%5Bsongs%%5D=isrc,durationInMillis,hasHaptics",
+                    storefront, escaped(isrc)];
+        };
+        askCatalog(addressIn(region), @"data", YES, ^(NSArray *found, BOOL answered) {
+            if (found.count || [region isEqualToString:@"us"]) {
+                answer(found, answered);
+                return;
+            }
+            askCatalog(addressIn(@"us"), @"data", YES, ^(NSArray *inUS, BOOL answeredInUS) { answer(inUS, answeredInUS); });
+        });
     });
 }

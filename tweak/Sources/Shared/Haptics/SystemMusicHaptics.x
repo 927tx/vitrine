@@ -281,11 +281,15 @@ API_AVAILABLE(ios(18.0))
         SGAddPlayerStateObserver(native);
         NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
         void (^changed)(NSNotification *) = ^(NSNotification *note) { [native systemChanged]; };
-        [center addObserverForName:MAMusicHapticsManagerActiveStatusDidChangeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:changed];
+        // iOS's own may come from any thread: heard there and handed to main without waiting (AGENTS.md).
+        void (^changedFromAnywhere)(NSNotification *) = ^(NSNotification *note) {
+            dispatch_async(dispatch_get_main_queue(), ^{ [native systemChanged]; });
+        };
+        [center addObserverForName:MAMusicHapticsManagerActiveStatusDidChangeNotification object:nil queue:nil usingBlock:changedFromAnywhere];
         // Not in the SDK's headers, though MediaAccessibility exports it: posted as the switch in Accessibility moves.
         void *enabledName = dlsym(RTLD_DEFAULT, "MAMusicHapticsEnabledStatusDidChangeNotification");
         id name = enabledName ? (__bridge id)*(void **)enabledName : nil;
-        if ([name isKindOfClass:NSString.class]) [center addObserverForName:name object:nil queue:NSOperationQueue.mainQueue usingBlock:changed];
+        if ([name isKindOfClass:NSString.class]) [center addObserverForName:name object:nil queue:nil usingBlock:changedFromAnywhere];
         [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:changed];
         // Only In the Background's own flip: Music Haptics' would take iOS's identifier off for nothing.
         __block BOOL background = SGMusicHapticsInBackground();
