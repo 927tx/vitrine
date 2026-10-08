@@ -658,6 +658,13 @@ for Animated while the player has no clip, the card looks the playing track's up
 is in, then the clip over it, poster first (harness/player/ `preview`);
 under it a segmented control of the five backgrounds (Still, Colors, Fluid, Animated, Visualizer, changing the card at once)
 with a note on what the one picked does, Artwork sources and Download in Low Data Mode while Animated is chosen,
+while Fluid is chosen its five sliders and a red Reset (Redesigned/Kit/SGRFluid.h, spotifyglass.redesign.fluid.*):
+Speed (25-300 %, how fast the four blurred copies turn, picked up from the angle each is at), Warp (0-100 %, how
+far from the middle they turn and how much the upper three show; at none one copy turns alone), Blur (2-24, the
+radius at 1.25 px a step on the 128 px cover), Saturation (0-250 %) and Brightness (40-150 %, a gain on linear
+light that the luminance ceiling for the player's text, 0.07 or 0.04 with Increase Contrast, still caps); the
+card and the player follow each step at once through SGRFluidSettingsDidChangeNotification, the last three by
+blurring the cover again off the main thread, and Animated and Visualizer's Fluid with them,
 and Mini player: Apple Music style (the tab bar's minimize on scroll), Device button (the now playing bar keeps
 Spotify's device button in that minimized row, off by default) and the device button hidden on the full bar,
 checked in the simulator against harness/player/ (`settings`). Vibrations, a page of its own under either

@@ -17,15 +17,16 @@
 // width, and every choice stays one tap away with the card showing it at once. A note under the control says what the
 // choice does; it is given the room of the longest note, so the rows under it hold still as it changes.
 //
-// Under the header: the rows that follow the choice (Animated's sources and its Low Data Mode switch;
-// Fluid has no settings of its own), the Mini player section (Redesigned/NowPlayingBar/
-// NowPlayingBarSettings.m), then the sections either look shares.
+// Under the header: the rows that follow the choice (Animated's sources and its Low Data Mode switch; Fluid's
+// five sliders and their Reset, which the card and the player follow as they move, SGRFluid.h), the Mini
+// player section (Redesigned/NowPlayingBar/NowPlayingBarSettings.m), then the sections either look shares.
 //
 // Threading: main thread only.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Redesigned/Kit/SGRFluid.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/SGLastTrack.h"
@@ -316,6 +317,14 @@ static NSArray<NSString *> *backgroundNotes(void) {
 
 @end
 
+// One of Fluid's settings on a slider, written out with `unit` after the number.
+static SGModRow *fluidSlider(NSString *title, SGRFluidSetting setting, NSString *unit) {
+    SGRFluidLimits l = SGRFluidLimitsOf(setting);
+    return SGSliderRow(title, nil, l.least, l.most, l.step, ^double { return SGRFluidValue(setting); },
+                       ^(double value) { SGRSetFluidValue(setting, lround(value)); },
+                       ^NSString *(double value) { return [NSString stringWithFormat:@"%.0f%@", value, unit]; });
+}
+
 UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     SGRPlayerShowcase *showcase = [[SGRPlayerShowcase alloc] initWithFrame:CGRectMake(0, 0, 320, kCardMinHeight)];
     UISegmentedControl *backgrounds = [[UISegmentedControl alloc] initWithItems:SGRPlayerBackgroundNames()];
@@ -328,8 +337,22 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     SGModRow *sources = SGMotionSourcesRow();
     sources.visible = lowData.visible;
 
+    __block __weak UITableViewController *weakPage;
+    SGModRow *reset = SGActionRow(@"Reset", nil, ^{
+        SGRResetFluidSettings();
+        [weakPage.tableView reloadData];   // the sliders at once, rather than at the page's next tick
+    });
+    reset.color = SGRed();
+    NSArray<SGModRow *> *fluid = @[
+        fluidSlider(@"Speed", SGRFluidSpeed, @"%"), fluidSlider(@"Warp", SGRFluidWarp, @"%"), fluidSlider(@"Blur", SGRFluidBlur, @""),
+        fluidSlider(@"Saturation", SGRFluidSaturation, @"%"), fluidSlider(@"Brightness", SGRFluidBrightness, @"%"), reset,
+    ];
+    for (SGModRow *row in fluid) row.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundFluid; };
+
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
         SGSection(nil, @[sources, lowData]),
+        SGNotedSection(nil, fluid, @"Brightness above 100% can make white text harder to read. A paused song holds the "
+                                   @"background still. Animated and Visualizer use these where they show Fluid."),
         SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
                        @"Apple Music style moves the now playing bar in between two tabs as you scroll down."), nil];
     [sections addObjectsFromArray:more];
@@ -337,6 +360,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     // on the field's layout); Still and Colors are a field of another kind, made once a launch (PlayerField.x).
     NSString *footer = @"Fluid, Animated and Visualizer change with the next song. Still, Colors and Hide on the player apply after you restart Spotify.";
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:footer];
+    weakPage = page;
     page.showcase = showcase;
     page.backgrounds = backgrounds;
     [backgrounds addTarget:page action:@selector(backgroundPicked) forControlEvents:UIControlEventValueChanged];
