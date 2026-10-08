@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-beta.7](https://github.com/My-Name-Is-Jeff/vitrine/compare/v1.0.0-beta.6...v1.0.0-beta.7) (2026-10-08)
+
+
+### Fixes
+
+* the tweak compiles with Xcode 26 again ([cd8b70f](https://github.com/My-Name-Is-Jeff/vitrine/commit/cd8b70fab5220379c3a882b4340d46fe984be7b3))
+
 ## [1.0.0-beta.6](https://github.com/My-Name-Is-Jeff/vitrine/compare/v1.0.0-beta.5...v1.0.0-beta.6) (2026-10-08)
 
 
