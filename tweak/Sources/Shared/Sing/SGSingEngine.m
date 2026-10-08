@@ -53,6 +53,7 @@ struct SGSingEngine {
     atomic_bool budgetHeld;       // a faster copy is on its way: falling behind spends no budget
     _Atomic uint64_t spent;       // the render's `recovering`, for the stats
     _Atomic uint64_t dropped;     // frames of held sound never played: flushes
+    _Atomic uint64_t aheadStops;  // renders whose reading ahead stopped where Spotify's mixer had no sound yet
     // What Spotify's clock had counted past what plays, at each render that changed it (written less played,
     // plus dropped: a flush leaves it as it was), with when; `historyCount` counts the entries made.
     struct { _Atomic double at; _Atomic uint64_t ahead; } history[kHistory];
@@ -115,12 +116,17 @@ static void startOver(SGSingEngine *engine) {
     atomic_store(&engine->mixing, false);
 }
 
-// `count` frames from the mixer into the rings at `at`, in up to two runs where the ring wraps.
-static OSStatus pullInto(SGSingEngine *engine, uint64_t at, uint64_t count, SGSingPull pull, void *context) {
+// `count` frames from the mixer into the rings at `at`, in up to two runs where the ring wraps. With `kept`, it stops
+// at the first part the mixer marks silent and sets the frames before it.
+static OSStatus pullInto(SGSingEngine *engine, uint64_t at, uint64_t count, SGSingPull pull, void *context, uint64_t *kept) {
+    if (kept) *kept = 0;
     while (count) {
         uint64_t index = at % kRing, run = MIN(count, kRing - index);
-        OSStatus status = pull(context, (UInt32)run, engine->left + index, engine->right + index);
+        UInt32 sounding = (UInt32)run;
+        OSStatus status = pull(context, (UInt32)run, engine->left + index, engine->right + index, kept ? &sounding : NULL);
         if (status != noErr) return status;
+        if (kept) *kept += sounding;
+        if (sounding < run) return noErr;
         at += run;
         count -= run;
     }
@@ -168,10 +174,10 @@ static inline float middleBefore(SGSingEngine *engine, uint64_t position, uint64
 
 OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, float *right, SGSingPull pull, void *context) {
     // Larger than any slice an output asks for, and more than the rings leave room for: passed as it is.
-    if (frames > kSGSingRate / 4) return pull(context, frames, left, right);
+    if (frames > kSGSingRate / 4) return pull(context, frames, left, right, NULL);
     bool on = atomic_load_explicit(&engine->on, memory_order_relaxed);
     if (!engine->running) {
-        if (!on) return pull(context, frames, left, right);
+        if (!on) return pull(context, frames, left, right, NULL);
         engine->running = true;
         startOver(engine);
         atomic_store(&engine->flushAsked, false);
@@ -197,13 +203,21 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
     count = MAX(count, (int64_t)frames - (int64_t)held);
     count = MIN(count, (int64_t)(kRing - kSGSingWindowFrames) - (int64_t)held);
     if (count > 0) {
-        OSStatus status = pullInto(engine, written, (uint64_t)count, pull, context);
+        // What this render plays and the lead does not hold is pulled whatever it is. The rest reads ahead, and a part of
+        // it the mixer marks silent is sound Spotify has not decoded yet: it is not taken into the lead, and reading ahead
+        // stops there until the next render.
+        uint64_t need = (uint64_t)MIN(count, MAX(0, (int64_t)frames - (int64_t)held)), ahead = 0;
+        OSStatus status = pullInto(engine, written, need, pull, context, NULL);
+        if (status == noErr && (uint64_t)count > need) {
+            status = pullInto(engine, written + need, (uint64_t)count - need, pull, context, &ahead);
+            if (ahead < (uint64_t)count - need) atomic_fetch_add_explicit(&engine->aheadStops, 1, memory_order_relaxed);
+        }
         if (status != noErr) {
             memset(left, 0, frames * sizeof(float));
             memset(right, 0, frames * sizeof(float));
             return status;
         }
-        written += (uint64_t)count;
+        written += need + ahead;
         atomic_store_explicit(&engine->written, written, memory_order_release);
     }
 
@@ -569,6 +583,7 @@ SGSingEngineStats SGSingEngineReadStats(SGSingEngine *engine) {
         .failures = atomic_load(&engine->failures),
         .dryFrames = atomic_load(&engine->dryFrames),
         .dropped = atomic_load(&engine->dropped) / (double)kSGSingRate,
+        .aheadStops = atomic_load(&engine->aheadStops),
         .written = atomic_load(&engine->written),
         .played = played,
         .mixing = atomic_load(&engine->mixing),

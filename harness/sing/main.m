@@ -21,6 +21,9 @@
 //   lead held then, less what was dropped since.
 // - the lead's cap, without the model: a lead held past it drains at half speed, every frame played and none of the
 //   budget spent, is built again once it is lifted, and drains with Sing switched off too.
+// - reading ahead of a slow decoder, without the model: past what Spotify has decoded its mixer marks the sound silent;
+//   that is never taken into the lead, reading ahead tries again at the next render, and a stall of the decoder plays
+//   through on the lead, so what plays is the song with no gap, every frame in order.
 // - spatial voice, without the model: a separator that hands the whole window back as vocals, so what plays is
 //   the vocals placed. A tone straight ahead plays exactly as it came; at 90 degrees right the right ear has it
 //   louder by the pan's 7.7 dB at the same power and the left ear late by the delay around the head; at 90
@@ -397,16 +400,22 @@ static void describePlan(NSString *path, bool neural) {
 typedef struct {
     Audio source;
     size_t pulled;
+    bool limited;      // Spotify has decoded only up to `decoded`
+    size_t decoded;
 } Source;
 
-static OSStatus pullSource(void *context, UInt32 frames, float *left, float *right) {
+// As Spotify's mixer: past what is decoded the sound is marked silent and does not move on, and a pull asked to stop
+// there (`sounding`) does.
+static OSStatus pullSource(void *context, UInt32 frames, float *left, float *right, UInt32 *sounding) {
     Source *source = context;
+    size_t has = !source->limited ? frames : source->decoded > source->pulled ? MIN(frames, source->decoded - source->pulled) : 0;
+    if (sounding) *sounding = (UInt32)has;
     for (UInt32 i = 0; i < frames; i++) {
         size_t at = source->pulled + i;
-        left[i] = at < source->source.frames ? source->source.left[at] : 0;
-        right[i] = at < source->source.frames ? source->source.right[at] : 0;
+        left[i] = i < has && at < source->source.frames ? source->source.left[at] : 0;
+        right[i] = i < has && at < source->source.frames ? source->source.right[at] : 0;
     }
-    source->pulled += frames;
+    source->pulled += has;
     return noErr;
 }
 
@@ -684,6 +693,52 @@ static void checkCap(void) {
     for (size_t i = 0; i < out.frames / 1024 * 1024; i++) worst = fmax(worst, fabsf(out.left[i] - tone.left[i]));
     CHECK(worst < 1e-6, "through it all every frame plays in order, nothing skipped (%.2g)", worst);
     CHECK(atomic_load(&sg_renderAllocations) == 0, "the cap: no allocation on the render thread (%u)", atomic_load(&sg_renderAllocations));
+    SGSingEngineDestroy(engine);
+}
+
+// A decoder slower than the lead fills (Spotify on a slow network): its mixer marks what it has not decoded silent, and
+// none of that is taken into the lead; reading ahead stops there and tries again at the next render, so the lead fills
+// as fast as the decoder lets it. A stall of the decoder plays through on the lead, which is read again after it.
+static void checkStarved(void) {
+    size_t frames = 14 * kSGSingRate;
+    Audio tone = makeAudio(frames);
+    for (size_t i = 0; i < frames; i++) tone.left[i] = tone.right[i] = (float)(0.5 * sin(2 * M_PI * 440 * i / kSGSingRate));
+    SGSingEngine *engine = SGSingEngineCreate();
+    SGPacedSeparator *steady = [[SGPacedSeparator alloc] initWithModel:nil];
+    steady.fastWindows = INT_MAX;
+    SGSingEngineSetSeparator(engine, steady);
+    SGSingEngineSetLevel(engine, 1);
+    SGSingEngineSetOn(engine, true);
+    Source source = {tone, 0, true, 0}, *pulled = &source;
+    __block double worst = 0, leadAt6 = 0, leastInStall = 100, leadAt12 = 0;
+    __block unsigned long long stopsAt6 = 0, stopsAt12 = 0;
+    malloc_logger = countAllocation;
+    Audio out = play(engine, tone, &source, 1024, 12.5, ^(double played) {
+        // Decoded at 1.5 times what plays from a quarter second in, stalled from 6 s to 8 s.
+        double decoding = played - fmin(fmax(played - 6, 0), 2);
+        pulled->decoded = (size_t)((0.25 + 1.5 * decoding) * kSGSingRate);
+        worst = fmax(worst, fabs(SGSingEngineLead(engine) - ((double)pulled->pulled - played * kSGSingRate) / kSGSingRate));
+        if (played >= 6 && !leadAt6) {
+            leadAt6 = SGSingEngineLead(engine);
+            stopsAt6 = SGSingEngineReadStats(engine).aheadStops;
+        }
+        if (played >= 6 && played < 8.1) leastInStall = fmin(leastInStall, SGSingEngineLead(engine));
+        if (played >= 12 && !leadAt12) {
+            leadAt12 = SGSingEngineLead(engine);
+            stopsAt12 = SGSingEngineReadStats(engine).aheadStops;
+        }
+    });
+    malloc_logger = NULL;
+    CHECK(worst < 0.5 / kSGSingRate, "a slow decoder: the lead is the frames the decoder handed over and not yet played, to the frame (off by %.0f at most): "
+          "none marked silent is taken in", worst * kSGSingRate);
+    CHECK(stopsAt6 > 100 && leadAt6 > 2, "reading ahead stopped at the decoder %llu times by 6 s and tried again each next render, the lead "
+          "filling as the decoder let it (%.2f s at 6 s)", stopsAt6, leadAt6);
+    CHECK(leastInStall > 0.5 && leastInStall < leadAt6 - 1, "a 2 s stall of the decoder at 6 s plays through on the lead (down to %.2f s)", leastInStall);
+    CHECK(leadAt12 > 2 && stopsAt12 > stopsAt6, "after it the lead is read again (%.2f s at 12 s, %llu stops)", leadAt12, stopsAt12);
+    double gap = 0;
+    for (size_t i = 0; i < 12 * kSGSingRate; i++) gap = fmax(gap, fabsf(out.left[i] - tone.left[i]));
+    CHECK(gap < 1e-6, "what plays is the song with no gap and every frame in order, the stall included (%.2g)", gap);
+    CHECK(atomic_load(&sg_renderAllocations) == 0, "a slow decoder: no allocation on the render thread (%u)", atomic_load(&sg_renderAllocations));
     SGSingEngineDestroy(engine);
 }
 
@@ -1009,6 +1064,7 @@ int main(int argc, char **argv) {
             sg_outDir = NSTemporaryDirectory();
             checkHold();
             checkCap();
+            checkStarved();
             checkSpatial();
             checkFront();
             checkFallingBehind();
@@ -1073,6 +1129,7 @@ int main(int argc, char **argv) {
         if (neural) checkNeuralFallback(modelPath);
         checkHold();
         checkCap();
+        checkStarved();
         checkSpatial();
         checkFront();
         checkFallingBehind();

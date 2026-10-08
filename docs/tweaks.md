@@ -257,7 +257,10 @@ Shared:
                   run a window (one that falls behind keeps its place); Runs on is Automatic or CPU only, the GPU and
                   Neural Engine choices stored before read as Automatic; the STFT around it on Accelerate,
                   and an engine that stands in Speed and pitch's chain between Spotify's mixer and its output
-                  (SGPlayerSetStage), pulls the mixer a few seconds ahead of what plays, separates two-second windows
+                  (SGPlayerSetStage), pulls the mixer a few seconds ahead of what plays, never past sound Spotify has not
+                  decoded yet (a part of a pull ahead its mixer marks silent is left out of the lead and read again at the
+                  next render, so a slow network fills the lead more slowly and a stall plays through on it; "sing: read
+                  ahead:" in the log, the first three times and then a count a minute), separates two-second windows
                   there on a worker thread and mixes the vocals down on the render thread. Spotify's clock has the lead
                   taken off (SPTPlayerState's positionAsOfTimestamp): the lead held when that line of the clock began
                   (the same position run on at the same speed, however often a state is stamped again), less what was

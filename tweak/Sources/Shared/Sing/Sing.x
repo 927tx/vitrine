@@ -98,15 +98,15 @@ typedef struct {
     void *context;
 } ChainPull;
 
-static OSStatus pullChain(void *context, UInt32 frames, float *left, float *right) {
+static OSStatus pullChain(void *context, UInt32 frames, float *left, float *right, UInt32 *sounding) {
     ChainPull *chain = context;
     struct { AudioBufferList list; AudioBuffer second; } buffers = {{2, {{1, frames * 4, left}}}, {1, frames * 4, right}};
-    return chain->pull(chain->context, frames, &buffers.list);
+    return chain->pull(chain->context, frames, &buffers.list, sounding);
 }
 
 static OSStatus stage(UInt32 frames, AudioBufferList *data, SGPlayerPull pull, void *context) {
     SGSingEngine *engine = atomic_load_explicit(&sg_engine, memory_order_acquire);
-    if (!engine) return pull(context, frames, data);
+    if (!engine) return pull(context, frames, data, NULL);
     atomic_store_explicit(&sg_staged, true, memory_order_relaxed);
     atomic_store_explicit(&sg_rendered, true, memory_order_relaxed);
     BOOL takes = atomic_load_explicit(&sg_formatTaken, memory_order_relaxed) && data->mNumberBuffers == 2;
@@ -115,7 +115,7 @@ static OSStatus stage(UInt32 frames, AudioBufferList *data, SGPlayerPull pull, v
     }
     if (!takes) {
         atomic_store_explicit(&sg_formatRefused, true, memory_order_relaxed);
-        return pull(context, frames, data);
+        return pull(context, frames, data, NULL);
     }
     ChainPull chain = {pull, context};
     return SGSingEngineRender(engine, frames, data->mBuffers[0].mData, data->mBuffers[1].mData, pullChain, &chain);
@@ -765,6 +765,32 @@ static void logClock(SGSingEngine *engine) {
     before = stats;
 }
 
+// Reading ahead stopped where Spotify's mixer had no sound yet (SGSingEngineRender): the first few times a launch, then
+// how often a minute.
+static void logAheadStops(SGSingEngine *engine) {
+    static const int kTold = 3;
+    static int told;
+    static unsigned long long seen, atMinute;
+    static CFAbsoluteTime minute;
+    if (!engine) return;
+    unsigned long long stops = SGSingEngineReadStats(engine).aheadStops;
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (stops > seen && told < kTold) {
+        told++;
+        SGLog(@"sing: read ahead: Spotify's mixer marked the sound past what plays silent (not decoded yet), so it is not "
+              @"taken into the lead and reading ahead stops until the next buffer (%llu so far, %.2f s held)", stops, SGSingEngineLead(engine));
+    }
+    seen = stops;
+    if (!minute) {
+        minute = now;
+        atMinute = stops;
+    } else if (now - minute >= 60) {
+        if (stops > atMinute) SGLog(@"sing: read ahead: stopped %llu times in the last minute where Spotify had not decoded the sound yet", stops - atMinute);
+        minute = now;
+        atMinute = stops;
+    }
+}
+
 
 static void flush(NSString *why) {
     SGSingEngine *engine = atomic_load(&sg_engine);
@@ -905,6 +931,7 @@ static void tick(void) {
     if (sg_interrupted && rendered && playing && now - sg_interruptedAt > 1) interrupted(NO, @"is over: Spotify plays again");
     SGSingEngine *engine = atomic_load(&sg_engine);
     logClock(engine);
+    logAheadStops(engine);
     if (state == SGSingStateSinging) sg_sangThisTrack = YES;
     // A Neural Engine copy that failed a window (Core ML's error) is given up on for the launch. One that is only slow
     // stays: falling behind is the budget's, as on any copy.

@@ -2,7 +2,8 @@
 //
 // The model takes two seconds at a time and is far too slow for the render thread, so the engine stands
 // between Spotify's mixer and its output and pulls the mixer ahead of what plays: up to twice what a
-// render asks for, until the sound it holds (the lead) is a window plus the model's time. A worker thread
+// render asks for, until the sound it holds (the lead) is a window plus the model's time, and never past sound Spotify
+// has not decoded yet (a part its mixer marks silent is left out, and read again at the next render). A worker thread
 // takes the held sound two seconds at a time, every 1.5 s, runs the separator and writes the vocals into a
 // second ring beside it, the half second the windows share crossfaded. Each render plays the held sound
 // from the oldest frame on, the vocals turned down by the level once a hop of them is in ahead, and dry once fewer
@@ -36,8 +37,10 @@ enum {
 
 typedef struct SGSingEngine SGSingEngine;
 
-// Fills `frames` frames of each channel with the next of Spotify's sound.
-typedef OSStatus (*SGSingPull)(void *context, UInt32 frames, float *left, float *right);
+// Fills `frames` frames of each channel with the next of Spotify's sound. With `sounding` set, it stops at the first
+// part Spotify's mixer marks silent (none of Spotify's sound there yet), leaves the rest silent and sets the frames
+// before it.
+typedef OSStatus (*SGSingPull)(void *context, UInt32 frames, float *left, float *right, UInt32 *sounding);
 
 SGSingEngine *SGSingEngineCreate(void);
 // Stops the worker and frees the engine; nothing may be rendering through it.
@@ -106,6 +109,7 @@ typedef struct {
     double voiceAngle;         // radians, as last set
     unsigned long long windows, failures, dryFrames;   // dry: frames played unseparated while separating
     double dropped;            // seconds of held sound never played (flushes), since the engine was made
+    unsigned long long aheadStops;   // renders whose reading ahead stopped where Spotify's mixer had no sound yet
     unsigned long long written, played;   // frames pulled from Spotify's mixer and played, since the engine was made
     bool mixing;               // the vocals are turned down now (the hysteresis in SGSingEngine.m)
     double budgetSpent;        // seconds short of vocals since they were last in, of the 8 s it gives up after

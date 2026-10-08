@@ -36,6 +36,12 @@ the CPU copy and the Neural Engine copy. Each check prints a line:
   the queue's last track): capped at 0, the lead held drains in twice its length with the mixer pulled at half speed,
   then the mixer is pulled as it plays; 12 s capped while separating spends none of the 8 s budget; lifted, the lead
   is built again; switched off with a cap of 1 s, the lead kept drains to it; every frame plays in order throughout;
+- reading ahead of a slow decoder, without the model (the mock mixer marks what is past the decoded sound silent and
+  does not move on there, as Spotify's does): decoded at 1.5 times what plays, the lead is the frames the decoder
+  handed over and not played, to the frame, none of the silence taken in; reading ahead stops at the decoder and tries
+  again at the next render, so the lead still fills; a 2 s stall of the decoder plays through on the lead, which is
+  read again after it; what plays is the song with no gap, every frame in order; nothing is allocated on the render
+  thread;
 - spatial voice, without the model (a separator that hands each window back whole as vocals, so what plays is the
   vocals placed): a 440 Hz tone at level 1 plays exactly as it came straight ahead; set 90 degrees right, the right
   ear has it 7.75 dB louder (the narrowed pan's 7.66 and the far ear's low-pass) at the same power, and the left ear
@@ -73,6 +79,11 @@ vocals scores; the harness built from before spatial voice passed right after it
 
 2026-10-07, the lead's cap: `build/sing spatial` passes, the cap's checks with it: 2.75 s held drain in 5.52 s at 0.50x,
 then at most 0 frames held, the budget unspent over 12 s capped, 2.75 s built again, 1.00 s kept off with a cap of 1 s.
+
+2026-10-07, reading ahead of a slow decoder: `build/sing spatial` passes, the new checks with it: off by 0 frames,
+reading ahead stopped 200 times by 6 s with 2.75 s held, the 2 s stall played through on the lead (down to 1.23 s),
+nothing skipped. The same checks against the engine before the change fail: 66939 frames of silence counted into the
+lead, and a gap in what plays.
 
 2026-10-05, a MacBook with an M4, macOS 27: everything passes under `gpu` and under ThreadSanitizer.
 

@@ -166,14 +166,15 @@ static void silence(AudioBufferList *data) {
 
 // The output's mixer's next `frames` frames into `data`, in chunks of at most its largest slice, each with a
 // sample time of the output's own, so Spotify's units never see a time twice (an AU renders a time it has
-// seen from cache).
-static OSStatus pullSource(Output *output, AudioUnit source, const AudioTimeStamp *outputTime, UInt32 frames, AudioBufferList *data) {
+// seen from cache). With `sounding`, it stops at the first chunk marked silent (SGPlayerPull).
+static OSStatus pullSource(Output *output, AudioUnit source, const AudioTimeStamp *outputTime, UInt32 frames, AudioBufferList *data, UInt32 *sounding) {
     enum { kMaxBuffers = 8 };
     UInt32 chunk = atomic_load_explicit(&output->chunk, memory_order_relaxed);
     if (data->mNumberBuffers > kMaxBuffers) chunk = frames;
     for (UInt32 b = 0; b < data->mNumberBuffers; b++) if (!data->mBuffers[b].mData) chunk = frames;
     UInt32 bytesPerFrame[kMaxBuffers];
     for (UInt32 b = 0; b < data->mNumberBuffers && b < kMaxBuffers; b++) bytesPerFrame[b] = data->mBuffers[b].mDataByteSize / frames;
+    if (sounding) *sounding = frames;
 
     for (UInt32 done = 0; done < frames;) {
         UInt32 count = MIN(chunk, frames - done);
@@ -194,6 +195,15 @@ static OSStatus pullSource(Output *output, AudioUnit source, const AudioTimeStam
         OSStatus status = AudioUnitRender(source, &flags, &time, output->sourceBus, count, target);
         output->sourceTime += count;
         if (status != noErr) return status;
+        // Asked to stop at silence: Spotify has none of its sound from here on yet, so the rest is not rendered.
+        if ((flags & kAudioUnitRenderAction_OutputIsSilence) && sounding) {
+            *sounding = done;
+            for (UInt32 b = 0; b < data->mNumberBuffers; b++) {
+                UInt32 per = data->mBuffers[b].mDataByteSize / frames;
+                if (data->mBuffers[b].mData) memset((char *)data->mBuffers[b].mData + done * per, 0, (frames - done) * per);
+            }
+            return noErr;
+        }
         // A buffer marked silent may still hold what was in it before; nothing after this reads the mark.
         if (flags & kAudioUnitRenderAction_OutputIsSilence) silence(target);
         done += count;
@@ -211,15 +221,15 @@ typedef struct {
     const AudioTimeStamp *time;
 } MixerPull;
 
-static OSStatus pullMixer(void *context, UInt32 frames, AudioBufferList *data) {
+static OSStatus pullMixer(void *context, UInt32 frames, AudioBufferList *data, UInt32 *sounding) {
     MixerPull *mixer = context;
-    return pullSource(mixer->output, mixer->source, mixer->time, frames, data);
+    return pullSource(mixer->output, mixer->source, mixer->time, frames, data, sounding);
 }
 
 // The music's mixer's sound, through the stage when one is set.
 static OSStatus pullChain(Output *output, AudioUnit source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *data) {
     SGPlayerStage stage = atomic_load_explicit(&sg_stage, memory_order_acquire);
-    if (!stage) return pullSource(output, source, time, frames, data);
+    if (!stage) return pullSource(output, source, time, frames, data, NULL);
     MixerPull mixer = {output, source, time};
     return stage(frames, data, pullMixer, &mixer);
 }
@@ -260,7 +270,7 @@ static OSStatus feed(void *refCon, AudioUnitRenderActionFlags *flags, const Audi
         *flags |= kAudioUnitRenderAction_OutputIsSilence;
     } else if (output != music()) {
         // Another chain plays as Spotify made it.
-        status = pullSource(output, source, timestamp, frames, data);
+        status = pullSource(output, source, timestamp, frames, data, NULL);
     } else {
         SGTimePitch *unit = atomic_load(&sg_pull);
         // A unit made for another rate passes the sound as it is, until the main thread makes one for the new rate.

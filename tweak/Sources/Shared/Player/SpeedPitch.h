@@ -59,8 +59,10 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on);
 // A stage between Spotify's mixer and the rest of the chain (Sing's look-ahead, Shared/Sing): it fills the
 // chain's buffers, pulling the mixer through `pull` as much as it likes. NULL passes the mixer straight on.
 // Called on the render thread, and only on the music's output (below) while Spotify's connection to it is taken
-// over (SGPlayerSpeedAllowed). The buffers are in SGPlayerMusicClientFormat's format.
-typedef OSStatus (*SGPlayerPull)(void *context, UInt32 frames, AudioBufferList *data);
+// over (SGPlayerSpeedAllowed). The buffers are in SGPlayerMusicClientFormat's format. With `sounding` set, a pull stops
+// at the first part the mixer marks silent (Spotify has none of its sound there yet), leaves the rest silent unrendered
+// and sets the frames before it; without, every part is rendered, silent or not.
+typedef OSStatus (*SGPlayerPull)(void *context, UInt32 frames, AudioBufferList *data, UInt32 *sounding);
 typedef OSStatus (*SGPlayerStage)(UInt32 frames, AudioBufferList *data, SGPlayerPull pull, void *context);
 void SGPlayerSetStage(SGPlayerStage stage);
 
