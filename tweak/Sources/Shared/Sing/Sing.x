@@ -529,7 +529,10 @@ NSString *SGSingStatusText(void) {
         }
         case SGSingStateWaiting: return sg_resting ? @"As sung" : @"Ready";
         case SGSingStateBuffering: return @"Listening ahead";
-        case SGSingStateSinging: return @"On";
+        case SGSingStateSinging: {
+            SGSingSeparator *separator = SGSingLoaderSeparator();
+            return separator && [separator stats].fast ? @"On, Neural Engine" : @"On, CPU";
+        }
         // The Neural Engine copy on its way: the budget is held (holdBudget), so this is not yet Too slow.
         case SGSingStateBehind:
             return SGSingLoaderFastState() == SGSingFastLoading ? @"Preparing for the Neural Engine" : @"Too slow";
@@ -961,11 +964,12 @@ static void tick(void) {
         NSString *fastPart = !neuralWanted() && SGSingLoaderFastState() == SGSingFastNone ? @"no Neural Engine copy"
             : [NSString stringWithFormat:@"Neural Engine copy %@, %llu at %.0f ms",
                @[@"not started", @"loading", @"ready", @"skipped", @"failed", @"timed out"][(NSUInteger)SGSingLoaderFastState()], copies.windows[1], copies.averageMS[1]];
-        SGLog(@"sing: %@, %llu windows at %.0f ms each (1500 ms keeps up; CPU copy %llu at %.0f ms, %@, %llu redone on the CPU, the last on the %@), "
+        NSString *last = copies.windows[0] + copies.windows[1] == 0 ? @"none run yet" : copies.fast ? @"the last on the Neural Engine" : @"the last on the CPU";
+        SGLog(@"sing: %@, %llu windows at %.0f ms each (1500 ms keeps up; CPU copy %llu at %.0f ms, %@, %llu redone on the CPU, %@), "
               @"lead %.2f s of %.2f s (the clock's %.2f s), %.2f s separated ahead, %llu frames dry, %.1f s dropped, %.1f s of 8 s short%@, %llu failures, Spotify %@, "
               @"thermal state %s, %@, Runs on %@%@",
               SGSingStatusText(), stats.windows, stats.averageMS, copies.windows[0], copies.averageMS[0], fastPart,
-              copies.fallbacks, copies.fast ? @"Neural Engine" : @"CPU", stats.lead, stats.targetLead, player ? SGSingLeadOf(player) : 0, stats.ready,
+              copies.fallbacks, last, stats.lead, stats.targetLead, player ? SGSingLeadOf(player) : 0, stats.ready,
               stats.dryFrames, stats.dropped, stats.budgetSpent, stats.budgetHeld ? @" (held while the Neural Engine copy loads)" : @"", stats.failures, sg_active ? @"active" : @"not active", SGSingThermalName(),
               SGSingMemoryText(), runsOnName(),
               sg_spatialListening ? [NSString stringWithFormat:@", the voice %.0f degrees right", stats.voiceAngle * 180 / M_PI] : @"");

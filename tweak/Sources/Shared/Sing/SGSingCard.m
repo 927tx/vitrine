@@ -300,8 +300,8 @@ static CGFloat height(float rms) {
     NSString *words = SGSingStatusText();
     float stored = SGSingLevel();
     if (state == SGSingStateSinging) {
-        words = stored > 0.001 && stored < 0.999 ? [NSString stringWithFormat:@"On · vocals at %@", SGSingLevelText(stored)]
-                                                 : [NSString stringWithFormat:@"On · %@", SGSingLevelText(stored)];
+        words = stored > 0.001 && stored < 0.999 ? [NSString stringWithFormat:@"%@ · vocals at %@", words, SGSingLevelText(stored)]
+                                                 : [NSString stringWithFormat:@"%@ · %@", words, SGSingLevelText(stored)];
     }
     if (SGSingStatusDetail()) words = [words stringByAppendingString:@"  ⓘ"];
     if (![_state.text isEqualToString:words]) _state.text = words;
