@@ -153,7 +153,9 @@ static SGRPlayerLyricsOverlay *overlayIn(UIView *host) {
     // On top of the player: it reaches from under the header row down to the progress bar, so it is over
     // the covers and the gradients and clear of every control. Under them instead, the mixing background
     // Spotify keeps between the two (01.txt:72) would be free to draw over the lines.
+    // Kept on top here and in replace(): Spotify adds Mix's transition cards later, over the lines.
     if (overlay.superview != host) [host addSubview:overlay];
+    else if (host.subviews.lastObject != overlay) [host bringSubviewToFront:overlay];
     return overlay;
 }
 
@@ -673,6 +675,7 @@ static void replace(void) {
     if (!sg_open) return;
     SGRPlayerLyricsOverlay *overlay = objc_getAssociatedObject(host, &kOverlayKey);
     if (!overlay.superview) return;
+    if (overlay.superview == host && host.subviews.lastObject != overlay) [host bringSubviewToFront:overlay];
     if (sg_alone) {
         l.stage = aloneStage(host, l);
         fadeControls(YES);
@@ -829,6 +832,12 @@ static SGRPlayerLyricsWatcher *sg_watcher;
     }];
     [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
         restartRest();
+        // The lyrics button asked again on the way back and twice after, as the lines can land in the meantime;
+        // it stayed dimmed after an instrumental heard in the background.
+        SGRPlayerLyricsChanged();
+        for (NSNumber *wait in @[@1, @3]) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wait.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ SGRPlayerLyricsChanged(); });
+        }
     }];
     // VoiceOver keeps the controls up: turned on, it brings them back.
     [NSNotificationCenter.defaultCenter addObserverForName:UIAccessibilityVoiceOverStatusDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
