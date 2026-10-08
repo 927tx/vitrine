@@ -1,7 +1,7 @@
 // Home redesign: the header the way the Music app has it. The filter pills (All, Music, Podcasts) go and
 // a large title takes their place at the leading edge; the avatar that opens the side drawer moves to the
 // trailing edge; the scrim Spotify lays behind the header goes too, the soft scroll edge (Kit/SGREdgeEffect.x)
-// being what keeps the title clear of the page scrolling under it, as on every other redesigned page.
+// being what keeps the page scrolling under it soft; the title itself scrolls away (followScroll).
 //
 // Tree (trees/clean/home/10.txt:3018-3051): FunkisViewController's view holds a 402x112 UIView around
 // Reprise_LiquidGlassKit LiquidGlass.GradientView (the scrim) and, at {0, 62}, an
@@ -98,6 +98,46 @@ static BOOL findHeader(UIView *view) {
     return NO;
 }
 
+// The title scrolls away with the page, as the Music app's large title does: it rises with what is under it and
+// fades over its own height, so the page never passes under it. The header itself stays, the avatar with it.
+static void followScroll(UIScrollView *scroll) {
+    UILabel *title = sg_header ? objc_getAssociatedObject(sg_header, &kTitleKey) : nil;
+    if (!title || !scroll) return;
+    CGFloat scrolled = MAX(0, scroll.contentOffset.y + scroll.adjustedContentInset.top);
+    title.transform = CGAffineTransformMakeTranslation(0, -scrolled);
+    title.alpha = 1 - MIN(1, scrolled / MAX(1, title.bounds.size.height));
+}
+
+@interface SGRHomeTitleFollower : NSObject
+@property (nonatomic, weak) UIScrollView *scroll;
+@end
+
+@implementation SGRHomeTitleFollower
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    followScroll(self.scroll);
+}
+@end
+
+// The feed: the page's tallest scroll view, found once. Followed by an observer that lives as long as it does.
+static char kFollowerKey;
+static __weak UIScrollView *sg_feed;
+static void follow(UIView *view) {
+    __block UIScrollView *feed = sg_feed;
+    if (![feed isDescendantOfView:view]) feed = nil;
+    if (!feed) SGForEachView(view, ^(UIView *v) {
+        if ([v isKindOfClass:UIScrollView.class] && v.bounds.size.height > (feed ? feed.bounds.size.height : 300)) feed = (UIScrollView *)v;
+    });
+    if (!feed) return;
+    sg_feed = feed;
+    if (!objc_getAssociatedObject(feed, &kFollowerKey)) {
+        SGRHomeTitleFollower *follower = [SGRHomeTitleFollower new];
+        follower.scroll = feed;
+        [feed addObserver:follower forKeyPath:@"contentOffset" options:0 context:NULL];
+        objc_setAssociatedObject(feed, &kFollowerKey, follower, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    followScroll(feed);
+}
+
 static void layoutHeader(UIViewController *page) {
     UIView *view = page.viewIfLoaded;
     if (!view || !findHeader(view)) return;
@@ -130,7 +170,12 @@ static void layoutHeader(UIViewController *page) {
     CGFloat trailing = face ? CGRectGetMinX([stack convertRect:face.frame toView:header]) - SGRGrid : header.bounds.size.width - SGRSideMargin;
     CGFloat height = ceil(font.lineHeight);
     CGRect frame = CGRectMake(SGRSideMargin, round(CGRectGetMidY(stack.frame) - height / 2), MAX(0, trailing - SGRSideMargin), height);
-    if (!CGRectEqualToRect(title.frame, frame)) title.frame = frame;
+    // By bounds and center: the title carries the scroll's transform.
+    CGRect bounds = (CGRect){CGPointZero, frame.size};
+    CGPoint center = CGPointMake(CGRectGetMidX(frame), CGRectGetMidY(frame));
+    if (!CGRectEqualToRect(title.bounds, bounds)) title.bounds = bounds;
+    if (!CGPointEqualToPoint(title.center, center)) title.center = center;
+    follow(view);
 
     static dispatch_once_t once;
     dispatch_once(&once, ^{
