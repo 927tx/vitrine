@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-beta.4](https://github.com/My-Name-Is-Jeff/vitrine/compare/v1.0.0-beta.3...v1.0.0-beta.4) (2026-10-08)
+
+
+### Fixes
+
+* an artist's About photo shows whole, and the liked heart has no black disc ([f2f09f2](https://github.com/My-Name-Is-Jeff/vitrine/commit/f2f09f2d00bc72d2fb6aabd96ce49b590a3bd2e2))
+
 ## [1.0.0-beta.3](https://github.com/My-Name-Is-Jeff/vitrine/compare/v1.0.0-beta.2...v1.0.0-beta.3) (2026-10-08)
 
 
