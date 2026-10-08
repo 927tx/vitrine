@@ -103,8 +103,10 @@ Shared:
                   answer Spotify's requests and the mod's sources and its own requests stand aside
     LyricsSources/ the sources lyrics come from, asked in the order the Lyrics page puts them in and merged into the
                   best answer (LyricsSources.m, the list to drag in LyricsSourcesPage.m): Apple Music's TTML from
-                  BiniLyrics.m and Unison.m, read by SGTTML.m, which carries a second voice and the
-                  backing vocals, and in its head Apple's translation and its pronunciation of a line, the pronunciation
+                  BiniLyrics.m (now lrc.red: first the TTML filed under Spotify's ISRC for the track, from
+                  SGSpotifyISRC in Haptics/SystemMusicHaptics.x, else its search by name) and Unison.m, read by SGTTML.m,
+                  which carries a second voice and the backing vocals, and in its head Apple's translation and its
+                  pronunciation of a line, each keyed to the line by its itunes:key or lrc:key, the pronunciation
                   timed word by word (the translation taken in the Lyrics page's language); Musixmatch.m, matched by
                   Spotify's track id with an anonymous token, word timed where it has richsync; NetEase.m, word timing from yrc for what the others only line time; LrcLib.m, open and
                   keyless and timed by the line, the floor under the rest. SpicyLyrics.m, Spicy Lyrics' Developer Platform
