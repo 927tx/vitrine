@@ -25,3 +25,5 @@ notes/
 
 # zsign's signature cache, from signing out/quick/ in place
 .zsign_cache/
+.phone.env
+.claude/worktrees/
