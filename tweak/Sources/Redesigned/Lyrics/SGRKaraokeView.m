@@ -38,8 +38,9 @@ static const CGFloat kUnderlineDrop = 1, kUnderlineWidth = 2, kUnderlineAlpha = 
 // opens the pages it links to.
 static const CGFloat kCreditSize = 12, kCreditBottom = 10, kCreditSlop = 8;
 // The button for the pronunciation and the translation, in the bottom leading corner as Apple Music
-// has it, and the gap between it and the credit beside it.
-static const CGFloat kExtrasSide = 44, kExtrasBottom = 12, kExtrasGlyph = 17, kExtrasCreditGap = 12;
+// has it, and the gap between it and the credit beside it. The translate glyph is half again as wide as the
+// mic's across from it, so it is drawn smaller to weigh the same: 14 pt is about the mic's 17 pt in area.
+static const CGFloat kExtrasSide = 44, kExtrasBottom = 12, kExtrasGlyph = 14, kExtrasCreditGap = 12;
 static char kExtrasGlassKey;
 static const NSTimeInterval kRestyleFade = 0.3;   // the lines crossfading to a new style
 static const NSTimeInterval kBrowseHold = 3;   // after scrolling by hand, how long until it follows the song again

@@ -132,7 +132,7 @@ Shared:
                   ways, each its own item: on the iPhone by Apple's Translate (iOS 26, the song's language told by
                   NaturalLanguage, both languages downloaded in the Translate app or the item says where to) and by Apple
                   Intelligence's model (iOS 26 where it is on and speaks the language; permissive guardrails for changing
-                  the user's own text, 40 lines a session, exactly one string a line by a generation schema), both in
+                  the user's own text, 12 lines a session, greedy and capped at 60 tokens a line, exactly one string a line by a generation schema; Translate retried once, as its first ask can fail while it loads), both in
                   OnDeviceTranslation.swift, the frameworks weak linked; and by Gemini on the user's own key (Keychain),
                   whose prompt and menu item say the lyrics go to Google. Gemini's reply read and checked on the Mac
                   against harness/lyrics-translation/

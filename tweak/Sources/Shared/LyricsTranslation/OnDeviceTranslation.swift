@@ -5,11 +5,15 @@ import Foundation
 import FoundationModels
 import NaturalLanguage
 import Translation
+import os
 
 @objc(SGOnDeviceTranslation)
 public final class SGOnDeviceTranslation: NSObject {
-    // The model asked fresh for each run of this many lines, so a long song stays inside its context.
-    private static let chunkLines = 40
+    private static let log = Logger(subsystem: "spotifyglass", category: "translation")
+    // The model asked fresh for each run of this many lines, so a long song stays inside its context, with room
+    // for this many tokens of answer a line: a model that runs on stops there instead of filling the context.
+    private static let chunkLines = 12
+    private static let tokensPerLine = 60
 
     private static func finish(_ done: @escaping ([String]?, String?) -> Void, _ lines: [String]?, _ error: String?) {
         DispatchQueue.main.async { done(lines, error) }
@@ -59,15 +63,22 @@ public final class SGOnDeviceTranslation: NSObject {
                 line.trimmingCharacters(in: .whitespaces).isEmpty || line == "♪" ? nil
                     : TranslationSession.Request(sourceText: line, clientIdentifier: String(index))
             }
-            do {
-                let session = TranslationSession(installedSource: source, target: target)
-                var out = [String](repeating: "", count: lines.count)
-                for response in try await session.translations(from: requests) {
-                    if let id = response.clientIdentifier, let index = Int(id) { out[index] = response.targetText }
+            let started = Date()
+            // A first ask can fail while Translate loads its languages; the second, a moment later, finds them in.
+            for attempt in 1...2 {
+                do {
+                    let session = TranslationSession(installedSource: source, target: target)
+                    var out = [String](repeating: "", count: lines.count)
+                    for response in try await session.translations(from: requests) {
+                        if let id = response.clientIdentifier, let index = Int(id) { out[index] = response.targetText }
+                    }
+                    log.notice("translate: \(source.minimalIdentifier, privacy: .public) to \(target.minimalIdentifier, privacy: .public), \(requests.count) lines in \(Date().timeIntervalSince(started), format: .fixed(precision: 1)) s")
+                    return finish(done, out, nil)
+                } catch {
+                    log.error("translate: \(source.minimalIdentifier, privacy: .public) to \(target.minimalIdentifier, privacy: .public), try \(attempt) failed: \(String(describing: error), privacy: .public)")
+                    if attempt == 2 { return finish(done, nil, "Apple's Translate could not translate the song (\(error.localizedDescription)).") }
+                    try? await Task.sleep(for: .seconds(1))
                 }
-                finish(done, out, nil)
-            } catch {
-                finish(done, nil, "Apple's Translate could not translate the song (\(error.localizedDescription)).")
             }
         }
     }
@@ -91,13 +102,18 @@ public final class SGOnDeviceTranslation: NSObject {
         let language = name(Locale.Language(identifier: languageTag))
         Task {
             var out: [String] = []
+            let started = Date()
             do {
                 for start in stride(from: 0, to: lines.count, by: chunkLines) {
                     let chunk = Array(lines[start..<min(start + chunkLines, lines.count)])
+                    let chunkStarted = Date()
                     out += try await translateChunk(chunk, into: language)
+                    log.notice("intelligence: lines \(start + 1)-\(start + chunk.count) of \(lines.count) in \(Date().timeIntervalSince(chunkStarted), format: .fixed(precision: 1)) s")
                 }
+                log.notice("intelligence: \(lines.count) lines into \(languageTag, privacy: .public) in \(Date().timeIntervalSince(started), format: .fixed(precision: 1)) s")
                 finish(done, out, nil)
             } catch {
+                log.error("intelligence: failed after \(out.count) of \(lines.count) lines, \(Date().timeIntervalSince(started), format: .fixed(precision: 1)) s: \(String(describing: error), privacy: .public)")
                 finish(done, nil, problem(error))
             }
         }
@@ -139,7 +155,8 @@ public final class SGOnDeviceTranslation: NSObject {
         let schema = try GenerationSchema(root: DynamicGenerationSchema(arrayOf: line, minimumElements: lines.count, maximumElements: lines.count),
                                           dependencies: [])
         let prompt = String(decoding: try JSONSerialization.data(withJSONObject: lines), as: UTF8.self)
-        let answer = try await session.respond(to: prompt, schema: schema).content.value([String].self)
+        let options = GenerationOptions(samplingMode: .greedy, maximumResponseTokens: tokensPerLine * lines.count + 32)
+        let answer = try await session.respond(to: prompt, schema: schema, options: options).content.value([String].self)
         return answer.count == lines.count ? answer : lines.indices.map { $0 < answer.count ? answer[$0] : "" }
     }
 }
