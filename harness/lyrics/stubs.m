@@ -54,6 +54,26 @@ void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *li
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ done(translations, nil); });
 }
 
+// -onDevice 1 / -intelligence 1: Translate on iPhone and Apple Intelligence are offered, each answering every
+// line with itself, marked.
+@interface SGOnDeviceTranslation : NSObject
+@end
+@implementation SGOnDeviceTranslation
++ (BOOL)translationAvailable { return [NSUserDefaults.standardUserDefaults boolForKey:@"onDevice"]; }
++ (BOOL)appleIntelligenceAvailable:(NSString *)languageTag { return [NSUserDefaults.standardUserDefaults boolForKey:@"intelligence"]; }
++ (void)answer:(NSArray<NSString *> *)lines as:(NSString *)mark done:(void (^)(NSArray<NSString *> *, NSString *))done {
+    NSMutableArray<NSString *> *out = [NSMutableArray array];
+    for (NSString *line in lines) [out addObject:line.length ? [mark stringByAppendingString:line] : @""];
+    dispatch_async(dispatch_get_main_queue(), ^{ done(out, nil); });
+}
++ (void)translate:(NSArray<NSString *> *)lines to:(NSString *)languageTag done:(void (^)(NSArray<NSString *> *, NSString *))done {
+    [self answer:lines as:@"iPhone: " done:done];
+}
++ (void)translateWithAppleIntelligence:(NSArray<NSString *> *)lines to:(NSString *)languageTag done:(void (^)(NSArray<NSString *> *, NSString *))done {
+    [self answer:lines as:@"Intelligence: " done:done];
+}
+@end
+
 // Line meanings: -title and -artist name the track Genius is searched for, and the setting's key
 // (-spotifyglass.lyricsMeanings 3) turns them on.
 @interface SGHarnessTrack : NSObject

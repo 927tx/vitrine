@@ -128,9 +128,14 @@ Shared:
                   no translation of their own take Musixmatch's community translations (Musixmatch.m), whichever
                   source won, Spotify's own included: matched by the line's folded text, as copies kept in place of the
                   lines (KaraokeSource.x), which the view picks up
-    LyricsTranslation/ a song's lines translated by Gemini on the user's own key (Keychain), from the lyrics' corner
-                  menu, for the lines no source translated; the key's prompt and the menu item say the lyrics go to
-                  Google. The reply read and checked on the Mac against harness/lyrics-translation/
+    LyricsTranslation/ a song's lines translated from the lyrics' corner menu, for the lines no source translated, three
+                  ways, each its own item: on the iPhone by Apple's Translate (iOS 26, the song's language told by
+                  NaturalLanguage, both languages downloaded in the Translate app or the item says where to) and by Apple
+                  Intelligence's model (iOS 26 where it is on and speaks the language; permissive guardrails for changing
+                  the user's own text, 40 lines a session, exactly one string a line by a generation schema), both in
+                  OnDeviceTranslation.swift, the frameworks weak linked; and by Gemini on the user's own key (Keychain),
+                  whose prompt and menu item say the lyrics go to Google. Gemini's reply read and checked on the Mac
+                  against harness/lyrics-translation/
     LockScreenLyrics/ the line being sung in the system's now playing, and on iOS 26 the lyrics as the lock screen's
                   full-screen artwork (LyricsArtwork.x): a new artwork ID per line, its 3:4 H.264 clip (the line and the
                   next one dimmed over the blurred cover, SGLyricsClip.m) written only when the lock screen asks for it,

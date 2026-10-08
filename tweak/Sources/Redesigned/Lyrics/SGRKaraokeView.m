@@ -1700,6 +1700,18 @@ static BOOL hasWords(SGKaraokeLine *line) {
     return NO;
 }
 
+// A way to translate a song: the lines, the track and the language in, one translation per line out, or a
+// message to show. Main queue.
+typedef void (^SGRTranslated)(NSArray<NSString *> *translations, NSString *error);
+typedef void (^SGRTranslator)(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *language, SGRTranslated done);
+
+// The lines' text for a translator, "" for a line with no words.
+static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
+    NSMutableArray<NSString *> *texts = [NSMutableArray arrayWithCapacity:lines.count];
+    for (SGKaraokeLine *line in lines) [texts addObject:hasWords(line) ? SGKaraokeLineText(line) ?: @"" : @""];
+    return texts;
+}
+
 // When each line is sung and where the breaks are, worked out once per song for the frames to read.
 - (void)timeLines {
     free(_spans);
@@ -1801,8 +1813,10 @@ static BOOL hasWords(SGKaraokeLine *line) {
 // The button shows only for a song with a pronunciation or a translation to show, and its menu only
 // what the song has: a switch for each, reading what tapping it will do.
 - (void)offerExtras {
-    BOOL gemini = SGGeminiKeySet();
-    BOOL offered = _lines && !_sample && (_hasSpoken || _hasTranslation || gemini);
+    NSString *language = SGLyricsGeminiLanguage();
+    BOOL gemini = SGGeminiKeySet(), onDevice = SGOnDeviceTranslation.translationAvailable;
+    BOOL intelligence = [SGOnDeviceTranslation appleIntelligenceAvailable:language];
+    BOOL offered = _lines && !_sample && (_hasSpoken || _hasTranslation || gemini || onDevice || intelligence);
     if (!offered) {
         _extrasBox.hidden = YES;
         [self setNeedsLayout];
@@ -1827,7 +1841,7 @@ static BOOL hasWords(SGKaraokeLine *line) {
         [self addSubview:_extrasBox];
         self.extrasHidden = _extrasHidden;
     }
-    // While Gemini works the glyph turns into a spinner, and the menu has nothing to ask it a second time.
+    // While a translation is worked out the glyph turns into a spinner, and the menu has nothing to ask a second time.
     BOOL translating = _translating && _translating == _lines;
     UIButtonConfiguration *config = _extras.configuration;
     if (config.showsActivityIndicator != translating) {
@@ -1848,14 +1862,31 @@ static BOOL hasWords(SGKaraokeLine *line) {
                                              image:[UIImage systemImageNamed:@"character.bubble"] identifier:nil
                                            handler:^(UIAction *action) { SGRSetLyricsTextShown(SGRLyricsTextTranslation, !on); }]];
     }
-    // Also for a song a source translated in part, as Musixmatch's community often has: Gemini fills in the rest.
-    // Said in the item itself: the song's words leave the phone for Google's servers.
-    if (gemini && _untranslated && !translating) {
+    // Also for a song a source translated in part, as Musixmatch's community often has: the rest is filled in.
+    // Said in each item: whether the song's words stay on the phone.
+    if (_untranslated && !translating) {
         __weak SGRKaraokeView *weakSelf = self;
-        UIAction *gemini = [UIAction actionWithTitle:@"Translate with Gemini" image:[UIImage systemImageNamed:@"sparkles"]
-                                          identifier:nil handler:^(UIAction *action) { [weakSelf translateWithGemini]; }];
-        gemini.subtitle = @"Sends the lyrics to Google";
-        [items addObject:gemini];
+        void (^offer)(NSString *, NSString *, NSString *, SGRTranslator) = ^(NSString *title, NSString *glyph, NSString *subtitle, SGRTranslator translator) {
+            UIAction *action = [UIAction actionWithTitle:title image:[UIImage systemImageNamed:glyph] identifier:nil
+                                                 handler:^(UIAction *action) { [weakSelf translateWith:translator]; }];
+            action.subtitle = subtitle;
+            [items addObject:action];
+        };
+        if (onDevice) {
+            offer(@"Translate on iPhone", @"translate", @"Apple's Translate, on this iPhone",
+                  ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated done) {
+                [SGOnDeviceTranslation translate:textsOf(lines) to:to done:done];
+            });
+        }
+        if (intelligence) {
+            offer(@"Translate with Apple Intelligence", @"apple.intelligence", @"On this iPhone",
+                  ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated done) {
+                [SGOnDeviceTranslation translateWithAppleIntelligence:textsOf(lines) to:to done:done];
+            });
+        }
+        if (gemini) offer(@"Translate with Gemini", @"sparkles", @"Sends the lyrics to Google", ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated done) {
+            SGLyricsTranslateWithGemini(track, lines, to, done);
+        });
     }
     _extras.menu = [UIMenu menuWithChildren:items];
     _extrasBox.hidden = NO;
@@ -1863,14 +1894,14 @@ static BOOL hasWords(SGKaraokeLine *line) {
 }
 
 // The song's lines into the Lyrics page's language, or the phone's: each line without a translation takes
-// Gemini's, and translations are switched on so the answer shows. The whole song is sent, for the sense.
-- (void)translateWithGemini {
+// the translator's, and translations are switched on so the answer shows. The whole song goes, for the sense.
+- (void)translateWith:(SGRTranslator)translator {
     NSArray<SGKaraokeLine *> *lines = _lines;
     NSString *track = _track;
     if (!lines.count || _translating == lines) return;
     _translating = lines;
     [self offerExtras];
-    SGLyricsTranslateWithGemini(track, lines, SGLyricsGeminiLanguage(), ^(NSArray<NSString *> *translations, NSString *error) {
+    translator(lines, track, SGLyricsGeminiLanguage(), ^(NSArray<NSString *> *translations, NSString *error) {
         if (self->_translating == lines) self->_translating = nil;
         [self offerExtras];
         if (!translations) {
@@ -1884,7 +1915,7 @@ static BOOL hasWords(SGKaraokeLine *line) {
         }
         if (lines != self->_lines) return;   // the song moved on meanwhile
         [lines enumerateObjectsUsingBlock:^(SGKaraokeLine *line, NSUInteger i, BOOL *stop) {
-            if (translations[i].length && !line.translation.length) line.translation = translations[i];
+            if (i < translations.count && translations[i].length && !line.translation.length) line.translation = translations[i];
         }];
         self->_hasTranslation = YES;
         self->_untranslated = NO;

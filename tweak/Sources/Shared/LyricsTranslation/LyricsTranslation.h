@@ -21,3 +21,14 @@ NSArray<NSString *> *SGGeminiTranslationsIn(id root, NSInteger status, NSError *
 
 // The Lyrics page's row: shows whether a key is set, and sets or removes it.
 SGModRow *SGGeminiKeyRow(void);
+
+// On the iPhone itself (OnDeviceTranslation.swift): Apple's Translate, with both languages downloaded in the
+// Translate app, and Apple Intelligence's model. Each gives one translation per line ("" for a line with no
+// words), or nil and a message to show, on the main queue.
+@interface SGOnDeviceTranslation : NSObject
+@property (class, readonly) BOOL translationAvailable;
++ (BOOL)appleIntelligenceAvailable:(NSString *)languageTag;
++ (void)translate:(NSArray<NSString *> *)lines to:(NSString *)languageTag done:(void (^)(NSArray<NSString *> *lines, NSString *error))done;
++ (void)translateWithAppleIntelligence:(NSArray<NSString *> *)lines to:(NSString *)languageTag
+                                  done:(void (^)(NSArray<NSString *> *lines, NSString *error))done;
+@end
