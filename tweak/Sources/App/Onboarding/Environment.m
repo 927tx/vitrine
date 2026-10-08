@@ -1,5 +1,6 @@
 // What about the install itself can work against the mod, said once and kept at the top of Mod Settings
-// while it lasts: EeveeSpotify injected beside it, a Spotify other than the one it is made for, and a
+// while it lasts: EeveeSpotify injected beside it, a Spotify other than the one it is made for, the redesign without
+// the app changes the IPA build makes, and a
 // redesign below iOS 26 that did not start (Core/SGUIMode.h), which turned itself off. Also what Chroma, installed
 // over the same Spotify before, left behind, offered once for deleting.
 #import "Shared/Lyrics/Lyrics.h"
@@ -37,6 +38,18 @@ static SGProblem version(void) {
     return @[[NSString stringWithFormat:@"Spotify %@ is not the version Vitrine is made for", SGSpotifyVersion()],
              [NSString stringWithFormat:@"Vitrine is made for Spotify %@. On another version some of its changes find nothing to change, and some screens can look wrong or crash. Inject Vitrine into Spotify %@.",
                  SGSpotifyMadeFor, SGSpotifyMadeFor]];
+}
+
+// Installed without the app changes Vitrine's IPA build makes (scripts/pipeline.sh: plist/liquid-glass.plist and the
+// Live Activity), as when its .deb is injected by hand: the system keeps its old bars, so the glass tab bar is gone.
+static BOOL withoutAppChanges(void) {
+    id compatibility = [NSBundle.mainBundle objectForInfoDictionaryKey:@"UIDesignRequiresCompatibility"];
+    return SGRedesignAvailable() && SGRedesignedUIStored() && !([compatibility isKindOfClass:NSNumber.class] && ![compatibility boolValue]);
+}
+
+static SGProblem appChanges(void) {
+    return @[@"Installed without Vitrine's app changes",
+             @"The redesign needs changes to the app that only Vitrine's IPA build makes, so the tab bar stays Spotify's own and the Live Activity is missing. Build the IPA with Vitrine instead of injecting its .deb."];
 }
 
 static SGProblem fellBack(void) {
@@ -108,6 +121,7 @@ static NSArray<SGProblem> *installProblems(void) {
     NSMutableArray<SGProblem> *list = [NSMutableArray array];
     if (SGEeveeSpotifyInjected()) [list addObject:eevee()];
     if (otherVersion()) [list addObject:version()];
+    if (withoutAppChanges()) [list addObject:appChanges()];
     return list;
 }
 
@@ -120,6 +134,8 @@ NSArray<SGModRow *> *SGEnvironmentWarningRows(void) {
         [rows addObject:SGWarningRow([NSString stringWithFormat:@"Made for Spotify %@", SGSpotifyMadeFor],
                                      [NSString stringWithFormat:@"This is %@. Tap for what that does", SGSpotifyVersion()],
                                      ^{ tell(@[version()]); })];
+    if (withoutAppChanges())
+        [rows addObject:SGWarningRow(@"Installed without the app changes", @"Tap for what that does", ^{ tell(@[appChanges()]); })];
     if (chromaLeftovers().count)
         [rows addObject:SGWarningRow(@"Chroma left files behind", [NSString stringWithFormat:@"%@ Vitrine never uses. Tap to delete", sizeOf(chromaLeftovers())], ^{ offerCleanup(); })];
     return rows;
@@ -128,7 +144,7 @@ NSArray<SGModRow *> *SGEnvironmentWarningRows(void) {
 // Once per install state: the same EeveeSpotify and the same Spotify version say nothing again, a
 // change says what it is now.
 static NSString *state(void) {
-    return [NSString stringWithFormat:@"eevee %d, spotify %@", SGEeveeSpotifyInjected(), SGSpotifyVersion()];
+    return [NSString stringWithFormat:@"eevee %d, spotify %@, app changes %d", SGEeveeSpotifyInjected(), SGSpotifyVersion(), !withoutAppChanges()];
 }
 
 static void whenClear(NSInteger tries, void (^then)(void)) {

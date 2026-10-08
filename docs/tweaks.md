@@ -545,8 +545,9 @@ App:
                    that came over from upstream is left out, so a build without its own has no sheet). The Mod
                    page offers both again. Environment.m says once per install state, a few seconds in, when
                    EeveeSpotify is injected too (a dyld image named so, or its settings page's Swift class) or Spotify is not the version the mod is
-                   made for (SGSpotifyMadeFor), and when a redesign below iOS 26 did not start; the first two stay
-                   as red rows at the top of Mod Settings. What Chroma left in Spotify's storage when Vitrine
+                   made for (SGSpotifyMadeFor), and when a redesign below iOS 26 did not start, and when the redesign runs without the app
+                   changes the IPA build makes (UIDesignRequiresCompatibility, as with a .deb injected by hand); all but
+                   the third stay as red rows at the top of Mod Settings. What Chroma left in Spotify's storage when Vitrine
                    replaced it (its Karaoke model and saved lock screen videos, never its listening history or audio
                    effects) is offered for deleting once, and stays a row there until it goes. Laid out on the simulator by harness/onboarding/
 
