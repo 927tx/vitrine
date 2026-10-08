@@ -21,6 +21,24 @@
 #import "Artist.h"
 
 static char kSettledKey, kKindsKey, kDroppedKey;
+
+// The "You liked" row's heart sits on a 24pt black disc at the avatar's corner, a ring on any field but black
+// (device 2026-10-08). The disc goes; a soft shadow keeps the heart readable on the photo.
+static void clearLikedBadge(UIView *cell) {
+    SGForEachView(cell, ^(UIView *row) {
+        if (![row.accessibilityIdentifier isEqualToString:@"Components.UI.LikedSongs.Row"]) return;
+        SGForEachView(row, ^(UIView *disc) {
+            CGSize size = disc.bounds.size;
+            if (size.width > 30 || size.width != size.height || !SGIsBaseSurface(disc.layer.backgroundColor)) return;
+            disc.backgroundColor = UIColor.clearColor;
+            disc.clipsToBounds = NO;
+            disc.layer.shadowColor = UIColor.blackColor.CGColor;
+            disc.layer.shadowOpacity = 0.5;
+            disc.layer.shadowRadius = 2;
+            disc.layer.shadowOffset = CGSizeZero;
+        });
+    });
+}
 static BOOL hideVideos;
 
 typedef NS_ENUM(NSInteger, SGRArtistCell) {
@@ -173,6 +191,7 @@ static void logOnce(NSString *what) {
         // What the cell paints over the field -- the "You liked" row, every carousel's collection and the
         // fade Popular's "See more" draws over its last track (device, trees/continuous/3.txt 2026-09-18).
         SGRClearCellPaint(cell);
+        clearLikedBadge(cell);
     }
 }
 

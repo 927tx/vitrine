@@ -348,11 +348,17 @@ static const CGFloat kPaintedShare = 0.75;
 // A "see more" fade lies over the section's last row with the footer drawn on top of both, its button over the
 // row's bottom line (Popular's 6th track, device 2026-10-07: the fade over the whole cell, the footer from 40pt).
 // With the fade gone, the row fades itself out above the footer instead, so the field shows through, not a paint.
+// Only above a section footer (ListSectionFooterElement): the About card lays its photo, a fade and its words out the
+// same way, and its photo is not to fade (device 2026-10-08).
 static char kRowFadeKey;
+static BOOL isFooter(UIView *view) {
+    return [NSStringFromClass(view.class) containsString:@"ListSectionFooter"];
+}
+
 static void fadeRowsAbove(UIView *gradient) {
     NSArray<UIView *> *siblings = gradient.superview.subviews;
     NSUInteger at = [siblings indexOfObject:gradient];
-    if (at == NSNotFound || at + 1 >= siblings.count) return;
+    if (at == NSNotFound || at + 1 >= siblings.count || !isFooter(siblings[at + 1])) return;
     CGFloat footerTop = siblings[at + 1].frame.origin.y;
     for (NSUInteger i = 0; i < at; i++) {
         UIView *row = siblings[i];
@@ -378,7 +384,7 @@ static BOOL aboveFooter(UIView *row) {
     NSArray<UIView *> *siblings = row.superview.subviews;
     NSUInteger at = [siblings indexOfObject:row];
     for (NSUInteger i = at + 1; at != NSNotFound && i + 1 < siblings.count; i++) {
-        if ([NSStringFromClass(siblings[i].class) containsString:@"GradientView"]) return YES;
+        if ([NSStringFromClass(siblings[i].class) containsString:@"GradientView"] && isFooter(siblings[i + 1])) return YES;
     }
     return NO;
 }
