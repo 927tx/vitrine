@@ -1890,7 +1890,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
         if (intelligence) {
             offer(@"Translate with Apple Intelligence", @"apple.intelligence", @"On this iPhone",
                   ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated progress, SGRTranslated done) {
-                [SGOnDeviceTranslation translateWithAppleIntelligence:textsOf(lines) to:to progress:^(NSArray<NSString *> *soFar) { progress(soFar, nil); } done:done];
+                [SGOnDeviceTranslation translateWithAppleIntelligence:textsOf(lines) to:to song:SGLyricsSongName(track) progress:^(NSArray<NSString *> *soFar) { progress(soFar, nil); } done:done];
             });
         }
         if (gemini) offer(@"Translate with Gemini", @"sparkles", @"Sends the lyrics to Google", ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated progress, SGRTranslated done) {

@@ -12,6 +12,9 @@ BOOL SGGeminiKeySet(void);
 void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *lines, NSString *languageTag,
                                  void (^done)(NSArray<NSString *> *translations, NSString *error));
 
+// "“Title” by Artist" for a track the player or the local files know, for a translator's instructions; else nil.
+NSString *SGLyricsSongName(NSString *trackID);
+
 // The language a translation is asked in: the Lyrics page's, else the phone's own.
 NSString *SGLyricsGeminiLanguage(void);
 
@@ -30,7 +33,7 @@ SGModRow *SGGeminiKeyRow(void);
 + (BOOL)appleIntelligenceAvailable:(NSString *)languageTag;
 + (void)translate:(NSArray<NSString *> *)lines to:(NSString *)languageTag done:(void (^)(NSArray<NSString *> *lines, NSString *error))done;
 // Apple Intelligence works through the song a batch at a time: `progress` gets the lines so far, "" for the rest.
-+ (void)translateWithAppleIntelligence:(NSArray<NSString *> *)lines to:(NSString *)languageTag
++ (void)translateWithAppleIntelligence:(NSArray<NSString *> *)lines to:(NSString *)languageTag song:(NSString *)song
                               progress:(void (^)(NSArray<NSString *> *lines))progress
                                   done:(void (^)(NSArray<NSString *> *lines, NSString *error))done;
 @end

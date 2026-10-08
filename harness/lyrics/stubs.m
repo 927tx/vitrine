@@ -70,7 +70,7 @@ void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *li
     [self answer:lines as:@"iPhone: " done:done];
 }
 // A batch at a time, as the model works: the first half shows a second before the rest.
-+ (void)translateWithAppleIntelligence:(NSArray<NSString *> *)lines to:(NSString *)languageTag progress:(void (^)(NSArray<NSString *> *))progress
++ (void)translateWithAppleIntelligence:(NSArray<NSString *> *)lines to:(NSString *)languageTag song:(NSString *)song progress:(void (^)(NSArray<NSString *> *))progress
                                   done:(void (^)(NSArray<NSString *> *, NSString *))done {
     NSMutableArray<NSString *> *half = [NSMutableArray array];
     [lines enumerateObjectsUsingBlock:^(NSString *line, NSUInteger i, BOOL *stop) {
@@ -152,3 +152,5 @@ void SGKaraokeSeek(NSInteger ms) {
         SGHarnessStartClock(ms, sg_rate, -1, 0);
     });
 }
+// "“Title” by Artist" the translators are told.
+NSString *SGLyricsSongName(NSString *trackID) { return @"“Sample” by Harness"; }
