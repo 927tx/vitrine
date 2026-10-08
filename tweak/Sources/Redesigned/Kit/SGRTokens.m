@@ -127,3 +127,15 @@ void SGRAnimate(SGRMotion motion, void (^animations)(void), void (^completion)(B
             break;
     }
 }
+
+void SGRAnimateLayout(UIView *host, void (^animations)(void), void (^completion)(BOOL finished)) {
+    if (!animations) return;
+    if (!SGRReduceMotion() || !host.window) {
+        SGRAnimate(SGRMotionLayout, animations, completion);
+        return;
+    }
+    // Snapshot the host, so the layout changes in place while the old picture dissolves.
+    [UIView transitionWithView:host duration:0.2
+        options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
+        animations:animations completion:completion];
+}

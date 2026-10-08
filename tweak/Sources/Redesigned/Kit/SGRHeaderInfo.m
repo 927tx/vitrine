@@ -144,7 +144,7 @@ UIImageView *SGRCreatorPicture(UIView *root) {
         return;
     }
     SGRAnimate(SGRMotionFade, fade, faded);
-    SGRAnimate(SGRMotionLayout, ^{ [self layoutIfNeeded]; }, nil);
+    SGRAnimateLayout(self, ^{ [self layoutIfNeeded]; }, nil);
 }
 
 // The space under a line: a picture needs more room under it than a line of text does.
@@ -211,7 +211,7 @@ UIImageView *SGRCreatorPicture(UIView *root) {
     if (!appears || !self.window) return;
     _picture.alpha = 0;
     SGRAnimate(SGRMotionFade, ^{ self->_picture.alpha = 1; }, nil);
-    SGRAnimate(SGRMotionLayout, ^{ [self layoutIfNeeded]; }, nil);
+    SGRAnimateLayout(self, ^{ [self layoutIfNeeded]; }, nil);
 }
 
 // The creator line takes a touch only where its text and its picture are; everything else of the view is the

@@ -527,7 +527,7 @@ static void setAlone(BOOL alone, BOOL animated) {
         l.stage = aloneStage(host, l);
     }
     SGRPlayerLyricsOverlay *overlay = objc_getAssociatedObject(host, &kOverlayKey);
-    // What moves and what fades are animated apart: Reduce Motion takes the move and keeps the fade.
+    // Layout and opacity have their own timing; Reduce Motion dissolves the layout in place.
     void (^move)(void) = ^{
         if (!overlay.superview || !l.ok) return;
         place(overlay, host, l);
@@ -543,7 +543,7 @@ static void setAlone(BOOL alone, BOOL animated) {
     sg_wake.enabled = alone;
     if (overlay) letLinesSeek(overlay, !alone);
     if (animated) {
-        SGRAnimate(SGRMotionLayout, move, nil);
+        SGRAnimateLayout(host, move, nil);
         // Going, the controls take their time, since nobody waits on them; coming back at a touch, they answer at
         // once, from wherever the fade out has got to.
         SGRAnimate(alone ? SGRMotionFade : SGRMotionRespond, fade, nil);
@@ -632,12 +632,12 @@ static void setOpen(BOOL open, BOOL animated) {
         settled(YES);
     } else {
         sg_moving = YES;
-        // Settled once both are done: under Reduce Motion the move is over at once and the fade is not.
+        // Settled once both the layout transition and the fade are done.
         __block NSInteger running = 2;
         void (^done)(BOOL) = ^(BOOL finished) {
             if (--running == 0) settled(finished);
         };
-        SGRAnimate(SGRMotionLayout, move, done);
+        SGRAnimateLayout(host, move, done);
         SGRAnimate(SGRMotionFade, fade, done);
         // The lines come in behind the cover leaving, and go before it comes back.
         [UIView animateWithDuration:open ? kLyricsIn : kLyricsOut delay:open ? kLyricsInDelay : 0

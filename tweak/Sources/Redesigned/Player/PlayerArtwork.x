@@ -18,7 +18,7 @@
 #import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
 
-static const CGFloat kPausedScale = 0.84, kPausedScaleReduceMotion = 0.92;
+static const CGFloat kPausedScale = 0.84;
 // The bar's 40pt cover lives in a tilt view of its own; the player's is 354.
 static const CGFloat kCoverMinWidth = 200;
 
@@ -31,7 +31,7 @@ static NSMapTable<UIView *, UIView *> *sg_covers;
 static CGFloat currentScale(void) {
     SPTPlayerState *state = SGPlayerState();
     if (!state.isPaused) return 1;
-    return SGRReduceMotion() ? kPausedScaleReduceMotion : kPausedScale;
+    return SGRReduceMotion() ? 1 : kPausedScale;
 }
 
 // The child of the tilt view the size of the cover.
@@ -113,7 +113,7 @@ CGRect SGRPlayerArtworkAreaIn(UIView *host) {
 static __weak UIView *sg_hiddenCover, *sg_hiddenPlate;
 
 void SGRPlayerSetCoverHidden(BOOL hidden) {
-    sg_hiddenCover.alpha = 1;
+    sg_hiddenCover.alpha = SGRReduceMotion() && SGPlayerState().isPaused ? 0.75 : 1;
     sg_hiddenPlate.alpha = 1;
     sg_hiddenCover = sg_hiddenPlate = nil;
     if (!hidden) return;
@@ -133,9 +133,13 @@ static void scaleEveryCover(BOOL animated) {
     CGFloat scale = currentScale();
     NSArray<UIView *> *tilts = sg_tilts.allObjects;
     void (^apply)(void) = ^{
-        for (UIView *tilt in tilts) scaleCover(tilt, scale);
+        for (UIView *tilt in tilts) {
+            scaleCover(tilt, scale);
+            UIView *cover = coverIn(tilt);
+            if (cover != sg_hiddenCover) cover.alpha = SGRReduceMotion() && SGPlayerState().isPaused ? 0.75 : 1;
+        }
     };
-    if (animated) SGRAnimate(SGRMotionLayout, apply, nil);
+    if (animated) SGRAnimate(SGRReduceMotion() ? SGRMotionRespond : SGRMotionLayout, apply, nil);
     else apply();
 }
 

@@ -298,7 +298,7 @@ static void tell(NSString *message, NSString *action, void (^then)(void)) {
         SGRShowGlass(glass, YES);
         self->_slider.alpha = self->_mark.alpha = self->_level.alpha = 1;
     }, nil);
-    SGRAnimate(SGRMotionLayout, ^{ self->_panel.transform = CGAffineTransformIdentity; }, nil);
+    SGRAnimateLayout(self, ^{ self->_panel.transform = CGAffineTransformIdentity; }, nil);
     [self letPanelGo];
 }
 
