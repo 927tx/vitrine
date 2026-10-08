@@ -133,12 +133,14 @@ public final class SGOnDeviceTranslation: NSObject {
         }
     }
 
-    // iOS 27 throws LanguageModelError, iOS 26 the session's GenerationError.
+    // iOS 27 throws LanguageModelError, iOS 26 the session's GenerationError. The first is only in the iOS 27 SDK
+    // (Swift 6.4), and the release build has the iOS 26 one; GenerationOptions' sampling: label is in both.
     @available(iOS 26.0, *)
     private static func problem(_ error: Error) -> String {
         let declined = "Apple Intelligence declined to translate this song's lyrics."
         let tooLong = "The song is too long for Apple Intelligence."
         let language = "Apple Intelligence does not work in this language."
+        #if compiler(>=6.4)
         if #available(iOS 27.0, *), let error = error as? LanguageModelError {
             switch error {
             case .guardrailViolation, .refusal: return declined
@@ -146,7 +148,9 @@ public final class SGOnDeviceTranslation: NSObject {
             case .unsupportedLanguageOrLocale: return language
             default: break
             }
-        } else if let error = error as? LanguageModelSession.GenerationError {
+        }
+        #endif
+        if let error = error as? LanguageModelSession.GenerationError {
             switch error {
             case .guardrailViolation, .refusal: return declined
             case .exceededContextWindowSize: return tooLong
@@ -175,7 +179,7 @@ public final class SGOnDeviceTranslation: NSObject {
         let json = { (value: Any) in String(decoding: (try? JSONSerialization.data(withJSONObject: value)) ?? Data(), as: UTF8.self) }
         let prompt = before.isEmpty ? json(lines)
             : "Just before, already translated: \(json(before.map { [$0.0, $0.1] }))\n\nTranslate: \(json(lines))"
-        let options = GenerationOptions(samplingMode: .greedy, maximumResponseTokens: tokensPerLine * lines.count + 32)
+        let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: tokensPerLine * lines.count + 32)
         let answer = try await session.respond(to: prompt, schema: schema, options: options).content.value([String].self)
         return answer.count == lines.count ? answer : lines.indices.map { $0 < answer.count ? answer[$0] : "" }
     }
