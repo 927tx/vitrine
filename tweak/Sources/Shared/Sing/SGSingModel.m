@@ -491,8 +491,11 @@ void SGSingRemoveOldModel(void) {
     NSString *size = [NSByteCountFormatter stringFromByteCount:freed countStyle:NSByteCountFormatterCountStyleFile];
     if (old) SGLog(@"sing: the old voice model (separator.mlmodelc) is deleted, %@ freed; the model is separator-ane.mlmodelc", size);
     else if (left) SGLog(@"sing: what the old voice model's download left is deleted, %@ freed", size);
+    // Which model is in use: a FLEX build's dev copy of the new one comes before the old.
     if (there && !replaced) {
-        SGLog(@"sing: the old voice model (separator.mlmodelc) is kept until separator-ane.mlmodelc is downloaded, and Karaoke runs on it, on the CPU alone");
+        SGLog(SGSingModelUpdateAvailable()
+              ? @"sing: the old voice model (separator.mlmodelc) is kept until separator-ane.mlmodelc is downloaded, and Karaoke runs on it, on the CPU alone"
+              : @"sing: the old voice model (separator.mlmodelc) is kept until separator-ane.mlmodelc is downloaded; the dev copy is in use");
     }
 }
 

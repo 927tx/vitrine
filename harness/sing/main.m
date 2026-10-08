@@ -19,6 +19,8 @@
 //   heat, resting), given up or switched off, it is kept and played on as it is, nothing skipped and none built; a
 //   flush (a pause, a seek) drops it at once; and the lead to take off a position Spotify counted at a moment is the
 //   lead held then, less what was dropped since.
+// - the lead's cap, without the model: a lead held past it drains at half speed, every frame played and none of the
+//   budget spent, is built again once it is lifted, and drains with Sing switched off too.
 // - spatial voice, without the model: a separator that hands the whole window back as vocals, so what plays is
 //   the vocals placed. A tone straight ahead plays exactly as it came; at 90 degrees right the right ear has it
 //   louder by the pan's 7.7 dB at the same power and the left ear late by the delay around the head; at 90
@@ -631,6 +633,60 @@ static void checkHold(void) {
     SGSingEngineDestroy(engine);
 }
 
+// The lead's cap (Sing.x: 0 while a seek or a skip is on its way, the time left on the queue's last track): a lead held
+// past it drains at half speed with every frame played, the mixer then pulled as it plays, none of the budget spent
+// however long it lasts; lifted, the lead is built again; and switched off, the lead kept drains to it too.
+static void checkCap(void) {
+    size_t frames = 32 * kSGSingRate;
+    Audio tone = makeAudio(frames);
+    for (size_t i = 0; i < frames; i++) tone.left[i] = tone.right[i] = (float)(0.5 * sin(2 * M_PI * 440 * i / kSGSingRate));
+    SGSingEngine *engine = SGSingEngineCreate();
+    SGPacedSeparator *steady = [[SGPacedSeparator alloc] initWithModel:nil];
+    steady.fastWindows = INT_MAX;
+    SGSingEngineSetSeparator(engine, steady);
+    SGSingEngineSetLevel(engine, 1);
+    SGSingEngineSetOn(engine, true);
+    Source source = {tone, 0}, *pulled = &source;
+    __block double leadAt6 = 0, emptyAt = 0, pulledAt6 = 0, pulledEmpty = 0, mostAfter = 0, leadAt25 = 0, leadAt30 = 0;
+    __block bool gaveUp = false;
+    malloc_logger = countAllocation;
+    Audio out = play(engine, tone, &source, 1024, 30, ^(double played) {
+        double lead = SGSingEngineLead(engine);
+        if (played >= 6 && !leadAt6) {
+            leadAt6 = lead;
+            pulledAt6 = pulled->pulled;
+            SGSingEngineSetLeadCap(engine, 0);
+        }
+        if (leadAt6 && !emptyAt && lead == 0) {
+            emptyAt = played;
+            pulledEmpty = pulled->pulled;
+        }
+        if (emptyAt && played < 18) mostAfter = fmax(mostAfter, lead);
+        gaveUp |= SGSingEngineGaveUp(engine);
+        if (played >= 18 && played < 25) SGSingEngineSetLeadCap(engine, INFINITY);
+        if (played >= 25 && !leadAt25) {
+            leadAt25 = lead;
+            SGSingEngineSetOn(engine, false);
+            SGSingEngineSetLeadCap(engine, 1);
+        }
+        if (played >= 30 - 0.05 && !leadAt30) leadAt30 = lead;
+    });
+    malloc_logger = NULL;
+    double drained = emptyAt - 6, rate = (pulledEmpty - pulledAt6) / (drained * kSGSingRate);
+    CHECK(emptyAt && fabs(drained - 2 * leadAt6) < 0.05 && fabs(rate - 0.5) < 0.02,
+          "capped at 0 at 6 s, the %.2f s held drain in %.2f s, the mixer pulled at %.2fx", leadAt6, drained, rate);
+    CHECK(mostAfter < 1100.0 / kSGSingRate, "then the mixer is pulled as it plays, the lead at most %.0f frames", mostAfter * kSGSingRate);
+    CHECK(!gaveUp, "12 s capped while separating spends none of the 8 s budget");
+    CHECK(leadAt25 > 2, "the cap lifted at 18 s, the lead is built again (%.2f s at 25 s)", leadAt25);
+    CHECK(fabs(leadAt30 - 1) < 0.05, "switched off at 25 s with a cap of 1 s, the lead kept drains to it (%.2f s at 30 s)", leadAt30);
+    double worst = 0;
+    // play() renders whole buffers: the tail short of one is not played.
+    for (size_t i = 0; i < out.frames / 1024 * 1024; i++) worst = fmax(worst, fabsf(out.left[i] - tone.left[i]));
+    CHECK(worst < 1e-6, "through it all every frame plays in order, nothing skipped (%.2g)", worst);
+    CHECK(atomic_load(&sg_renderAllocations) == 0, "the cap: no allocation on the render thread (%u)", atomic_load(&sg_renderAllocations));
+    SGSingEngineDestroy(engine);
+}
+
 // A model that keeps up for a while and then falls behind: the vocals fade out once, not at every window, and
 // after 8 s short of them the engine gives up and gives the lead back. And a NaN from the model never plays.
 static void checkFallingBehind(void) {
@@ -952,6 +1008,7 @@ int main(int argc, char **argv) {
         if (argc == 2 && !strcmp(argv[1], "spatial")) {
             sg_outDir = NSTemporaryDirectory();
             checkHold();
+            checkCap();
             checkSpatial();
             checkFront();
             checkFallingBehind();
@@ -1015,6 +1072,7 @@ int main(int argc, char **argv) {
         checkCopies(separator, mix, neural);
         if (neural) checkNeuralFallback(modelPath);
         checkHold();
+        checkCap();
         checkSpatial();
         checkFront();
         checkFallingBehind();

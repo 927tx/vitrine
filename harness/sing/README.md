@@ -32,6 +32,10 @@ the CPU copy and the Neural Engine copy. Each check prints a line:
   resting), given up or switched off, it is kept and played on as it is, every frame in order and none built; a flush
   (a pause, a seek) drops it at once and the next frame pulled plays next; it is built again when it separates; and
   the lead to take off a position Spotify counted at a moment is the lead held then, less what was dropped since;
+- the lead's cap, without the model (Sing.x caps it at 0 while a seek or a skip is on its way, and at the time left on
+  the queue's last track): capped at 0, the lead held drains in twice its length with the mixer pulled at half speed,
+  then the mixer is pulled as it plays; 12 s capped while separating spends none of the 8 s budget; lifted, the lead
+  is built again; switched off with a cap of 1 s, the lead kept drains to it; every frame plays in order throughout;
 - spatial voice, without the model (a separator that hands each window back whole as vocals, so what plays is the
   vocals placed): a 440 Hz tone at level 1 plays exactly as it came straight ahead; set 90 degrees right, the right
   ear has it 7.75 dB louder (the narrowed pan's 7.66 and the far ear's low-pass) at the same power, and the left ear
@@ -66,6 +70,9 @@ Mac loaded far past its cores had the model fall behind (790 ms a window, 3.6 s 
 vocals scores; the harness built from before spatial voice passed right after it, and this one on the next run.
 
 2026-10-06, the front: `build/sing spatial` passes with its four checks.
+
+2026-10-07, the lead's cap: `build/sing spatial` passes, the cap's checks with it: 2.75 s held drain in 5.52 s at 0.50x,
+then at most 0 frames held, the budget unspent over 12 s capped, 2.75 s built again, 1.00 s kept off with a cap of 1 s.
 
 2026-10-05, a MacBook with an M4, macOS 27: everything passes under `gpu` and under ThreadSanitizer.
 

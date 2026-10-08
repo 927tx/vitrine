@@ -60,6 +60,7 @@ struct SGSingEngine {
     struct { double when; uint64_t ahead; } asked[kAsked];
     unsigned askedNext;
     atomic_uint levelBits, targetLead, voiceAngleBits;
+    atomic_uint leadCap;          // frames the lead may hold at most, separating or not (SGSingEngineSetLeadCap)
 
     // The render thread's own.
     bool running;                 // the rings are in use: Sing is on, or the lead is not given back yet
@@ -186,9 +187,13 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
                    && !atomic_load_explicit(&engine->gaveUp, memory_order_relaxed);
     // Separating: up to twice what plays while the lead fills, half while a shorter target is reached. Not separating
     // (off, held, given up, no model), what plays: the lead held plays on as it is, nothing skipped, until a flush
-    // (Spotify seeks, skips, stops, or Sing.x seeks it back to what is heard at a pause), and none is built.
-    int64_t want = (int64_t)atomic_load_explicit(&engine->targetLead, memory_order_relaxed) - (int64_t)held;
-    int64_t count = (int64_t)frames + (working ? MAX(-(int64_t)frames / 2, MIN(want, (int64_t)frames)) : 0);
+    // (Spotify seeks, skips, stops, or Sing.x seeks it back to what is heard at a pause), and none is built. Either way
+    // never more than the cap, which it drains down to at half speed, every frame still played.
+    int64_t cap = atomic_load_explicit(&engine->leadCap, memory_order_relaxed);
+    int64_t target = atomic_load_explicit(&engine->targetLead, memory_order_relaxed);
+    bool capped = cap < target;
+    int64_t want = MIN(working ? target : (int64_t)held, cap) - (int64_t)held;
+    int64_t count = (int64_t)frames + MAX(-(int64_t)frames / 2, MIN(want, (int64_t)frames));
     count = MAX(count, (int64_t)frames - (int64_t)held);
     count = MIN(count, (int64_t)(kRing - kSGSingWindowFrames) - (int64_t)held);
     if (count > 0) {
@@ -220,7 +225,8 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
     if (mixing) {
         engine->steady += frames;
         if (engine->steady >= kBudget) engine->recovering = 0;
-    } else if (atomic_load_explicit(&engine->budgetHeld, memory_order_relaxed)) {
+    } else if (capped || atomic_load_explicit(&engine->budgetHeld, memory_order_relaxed)) {
+        // Short of vocals for the cap, not the model: none of the budget is spent.
         engine->recovering = 0;
     } else if (working && engine->established) {
         engine->recovering += frames;
@@ -422,6 +428,7 @@ SGSingEngine *SGSingEngineCreate(void) {
     engine->vocalsGain = engine->otherGain = 1;
     storeFloat(&engine->levelBits, 1);
     updateTarget(engine, 1);
+    atomic_store(&engine->leadCap, UINT_MAX);
     atomic_store(&engine->alive, true);
     if (!engine->left || !engine->right || !engine->vocalsLeft || !engine->vocalsRight || !engine->window[0] || !engine->window[1]
         || !engine->vocals[0] || !engine->vocals[1] || pthread_create(&engine->worker, NULL, work, engine) != 0) {
@@ -496,6 +503,10 @@ void SGSingEngineSetVoiceAngle(SGSingEngine *engine, float radians) {
 
 void SGSingEngineSetPaused(SGSingEngine *engine, bool paused) {
     atomic_store(&engine->paused, paused);
+}
+
+void SGSingEngineSetLeadCap(SGSingEngine *engine, double seconds) {
+    atomic_store(&engine->leadCap, seconds < (double)kRing / kSGSingRate ? (unsigned)fmax(0, seconds * kSGSingRate) : UINT_MAX);
 }
 
 void SGSingEngineFlush(SGSingEngine *engine) {

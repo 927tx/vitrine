@@ -21,7 +21,11 @@
 // skip or a stop drops the lead (-[SPTEsperantoPlayer seekTo:...] and skipTo...TrackWithOptions:track:loggingParams:
 // in the binary's method list, each returning Spotify's own result for the command; the shorter skips are
 // trampolines into those two through objc_msgSend, 0x1096da9e4-0x1096daa08), and so does a track changing well
-// before the last one ended: something new was played.
+// before the last one ended: something new was played. The next track in the queue coming up to 12 s early is
+// crossfade, which keeps it. Until a seek or a skip lands (Spotify reports the target or the new track, or 5 s pass)
+// nothing is read ahead, as Spotify's mixer still hands over what came before it; and on the queue's last track the
+// lead drains a second before Spotify's decoder reaches the end, where Spotify may stop its output with it held
+// (SGSingEngineSetLeadCap).
 //
 // The model is loaded by SGSingLoader.m, only while Spotify is active and the mic is on, and kept a minute after the
 // mic goes off: a CPU copy, then on Automatic a Neural Engine copy beside it, which runs the windows once it is in. From the thermal state Serious up the engine is held, plays the song as it is and lets the model go,
@@ -35,7 +39,12 @@
 // Whenever Sing does not separate (stopped, held, resting, standing aside), the engine plays the sound it holds ahead
 // on as it is, dry, and the clock stays corrected for it: letting it go mid-song would skip that much of the song.
 // It goes where nothing heard is lost: a seek, a skip, Spotify's output stopping, or a pause, where Spotify is
-// seeked back to what was heard (SGSingTrackWatcher).
+// seeked back to what was heard (SGSingTrackWatcher), as it is when the headphones it played on go.
+//
+// Sing stands aside, the model kept, over AirPlay, for what is not a song, and while Spotify plays but its output has
+// not rendered for 3 s (another device plays, through Connect). An interruption (a call, Siri, another app's audio)
+// holds the worker and keeps the model and the lead for when Spotify plays again, until iOS says it ended or the sound
+// comes back; Spotify decides whether it resumes.
 //
 // Spatial voice listens to Shared/HeadGestures' motion (the app's one CMHeadphoneMotionManager) while Sing is
 // on and Spotify plays, and hands the engine the head's yaw off a front that follows where the head points over
@@ -67,14 +76,19 @@
 static const float kDefaultLevel = 0.15f;
 // How often what Sing is doing is read while the mic is on.
 static const NSTimeInterval kWatchEvery = 0.5;
-// A track changing more than this before the last one's end is something new played, not the next track.
+// A track changing more than this before the last one's end is something new played, not the next track; the next
+// track in the queue, up to Spotify's longest crossfade more.
 static const double kEndSlack = 2;
+static const double kCrossfadeMost = 12;
+// Spotify playing with its music output silent this long: it plays on another device.
+static const NSTimeInterval kNoOutputFor = 3;
 
 static _Atomic(SGSingEngine *) sg_engine;   // made the first time the mic is on, never freed
 static atomic_bool sg_formatTaken;          // Spotify's output is in a format Sing takes
 static atomic_bool sg_staged;               // the stage has run: Spotify's sound comes through the chain
 static atomic_bool sg_formatRefused;        // the stage was handed buffers it does not take
 static atomic_bool sg_outputStarted;        // Spotify has started or connected the music's output
+static atomic_bool sg_rendered;             // the stage ran since tick last looked
 static BOOL sg_outputReachable;             // Shared/Player watches the music's output for Sing
 
 #pragma mark - the render thread
@@ -94,6 +108,7 @@ static OSStatus stage(UInt32 frames, AudioBufferList *data, SGPlayerPull pull, v
     SGSingEngine *engine = atomic_load_explicit(&sg_engine, memory_order_acquire);
     if (!engine) return pull(context, frames, data);
     atomic_store_explicit(&sg_staged, true, memory_order_relaxed);
+    atomic_store_explicit(&sg_rendered, true, memory_order_relaxed);
     BOOL takes = atomic_load_explicit(&sg_formatTaken, memory_order_relaxed) && data->mNumberBuffers == 2;
     for (UInt32 b = 0; takes && b < 2; b++) {
         takes = data->mBuffers[b].mData && data->mBuffers[b].mNumberChannels == 1 && data->mBuffers[b].mDataByteSize == frames * sizeof(float);
@@ -147,24 +162,31 @@ static const int kGiveUpsKept = 3;
 static int sg_giveUps;            // falls behind since a song was last kept up
 static BOOL sg_sangThisTrack;     // the vocals were down at some point of the track playing
 
-// AirPlay's delay changes as it plays, and a podcast or an ad has no song to take the vocals from: Sing stands
-// aside, the song plays as it is, and the model is kept for when it can run again. Whether that changed.
+// AirPlay's delay changes as it plays, Spotify playing on another device leaves this iPhone nothing to take the vocals
+// from, nor does a podcast or an ad: Sing stands aside, the song plays as it is, and the model is kept for when it can
+// run again. Whether that changed.
+static NSString *const kOverAirPlay = @"Karaoke does not run over AirPlay, whose delay changes as it plays, so the song plays as it is.";
+static NSString *const kElsewhere = @"Spotify plays, but this iPhone has not played any of it for 3 s (it plays on another device), and Karaoke works on "
+                                    @"what this iPhone plays itself. It starts once the song plays here.";
+static NSString *const kNotASong = @"Karaoke turns down the vocals of songs, and what plays now is not one, so it plays as it is.";
+static BOOL sg_elsewhere;         // Spotify plays and its music output has not rendered for 3 s (tick)
 static BOOL readRefusal(void) {
     NSString *refused = nil;
     for (AVAudioSessionPortDescription *port in AVAudioSession.sharedInstance.currentRoute.outputs) {
-        if ([port.portType isEqualToString:AVAudioSessionPortAirPlay]) refused = @"Karaoke does not run over AirPlay, whose delay changes as it plays, so the song plays as it is.";
+        if ([port.portType isEqualToString:AVAudioSessionPortAirPlay]) refused = kOverAirPlay;
     }
+    if (!refused && sg_elsewhere) refused = kElsewhere;
     NSString *uri = SGURIString(SGPlayerState().track.URI);
-    if (!refused && uri && ![uri hasPrefix:@"spotify:track:"] && ![uri hasPrefix:@"spotify:local:"]) {
-        refused = @"Karaoke turns down the vocals of songs, and what plays now is not one, so it plays as it is.";
-    }
+    if (!refused && uri && ![uri hasPrefix:@"spotify:track:"] && ![uri hasPrefix:@"spotify:local:"]) refused = kNotASong;
     if (refused == sg_refused || [refused isEqualToString:sg_refused]) return NO;
     sg_refused = refused;
-    SGLog(@"sing: %@", refused ?: @"runs again: what plays is a song, not over AirPlay");
+    SGLog(@"sing: %@", refused ?: @"runs again: what plays is a song, on this iPhone, not over AirPlay");
     return YES;
 }
 static BOOL sg_hot;
 static BOOL sg_active;            // Spotify is the active app: the only time a load starts
+static BOOL sg_interrupted;       // a call, Siri or another app's audio holds the session: the worker is held
+static CFAbsoluteTime sg_interruptedAt;
 
 static void announce(void) {
     [NSNotificationCenter.defaultCenter postNotificationName:SGSingChangedNotification object:nil];
@@ -369,10 +391,10 @@ static void apply(void) {
     if (!engine) return;
     SGSingEngineSetSeparator(engine, SGSingLoaderSeparator());
     holdBudget(engine);
-    SGSingEngineSetPaused(engine, held || rest);
+    SGSingEngineSetPaused(engine, held || rest || sg_interrupted);
     SGSingEngineSetOn(engine, on);
     double lead = SGSingEngineLead(engine);
-    if ((!on || held || rest) && lead > 0.05) SGLog(@"sing: keeps the %.2f s held ahead, played as it is, until Spotify pauses, seeks or skips", lead);
+    if ((!on || held || rest || sg_interrupted) && lead > 0.05) SGLog(@"sing: keeps the %.2f s held ahead, played as it is, until Spotify pauses, seeks or skips", lead);
     updateSpatial();
     watch();
 }
@@ -392,6 +414,8 @@ void SGSetSingOn(BOOL on) {
     sg_stopKind = SGSingStopNone;
     sg_giveUps = 0;
     SGLog(@"sing: the mic is %@", on ? @"on" : @"off");
+    // Read only while on: what it was when last on may be gone.
+    readRefusal();
     apply();
     announce();
 }
@@ -473,6 +497,8 @@ SGSingState SGSingCurrentState(void) {
     if (sg_stopped || sg_refused || SGSingLoaderError() || !engine || SGSingEngineError(engine)) return SGSingStateFailed;
     // Resting, ready for the level to move, whether the model is still kept or not.
     if (sg_resting) return SGSingStateWaiting;
+    // Interrupted: held, nothing plays, nothing is behind.
+    if (sg_interrupted && SGSingLoaderSeparator()) return SGSingStateWaiting;
     if (!SGSingLoaderSeparator()) return SGSingStatePreparing;
     // Spotify plays and Speed and pitch never took its output over: the stage, and so Sing, never runs.
     if (!atomic_load(&sg_staged) && atomic_load(&sg_outputStarted) && !SGPlayerSpeedAllowed()) return SGSingStateFailed;
@@ -506,7 +532,7 @@ NSString *SGSingStatusText(void) {
             return SGSingLoaderFastState() == SGSingFastLoading ? @"Preparing for the Neural Engine" : @"Too slow";
         case SGSingStateHot: return @"Held, too hot";
         case SGSingStateFailed:
-            if (!sg_stopped && sg_refused) return [sg_refused containsString:@"AirPlay"] ? @"Off over AirPlay" : @"Songs only";
+            if (!sg_stopped && sg_refused) return sg_refused == kOverAirPlay ? @"Off over AirPlay" : sg_refused == kElsewhere ? @"Not on this iPhone" : @"Songs only";
             return sg_stopped ? @"Stopped" : @"Failed";
     }
     return @"";
@@ -749,6 +775,99 @@ static void flush(NSString *why) {
     SGLog(@"sing: %@, the %.1f s held ahead are dropped", why, lead);
 }
 
+// The lead let go with nothing heard lost: Spotify is seeked back to what was heard, so it resumes in step.
+static void dropLead(NSString *why, SPTPlayerState *state) {
+    if (!state || SGSingHeldLead() <= 0.05) return;
+    // Hooked: what is heard, held while paused and run on while playing.
+    double heard = state.isPaused ? state.positionAsOfTimestamp : state.position;
+    if (heard < 0) return;
+    flush([NSString stringWithFormat:@"%@, Spotify seeked back to %.2f s", why, heard]);
+    SGKaraokeSeek((NSInteger)llround(heard * 1000));
+}
+
+// A seek or a skip Spotify was asked for and has not carried out yet: until then its mixer hands over what came before
+// it, which read ahead would play after the jump, so nothing is read ahead (a cap of 0) until Spotify reports the new
+// track or the target (a seek's, 0 for a skip's), or kLandWithin passes. Hooks set it from any thread, tick and the
+// track watcher clear it on main.
+static const NSTimeInterval kLandWithin = 5;
+static const double kLandedNear = 0.3;
+static _Atomic CFAbsoluteTime sg_commandAt;   // 0 with none on its way
+static double sg_commandTarget;               // -1 where it is not known (a relative seek)
+static NSString *sg_commandTrack;
+// On the queue's last track the lead is let play out a second before Spotify's decoder reaches the end, where Spotify
+// may stop its output with the lead still held.
+static const double kEndMargin = 1;
+
+// The track after this one, the same one on repeat; nil at the end of the queue.
+static NSString *nextTrack(SPTPlayerState *state) {
+    if (state.options.repeatingTrack) return SGURIString(state.track.URI);
+    id future = [state respondsToSelector:@selector(future)] ? state.future : nil;
+    id next = [future isKindOfClass:NSArray.class] ? [(NSArray *)future firstObject] : nil;
+    return [next isKindOfClass:objc_getClass("SPTPlayerTrack")] ? SGURIString([(SPTPlayerTrack *)next URI]) : nil;
+}
+
+static void commanded(NSString *why, double target) {
+    flush(why);
+    sg_commandTarget = target;
+    sg_commandTrack = SGURIString(SGPlayerState().track.URI);
+    atomic_store(&sg_commandAt, CFAbsoluteTimeGetCurrent());
+    SGSingEngine *engine = atomic_load(&sg_engine);
+    if (engine) SGSingEngineSetLeadCap(engine, 0);
+}
+
+static void updateCap(void) {
+    SGSingEngine *engine = atomic_load(&sg_engine);
+    SPTPlayerState *state = SGPlayerState();
+    if (!engine) return;
+    static BOOL wasLast;
+    BOOL last = state.duration > 0 && !nextTrack(state) && !state.options.repeatingContext;
+    if (last != wasLast) {
+        wasLast = last;
+        SGLog(@"sing: %@", last ? @"the queue's last track: the lead is let play out a second before its end" : @"a track follows: the lead is read ahead to the end");
+    }
+    double cap = atomic_load(&sg_commandAt) ? 0 : last ? fmax(0, state.duration - rawPosition(state) - kEndMargin) : INFINITY;
+    SGSingEngineSetLeadCap(engine, cap);
+}
+
+// The seek or skip on its way landed, or is given up on: the lead is read ahead again.
+static void checkLanding(SPTPlayerState *state) {
+    CFAbsoluteTime asked = atomic_load(&sg_commandAt);
+    if (!asked) return;
+    NSString *track = SGURIString(state.track.URI);
+    NSDate *stamp = [state respondsToSelector:@selector(timestamp)] ? state.timestamp : nil;
+    double at = state ? rawAsOf(state) : -1;
+    BOOL after = [stamp isKindOfClass:NSDate.class] && stamp.timeIntervalSinceReferenceDate >= asked;
+    BOOL landed = state && (sg_commandTarget < 0 ? after : (track && sg_commandTrack && ![track isEqualToString:sg_commandTrack]) || fabs(at - sg_commandTarget) < kLandedNear);
+    double waited = CFAbsoluteTimeGetCurrent() - asked;
+    if (!landed && waited < kLandWithin) return;
+    atomic_store(&sg_commandAt, 0);
+    SGLog(@"sing: %@ %.2f s after it was asked, the lead is read ahead again", landed ? [NSString stringWithFormat:@"Spotify landed at %.2f s", at]
+          : [NSString stringWithFormat:@"no landing reported (Spotify at %.2f s, %@)", at, sg_commandTarget < 0 ? @"a relative seek" : [NSString stringWithFormat:@"asked for %.2f s", sg_commandTarget]], waited);
+    updateCap();
+}
+
+// A call, Siri or another app's audio began or ended. iOS does not always say it ended: sound rendered with Spotify
+// playing, a second on, says it (tick).
+static void interrupted(BOOL began, NSString *why) {
+    if (began) sg_interruptedAt = CFAbsoluteTimeGetCurrent();
+    SGLog(@"sing: an interruption (a call, Siri, another app's audio) %@%@", why, began == sg_interrupted ? @""
+          : began ? [NSString stringWithFormat:@": the worker is held, the model and the %.2f s held ahead kept", SGSingHeldLead()] : @": Karaoke separates again");
+    if (began == sg_interrupted) return;
+    sg_interrupted = began;
+    apply();
+    announce();
+}
+
+// The headphones Spotify played on are gone, and iOS has it pause: the lead is let go there with nothing heard lost, so
+// the song resumes in step on the new route whatever Spotify does with its output meanwhile. A route that plays on
+// keeps it, where a seek would be heard; spatial voice and AirPlay are read again for any.
+static void routeChanged(AVAudioSessionRouteChangeReason reason) {
+    if (!atomic_load(&sg_engine)) return;
+    NSArray *outputs = [AVAudioSession.sharedInstance.currentRoute.outputs valueForKey:@"portType"];
+    SGLog(@"sing: the route changed (reason %lu), now %@", (unsigned long)reason, [outputs componentsJoinedByString:@", "]);
+    if (reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) dropLead(@"the headphones it played on are gone", SGPlayerState());
+}
+
 static void tick(void) {
     // The Sing page gone a second ago: Sing may rest.
     updateRest();
@@ -766,6 +885,24 @@ static void tick(void) {
         // Seen soon after it is reported, its lead is kept for as long as it stands (SGSingEngineLeadAt).
         SGSingLeadOf(player);
     }
+    checkLanding(player);
+    updateCap();
+    // Spotify plays and its music output has not rendered for 3 s, outside an interruption: it plays on another device.
+    // Its output reached but not taken over is a failure of its own (SGSingCurrentState).
+    static CFAbsoluteTime silentSince;
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    BOOL rendered = atomic_exchange(&sg_rendered, false), playing = player.isPlaying && !player.isPaused && !player.isLoading;
+    if (rendered || !playing || sg_interrupted) silentSince = 0;
+    else if (!silentSince) silentSince = now;
+    BOOL elsewhere = silentSince && now - silentSince >= kNoOutputFor && !(atomic_load(&sg_outputStarted) && !SGPlayerSpeedAllowed());
+    if (elsewhere != sg_elsewhere) {
+        sg_elsewhere = elsewhere;
+        if (SGSingOn() && readRefusal()) {
+            apply();
+            announce();
+        }
+    }
+    if (sg_interrupted && rendered && playing && now - sg_interruptedAt > 1) interrupted(NO, @"is over: Spotify plays again");
     SGSingEngine *engine = atomic_load(&sg_engine);
     logClock(engine);
     if (state == SGSingStateSinging) sg_sangThisTrack = YES;
@@ -826,25 +963,23 @@ static void watch(void) {
         announce();
     }
     updateSpatial();
-    // Paused while not separating: Spotify is seeked back to what was heard, which drops the lead with nothing heard
-    // lost, so the song resumes in step.
+    checkLanding(state);
+    // Paused while not separating: the lead is dropped with nothing heard lost. Not through an interruption, which
+    // holds the worker and keeps the lead for when Spotify plays again.
     SGSingEngine *engine = atomic_load(&sg_engine);
-    double lead = SGSingHeldLead();
-    if (state.isPaused && lead > 0.05 && !SGSingEngineSeparating(engine)) {
-        double heard = state.positionAsOfTimestamp;
-        if (heard >= 0) {
-            flush([NSString stringWithFormat:@"paused while not separating, Spotify seeked back to %.2f s", heard]);
-            SGKaraokeSeek((NSInteger)llround(heard * 1000));
-        }
-    }
+    if (state.isPaused && !sg_interrupted && !SGSingEngineSeparating(engine)) dropLead(@"paused while not separating", state);
     NSString *track = SGURIString(state.track.URI);
     BOOL another = track && sg_lastTrack && ![track isEqualToString:sg_lastTrack];
     if (another) sg_seekTarget = -1;
-    if (another && sg_lastRaw >= 0 && sg_lastDuration > 0 && sg_lastDuration - sg_lastRaw > kEndSlack + kWatchEvery
-        && CFAbsoluteTimeGetCurrent() - sg_lastFlush > 1) {
+    // The queue's next track, up to a crossfade early, is reached: its lead is kept.
+    static NSString *expected;
+    double slack = kEndSlack + kWatchEvery + (another && [track isEqualToString:expected] ? kCrossfadeMost : 0);
+    if (another && sg_lastRaw >= 0 && sg_lastDuration > 0 && sg_lastDuration - sg_lastRaw > slack && CFAbsoluteTimeGetCurrent() - sg_lastFlush > 1) {
         flush(@"another track was played");
     }
     if (track) sg_lastTrack = track;
+    expected = nextTrack(state);
+    updateCap();
     if (another) {
         // A track Sing kept up with to its end clears the count of falls behind.
         if (!sg_stopped && sg_sangThisTrack) sg_giveUps = 0;
@@ -926,17 +1061,17 @@ static void readHeat(void) {
     return %orig;
 }
 - (id)seekTo:(double)position relative:(long long)relative options:(id)options creatorTimestampPositionMs:(double)creator {
-    flush(@"Spotify seeks");
+    commanded(@"Spotify seeks", relative == 0 ? position : -1);
     if (relative == 0) seekAnchor(position);
     return %orig;
 }
-// Every skip of Spotify's ends up in one of these two.
+// Every skip of Spotify's ends up in one of these two; a skip back early in a track starts it again, at 0.
 - (id)skipToNextTrackWithOptions:(id)options track:(id)track loggingParams:(id)params {
-    flush(@"Spotify skips");
+    commanded(@"Spotify skips", 0);
     return %orig;
 }
 - (id)skipToPreviousTrackWithOptions:(id)options track:(id)track loggingParams:(id)params {
-    flush(@"Spotify skips back");
+    commanded(@"Spotify skips back", 0);
     return %orig;
 }
 - (id)stop {
@@ -974,7 +1109,9 @@ static void readHeat(void) {
         for (NSNotificationName name in @[AVAudioSessionRouteChangeNotification, AVAudioSessionSpatialPlaybackCapabilitiesChangedNotification]) {
             // Posted on the audio session's thread: handed to main without waiting, so it cannot deadlock against main.
             [center addObserverForName:name object:nil queue:nil usingBlock:^(NSNotification *note) {
+                NSNumber *reason = [note.name isEqualToString:AVAudioSessionRouteChangeNotification] ? note.userInfo[AVAudioSessionRouteChangeReasonKey] : nil;
                 dispatch_async(dispatch_get_main_queue(), ^{
+                    if (reason) routeChanged(reason.unsignedIntegerValue);
                     if (SGSingOn() && readRefusal()) {
                         apply();
                         announce();
@@ -983,6 +1120,14 @@ static void readHeat(void) {
                 });
             }];
         }
+        // A call, Siri or another app's audio. Posted on the audio session's thread too.
+        [center addObserverForName:AVAudioSessionInterruptionNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+            BOOL began = [note.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue] == AVAudioSessionInterruptionTypeBegan;
+            BOOL resume = [note.userInfo[AVAudioSessionInterruptionOptionKey] unsignedIntegerValue] & AVAudioSessionInterruptionOptionShouldResume;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                interrupted(began, began ? @"began" : resume ? @"ended, iOS says Spotify may resume" : @"ended, iOS says Spotify should not resume");
+            });
+        }];
         // A load starts only while Spotify is active, so never in a launch into the background.
         [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
             sg_active = YES;

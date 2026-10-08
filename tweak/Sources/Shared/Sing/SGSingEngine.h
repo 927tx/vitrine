@@ -85,6 +85,10 @@ bool SGSingEngineGaveUp(SGSingEngine *engine);
 void SGSingEngineHoldBudget(SGSingEngine *engine, bool held);
 // Holds the worker (a hot phone, or Sing resting at As sung): what plays is dry, the lead kept as it is.
 void SGSingEngineSetPaused(SGSingEngine *engine, bool paused);
+// The most the lead may hold, in seconds, separating or not (INFINITY for no limit): one held past it drains down to it
+// at half speed, every frame played. Sing.x reads nothing ahead of a seek or a skip Spotify has not carried out yet
+// (0), and on the queue's last track nothing past a second before its end, where Spotify's output may stop.
+void SGSingEngineSetLeadCap(SGSingEngine *engine, double seconds);
 // Drops the sound held ahead, at the next render; the lead reads as dropped from now.
 void SGSingEngineFlush(SGSingEngine *engine);
 // Seconds of Spotify's sound held ahead of what plays, as the render thread left it.
