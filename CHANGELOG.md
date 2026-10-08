@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.0.0-beta.3](https://github.com/My-Name-Is-Jeff/vitrine/compare/v1.0.0-beta.2...v1.0.0-beta.3) (2026-10-08)
+
+
+### Features
+
+* an untested option keeps Spotify's Apple Watch app in the build ([9becfa3](https://github.com/My-Name-Is-Jeff/vitrine/commit/9becfa31f43dbaf1b14f6701a8ed7d7b11cf862a))
+* Fluid artwork gets Speed, Warp, Blur, Saturation and Brightness sliders ([4e00fd0](https://github.com/My-Name-Is-Jeff/vitrine/commit/4e00fd025a5f4c4be889d5eb4ac7f9d253ca6eb3))
+* Karaoke prepares the Neural Engine in the background after an update ([e6d9dc4](https://github.com/My-Name-Is-Jeff/vitrine/commit/e6d9dc410aa0c8b7e69ede09ef03e4bc9bf427a8))
+* Karaoke's status says if it runs on the Neural Engine or the CPU ([c265e82](https://github.com/My-Name-Is-Jeff/vitrine/commit/c265e82d25e82eff801faf60d3699f5c2dc29d05))
+* the lock screen lyrics switch is on the Lock screen page too ([7f4a8cf](https://github.com/My-Name-Is-Jeff/vitrine/commit/7f4a8cf089c653450b1a711282415f3ee350bc39))
+* the mini player shows the title over the artists, as the Music app does ([1457e19](https://github.com/My-Name-Is-Jeff/vitrine/commit/1457e19a6250fbf05f3b8a936a0c72be107b0413))
+* Vitrine says when the redesign runs without the IPA's app changes ([bbb9931](https://github.com/My-Name-Is-Jeff/vitrine/commit/bbb9931b0d75f4613ec561594d45ae7b7727dd19))
+
+
+### Fixes
+
+* an album's animated cover starts at once on a second visit, even after a relaunch ([5b066fd](https://github.com/My-Name-Is-Jeff/vitrine/commit/5b066fd614a616af67b58f26b5486a55d62eb584))
+* background Music Haptics finds songs outside the US catalog and cannot hang Spotify at launch ([f70d37e](https://github.com/My-Name-Is-Jeff/vitrine/commit/f70d37ed864708f7c02e9a251b8f2caf4fe0bb2a))
+* Home's large title scrolls away instead of covering the feed ([14861fd](https://github.com/My-Name-Is-Jeff/vitrine/commit/14861fded58592d979bb72a5348a123cfb4dae48))
+* Karaoke no longer bakes silence into the song when Spotify is slow to load it ([b151823](https://github.com/My-Name-Is-Jeff/vitrine/commit/b1518231105f2cb0454091012fb8006ab2609bd4))
+* Karaoke stays in step through seeks, crossfade, the end of the queue, calls and headphones ([9beeb05](https://github.com/My-Name-Is-Jeff/vitrine/commit/9beeb054968bd1b71800eddd3554b36943d5a214))
+* lock screen Lyrics applies without a restart and keeps up with the lines ([ec75e5e](https://github.com/My-Name-Is-Jeff/vitrine/commit/ec75e5e155480f2c3a0efac61835edcfc9a49987))
+* Mix's transition cards stay under the lyrics, and the lyrics button wakes up on return ([3c9fe4e](https://github.com/My-Name-Is-Jeff/vitrine/commit/3c9fe4ee89d04c6400f57ebc130d32f08f923b1e))
+* Popular's last track fades out under See more and no longer shows through it ([5f0b03c](https://github.com/My-Name-Is-Jeff/vitrine/commit/5f0b03c75a00d3b5006fff73104776f7f36c1607))
+* releases no longer attach a .deb that misses the redesign's app changes ([effe661](https://github.com/My-Name-Is-Jeff/vitrine/commit/effe661f4ff6e5e179d43e7ce992719f81945831))
+* the Connect relay asks the network a quarter as often and stops logging every answer ([6afe5ca](https://github.com/My-Name-Is-Jeff/vitrine/commit/6afe5ca5c3b0bfbb830aefcb83d79acb3c82c004))
+* the Live Activity asks ActivityKit only when it has something to send ([e79dd12](https://github.com/My-Name-Is-Jeff/vitrine/commit/e79dd1249f1743969cea961a1d9af3a5dbfff249))
+* the lyrics and the scrubber start the next song when its audio does ([815ed20](https://github.com/My-Name-Is-Jeff/vitrine/commit/815ed2005437b111bfbe5cac00ae7c51f68707c8))
+* with Reduce Motion on, layout changes crossfade and a paused cover dims ([e7a2482](https://github.com/My-Name-Is-Jeff/vitrine/commit/e7a24827b2f471ca336d63e3e6017fd63d7be8b3))
+
 ## [1.0.0-beta.2](https://github.com/My-Name-Is-Jeff/vitrine/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2026-10-07)
 
 
