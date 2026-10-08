@@ -1704,7 +1704,8 @@ static BOOL hasWords(SGKaraokeLine *line) {
 // A way to translate a song: the lines, the track and the language in, one translation per line out, or a
 // message to show. Main queue.
 typedef void (^SGRTranslated)(NSArray<NSString *> *translations, NSString *error);
-typedef void (^SGRTranslator)(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *language, SGRTranslated done);
+// `progress` may be called with the lines so far before `done`.
+typedef void (^SGRTranslator)(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *language, SGRTranslated progress, SGRTranslated done);
 
 // The lines' text for a translator, "" for a line with no words.
 static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
@@ -1723,6 +1724,7 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
     _breakCount = 0;
     _hasSpoken = _hasTranslation = _untranslated = NO;
     _plain = SGKaraokeLinesTiming(_lines) == SGKaraokeTimingNone;
+    if (!_sample) SGLyricsApplySavedTranslation(_track, SGLyricsGeminiLanguage(), _lines);
     NSInteger sungTo = 0;   // the top of the song counts as where the singing before the first line ends
     for (NSUInteger i = 0; i < count; i++) {
         SGKaraokeLine *line = _lines[i];
@@ -1875,17 +1877,17 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
         };
         if (onDevice) {
             offer(@"Translate on iPhone", @"translate", @"Apple's Translate, on this iPhone",
-                  ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated done) {
+                  ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated progress, SGRTranslated done) {
                 [SGOnDeviceTranslation translate:textsOf(lines) to:to done:done];
             });
         }
         if (intelligence) {
             offer(@"Translate with Apple Intelligence", @"apple.intelligence", @"On this iPhone",
-                  ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated done) {
-                [SGOnDeviceTranslation translateWithAppleIntelligence:textsOf(lines) to:to done:done];
+                  ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated progress, SGRTranslated done) {
+                [SGOnDeviceTranslation translateWithAppleIntelligence:textsOf(lines) to:to progress:^(NSArray<NSString *> *soFar) { progress(soFar, nil); } done:done];
             });
         }
-        if (gemini) offer(@"Translate with Gemini", @"sparkles", @"Sends the lyrics to Google", ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated done) {
+        if (gemini) offer(@"Translate with Gemini", @"sparkles", @"Sends the lyrics to Google", ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated progress, SGRTranslated done) {
             SGLyricsTranslateWithGemini(track, lines, to, done);
         });
     }
@@ -1902,10 +1904,13 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
     if (!lines.count || _translating == lines) return;
     _translating = lines;
     [self offerExtras];
-    translator(lines, track, SGLyricsGeminiLanguage(), ^(NSArray<NSString *> *translations, NSString *error) {
+    NSString *language = SGLyricsGeminiLanguage();
+    translator(lines, track, language, ^(NSArray<NSString *> *soFar, NSString *error) {
+        if (lines == self->_lines) [self takeTranslations:soFar into:lines];
+    }, ^(NSArray<NSString *> *translations, NSString *error) {
         if (self->_translating == lines) self->_translating = nil;
-        [self offerExtras];
         if (!translations) {
+            [self offerExtras];
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"No translation" message:error
                                                                     preferredStyle:UIAlertControllerStyleAlert];
             // Over the player, which is dark whatever the system's appearance.
@@ -1914,15 +1919,28 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
             [SGTopController() presentViewController:alert animated:YES completion:nil];
             return;
         }
-        if (lines != self->_lines) return;   // the song moved on meanwhile
-        [lines enumerateObjectsUsingBlock:^(SGKaraokeLine *line, NSUInteger i, BOOL *stop) {
-            if (i < translations.count && translations[i].length && !line.translation.length) line.translation = translations[i];
-        }];
-        self->_hasTranslation = YES;
-        self->_untranslated = NO;
-        if (SGFlag(SGRKeyLyricsTranslation, NO)) [self restyle];
-        else SGRSetLyricsTextShown(SGRLyricsTextTranslation, YES);
+        [self takeTranslations:translations into:lines];
+        SGLyricsSaveTranslation(track, language, lines);
+        if (lines == self->_lines) self->_untranslated = NO;
+        [self offerExtras];
     });
+}
+
+// Each line still without a translation takes the one given for it, and translations are switched on so
+// they show. The lines may be another song's by now: they keep the translation, the page is left alone.
+- (void)takeTranslations:(NSArray<NSString *> *)translations into:(NSArray<SGKaraokeLine *> *)lines {
+    __block BOOL took = NO;
+    [lines enumerateObjectsUsingBlock:^(SGKaraokeLine *line, NSUInteger i, BOOL *stop) {
+        if (i < translations.count && translations[i].length && !line.translation.length) {
+            line.translation = translations[i];
+            took = YES;
+        }
+    }];
+    if (!took || lines != _lines) return;
+    _hasTranslation = YES;
+    [self offerExtras];
+    if (SGFlag(SGRKeyLyricsTranslation, NO)) [self restyle];
+    else SGRSetLyricsTextShown(SGRLyricsTextTranslation, YES);
 }
 
 // Where a line starts on the page, for the stack as it is arranged now: an open break holds the room

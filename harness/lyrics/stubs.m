@@ -69,10 +69,20 @@ void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *li
 + (void)translate:(NSArray<NSString *> *)lines to:(NSString *)languageTag done:(void (^)(NSArray<NSString *> *, NSString *))done {
     [self answer:lines as:@"iPhone: " done:done];
 }
-+ (void)translateWithAppleIntelligence:(NSArray<NSString *> *)lines to:(NSString *)languageTag done:(void (^)(NSArray<NSString *> *, NSString *))done {
-    [self answer:lines as:@"Intelligence: " done:done];
+// A batch at a time, as the model works: the first half shows a second before the rest.
++ (void)translateWithAppleIntelligence:(NSArray<NSString *> *)lines to:(NSString *)languageTag progress:(void (^)(NSArray<NSString *> *))progress
+                                  done:(void (^)(NSArray<NSString *> *, NSString *))done {
+    NSMutableArray<NSString *> *half = [NSMutableArray array];
+    [lines enumerateObjectsUsingBlock:^(NSString *line, NSUInteger i, BOOL *stop) {
+        [half addObject:i < lines.count / 2 && line.length ? [@"Intelligence: " stringByAppendingString:line] : @""];
+    }];
+    dispatch_async(dispatch_get_main_queue(), ^{ progress(half); });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{ [self answer:lines as:@"Intelligence: " done:done]; });
 }
 @end
+// Nothing is kept between runs of the harness.
+BOOL SGLyricsApplySavedTranslation(NSString *track, NSString *language, NSArray<SGKaraokeLine *> *lines) { return NO; }
+void SGLyricsSaveTranslation(NSString *track, NSString *language, NSArray<SGKaraokeLine *> *lines) {}
 
 // Line meanings: -title and -artist name the track Genius is searched for, and the setting's key
 // (-spotifyglass.lyricsMeanings 3) turns them on.

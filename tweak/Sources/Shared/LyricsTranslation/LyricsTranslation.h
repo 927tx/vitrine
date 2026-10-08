@@ -29,6 +29,15 @@ SGModRow *SGGeminiKeyRow(void);
 @property (class, readonly) BOOL translationAvailable;
 + (BOOL)appleIntelligenceAvailable:(NSString *)languageTag;
 + (void)translate:(NSArray<NSString *> *)lines to:(NSString *)languageTag done:(void (^)(NSArray<NSString *> *lines, NSString *error))done;
+// Apple Intelligence works through the song a batch at a time: `progress` gets the lines so far, "" for the rest.
 + (void)translateWithAppleIntelligence:(NSArray<NSString *> *)lines to:(NSString *)languageTag
+                              progress:(void (^)(NSArray<NSString *> *lines))progress
                                   done:(void (^)(NSArray<NSString *> *lines, NSString *error))done;
 @end
+
+// SavedTranslations.m: a song's translations kept on disk by track and language, matched to lines by their text.
+// Applying fills only lines with no translation and says whether any took one. Main thread.
+BOOL SGLyricsApplySavedTranslation(NSString *track, NSString *language, NSArray<SGKaraokeLine *> *lines);
+void SGLyricsSaveTranslation(NSString *track, NSString *language, NSArray<SGKaraokeLine *> *lines);
+// The Lyrics page's row: how many songs are kept, and a tap to delete them.
+SGModRow *SGSavedTranslationsRow(void);

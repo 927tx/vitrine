@@ -97,7 +97,8 @@ public final class SGOnDeviceTranslation: NSObject {
         return model.availability == .available && model.supportedLanguages.contains { same($0, target) }
     }
 
-    @objc public static func translateWithAppleIntelligence(_ lines: [String], to languageTag: String, done: @escaping ([String]?, String?) -> Void) {
+    @objc public static func translateWithAppleIntelligence(_ lines: [String], to languageTag: String, progress: @escaping ([String]) -> Void,
+                                                            done: @escaping ([String]?, String?) -> Void) {
         guard #available(iOS 26.0, *) else { return finish(done, nil, "Apple Intelligence needs iOS 26.") }
         let language = name(Locale.Language(identifier: languageTag))
         Task {
@@ -109,6 +110,8 @@ public final class SGOnDeviceTranslation: NSObject {
                     let chunkStarted = Date()
                     out += try await translateChunk(chunk, into: language)
                     log.notice("intelligence: lines \(start + 1)-\(start + chunk.count) of \(lines.count) in \(Date().timeIntervalSince(chunkStarted), format: .fixed(precision: 1)) s")
+                    let soFar = out + [String](repeating: "", count: lines.count - out.count)
+                    if out.count < lines.count { DispatchQueue.main.async { progress(soFar) } }
                 }
                 log.notice("intelligence: \(lines.count) lines into \(languageTag, privacy: .public) in \(Date().timeIntervalSince(started), format: .fixed(precision: 1)) s")
                 finish(done, out, nil)
