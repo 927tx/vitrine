@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # Builds the spotifyglass tweak and injects it (plus FLEX) into a decrypted Spotify IPA.
 #
-#   scripts/pipeline.sh <decrypted.ipa> [-o out.ipa] [--no-flex] [--install] [--name N] [--icon P.png]   (or: make build / make install)
+#   scripts/pipeline.sh <decrypted.ipa> [-o out.ipa] [--no-flex] [--install] [--name N] [--icon P.png] [--keep-watch]
+#   (or: make build / make install)
+#
+# --keep-watch keeps Spotify's Apple Watch app, untested. Only its arm64 build is decrypted in an IPA dumped on an
+# iPhone (the arm64_32 one older Watches run stays encrypted and is taken out), so it can only run on a Watch from
+# Series 9 and Ultra 2 on. Its companion key names com.spotify.client until it is signed: the signer has to rename
+# it and the Watch app's ids to the signing App ID, and sign the Watch app with a profile of its own that covers
+# the Watch.
 #
 # Every icons/NAME.png becomes an alternate icon (icons/README.md).
 #
@@ -26,7 +33,7 @@ FLEX_DEB="$ROOT/vendor/com.hopeless.autoflex_0.0.1_iphoneos-arm.deb"
 BUNDLE_ID="${BUNDLE_ID:-}"
 mkdir -p "$ROOT/out"
 
-IN="" OUT="" WITH_FLEX=1 INSTALL=0 NAME="" ICON=""
+IN="" OUT="" WITH_FLEX=1 INSTALL=0 NAME="" ICON="" KEEP_WATCH=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) OUT="$2"; shift 2 ;;
@@ -34,6 +41,7 @@ while [ $# -gt 0 ]; do
     --icon) ICON="$2"; shift 2 ;;
     --no-flex) WITH_FLEX=0; shift ;;
     --install) INSTALL=1; shift ;;
+    --keep-watch) KEEP_WATCH=1; shift ;;
     -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
     *) IN="$1"; shift ;;
   esac
@@ -129,9 +137,25 @@ rm -f "$ROOT/out/.info.plist"
 
 echo "==> injecting"
 # -w drops the Watch app: its companion-app key would still name com.spotify.client and block the install.
-cyan -i "$IN" -o "$OUT" -f "${FILES[@]}" -l "$OVERLAY" ${BUNDLE_ID:+-b "$BUNDLE_ID"} ${NAME:+-n "$NAME"} ${ICON:+-k "$ICON"} -w -s --overwrite
+WATCH=(-w)
+[ -n "$KEEP_WATCH" ] && WATCH=()
+cyan -i "$IN" -o "$OUT" -f "${FILES[@]}" -l "$OVERLAY" ${BUNDLE_ID:+-b "$BUNDLE_ID"} ${NAME:+-n "$NAME"} ${ICON:+-k "$ICON"} ${WATCH[@]+"${WATCH[@]}"} -s --overwrite
 rm -f "$OVERLAY"
 
+if [ -n "$KEEP_WATCH" ]; then
+  echo "==> keeping the Watch app, its arm64 build only (untested)"
+  PATCH="$(mktemp -d)"
+  OUT_ABS="$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")"
+  (cd "$PATCH" && unzip -q "$OUT_ABS" "${APP_DIR}Watch/*")
+  # The arm64_32 build is still encrypted with the App Store's DRM and could never run; the DRM records go too.
+  find "$PATCH/${APP_DIR}Watch" -type f -perm -u+x | while read -r bin; do
+    if lipo -archs "$bin" 2>/dev/null | grep -qw arm64_32; then lipo -remove arm64_32 "$bin" -output "$bin"; fi
+  done
+  find "$PATCH/${APP_DIR}Watch" -type d -name SC_Info -prune -exec rm -rf {} +
+  zip -q -d "$OUT_ABS" "${APP_DIR}Watch/*" >/dev/null
+  (cd "$PATCH" && zip -q -r "$OUT_ABS" "${APP_DIR}Watch")
+  rm -rf "$PATCH"
+fi
 echo "==> loading the App Group shim in the home screen widget"
 WIDGET_BIN="${APP_DIR}PlugIns/WidgetExtension.appex/WidgetExtension"
 if unzip -l "$OUT" "$WIDGET_BIN" >/dev/null 2>&1; then

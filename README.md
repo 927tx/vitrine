@@ -69,6 +69,11 @@ Put the decrypted `.ipa` in `ipa/`, then:
     make release    # out/vitrine-<version>.ipa, ready to sign
     make install    # the same, signed with your certificate and installed over USB or Wi-Fi
 
+`scripts/pipeline.sh <ipa> --no-flex --keep-watch` keeps Spotify's Apple Watch app (**untested**). Only its
+arm64 build survives decryption on an iPhone, so it can run only on an Apple Watch Series 9, Ultra 2 or newer, and
+it needs a signer that renames the Watch app to your App ID and signs it with a profile of its own that includes the
+Watch. `make install` does not do that yet.
+
 `make install` reads `SIGN_P12`, `SIGN_PROFILE` and `SIGN_P12_PASSWORD` from `.signing.env`; copy
 `.signing.env.example` and fill it in.
 
