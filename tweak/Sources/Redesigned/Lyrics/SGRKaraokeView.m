@@ -1001,20 +1001,28 @@ static const NSUInteger kLinesPerFrame = 4;
     _underline = nil;
     if (!meanings.count || !_lyricWords.count) return;
     if (meanings.firstObject.author == SGLyricsMeaningByArtist) {
+        // Beside the line's last row, on the side that faces into the page: after it for a line against the left
+        // edge, before it, the quote mirrored, for one against the right (a second voice, or right to left), whose
+        // far end is the screen's edge.
         SGRKaraokeWordView *last = _lyricWords.lastObject;
-        BOOL rightToLeft = readsRightToLeft(SGKaraokeLineText(_line));
-        CGRect word = CGRectMake(last.center.x - last.bounds.size.width / 2, last.center.y - last.bounds.size.height / 2,
-                                 last.bounds.size.width, last.bounds.size.height);
-        CGFloat x = rightToLeft ? CGRectGetMinX(word) - kBubbleGap - kBubbleSide : CGRectGetMaxX(word) + kBubbleGap;
+        CGFloat rowLeft = CGFLOAT_MAX, rowRight = -CGFLOAT_MAX;
+        for (SGRKaraokeWordView *word in _lyricWords) {
+            if (fabs(word.center.y - last.center.y) > 1) continue;
+            rowLeft = MIN(rowLeft, word.center.x - word.bounds.size.width / 2);
+            rowRight = MAX(rowRight, word.center.x + word.bounds.size.width / 2);
+        }
+        BOOL before = alignsRight(_line);
+        CGFloat x = before ? rowLeft - kBubbleGap - kBubbleSide : rowRight + kBubbleGap;
         UIImage *glyph = [UIImage systemImageNamed:@"quote.opening" withConfiguration:
                           [UIImageSymbolConfiguration configurationWithPointSize:kBubbleGlyph weight:UIImageSymbolWeightBold]];
+        if (before) glyph = glyph.imageWithHorizontallyFlippedOrientation;
         _bubble = [[UIImageView alloc] initWithImage:glyph];
         _bubble.contentMode = UIViewContentModeCenter;
         _bubble.tintColor = UIColor.blackColor;
         _bubble.backgroundColor = UIColor.whiteColor;
         _bubble.layer.cornerRadius = kBubbleSide / 2;
         _bubble.alpha = kBubbleAlpha;
-        _bubble.frame = CGRectMake(x, CGRectGetMidY(word) - kBubbleSide / 2, kBubbleSide, kBubbleSide);
+        _bubble.frame = CGRectMake(x, last.center.y - kBubbleSide / 2, kBubbleSide, kBubbleSide);
         _bubble.isAccessibilityElement = YES;
         _bubble.accessibilityLabel = @"Meaning from the artist";
         [self addSubview:_bubble];
