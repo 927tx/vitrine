@@ -345,15 +345,58 @@ static const CGFloat kPaintedShare = 0.75;
 // A cell nested inside the cell is walked into only while it is as wide as the band being looked for:
 // a card in a carousel is its own and narrower, while the element framework wraps a cell's content in
 // views of its own that are the full width, and stopping at one of those is stopping before the paint.
+// A "see more" fade lies over the section's last row with the footer drawn on top of both, its button over the
+// row's bottom line (Popular's 6th track, device 2026-10-07: the fade over the whole cell, the footer from 40pt).
+// With the fade gone, the row fades itself out above the footer instead, so the field shows through, not a paint.
+static char kRowFadeKey;
+static void fadeRowsAbove(UIView *gradient) {
+    NSArray<UIView *> *siblings = gradient.superview.subviews;
+    NSUInteger at = [siblings indexOfObject:gradient];
+    if (at == NSNotFound || at + 1 >= siblings.count) return;
+    CGFloat footerTop = siblings[at + 1].frame.origin.y;
+    for (NSUInteger i = 0; i < at; i++) {
+        UIView *row = siblings[i];
+        CGFloat top = footerTop - 12 - row.frame.origin.y, bottom = footerTop + 8 - row.frame.origin.y, height = row.bounds.size.height;
+        if (footerTop <= row.frame.origin.y || top >= height || height <= 0) continue;
+        CAGradientLayer *fade = objc_getAssociatedObject(row, &kRowFadeKey);
+        if (!fade) {
+            fade = [CAGradientLayer layer];
+            fade.colors = @[(id)UIColor.blackColor.CGColor, (id)UIColor.clearColor.CGColor];
+            objc_setAssociatedObject(row, &kRowFadeKey, fade, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        fade.frame = row.bounds;
+        fade.locations = @[@(fmax(0, top) / height), @(fmin(bottom, height) / height)];
+        [CATransaction commit];
+        if (row.layer.mask != fade) row.layer.mask = fade;
+    }
+}
+
+// A row reused away from the footer, with no fade and footer after it any more, is shown whole again.
+static BOOL aboveFooter(UIView *row) {
+    NSArray<UIView *> *siblings = row.superview.subviews;
+    NSUInteger at = [siblings indexOfObject:row];
+    for (NSUInteger i = at + 1; at != NSNotFound && i + 1 < siblings.count; i++) {
+        if ([NSStringFromClass(siblings[i].class) containsString:@"GradientView"]) return YES;
+    }
+    return NO;
+}
+
 static void clearPaint(UIView *view, UIView *cell, CGFloat wide) {
     BOOL full = view.bounds.size.width >= wide;
     if (view != cell && !full && [view isKindOfClass:UICollectionViewCell.class]) return;
+    CALayer *fade = objc_getAssociatedObject(view, &kRowFadeKey);
+    if (fade && view.layer.mask == fade && !aboveFooter(view)) view.layer.mask = nil;
     if (full) {
         // Read off the layer, written through the view, so the two are left saying the same thing: the
         // clear color lands on both, and reads back with an alpha the next pass does not take for paint.
         CGColorRef color = view.layer.backgroundColor;
         if (color && SGIsBaseSurface(color)) view.backgroundColor = UIColor.clearColor;
-        if (!view.layer.mask && [NSStringFromClass(view.class) containsString:@"GradientView"]) view.layer.mask = [CALayer layer];
+        if ([NSStringFromClass(view.class) containsString:@"GradientView"]) {
+            if (!view.layer.mask) view.layer.mask = [CALayer layer];
+            fadeRowsAbove(view);
+        }
     }
     for (UIView *sub in view.subviews) clearPaint(sub, cell, wide);
 }
