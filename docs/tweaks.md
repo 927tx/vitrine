@@ -137,7 +137,7 @@ Shared:
                   system's now playing through this hook and Player/NowPlayingExtras.x is checked by harness/now-playing/
     AnimatedArtwork/ moving artwork (AnimatedArtwork.h): the track's Canvas, else Apple Music's animated album cover
                   (SGMotionCatalog.m: searched without the album's edition, the edition of the same name first, and
-                  left alone for 10 minutes after a 403 or 429), kept as local files (SGMotionStore.m, a download that
+                  left alone for 10 minutes after a 403 or 429; an album's answer kept on disk for a week, so a relaunch skips the search), kept as local files (SGMotionStore.m, a download that
                   fails on the way tried once more), on iOS 26 the lock screen's full-screen
                   artwork (LockScreenMotion.x). With Every song, a song with neither gets its cover over copies of it
                   blurred and swaying, a seamless 8 s 3:4 loop drawn on the CPU only when the lock screen asks for it

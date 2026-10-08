@@ -224,6 +224,8 @@ static void *kReadyContext = &kReadyContext;
     _player = [AVQueuePlayer new];
     _player.muted = YES;
     _player.preventsDisplaySleepDuringVideoPlayback = NO;
+    // A file on the phone: nothing to buffer against, so it starts as soon as it can.
+    _player.automaticallyWaitsToMinimizeStalling = NO;
     _looper = [AVPlayerLooper playerLooperWithPlayer:_player templateItem:item];
     [self sgr_dropMotion];
     _motion = [AVPlayerLayer playerLayerWithPlayer:_player];
@@ -252,7 +254,8 @@ static void *kReadyContext = &kReadyContext;
     dispatch_async(dispatch_get_main_queue(), ^{ [weakSelf sgr_fadeInMotion:object]; });
 }
 
-// Once, when the clip has a frame to show: eased out, over the Kit's crossfade, on screen; at once off it.
+// Once, when the clip has a frame to show: over 0.2 s on a curve most of the way there at once (the Kit's response,
+// an entrance being quick), on screen; at once off it.
 - (void)sgr_fadeInMotion:(AVPlayerLayer *)layer {
     if (layer != _motion || !layer.readyForDisplay || layer.opacity == 1) return;
     [CATransaction begin];
@@ -262,8 +265,8 @@ static void *kReadyContext = &kReadyContext;
         CABasicAnimation *fade = [CABasicAnimation animationWithKeyPath:@"opacity"];
         fade.fromValue = @0;
         fade.toValue = @1;
-        fade.duration = SGRCrossfade;
-        fade.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
+        fade.duration = 0.2;
+        fade.timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.23 :1 :0.32 :1];
         [layer addAnimation:fade forKey:@"fade"];
     }
     [CATransaction commit];

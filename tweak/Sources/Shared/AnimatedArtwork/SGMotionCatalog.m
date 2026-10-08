@@ -1,6 +1,6 @@
 // Animated album covers, artist logos and songs by ISRC from Apple Music's catalog. The catalog takes the developer
 // token Apple Music's web player carries, so the token is read out of the web player's script and
-// kept until it is about to expire. Answers are kept for the launch.
+// kept until it is about to expire. Answers are kept for the launch, and an album's for a week on disk.
 #import "Core/SGCore.h"
 #import "AnimatedArtwork.h"
 
@@ -17,10 +17,39 @@ static NSMutableDictionary<NSString *, id> *sg_kept;
 static NSMutableDictionary<NSString *, NSMutableArray *> *sg_waiting;
 static NSMutableArray<void (^)(NSString *)> *sg_tokenWaiting;
 
+// An album's answer, its clip's address or that it has none, kept on disk so that an album opened before starts at
+// once after a relaunch, without the token and the search. Older answers are asked again.
+static const NSTimeInterval kAlbumAnswerLife = 7 * 24 * 3600;
+
+static NSURL *albumAnswersFile(void) {
+    NSURL *caches = [NSFileManager.defaultManager URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask].firstObject;
+    return [caches URLByAppendingPathComponent:@"Vitrine/Motion/album answers.plist"];
+}
+
+// Key to {url: the address, "" for none; at: when it was asked}.
+static NSMutableDictionary<NSString *, NSDictionary *> *sg_albumAnswers;
+
+static void keepAlbumAnswer(NSString *key, NSURL *remote) {
+    sg_albumAnswers[key] = @{@"url": remote.absoluteString ?: @"", @"at": NSDate.date};
+    NSURL *file = albumAnswersFile();
+    [NSFileManager.defaultManager createDirectoryAtURL:file.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
+    [sg_albumAnswers writeToURL:file atomically:YES];
+}
+
 static void setUp(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         sg_kept = [NSMutableDictionary dictionary];
+        sg_albumAnswers = [NSMutableDictionary dictionary];
+        NSDictionary *stored = [NSDictionary dictionaryWithContentsOfURL:albumAnswersFile()];
+        for (NSString *key in stored) {
+            NSDictionary *answer = stored[key];
+            NSDate *at = [answer isKindOfClass:NSDictionary.class] ? answer[@"at"] : nil;
+            NSString *url = [at isKindOfClass:NSDate.class] ? answer[@"url"] : nil;
+            if (![url isKindOfClass:NSString.class] || -at.timeIntervalSinceNow > kAlbumAnswerLife) continue;
+            sg_albumAnswers[key] = answer;
+            sg_kept[key] = url.length ? ([NSURL URLWithString:url] ?: NSNull.null) : NSNull.null;
+        }
         sg_waiting = [NSMutableDictionary dictionary];
         sg_tokenWaiting = [NSMutableArray array];
     });
@@ -305,6 +334,7 @@ static void lookUp(NSString *key, void (^done)(id value), void (^look)(void (^an
     sg_waiting[key] = [NSMutableArray arrayWithObject:[done copy]];
     look(^(id value, BOOL keep) {
         if (keep) sg_kept[key] = value ?: NSNull.null;
+        if (keep && [key hasPrefix:@"album\n"] && (!value || [value isKindOfClass:NSURL.class])) keepAlbumAnswer(key, value);
         NSArray *callers = sg_waiting[key];
         [sg_waiting removeObjectForKey:key];
         for (void (^caller)(id) in callers) caller(value);
