@@ -1707,11 +1707,17 @@ typedef void (^SGRTranslated)(NSArray<NSString *> *translations, NSString *error
 // `progress` may be called with the lines so far before `done`.
 typedef void (^SGRTranslator)(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *language, SGRTranslated progress, SGRTranslated done);
 
-// The lines' text for a translator, "" for a line with no words.
+// The lines' text for a translator, "" for a line with no words or a translation already.
 static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
     NSMutableArray<NSString *> *texts = [NSMutableArray arrayWithCapacity:lines.count];
-    for (SGKaraokeLine *line in lines) [texts addObject:hasWords(line) ? SGKaraokeLineText(line) ?: @"" : @""];
+    for (SGKaraokeLine *line in lines) [texts addObject:hasWords(line) && !line.translation.length ? SGKaraokeLineText(line) ?: @"" : @""];
     return texts;
+}
+
+// Whether a line with words is still without a translation.
+static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
+    for (SGKaraokeLine *line in lines) if (!line.translation.length && hasWords(line)) return YES;
+    return NO;
 }
 
 // When each line is sung and where the breaks are, worked out once per song for the frames to read.
@@ -1905,8 +1911,10 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
     _translating = lines;
     [self offerExtras];
     NSString *language = SGLyricsGeminiLanguage();
+    // Kept a batch at a time too, so a translation cut off by Spotify closing keeps what was done.
     translator(lines, track, language, ^(NSArray<NSString *> *soFar, NSString *error) {
-        if (lines == self->_lines) [self takeTranslations:soFar into:lines];
+        [self takeTranslations:soFar into:lines];
+        SGLyricsSaveTranslation(track, language, lines);
     }, ^(NSArray<NSString *> *translations, NSString *error) {
         if (self->_translating == lines) self->_translating = nil;
         if (!translations) {
@@ -1921,7 +1929,8 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
         }
         [self takeTranslations:translations into:lines];
         SGLyricsSaveTranslation(track, language, lines);
-        if (lines == self->_lines) self->_untranslated = NO;
+        // A batch Apple Intelligence turned down stays untranslated, and asking again sends only its lines.
+        if (lines == self->_lines) self->_untranslated = anyUntranslated(lines);
         [self offerExtras];
     });
 }

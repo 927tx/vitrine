@@ -101,24 +101,31 @@ public final class SGOnDeviceTranslation: NSObject {
                                                             done: @escaping ([String]?, String?) -> Void) {
         guard #available(iOS 26.0, *) else { return finish(done, nil, "Apple Intelligence needs iOS 26.") }
         let language = name(Locale.Language(identifier: languageTag))
+        // Only the lines given text ("" for those translated already or with no words), 12 to a batch. A batch
+        // the model refuses or fails is left out and the rest go on, so an explicit verse costs its own lines only.
+        let wanted = lines.indices.filter { !lines[$0].isEmpty }
         Task {
-            var out: [String] = []
+            var out = [String](repeating: "", count: lines.count)
+            var failure: Error?
+            var translated = 0
             let started = Date()
-            do {
-                for start in stride(from: 0, to: lines.count, by: chunkLines) {
-                    let chunk = Array(lines[start..<min(start + chunkLines, lines.count)])
-                    let chunkStarted = Date()
-                    out += try await translateChunk(chunk, into: language)
-                    log.notice("intelligence: lines \(start + 1)-\(start + chunk.count) of \(lines.count) in \(Date().timeIntervalSince(chunkStarted), format: .fixed(precision: 1)) s")
-                    let soFar = out + [String](repeating: "", count: lines.count - out.count)
-                    if out.count < lines.count { DispatchQueue.main.async { progress(soFar) } }
+            for first in stride(from: 0, to: wanted.count, by: chunkLines) {
+                let indices = Array(wanted[first..<min(first + chunkLines, wanted.count)])
+                let chunkStarted = Date()
+                do {
+                    let answer = try await translateChunk(indices.map { lines[$0] }, into: language)
+                    for (index, translation) in zip(indices, answer) { out[index] = translation }
+                    translated += indices.count
+                    log.notice("intelligence: \(first + indices.count) of \(wanted.count) lines in \(Date().timeIntervalSince(chunkStarted), format: .fixed(precision: 1)) s")
+                } catch {
+                    failure = error
+                    log.error("intelligence: lines \(first + 1)-\(first + indices.count) of \(wanted.count) failed: \(String(describing: error), privacy: .public)")
                 }
-                log.notice("intelligence: \(lines.count) lines into \(languageTag, privacy: .public) in \(Date().timeIntervalSince(started), format: .fixed(precision: 1)) s")
-                finish(done, out, nil)
-            } catch {
-                log.error("intelligence: failed after \(out.count) of \(lines.count) lines, \(Date().timeIntervalSince(started), format: .fixed(precision: 1)) s: \(String(describing: error), privacy: .public)")
-                finish(done, nil, problem(error))
+                if first + chunkLines < wanted.count { let soFar = out; DispatchQueue.main.async { progress(soFar) } }
             }
+            log.notice("intelligence: \(translated) of \(wanted.count) lines into \(languageTag, privacy: .public) in \(Date().timeIntervalSince(started), format: .fixed(precision: 1)) s")
+            if translated == 0, let failure { return finish(done, nil, problem(failure)) }
+            finish(done, out, nil)
         }
     }
 
