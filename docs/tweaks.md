@@ -130,7 +130,10 @@ Shared:
     LockScreenLyrics/ the line being sung in the system's now playing, and on iOS 26 the lyrics as the lock screen's
                   full-screen artwork (LyricsArtwork.x): a new artwork ID per line, its 3:4 H.264 clip (the line and the
                   next one dimmed over the blurred cover, SGLyricsClip.m) written only when the lock screen asks for it,
-                  Still (one frame) or Animated. Rendered on the Mac against harness/lyrics-clip/. What reaches the
+                  Still (one frame) or Animated (15 fps). The backdrop is blurred small and drawn large, on the CPU as the
+                  lock screen asks in the background; previews are drawn on a queue apart from the clips, and while the
+                  lock screen is asking, the next line's preview and clip are drawn ahead and a ready preview is handed
+                  over at once. iOS still shows the plain cover for about half a second at each change of artwork. Picking it or another artwork applies at once. Rendered on the Mac against harness/lyrics-clip/. What reaches the
                   system's now playing through this hook and Player/NowPlayingExtras.x is checked by harness/now-playing/
     AnimatedArtwork/ moving artwork (AnimatedArtwork.h): the track's Canvas, else Apple Music's animated album cover
                   (SGMotionCatalog.m: searched without the album's edition, the edition of the same name first, and
@@ -478,7 +481,7 @@ Redesigned:
                   harness/lyrics/; the page against harness/lyrics-page/
     Home/         Home decluttered to music on black (an allow list of its sections: shortcuts, the DJ without its heading and
                   transcript, the shelves of cards), a large title where the filter pills were with the avatar at the trailing
-                  edge, the shelves' headings at the Music app's size, each shortcut tile's cover run across it blurred
+                  edge, the title rising and fading with the feed as it scrolls, as the Music app's does, the shelves' headings at the Music app's size, each shortcut tile's cover run across it blurred
                   (SGRPalette's extension), continuous corners on the covers, and in FLEX builds a meter of each scroll's
                   frames and the hooks' time (Home.h lists its files)
     Search/       the Browse page decluttered to its category cards (an allow list of the list's cells: the watch feed

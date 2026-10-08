@@ -27,12 +27,12 @@ static const CGFloat kSameShape = 0.02;
 static NSString *sg_title;
 static NSString *sg_picture;   // the picture the track names, for the cover's clip
 static NSUInteger sg_walk;   // counts the tracks walked, so a poster that comes late is told from the newest
-static SGLockArtwork sg_choice, sg_launchChoice;
+static SGLockArtwork sg_choice;
 static dispatch_queue_t sg_queue;   // cuts clips and makes the cover's, one at a time
 static SGMotionFollower *sg_follower;
 
 static BOOL motionOn(SGLockArtwork choice) {
-    return sg_launchChoice != SGLockArtworkLyrics && (choice == SGLockArtworkMotion || choice == SGLockArtworkEverySong);
+    return choice == SGLockArtworkMotion || choice == SGLockArtworkEverySong;
 }
 
 // The key a clip shown at `shown` goes under, and the shape it is cut to (width over height): 1:1 for a
@@ -151,7 +151,7 @@ static void showCover(NSString *picture) {
 
 %ctor {
     if (@available(iOS 26.0, *)) {
-        sg_launchChoice = sg_choice = SGLockScreenArtwork();
+        sg_choice = SGLockScreenArtwork();
         sg_queue = dispatch_queue_create("spotifyglass.lockscreen.motion", DISPATCH_QUEUE_SERIAL);
         // Each walk takes the last one's clip off first, so the lock screen falls back to the still cover.
         sg_follower = [[SGMotionFollower alloc] initWithBegin:^BOOL(NSString *uri, SPTPlayerState *state) {

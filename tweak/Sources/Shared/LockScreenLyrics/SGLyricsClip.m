@@ -21,7 +21,7 @@ static const CGFloat kNextAlpha = 0.4;
 // plays before the lock screen loops it.
 static const int32_t kStillSeconds = 2;
 static const int32_t kLoopSeconds = 4;
-static const int32_t kFPS = 24;
+static const int32_t kFPS = 15;   // the breath is slow; at 24 a line took about 4 s to write on the CPU
 static const CGFloat kBreath = 0.06;   // how much bigger the cover grows at the top of a breath
 
 CGSize SGLyricsClipSize(CGFloat pixels) {
@@ -37,6 +37,9 @@ static CGContextRef newContext(CGSize size, void *data, size_t bytesPerRow) {
     return context;
 }
 
+// The width the cover is blurred at, before it is drawn at the clip's size.
+static const CGFloat kBackdropWidth = 128;
+
 CGImageRef SGLyricsClipBackdrop(CGImageRef cover, CGSize size) {
     CGContextRef context = newContext(size, NULL, 0);
     CGRect bounds = {CGPointZero, size};
@@ -47,15 +50,19 @@ CGImageRef SGLyricsClipBackdrop(CGImageRef cover, CGSize size) {
         static dispatch_once_t once;
         // On the CPU: the lock screen asks while Spotify is in the background, where GPU work gets it killed.
         dispatch_once(&once, ^{ renderer = [CIContext contextWithOptions:@{kCIContextUseSoftwareRenderer: @YES}]; });
+        // Blurred small and drawn large: a blur this wide looks the same either way, and on the CPU at full size it
+        // took 12 to 20 s for a song's first line.
+        CGSize small = CGSizeMake(kBackdropWidth, round(kBackdropWidth * size.height / size.width));
         // Filled the way the lock screen fills the screen, the square cover's sides overflowing.
         CIImage *image = [CIImage imageWithCGImage:cover];
-        CGFloat scale = MAX(size.width / image.extent.size.width, size.height / image.extent.size.height);
+        CGFloat scale = MAX(small.width / image.extent.size.width, small.height / image.extent.size.height);
         image = [image imageByApplyingTransform:CGAffineTransformMakeScale(scale, scale)];
-        image = [image imageByApplyingTransform:CGAffineTransformMakeTranslation((size.width - image.extent.size.width) / 2,
-                                                                                 (size.height - image.extent.size.height) / 2)];
+        image = [image imageByApplyingTransform:CGAffineTransformMakeTranslation((small.width - image.extent.size.width) / 2,
+                                                                                 (small.height - image.extent.size.height) / 2)];
         // Clamped first, so the blur does not pull the dark in from past the edges.
-        image = [[image imageByClampingToExtent] imageByApplyingGaussianBlurWithSigma:size.width * 0.05];
-        CGImageRef blurred = [renderer createCGImage:image fromRect:bounds];
+        image = [[image imageByClampingToExtent] imageByApplyingGaussianBlurWithSigma:small.width * 0.05];
+        CGImageRef blurred = [renderer createCGImage:image fromRect:(CGRect){CGPointZero, small}];
+        CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
         if (blurred) CGContextDrawImage(context, bounds, blurred);
         CGImageRelease(blurred);
         // Darkened, so white words read over a light cover.

@@ -54,9 +54,11 @@ static NSArray<NSArray<SGKaraokeWord *> *> *piecesOf(SGKaraokeLine *line) {
     return pieces;
 }
 
-// Seconds into the track at `now`, run on from what Spotify last reported.
+// Seconds into the track at `now`, run on from what Spotify last reported. A rate it left out runs at 1, as
+// playingBy counts it: read as 0, every line written pinned the lock screen's time to Spotify's last report.
 static double elapsedAt(NSDictionary *info, CFAbsoluteTime reportedAt, CFAbsoluteTime now) {
-    double rate = [info[MPNowPlayingInfoPropertyPlaybackRate] doubleValue];
+    NSNumber *reported = info[MPNowPlayingInfoPropertyPlaybackRate];
+    double rate = reported ? reported.doubleValue : 1;
     return [info[MPNowPlayingInfoPropertyElapsedPlaybackTime] doubleValue] + rate * (now - reportedAt);
 }
 

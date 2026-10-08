@@ -50,7 +50,9 @@ void SGNowPlayingSetExtras(NSString *owner, NSDictionary *extras, NSString *titl
     @synchronized (sg_lock) {
         if (info[MPNowPlayingInfoPropertyElapsedPlaybackTime]) {
             sg_elapsed = [info[MPNowPlayingInfoPropertyElapsedPlaybackTime] doubleValue];
-            sg_rate = [info[MPNowPlayingInfoPropertyPlaybackRate] doubleValue];
+            // A rate left out runs at 1, as LockScreenLyrics.x reads it.
+            NSNumber *rate = info[MPNowPlayingInfoPropertyPlaybackRate];
+            sg_rate = rate ? rate.doubleValue : 1;
             sg_clockAt = CFAbsoluteTimeGetCurrent();
         }
         id title = info[MPMediaItemPropertyTitle];
