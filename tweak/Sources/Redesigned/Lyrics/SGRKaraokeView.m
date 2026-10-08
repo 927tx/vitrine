@@ -1724,14 +1724,32 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
     return texts;
 }
 
-// Whether the song's words are mostly in a language other than `language`. A song too short to tell counts as one.
+// Whether one distinct line in five is, with the recognizer at least 80% sure, in a language other than `language`:
+// K-pop and other songs half in English count, and a chorus sung eight times weighs as one line. The whole song's
+// guess is not asked: short lines sway it (it reads Havana, all "ooh na-na", as Dutch), and an unsure line does not
+// count either way. A song with no line it is sure of counts as foreign, too little to tell.
 static BOOL inAnotherLanguage(NSArray<SGKaraokeLine *> *lines, NSString *language) {
-    NSMutableString *words = [NSMutableString string];
-    for (SGKaraokeLine *line in lines) if (hasWords(line)) [words appendFormat:@"%@\n", SGKaraokeLineText(line)];
-    NSString *found = [NLLanguageRecognizer dominantLanguageForString:words];
-    if (!found.length || [found isEqualToString:NLLanguageUndetermined]) return YES;
-    NSString *(^code)(NSString *) = ^NSString *(NSString *tag) { return [tag componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"-_"]].firstObject.lowercaseString; };
-    return ![code(found) isEqualToString:code(language)];
+    NSString *(^code)(NSString *) = ^NSString *(NSString *tag) {
+        return [tag componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"-_"]].firstObject.lowercaseString;
+    };
+    NSString *target = code(language);
+    NSUInteger distinct = 0, sure = 0, foreign = 0;
+    NSMutableSet<NSString *> *seen = [NSMutableSet set];
+    NLLanguageRecognizer *recognizer = [NLLanguageRecognizer new];
+    for (SGKaraokeLine *line in lines) {
+        NSString *text = hasWords(line) ? SGKaraokeLineText(line).lowercaseString : nil;
+        if (!text.length || [seen containsObject:text]) continue;
+        [seen addObject:text];
+        distinct++;
+        [recognizer reset];
+        [recognizer processString:text];
+        NSDictionary<NLLanguage, NSNumber *> *guess = [recognizer languageHypothesesWithMaximum:1];
+        NLLanguage found = guess.allKeys.firstObject;
+        if (!found || guess[found].doubleValue < 0.8) continue;
+        sure++;
+        if (![code(found) isEqualToString:target]) foreign++;
+    }
+    return !sure || foreign * 5 >= MAX(distinct, 5);
 }
 
 // Whether a line with words is still without a translation.
