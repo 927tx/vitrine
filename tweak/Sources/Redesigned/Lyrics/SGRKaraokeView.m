@@ -1724,16 +1724,18 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
     return texts;
 }
 
-// Whether one distinct line in five is, with the recognizer at least 80% sure, in a language other than `language`:
-// K-pop and other songs half in English count, and a chorus sung eight times weighs as one line. The whole song's
-// guess is not asked: short lines sway it (it reads Havana, all "ooh na-na", as Dutch), and an unsure line does not
-// count either way. A song with no line it is sure of counts as foreign, too little to tell.
+// Whether a song is in a language other than `language`, line by line: one distinct line in five, or two lines in
+// another script (Hangul, kana, Han among English, for K-pop with only a verse in Korean), with the recognizer at
+// least 80% sure of each. A chorus sung eight times weighs as one line. The whole song's guess is not asked: short
+// lines sway it (it reads Havana, all "ooh na-na", as Dutch), and an unsure line counts neither way. A song with no
+// line it is sure of counts as foreign, too little to tell.
 static BOOL inAnotherLanguage(NSArray<SGKaraokeLine *> *lines, NSString *language) {
     NSString *(^code)(NSString *) = ^NSString *(NSString *tag) {
         return [tag componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"-_"]].firstObject.lowercaseString;
     };
     NSString *target = code(language);
-    NSUInteger distinct = 0, sure = 0, foreign = 0;
+    NSString *targetScript = [NSOrthography defaultOrthographyForLanguage:language].dominantScript;
+    NSUInteger distinct = 0, sure = 0, foreign = 0, otherScript = 0;
     NSMutableSet<NSString *> *seen = [NSMutableSet set];
     NLLanguageRecognizer *recognizer = [NLLanguageRecognizer new];
     for (SGKaraokeLine *line in lines) {
@@ -1747,9 +1749,11 @@ static BOOL inAnotherLanguage(NSArray<SGKaraokeLine *> *lines, NSString *languag
         NLLanguage found = guess.allKeys.firstObject;
         if (!found || guess[found].doubleValue < 0.8) continue;
         sure++;
-        if (![code(found) isEqualToString:target]) foreign++;
+        if ([code(found) isEqualToString:target]) continue;
+        foreign++;
+        if (![[NSOrthography defaultOrthographyForLanguage:found].dominantScript isEqualToString:targetScript]) otherScript++;
     }
-    return !sure || foreign * 5 >= MAX(distinct, 5);
+    return !sure || foreign * 5 >= MAX(distinct, 5) || otherScript >= 2;
 }
 
 // Whether a line with words is still without a translation.
@@ -1865,7 +1869,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     BOOL gemini = SGGeminiKeySet(), onDevice = SGOnDeviceTranslation.translationAvailable;
     BOOL intelligence = [SGOnDeviceTranslation appleIntelligenceAvailable:language];
     // A translator is offered only for a song in another language than the one it would translate into.
-    BOOL translatable = _foreign && _untranslated && (gemini || onDevice || intelligence);
+    BOOL translatable = (_foreign || SGHidden(SGKeyLyricsTranslateEverySong)) && _untranslated && (gemini || onDevice || intelligence);
     BOOL offered = _lines && !_sample && (_hasSpoken || _hasTranslation || translatable);
     if (!offered) {
         _extrasBox.hidden = YES;

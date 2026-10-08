@@ -7,6 +7,10 @@
 
 BOOL SGGeminiKeySet(void);
 
+// On: the translate menu is offered for every song, not only those found in another language.
+#define SGKeyLyricsTranslateEverySong @"spotifyglass.lyrics.translateEverySong"
+SGModRow *SGTranslateEverySongRow(void);
+
 // One translation per line, in order, or nil and a message to show. Main queue. The same song in the
 // same language is asked once a launch.
 void SGLyricsTranslateWithGemini(NSString *trackID, NSArray<SGKaraokeLine *> *lines, NSString *languageTag,

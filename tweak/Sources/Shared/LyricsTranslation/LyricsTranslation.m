@@ -196,6 +196,11 @@ static void askForKey(void) {
     [SGTopController() presentViewController:alert animated:YES completion:nil];
 }
 
+SGModRow *SGTranslateEverySongRow(void) {
+    return SGOptionRow(@"Translate any song", @"The lyrics' translate menu for songs that already read as your language",
+                       SGKeyLyricsTranslateEverySong);
+}
+
 SGModRow *SGGeminiKeyRow(void) {
     return SGStatActionRow(@"Gemini API key", @"Translate any song from the lyrics' corner menu",
                            ^NSString *{ return SGGeminiKeySet() ? @"Set" : @"Off"; }, ^{ askForKey(); });
