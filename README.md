@@ -46,9 +46,9 @@ to Spotify's own screens with everything else the mod adds on top. Both live in 
 ## Build it
 
 No IPA is distributed. Bring a decrypted **Spotify 9.1.78** IPA; you get an unsigned
-`vitrine-<mod version>.ipa` to sign with SideStore, Feather or any certificate signer. The release's `.deb`
-is the tweak alone: injected by hand, it misses the app changes the redesign needs (its glass tab bar), the Live Activity
-and Music Haptics in the background, so build the IPA instead.
+`vitrine-<mod version>.ipa` to sign with SideStore, Feather or any certificate signer. Releases have no `.deb`:
+injected by hand, the tweak alone misses the app changes the redesign needs (its glass tab bar), the Live
+Activity, Music Haptics in the background and Connect's local discovery, so build the IPA instead.
 
 ### Build with GitHub Actions
 

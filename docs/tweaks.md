@@ -584,7 +584,7 @@ USB and nothing on Wi-Fi reaches. `GET /tree` answers with the visible screen's 
 records it. The driver adds `GET /<command>?<params>`, each answering JSON with `ok` and either what happened
 or an `error`. A command needs an `X-Phone-Driver` header, which a web page on the phone cannot send to the
 loopback without a CORS preflight the server never grants (`curl -H 'X-Phone-Driver: 1'`). It is compiled only with `SG_DRIVER=1`, which `scripts/pipeline.sh` sets for the builds that
-carry FLEX; `make release` and the release workflow's `.deb` leave it out, and it starts only when FLEX is
+carry FLEX; `make release` and the release workflow's build leave it out, and it starts only when FLEX is
 there.
 
 `scripts/phone.py` is the client. It uses whatever already answers on 127.0.0.1:8085 or starts iproxy and

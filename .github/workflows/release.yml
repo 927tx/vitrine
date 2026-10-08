@@ -1,6 +1,7 @@
 # Every push to main updates one release PR (version.txt and CHANGELOG.md from the feat:/fix:
 # commits since the last release). Merging it tags vX.Y.Z and makes the GitHub Release, and the
-# second job builds the tweak's .deb and attaches it. No IPA is built or published here.
+# second job builds the tweak to check that the release compiles. Nothing is attached: a .deb injected by hand
+# misses the app changes the redesign needs, so people build the full IPA (README). No IPA is built here.
 name: Release
 
 on:
@@ -21,7 +22,7 @@ jobs:
       - uses: googleapis/release-please-action@v4
         id: release
 
-  deb:
+  build:
     needs: release-please
     if: needs.release-please.outputs.created == 'true'
     runs-on: macos-latest
@@ -54,8 +55,3 @@ jobs:
 
       - name: Build
         run: env -u MAKELEVEL gmake -C tweak clean package
-
-      - name: Attach to the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ needs.release-please.outputs.tag }}" tweak/packages/*.deb --clobber
