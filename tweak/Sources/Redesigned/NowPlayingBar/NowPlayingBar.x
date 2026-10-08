@@ -21,6 +21,7 @@
 #import "Redesigned/Kit/SGRRepaint.h"
 #import "Redesigned/Kit/SGRGlass.h"
 #import "Redesigned/Kit/SGRTokens.h"
+#import "Settings/SGMarquee.h"
 #import "NowPlayingBar.h"
 #import "Redesigned/Navbar/Navbar.h"
 
@@ -260,6 +261,134 @@ static void tuckExtras(UIView *bar, BOOL tuck) {
     });
 }
 
+// The Music app's two lines, the title over the artists, in place of Spotify's "title • artists" and the
+// device line under it; the title alone in the minimized row. Each swipe page holds its own track's labels,
+// so the text is read from them and drawn over them page by page. The page reads its own VoiceOver label.
+static NSString *const kPageId = @"now-playing-bar-page";
+static NSString *const kUnitId = @"Components.UI.PageInformationUnitNowPlayingBar";
+static NSString *const kDeviceLineId = @"now-plaging-bar-connect-content";   // Spotify's spelling
+static NSString *const kBullet = @" • ";
+static char kTextKey;
+
+@interface SGRBarText : UIView
+@property (nonatomic, readonly) SGMarqueeLabel *title, *artists;
+@property (nonatomic) BOOL inRow;
+@end
+
+@implementation SGRBarText
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (!(self = [super initWithFrame:frame])) return nil;
+    self.userInteractionEnabled = NO;
+    self.accessibilityElementsHidden = YES;
+    _title = [SGMarqueeLabel new];
+    _title.textColor = SGRPrimary();
+    _title.font = SGRFont(UIFontTextStyleSubheadline, UIFontWeightSemibold, UIContentSizeCategoryLarge);
+    _artists = [SGMarqueeLabel new];
+    _artists.textColor = SGRSecondary();
+    _artists.font = SGRFont(UIFontTextStyleFootnote, UIFontWeightRegular, UIContentSizeCategoryLarge);
+    [self addSubview:_title];
+    [self addSubview:_artists];
+    return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGSize size = self.bounds.size;
+    CGFloat titleHeight = ceil(_title.font.lineHeight), artistsHeight = ceil(_artists.font.lineHeight);
+    BOOL two = !_inRow && _artists.text.length;
+    // The lines share 2pt of their leading, set as close as the Music app sets its card's.
+    CGFloat shared = 2;
+    CGFloat top = round((size.height - titleHeight - (two ? artistsHeight - shared : 0)) / 2);
+    _title.frame = CGRectMake(0, top, size.width, titleHeight);
+    _artists.frame = CGRectMake(0, top + titleHeight - shared, size.width, artistsHeight);
+    _artists.alpha = two ? 1 : 0;
+}
+@end
+
+static NSString *marqueeText(UIView *marquee) {
+    for (UIView *sub in marquee.subviews) if ([sub isKindOfClass:UILabel.class]) return ((UILabel *)sub).text;
+    return nil;
+}
+
+// Not hidden or faded by Spotify between the view and the unit; the unit's own children are faded by this file.
+static BOOL inSight(UIView *view, UIView *unit) {
+    for (UIView *v = view; v && v != unit; v = v.superview) {
+        if (v.hidden || (v.alpha < 0.01 && v.superview != unit)) return NO;
+    }
+    return YES;
+}
+
+static void placeText(UIView *page) {
+    // The cell lays itself out before its content view places Spotify's text, so the text is placed first.
+    [page layoutIfNeeded];
+    __block UIView *unit = nil;
+    SGForEachView(page, ^(UIView *v) {
+        if (!unit && [v.accessibilityIdentifier isEqualToString:kUnitId]) unit = v;
+    });
+    // Spotify lays a page out two ways. With a device line under it, the unit's first marquee is "title • artists"
+    // and a later one, hidden, holds the artists alone. Without one, the first is the title and the next one in
+    // sight is the artists. A promotional line, held at no alpha, is never the artists.
+    __block NSString *line = nil, *artists = nil, *shown = nil;
+    if (unit) SGForEachView(unit, ^(UIView *v) {
+        if (![v.accessibilityIdentifier isEqualToString:@"Encore.MarqueeLabel"]) return;
+        NSString *text = marqueeText(v);
+        if (!line) {
+            line = text;
+            return;
+        }
+        if (!text.length) return;
+        if (!artists && [line hasSuffix:[kBullet stringByAppendingString:text]]) artists = text;
+        if (!shown && inSight(v, unit)) shown = text;
+    });
+    if (!line.length) return;
+    NSString *title = line;
+    if (artists) {
+        title = [line substringToIndex:line.length - artists.length - kBullet.length];
+    } else {
+        NSRange bullet = [line rangeOfString:kBullet];
+        if (bullet.location != NSNotFound) {
+            title = [line substringToIndex:bullet.location];
+            artists = [line substringFromIndex:NSMaxRange(bullet)];
+        } else {
+            artists = shown;
+        }
+    }
+
+    SGRBarText *text = objc_getAssociatedObject(page, &kTextKey);
+    BOOL made = !text;
+    if (made) {
+        text = [SGRBarText new];
+        objc_setAssociatedObject(page, &kTextKey, text, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    // Inside Spotify's unit, so the text moves and fades with it as Spotify slides a page's in and out: the page's
+    // height, which the card shows whole, and a line of text wide.
+    CGRect frame = CGRectMake(0, -SGFrameIn(unit, page).origin.y, unit.bounds.size.width, page.bounds.size.height);
+    BOOL inRow = sg_inline != nil;
+    void (^place)(void) = ^{
+        if (text.superview != unit) [unit addSubview:text];
+        else if (unit.subviews.lastObject != text) [unit bringSubviewToFront:text];
+        if (!CGRectEqualToRect(text.frame, frame)) text.frame = frame;
+        text.title.text = title;
+        text.artists.text = artists ?: @"";
+        // Every pass: the artists can come in after the title.
+        text.inRow = inRow;
+        [text setNeedsLayout];
+        [text layoutIfNeeded];
+    };
+    // A new page's text is placed where it belongs, never grown from nothing inside the bar's animation.
+    if (made) [UIView performWithoutAnimation:place];
+    else place();
+    for (UIView *sub in unit.subviews) if (sub != text && sub.alpha > 0) sub.alpha = 0;
+}
+
+static void placeTexts(UIView *bar) {
+    SGForEachView(bar, ^(UIView *v) {
+        NSString *name = v.accessibilityIdentifier;
+        if ([name isEqualToString:kPageId]) placeText(v);
+        else if ([name isEqualToString:kDeviceLineId] && v.alpha > 0) v.alpha = 0;
+    });
+}
+
 // In the minimized tab bar's row (TabBar.x): the bar narrowed to the slot by its edges, so Spotify's content
 // lays itself out to the width, and moved down by a transform on the container's view, which Spotify's
 // layout leaves alone. Outside a Jam only: its strip has no room in the row.
@@ -276,12 +405,14 @@ static void placeInline(UIViewController *container) {
         if (sg_inline) tuckExtras(bar, NO);
         sg_inline = nil;
         if (!CGAffineTransformIsIdentity(view.transform)) view.transform = CGAffineTransformIdentity;
+        if (bar) placeTexts(bar);
         return;
     }
     CGAffineTransform move = CGAffineTransformMakeTranslation(0, CGRectGetMidY(slot) - origin.y - CGRectGetMidY(bar.frame));
     if (!CGAffineTransformEqualToTransform(view.transform, move)) view.transform = move;
     tuckExtras(bar, YES);
     sg_inline = view;
+    placeTexts(bar);
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         NSMutableString *clips = [NSMutableString string];
@@ -392,6 +523,36 @@ static void styleNowPlayingBar(UIViewController *container) {
 }
 %end
 
+// A page lays out again when Spotify moves its text, which it does after the first pass at launch.
+%hook _TtC18NowPlaying_BarImpl17InformationCellV2
+- (void)layoutSubviews {
+    %orig;
+    if (sgr_nowPlayingRoot) placeText((UIView *)self);
+}
+%end
+
+%hook _TtC18NowPlaying_BarImpl15InformationCell
+- (void)layoutSubviews {
+    %orig;
+    if (sgr_nowPlayingRoot) placeText((UIView *)self);
+}
+%end
+
+// A page's marquee lays out again when Spotify gives it a new track, which nothing else of the bar's does.
+%hook _TtCE14Encore_TextKitO16EncoreFoundation6Encore12MarqueeLabel
+- (void)layoutSubviews {
+    %orig;
+    UIView *root = sgr_nowPlayingRoot;
+    if (!root || ![(UIView *)self isDescendantOfView:root]) return;
+    for (UIView *v = (UIView *)self; v && v != root; v = v.superview) {
+        if ([v.accessibilityIdentifier isEqualToString:kPageId]) {
+            placeText(v);
+            return;
+        }
+    }
+}
+%end
+
 %hook _TtC18NowPlaying_BarImpl27NowPlayingBarViewController
 - (void)viewDidLayoutSubviews {
     %orig;
@@ -407,5 +568,7 @@ static void styleNowPlayingBar(UIViewController *container) {
         @"_TtC18NowPlaying_BarImpl36NowPlayingBarContainerViewController",
         @"_TtC18NowPlaying_BarImpl27NowPlayingBarViewController",
         @"_TtC22NowPlaying_BarPageImplP33_CCC0D2EEA6D4725EECD8965E8C38C86D20TouchPassthroughView",
+        @"_TtCE14Encore_TextKitO16EncoreFoundation6Encore12MarqueeLabel",
+        @"_TtC18NowPlaying_BarImpl17InformationCellV2",
     ]);
 }
