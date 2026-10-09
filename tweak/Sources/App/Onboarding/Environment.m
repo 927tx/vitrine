@@ -4,6 +4,8 @@
 // redesign below iOS 26 that did not start (Core/SGUIMode.h), which turned itself off. Also what Chroma, installed
 // over the same Spotify before, left behind, offered once for deleting.
 #import "Shared/Lyrics/Lyrics.h"
+#import "Shared/Haptics/Haptics.h"
+#import "Shared/LiveActivity/LiveActivity.h"
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
@@ -52,17 +54,29 @@ static SGProblem version(void) {
                  joined([SGSpotifySupportedVersions arrayByAddingObjectsFromArray:likely], @"or")]];
 }
 
-// Installed without the app changes Vitrine's IPA build makes (scripts/pipeline.sh: plist/liquid-glass.plist and the
-// Live Activity), as when its .deb is injected by hand: the system keeps its old bars, so the glass tab bar is gone, and
-// without MusicHapticsSupported iOS leaves Spotify out of Music Haptics.
-static BOOL withoutAppChanges(void) {
+// What this install lacks of the app changes Vitrine's IPA build makes (scripts/pipeline.sh: plist/liquid-glass.plist),
+// as when its .deb is injected by hand, each said as what it costs. Spotify's own plist opting out of the system's glass
+// (9.1.88's) costs the redesign its glass bars. 9.1.90 has no such key, and none is the same as glass on. The Live
+// Activity and Music Haptics keys matter in either look, and their own settings say so too.
+static NSArray<NSString *> *missingAppChanges(void) {
+    NSMutableArray<NSString *> *missing = [NSMutableArray array];
     id compatibility = [NSBundle.mainBundle objectForInfoDictionaryKey:@"UIDesignRequiresCompatibility"];
-    return SGRedesignAvailable() && SGRedesignedUIStored() && !([compatibility isKindOfClass:NSNumber.class] && ![compatibility boolValue]);
+    if (SGRedesignAvailable() && SGRedesignedUIStored() && [compatibility isKindOfClass:NSNumber.class] && [compatibility boolValue])
+        [missing addObject:@"the tab bar stays Spotify's own, without its glass"];
+    if (!SGLiveActivityAllowedByInstall()) [missing addObject:@"the Live Activity is missing"];
+    if (!SGMusicHapticsListedByInstall())
+        [missing addObject:@"iOS does not list Spotify for Music Haptics, which stops vibrations in the background"];
+    return missing;
+}
+
+static BOOL withoutAppChanges(void) {
+    return missingAppChanges().count > 0;
 }
 
 static SGProblem appChanges(void) {
     return @[@"Installed without Vitrine's app changes",
-             @"The redesign needs changes to the app that only Vitrine's IPA build makes, so the tab bar stays Spotify's own, the Live Activity is missing, and iOS does not list Spotify for Music Haptics, which stops vibrations in the background. Build the IPA with Vitrine instead of injecting its .deb."];
+             [NSString stringWithFormat:@"Some of what Vitrine does needs changes to the app that only its IPA build makes. Without them, %@. Build the IPA with Vitrine instead of injecting its .deb.",
+                 joined(missingAppChanges(), @"and")]];
 }
 
 static SGProblem fellBack(void) {
