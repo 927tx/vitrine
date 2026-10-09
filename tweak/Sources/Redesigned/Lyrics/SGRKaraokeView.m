@@ -1725,11 +1725,40 @@ static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
     return texts;
 }
 
-// Whether a song is in a language other than `language`, line by line: one distinct line in five, or two lines in
-// another script (Hangul, kana, Han among English, for K-pop with only a verse in Korean), with the recognizer at
-// least 80% sure of each. A chorus sung eight times weighs as one line. The whole song's guess is not asked: short
-// lines sway it (it reads Havana, all "ooh na-na", as Dutch), and an unsure line counts neither way. A song with no
-// line it is sure of counts as foreign, too little to tell.
+// Letters outside the target's script, read from the characters: past Latin for a Latin-script language, Latin for
+// any other. A short Korean line or one mixed with English, which the recognizer is not sure of, still counts.
+static NSUInteger otherScriptLetters(NSString *text, BOOL latinTarget) {
+    __block NSUInteger count = 0;
+    [text enumerateSubstringsInRange:NSMakeRange(0, text.length) options:NSStringEnumerationByComposedCharacterSequences
+                          usingBlock:^(NSString *character, NSRange range, NSRange enclosing, BOOL *stop) {
+        UTF32Char c = 0;
+        if (![character getBytes:&c maxLength:sizeof(c) usedLength:NULL encoding:NSUTF32LittleEndianStringEncoding options:0
+                           range:NSMakeRange(0, character.length) remainingRange:NULL]) return;
+        if (![NSCharacterSet.letterCharacterSet longCharacterIsMember:c]) return;
+        BOOL latin = c < 0x250 || (c >= 0x1E00 && c < 0x1F00);
+        if (latin != latinTarget) count++;
+    }];
+    return count;
+}
+
+// Words spelled the way Korean is in Latin letters, with "eo" or "eu" (neol, geureon, eotteoke). Spicy Lyrics'
+// community syncs give some K-pop this way. Of twenty English songs checked, no line had two such words.
+static NSUInteger romanizedKoreanWords(NSString *text) {
+    NSUInteger count = 0;
+    for (NSString *word in [text componentsSeparatedByCharactersInSet:NSCharacterSet.letterCharacterSet.invertedSet]) {
+        if ([word containsString:@"eo"] || [word containsString:@"eu"]) count++;
+    }
+    return count;
+}
+
+// Whether a song is in a language other than `language`, line by line: one distinct line in five that the recognizer
+// is at least 80% sure is another language, or two lines in another script (Hangul, kana, Han among English, for
+// K-pop with only a verse in Korean). A line with two letters of another script counts however unsure the
+// recognizer is: NewJeans' "New Jeans" has six such lines, all short or mixed with English. So does a line of Korean
+// in Latin letters (romanizedKoreanWords). A chorus sung eight
+// times weighs as one line. The whole song's guess is not asked: short lines sway it (it reads Havana, all "ooh
+// na-na", as Dutch), and an unsure line counts neither way. A song with no line it is sure of counts as foreign,
+// too little to tell.
 static BOOL inAnotherLanguage(NSArray<SGKaraokeLine *> *lines, NSString *language) {
     NSString *(^code)(NSString *) = ^NSString *(NSString *tag) {
         return [tag componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"-_"]].firstObject.lowercaseString;
@@ -1744,15 +1773,20 @@ static BOOL inAnotherLanguage(NSArray<SGKaraokeLine *> *lines, NSString *languag
         if (!text.length || [seen containsObject:text]) continue;
         [seen addObject:text];
         distinct++;
+        BOOL lettersOther = otherScriptLetters(text, [targetScript isEqualToString:@"Latn"]) >= 2;
+        if (lettersOther) otherScript++;
         [recognizer reset];
         [recognizer processString:text];
         NSDictionary<NLLanguage, NSNumber *> *guess = [recognizer languageHypothesesWithMaximum:1];
         NLLanguage found = guess.allKeys.firstObject;
-        if (!found || guess[found].doubleValue < 0.8) continue;
+        BOOL confident = found && guess[found].doubleValue >= 0.8, inTarget = confident && [code(found) isEqualToString:target];
+        // A line sure to be in the target language does not count as romanized Korean, so French "peu" and "heure" stay.
+        if (!lettersOther && !inTarget && romanizedKoreanWords(text) >= 2) otherScript++;
+        if (!confident) continue;
         sure++;
-        if ([code(found) isEqualToString:target]) continue;
+        if (inTarget) continue;
         foreign++;
-        if (![[NSOrthography defaultOrthographyForLanguage:found].dominantScript isEqualToString:targetScript]) otherScript++;
+        if (!lettersOther && ![[NSOrthography defaultOrthographyForLanguage:found].dominantScript isEqualToString:targetScript]) otherScript++;
     }
     return !sure || foreign * 5 >= MAX(distinct, 5) || otherScript >= 2;
 }
