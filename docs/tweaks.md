@@ -93,7 +93,8 @@ Shared:
     ArtistBlock/  tracks by blocked artists skipped as they start (ArtistSkip.x), the list and the Blocked artists page under Player
     Flags/        Spotify's remote-config flags: the provider hook, the generated table, the All flags page and the Labs page;
                   the provider pins 9.1.88's ios-reprise-liquid-glass-override.mode to default in both looks (after an All flags
-                  override) and logs the server's own value once, as a force_disabled would take the glass off the redesign
+                  override) and logs the server's own value once, as a force_disabled would take the glass off the redesign.
+                  It also pins 9.1.90's ios-navigationui-tabbar-impl.is_liquid_glass_tab_bar_enabled off in both looks.
     Gestures/     the double tap zones on the player: the grid, what each cell does, the recognizer (each look hooks it on)
     Lyrics/       the lyrics engine for the redesign's Apple Music style lyrics and the lock screen: lines read from
                   color-lyrics and the player's clock (KaraokeSource.x), words timed by estimate inside Spotify's line
@@ -574,7 +575,7 @@ App:
                    that came over from upstream is left out, so a build without its own has no sheet). The Mod
                    page offers both again. Environment.m says once per install state, a few seconds in, when
                    EeveeSpotify is injected too (a dyld image named so, or its settings page's Swift class) or Spotify is not the version the mod is
-                   made for (SGSpotifyMadeFor, 9.1.78, or SGSpotifyLikelyWorks, 9.1.88, which ran cleanly in a short test), and when a redesign below iOS 26 did not start, and when the redesign runs without the app
+                   supports (SGSpotifySupportedVersions in Onboarding.h: 9.1.78, which it is made for, and 9.1.88) or likely works on (SGSpotifyLikelyWorksVersions: 9.1.90, which ran cleanly in a short test), and when a redesign below iOS 26 did not start, and when the redesign runs without the app
                    changes the IPA build makes (UIDesignRequiresCompatibility, as with a .deb injected by hand); all but
                    the third stay as red rows at the top of Mod Settings. What Chroma left in Spotify's storage when Vitrine
                    replaced it (its Karaoke model and saved lock screen videos, never its listening history or audio

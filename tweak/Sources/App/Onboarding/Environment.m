@@ -26,7 +26,8 @@ NSString *SGSpotifyVersion(void) {
 // says nothing, rather than "Spotify unknown".
 static BOOL otherVersion(void) {
     NSString *version = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
-    return [version isKindOfClass:NSString.class] && ![version isEqualToString:SGSpotifyMadeFor] && ![version isEqualToString:SGSpotifyLikelyWorks];
+    return [version isKindOfClass:NSString.class] && ![SGSpotifySupportedVersions containsObject:version]
+        && ![SGSpotifyLikelyWorksVersions containsObject:version];
 }
 
 static SGProblem eevee(void) {
@@ -34,10 +35,21 @@ static SGProblem eevee(void) {
              @"Vitrine already blocks ads and brings lyrics, and EeveeSpotify hooks the same parts of Spotify. With both, Spotify can freeze as it starts or show the wrong lyrics. Sign Spotify again without EeveeSpotify."];
 }
 
+// "a", "a and b", "a, b and c", with `word` for the last join.
+static NSString *joined(NSArray<NSString *> *items, NSString *word) {
+    if (items.count < 2) return items.firstObject ?: @"";
+    NSString *head = [[items subarrayWithRange:NSMakeRange(0, items.count - 1)] componentsJoinedByString:@", "];
+    return [NSString stringWithFormat:@"%@ %@ %@", head, word, items.lastObject];
+}
+
 static SGProblem version(void) {
+    NSArray<NSString *> *likely = SGSpotifyLikelyWorksVersions;
+    NSString *also = !likely.count ? @""
+        : [NSString stringWithFormat:@", and %@ likely %@ too", joined(likely, @"and"), likely.count == 1 ? @"works" : @"work"];
     return @[[NSString stringWithFormat:@"Spotify %@ is not the version Vitrine is made for", SGSpotifyVersion()],
-             [NSString stringWithFormat:@"Vitrine is made for Spotify %@, and %@ likely works too. On another version some of its changes find nothing to change, and some screens can look wrong or crash. Inject Vitrine into Spotify %@ or %@.",
-                 SGSpotifyMadeFor, SGSpotifyLikelyWorks, SGSpotifyMadeFor, SGSpotifyLikelyWorks]];
+             [NSString stringWithFormat:@"Vitrine is made for Spotify %@%@. On another version some of its changes find nothing to change, and some screens can look wrong or crash. Inject Vitrine into Spotify %@.",
+                 joined(SGSpotifySupportedVersions, @"and"), also,
+                 joined([SGSpotifySupportedVersions arrayByAddingObjectsFromArray:likely], @"or")]];
 }
 
 // Installed without the app changes Vitrine's IPA build makes (scripts/pipeline.sh: plist/liquid-glass.plist and the
@@ -132,7 +144,7 @@ NSArray<SGModRow *> *SGEnvironmentWarningRows(void) {
     if (SGEeveeSpotifyInjected())
         [rows addObject:SGWarningRow(@"EeveeSpotify is injected too", @"Tap for what that does", ^{ tell(@[eevee()]); })];
     if (otherVersion())
-        [rows addObject:SGWarningRow([NSString stringWithFormat:@"Made for Spotify %@", SGSpotifyMadeFor],
+        [rows addObject:SGWarningRow([NSString stringWithFormat:@"Made for Spotify %@", joined(SGSpotifySupportedVersions, @"and")],
                                      [NSString stringWithFormat:@"This is %@. Tap for what that does", SGSpotifyVersion()],
                                      ^{ tell(@[version()]); })];
     if (withoutAppChanges())
