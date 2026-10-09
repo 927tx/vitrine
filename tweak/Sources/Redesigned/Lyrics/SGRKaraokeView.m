@@ -1963,21 +1963,22 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
         SGLyricsSaveTranslation(track, language, lines);
     }, ^(NSArray<NSString *> *translations, NSString *error) {
         if (self->_translating == lines) self->_translating = nil;
-        if (!translations) {
-            [self offerExtras];
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"No translation" message:error
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
+        // Translations can come with a note, which names the lines left out. Those lines stay untranslated, and
+        // asking again sends only them.
+        if (translations) {
+            [self takeTranslations:translations into:lines];
+            SGLyricsSaveTranslation(track, language, lines);
+            if (lines == self->_lines) self->_untranslated = anyUntranslated(lines);
+        }
+        [self offerExtras];
+        if (error) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:translations ? @"Partly translated" : @"No translation"
+                                                                           message:error preferredStyle:UIAlertControllerStyleAlert];
             // Over the player, which is dark whatever the system's appearance.
             alert.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
             [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
             [SGTopController() presentViewController:alert animated:YES completion:nil];
-            return;
         }
-        [self takeTranslations:translations into:lines];
-        SGLyricsSaveTranslation(track, language, lines);
-        // A batch Apple Intelligence turned down stays untranslated, and asking again sends only its lines.
-        if (lines == self->_lines) self->_untranslated = anyUntranslated(lines);
-        [self offerExtras];
     });
 }
 
