@@ -80,7 +80,14 @@ Shared:
     AdBlock/      EeveeSpotify's ad blocking: the ad and upsell services silenced (AdServices.x), ad components out of the
                   Hub JSON (AdHubs.x) and the feeds (Feeds.m), Premium pop-ups dropped (AdPopups.x), and the responses
                   rewritten on the way in (AdNetwork.x, Premium.m over the protobuf walker in Protobuf.m), with crossfade
-                  and automix switched on in the player core and crossfade's switch kept in step with its slider (Crossfade.x)
+                  and automix switched on in the player core and crossfade's switch kept in step with its slider (Crossfade.x).
+                  With Spoof Premium on, RadioModes.m enables shuffle and repeat for radio/autoplay in either look:
+                  only restrictions made entirely of radio, endless_context and autoplay are allowed.
+                  Raw reason sets remain intact when Spotify copies its state. Positive radio evidence survives
+                  empty optimistic updates only for the same playbackId/contextURI; explicit non-radio reasons revoke it. The matching
+                  command's ESP request gets overrideRestrictions before the core receives it; other restrictions
+                  and commands stay as Spotify supplied them. The hooks install together only when the expected
+                  runtime signatures match. Checked by harness/radio-modes/; its README records device evidence.
     Privacy/      telemetry blocking and its counters, and the tracking taken off shared open.spotify.com links
                   (CleanLinks.x over the cleaner in CleanLinks.m)
     ArtistBlock/  tracks by blocked artists skipped as they start (ArtistSkip.x), the list and the Blocked artists page under Player
