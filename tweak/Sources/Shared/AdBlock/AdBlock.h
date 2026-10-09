@@ -17,8 +17,9 @@
 // What a switch turning Spoof Premium on is told first.
 extern NSString *const SGFakePremiumWarning;
 
-// A flag the ads or upsells switch forces off while it is on. Flags.x asks, and the row for it locks.
-BOOL SGAdBlockForcesFlagOff(NSString *key);
+// The value the ads or upsells switch forces a flag to while it is on, or nil. Flags.x asks, and the row for
+// it locks.
+NSNumber *SGAdBlockForcedFlag(NSString *key);
 
 // What the hooks stopped, by kind, for the counts under the switches (nil label for all of them).
 void SGAdBlockCountOne(NSString *label);
