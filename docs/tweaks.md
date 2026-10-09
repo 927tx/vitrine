@@ -474,8 +474,9 @@ Redesigned:
                   and a close with no pick dismisses the hidden sheet. Checked in the simulator against
                   harness/system-menu/
     Player/       the redesigned full screen player (Player.h lists its files); its more button opens the system
-                  menu (ContextMenu/), Spotify's rows and then Playback Speed, Pitch (with Pitch follows speed),
-                  Reverb and the backgrounds it can switch to (PlayerMenu.m), and a hold on either side of the
+                  menu (ContextMenu/), Spotify's rows and then Speed, Pitch & Reverb, which opens the sliders and
+                  Pitch follows speed in a popover from the ⋯ (SpeedPitchMenu.x), and the backgrounds it can switch
+                  to (PlayerMenu.m), and a hold on either side of the
                   cover plays at 2x until the finger lifts (PlayerArtwork.x), an octave higher while Pitch follows
                   speed is on. A Free account gets it too: Spotify's Reinvented Free player mode, whose units none of
                   the hooks reach, declines while the redesign runs, so the track falls to Spotify's other Free mode,
