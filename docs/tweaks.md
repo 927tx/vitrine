@@ -686,7 +686,8 @@ from gone through as sung to the vocals alone, with Sing along, Original and Voc
 (where the iPhone reads headphone motion; a page of its own, reading out On or Off, with a live preview at its top that
 follows the head through AirPods, or sways gently without them and holds still under Reduce Motion, a line under it
 saying which, then the switch; its row is on the main page too, under Karaoke's), the voice model's download (Paused and
-Checking among its states) and its removal, Ignore heat warnings, and under Advanced Runs on (Automatic: the Neural Engine
+Checking among its states) and its removal, Toggle from lyrics (the redesign's mic, on until switched off, issue #12),
+Ignore heat warnings, and under Advanced Runs on (Automatic: the Neural Engine
 beside the CPU; CPU only) and Prepare after updates, all applying straight away. Lock screen, on the main
 page under either look, opens the lock screen widget's page, titled Lock screen (Moving artwork, Lyrics or Every song, and the lyrics' style,
 Still or Animated, and Spotify's like and dislike buttons' flag; its podcast, audiobook and artwork flags stay in

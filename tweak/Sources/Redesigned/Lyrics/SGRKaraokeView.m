@@ -14,6 +14,7 @@
 #import "LyricsLook.h"
 #import "MeaningSheet.h"
 #import "SGRSingButton.h"
+#import "Shared/Sing/Sing.h"
 #import "Shared/LyricsSources/LyricsSources.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Settings/SGPageStyle.h"
@@ -1352,7 +1353,9 @@ typedef struct {
     for (NSNotificationName name in @[UIContentSizeCategoryDidChangeNotification, UIAccessibilityDarkerSystemColorsStatusDidChangeNotification])
         [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(creditStyleChanged) name:name object:nil];
     _sing = [SGRSingButton new];
+    _sing.hidden = !SGEnabled(SGKeySingButton);
     [self addSubview:_sing];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(singButtonChanged) name:SGSingButtonDidChangeNotification object:nil];
     [self addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)]];
     [self addGestureRecognizer:[[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(held:)]];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionNotification object:nil];
@@ -1366,6 +1369,11 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationDidBecomeActiveNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationWillResignActiveNotification object:nil];
     return self;
+}
+
+// Karaoke's settings switched the mic off or on: hidden at once, Karaoke itself as it was.
+- (void)singButtonChanged {
+    _sing.hidden = !SGEnabled(SGKeySingButton);
 }
 
 - (void)refreshCreditStyle {
