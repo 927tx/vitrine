@@ -292,6 +292,7 @@ static void fillRoom(UIView *tilt) {
     if (!cover) return;
     [sg_tilts addObject:tilt];
     watchHold(tilt);
+    SGRPlayerMotionCoverLaidOut();
     // The cover fills the tilt view (01.txt:37); bounds and center, unlike a frame, hold under the scale.
     CGRect bounds = tilt.bounds;
     CGPoint middle = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));

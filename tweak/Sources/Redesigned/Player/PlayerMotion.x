@@ -447,6 +447,12 @@ void SGRPlayerMotionFieldLaidOut(void) {
     setCoverShown(sg_motion == nil, NO);
 }
 
+// A clip that came in before the player opened finds no cover to hide at the field's first pass, the covers
+// laying out after it (issue #19: the cover over the clip after a relaunch), so each cover's layout asks too.
+void SGRPlayerMotionCoverLaidOut(void) {
+    setCoverShown(sg_motion == nil, NO);
+}
+
 BOOL SGRPlayerMotionShowing(void) {
     return sg_motion != nil;
 }
