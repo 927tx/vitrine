@@ -38,11 +38,11 @@ static const CGFloat kUnderlineDrop = 1, kUnderlineWidth = 2, kUnderlineAlpha = 
 // The line naming the source, under the lyrics, which fade out above it and the buttons beside it. It
 // wraps onto a second line rather than run under the buttons beside it, and a tap this far around it
 // opens the pages it links to.
-static const CGFloat kCreditSize = 12, kCreditBottom = 10, kCreditSlop = 8;
+static const CGFloat kCreditSize = 12, kCreditGap = 12, kCreditSlop = 8;
 // The button for the pronunciation and the translation, in the bottom leading corner as Apple Music
 // has it, and the gap between it and the credit beside it. The translate glyph is half again as wide as the
 // mic's across from it, so it is drawn smaller to weigh the same: 14 pt is about the mic's 17 pt in area.
-static const CGFloat kExtrasSide = 44, kExtrasBottom = 12, kExtrasGlyph = 14, kExtrasCreditGap = 12;
+static const CGFloat kExtrasSide = 44, kExtrasBottom = 12, kExtrasGlyph = 14;
 static char kExtrasGlassKey;
 static const NSTimeInterval kRestyleFade = 0.3;   // the lines crossfading to a new style
 static const NSTimeInterval kBrowseHold = 3;   // after scrolling by hand, how long until it follows the song again
@@ -666,13 +666,15 @@ static SGRKaraokeLayout *layOut(SGKaraokeLine *line, CGFloat width, SGRKaraokeSt
 // Where each line starts in the stack, from the heights alone. Measuring text is safe off the main
 // thread, and a song's worth of it is kept off it: the first card of a track lays out while the
 // player is opening, and a frame that measured every line then was a frame the animation lost.
+// Where each line starts in the stack, and one more: where the stack ends, which the credit follows.
 static NSArray<NSNumber *> *topsOf(NSArray<SGKaraokeLine *> *lines, CGFloat width, SGRKaraokeStyle *style, CGFloat gap) {
-    NSMutableArray<NSNumber *> *tops = [NSMutableArray arrayWithCapacity:lines.count];
+    NSMutableArray<NSNumber *> *tops = [NSMutableArray arrayWithCapacity:lines.count + 1];
     CGFloat top = 0;
     for (SGKaraokeLine *line in lines) {
         [tops addObject:@(top)];
         top += layOut(line, width, style, -1).height + gap;
     }
+    [tops addObject:@(top)];
     return tops;
 }
 
@@ -1262,6 +1264,7 @@ typedef struct {
     NSArray<SGKaraokeLine *> *_lines;
     // The song is placed from its lines' heights alone; views exist for the lines in and near sight.
     NSArray<NSNumber *> *_tops;   // where each line starts in the stack
+    CGFloat _stackEnd;            // where the last line's gap ends: the credit's place
     NSMutableDictionary<NSNumber *, SGRKaraokeLineView *> *_shown;   // the views there are, by line
     CGFloat _focusTop;            // the top of the line the stack is arranged around
     CGFloat _sightOffset, _sightFocus;   // what the views in sight were last chosen for
@@ -1342,7 +1345,7 @@ typedef struct {
     _credit.numberOfLines = 2;
     _crediting = SGFlag(SGKeyLyricsCredit, NO);
     _sweepsEstimates = SGFlag(SGKeyLyricsSimulateWords, NO);
-    [self addSubview:_credit];
+    [_scroll addSubview:_credit];
     __weak SGRKaraokeView *weakSelf = self;
     _credit.activate = ^BOOL {
         SGRKaraokeView *page = weakSelf;
@@ -1447,7 +1450,7 @@ typedef struct {
     if (_sing.userInteractionEnabled && [_sing pointInside:[tap locationInView:_sing] withEvent:nil]) return;
     if (_creditLinks.count && !_credit.hidden
         && CGRectContainsPoint(CGRectInset(_credit.frame, -kCreditSlop, -MAX(kCreditSlop, (44 - _credit.frame.size.height) / 2)),
-                               [tap locationInView:self])) {
+                               [tap locationInView:_scroll])) {
         SGLyricsOpenCreditLinks(_creditLinks, _credit);
         return;
     }
@@ -1644,19 +1647,9 @@ typedef struct {
     [self alignFade];
     _scroll.contentSize = self.bounds.size;
     _sing.frame = CGRectMake(self.bounds.size.width - _margin - kExtrasSide, self.bounds.size.height - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
-    BOOL extras = _extrasBox && !_extrasBox.hidden;
-    // Between the pronunciation button and the mic, wrapping to fit.
-    CGFloat left = extras ? _margin + kExtrasSide + kExtrasCreditGap : _margin;
-    CGFloat right = _sing ? CGRectGetMinX(_sing.frame) - kExtrasCreditGap : self.bounds.size.width - _margin;
-    CGFloat room = MAX(right - left, 0);
-    CGSize credit = [_credit sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)];
-    credit.width = MIN(ceil(credit.width), room);
-    credit.height = ceil(credit.height);
-    _credit.frame = CGRectMake(left, self.bounds.size.height - credit.height - kCreditBottom, credit.width, credit.height);
-    if (extras) {
+    if (_extrasBox && !_extrasBox.hidden) {
         _extrasBox.frame = CGRectMake(_margin, self.bounds.size.height - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
         SGRShowGlass(SGRGlassInside(_extrasBox, &kExtrasGlassKey, kExtrasSide), !_extrasHidden);
-        _credit.center = CGPointMake(_credit.center.x, _extrasBox.center.y);
     }
     [self clearBottomRow];
     if (_lines && self.bounds.size.width != _builtWidth) {
@@ -1671,13 +1664,13 @@ typedef struct {
     _placedHeight = self.bounds.size.height;
 }
 
-// The lines fade out above the bottom row (the credit, the mic and the extras button) and stay clear under
+// The lines fade out above the bottom row (the mic and the extras button) and stay clear under
 // it, so none is read through the credit; with nothing there they fade out at the bottom edge.
 - (void)clearBottomRow {
     CGFloat height = self.bounds.size.height;
     if (height <= 0) return;
     CGFloat floor = height;
-    for (UIView *view in @[_credit ?: NSNull.null, _sing ?: NSNull.null, _extrasBox ?: NSNull.null]) {
+    for (UIView *view in @[_sing ?: NSNull.null, _extrasBox ?: NSNull.null]) {
         if ([view isKindOfClass:UIView.class] && !view.hidden && view.superview) floor = MIN(floor, CGRectGetMinY(view.frame) - 8);
     }
     CGFloat clear = MAX(0, MIN(1, (height - floor) / height));
@@ -1852,7 +1845,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
         NSArray<NSNumber *> *tops = topsOf(lines, width, style, gap);
         dispatch_async(dispatch_get_main_queue(), ^{
             if (build != self->_build) return;   // the song or the width moved on meanwhile
-            self->_tops = tops;
+            [self takeTops:tops];
             [self placeLinesAnimated:NO];
         });
     });
@@ -1890,6 +1883,12 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     });
 }
 
+// topsOf's answer: the lines' tops, and the stack's end apart from them.
+- (void)takeTops:(NSArray<NSNumber *> *)tops {
+    _stackEnd = tops.lastObject.doubleValue;
+    _tops = tops.count ? [tops subarrayWithRange:NSMakeRange(0, tops.count - 1)] : tops;
+}
+
 - (void)showStyle:(SGRKaraokeStyle *)style tops:(NSArray<NSNumber *> *)tops {
     CATransition *fade = [CATransition animation];
     fade.type = kCATransitionFade;
@@ -1898,7 +1897,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     for (UIView *view in _shown.allValues) [view removeFromSuperview];
     [_shown removeAllObjects];
     _style = style;
-    _tops = tops;
+    [self takeTops:tops];
     _sightArrangement = NSUIntegerMax;
     [self placeLinesAnimated:NO];
     [self showLinesInSight];   // placing stands still while the page is scrolled by hand; the views do not
@@ -2201,9 +2200,30 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     [self showLinesInSight];
     for (NSNumber *key in _shown) [self placeLine:_shown[key] at:key.integerValue animated:animated];
     [self placeBreak];
+    [self placeCreditAnimated:animated];
     // Room to scroll until the first line or the last one reaches the anchor.
     CGFloat lastTop = _tops.lastObject.doubleValue + (_openBreak >= 0 ? [self breakRoom] : 0);
     _scroll.contentInset = UIEdgeInsetsMake(_focusTop, 0, MAX(0, lastTop - _focusTop), 0);
+}
+
+// The credit, under the last line as Spotify's and Apple Music's are: it moves with the stack, so it is seen at the
+// song's end or scrolled to, rather than over every line.
+- (void)placeCreditAnimated:(BOOL)animated {
+    if (!_tops.count || !_credit.text.length) return;
+    CGFloat anchor = _browsing ? _browseAnchor : self.bounds.size.height * kAnchor;
+    NSInteger openBreak = _browsing ? _browseBreak : _openBreak;
+    CGFloat width = MAX(self.bounds.size.width - 2 * _margin, 0);
+    CGSize size = [_credit sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
+    CGFloat top = anchor + _stackEnd - _focusTop + (openBreak >= 0 ? [self breakRoom] : 0) + kCreditGap;
+    CGRect frame = CGRectMake(_margin, top, MIN(ceil(size.width), width), ceil(size.height));
+    if (CGRectEqualToRect(_credit.frame, frame)) return;
+    if (!animated || _credit.hidden) {
+        _credit.frame = frame;
+        return;
+    }
+    [UIView animateWithDuration:0.7 delay:0.3 usingSpringWithDamping:0.86 initialSpringVelocity:0
+                        options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
+                     animations:^{ self->_credit.frame = frame; } completion:nil];
 }
 
 // The dots, at the anchor for as long as a break is open, against the edge the line after it is on.
@@ -2240,7 +2260,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     if (text == _credit.text || [text isEqualToString:_credit.text]) return;
     _credit.text = text;
     _credit.hidden = !_showing || !text.length;
-    [self setNeedsLayout];
+    [self placeCreditAnimated:NO];
 }
 
 - (NSArray *)accessibilityElements {

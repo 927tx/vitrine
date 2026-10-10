@@ -24,7 +24,7 @@ SGModSection *SGLyricsSourcesSection(BOOL namingSource) {
         SGOptionRow(@"Lyrics for every track", @"Even where Spotify has none", SGKeyLyricsAllTracks), SGSpicyLyricsKeyRow(), nil];
     // Spicy Lyrics' terms ask for its credit wherever its lines show (Shared/LyricsSources/SpicyLyrics.m), so the switch
     // says so, or its credit under the lyrics reads as the switch not working (issue #20).
-    if (namingSource) [rows addObject:SGOptionRow(@"Show source", @"Spicy Lyrics is always credited: its terms ask for it", SGKeyLyricsCredit)];
+    if (namingSource) [rows addObject:SGOptionRow(@"Show source", @"Spicy Lyrics is always credited after the last line: its terms ask for it", SGKeyLyricsCredit)];
     if (SGEeveeLyricsOn()) {
         [rows addObject:SGOptionRow(@"Use these sources anyway", @"Only if EeveeSpotify's lyrics are really off", SGKeyLyricsBesideEevee)];
         return SGNotedSection(@"Sources", rows, @"EeveeSpotify's lyrics are on, so it answers Spotify's lyrics and these sources stay "
