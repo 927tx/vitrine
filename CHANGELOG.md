@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.0-beta.10](https://github.com/My-Name-Is-Jeff/vitrine/compare/v1.0.0-beta.9...v1.0.0-beta.10) (2026-10-10)
+
+
+### Features
+
+* Spatial voice has Distance, Room, Back in front and Instruments width ([f2330a0](https://github.com/My-Name-Is-Jeff/vitrine/commit/f2330a0a2d2b549e104c1c0444f89881ffec6cdd))
+* the lyrics credit comes after the last line ([f4e0a1c](https://github.com/My-Name-Is-Jeff/vitrine/commit/f4e0a1c9bcc9cf45fa4ea6c827c9b443adc1ec71))
+
+
+### Fixes
+
+* a wider chosen font no longer breaks words mid-line ([0a395e6](https://github.com/My-Name-Is-Jeff/vitrine/commit/0a395e6276b60f7002add1ed7af3f9620b6ccbea)), closes [#14](https://github.com/My-Name-Is-Jeff/vitrine/issues/14)
+* Hide ads blocks the ad requests that Spotify's core sends ([34681b5](https://github.com/My-Name-Is-Jeff/vitrine/commit/34681b548434cc312b4c1ac9b773ef38b277c69d))
+* lyrics and the scrubber stay with the sound at other speeds ([1240ba1](https://github.com/My-Name-Is-Jeff/vitrine/commit/1240ba1f5908e9afcdd3adb9c6833dadd758f5fc))
+* lyrics opened again after a scroll show the line being sung ([72de07e](https://github.com/My-Name-Is-Jeff/vitrine/commit/72de07ee76a0fe96a3802563be601127ab5df6eb))
+* Music Haptics says where it is paused ([3c62384](https://github.com/My-Name-Is-Jeff/vitrine/commit/3c623848a5213045bff3da416d086f26d7bca9df))
+* Show source says that Spicy Lyrics is always credited ([836a378](https://github.com/My-Name-Is-Jeff/vitrine/commit/836a378b5f2afb51d245d041b8d0076d05116aca))
+* the chosen font reaches all of Spotify's text, not just titles ([e9a9181](https://github.com/My-Name-Is-Jeff/vitrine/commit/e9a918119463f058e62e6d23b0ee7a74a3ae8530)), closes [#14](https://github.com/My-Name-Is-Jeff/vitrine/issues/14)
+* the cover no longer covers the animated artwork after a relaunch ([52d602b](https://github.com/My-Name-Is-Jeff/vitrine/commit/52d602b10a750b9172e53a9fdf0dc6d1580440dc)), closes [#19](https://github.com/My-Name-Is-Jeff/vitrine/issues/19)
+* the redesign has no dark band at the bottom on Spotify 9.1.90 ([f37c4a6](https://github.com/My-Name-Is-Jeff/vitrine/commit/f37c4a6cac13226e97be5307d19f78e10e35a8e6))
+* with Karaoke on, lyrics stay with the sound at other speeds ([19a418c](https://github.com/My-Name-Is-Jeff/vitrine/commit/19a418cf29ee07046da1561f567a27d73ba5e63a))
+
 ## [1.0.0-beta.9](https://github.com/My-Name-Is-Jeff/vitrine/compare/v1.0.0-beta.8...v1.0.0-beta.9) (2026-10-10)
 
 
