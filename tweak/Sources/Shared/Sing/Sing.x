@@ -75,6 +75,44 @@
 #import "SGSingLoader.h"
 #import "SGSingSeparator.h"
 
+#if SG_DRIVER
+// Test builds only: a stand-in for the voice model that hands every window back as all vocals, as harness/sing's does,
+// with no model and no heat. The engine reads ahead and builds its lead as it would, and Spatial voice places the
+// whole song, so the clock, the lead and the placing can be checked on a phone too hot for the model.
+// pref --key spotifyglass.sing.devStandIn --value 1, then a relaunch.
+@interface SGSingWholeSeparator : SGSingSeparator
+@end
+
+@implementation SGSingWholeSeparator
+- (BOOL)separateLeft:(const float *)left right:(const float *)right vocalsLeft:(float *)vocalsLeft vocalsRight:(float *)vocalsRight error:(NSError **)error {
+    memcpy(vocalsLeft, left, kSGSingWindowFrames * sizeof(float));
+    memcpy(vocalsRight, right, kSGSingWindowFrames * sizeof(float));
+    return YES;
+}
+@end
+
+static SGSingSeparator *standIn(void) {
+    static SGSingSeparator *separator;
+    static BOOL on;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        on = SGFlag(@"spotifyglass.sing.devStandIn", NO);
+        if (on) separator = [[SGSingWholeSeparator alloc] initWithModel:nil];
+        if (on) SGLog(@"sing: STAND-IN: every window is all vocals, no model and no heat hold");
+    });
+    return separator;
+}
+#else
+static SGSingSeparator *standIn(void) {
+    return nil;
+}
+#endif
+
+// The separator the engine runs: the loader's, or a test build's stand-in.
+static SGSingSeparator *separatorNow(void) {
+    return standIn() ?: SGSingLoaderSeparator();
+}
+
 // The vocals' level until one is chosen: down to a guide.
 static const float kDefaultLevel = 0.15f;
 // How often what Sing is doing is read while the mic is on.
@@ -276,7 +314,7 @@ static void holdBudget(SGSingEngine *engine) {
 // alone from then on).
 static void loaderChanged(void) {
     SGSingEngine *engine = atomic_load(&sg_engine);
-    if (engine) SGSingEngineSetSeparator(engine, SGSingLoaderSeparator());
+    if (engine) SGSingEngineSetSeparator(engine, separatorNow());
     switch (SGSingLoaderFastState()) {
         case SGSingFastReady: [NSUserDefaults.standardUserDefaults setObject:neuralCompiled() forKey:kNeuralReadyOn]; break;
         case SGSingFastFailed: neuralFailed(@"did not load"); break;
@@ -425,7 +463,7 @@ static CFAbsoluteTime sg_linesReadAt;
 static BOOL sg_resting;
 
 static BOOL restful(void) {
-    BOOL held = sg_hot && !SGHidden(SGKeySingIgnoreHeat);
+    BOOL held = sg_hot && !SGHidden(SGKeySingIgnoreHeat) && !standIn();
     return SGSingOn() && !SGSingMissing() && !held && !sg_stopped && !sg_refused && fabsf(SGSingLevel() - 1) <= 0.001f && !SGSingSpatial()
            && CFAbsoluteTimeGetCurrent() - sg_linesReadAt > kLinesGoneAfter;
 }
@@ -443,7 +481,7 @@ static void apply(void) {
         applySpatialSound(engine);
         atomic_store_explicit(&sg_engine, engine, memory_order_release);
     }
-    BOOL held = sg_hot && !SGHidden(SGKeySingIgnoreHeat);
+    BOOL held = sg_hot && !SGHidden(SGKeySingIgnoreHeat) && !standIn();
     // Off, the model is kept a minute for a quick off and on. Held for the heat, it is let go at once, which frees
     // its memory and stops its work; it loads again once the iPhone cools.
     // ponytail: a phone flickering about Serious loads and drops the model each time; add a cooling-off delay if logs show it.
@@ -461,9 +499,9 @@ static void apply(void) {
     else if (!on) SGSingLoaderRelease();
     else if (held) SGSingLoaderPurge(@"the iPhone is too hot (thermal state serious or above)");
     else if (rest) { if (toRest) SGSingLoaderRelease(); }
-    else if (sg_active) wantModel();
+    else if (sg_active && !standIn()) wantModel();
     if (!engine) return;
-    SGSingEngineSetSeparator(engine, SGSingLoaderSeparator());
+    SGSingEngineSetSeparator(engine, separatorNow());
     holdBudget(engine);
     SGSingEngineSetPaused(engine, held || rest || sg_interrupted);
     SGSingEngineSetOn(engine, on);
@@ -571,8 +609,8 @@ SGSingState SGSingCurrentState(void) {
     // Resting, ready for the level to move, whether the model is still kept or not.
     if (sg_resting) return SGSingStateWaiting;
     // Interrupted: held, nothing plays, nothing is behind.
-    if (sg_interrupted && SGSingLoaderSeparator()) return SGSingStateWaiting;
-    if (!SGSingLoaderSeparator()) return SGSingStatePreparing;
+    if (sg_interrupted && separatorNow()) return SGSingStateWaiting;
+    if (!separatorNow()) return SGSingStatePreparing;
     // Spotify plays and Speed and pitch never took its output over: the stage, and so Sing, never runs.
     if (!atomic_load(&sg_staged) && atomic_load(&sg_outputStarted) && !SGPlayerSpeedAllowed()) return SGSingStateFailed;
     if (!sg_outputReachable || (atomic_load(&sg_staged) && atomic_load(&sg_formatRefused) && !atomic_load(&sg_formatTaken))) return SGSingStateFailed;
