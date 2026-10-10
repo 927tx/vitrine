@@ -101,6 +101,7 @@ static NSData *blockedReply(NSString *path) {
 static NSData *patched(NSURL *url, NSData *body) {
     NSString *path = url.path.lowercaseString ?: @"";
     if (isFeed(path)) return SGStripFeed(body);
+    SGAdBlockSawOne(@"Config rewrites");
     NSData *result = isBootstrap(path) ? SGPatchBootstrap(body) : SGPatchCustomize(body);
     if (!result) {
         SGLog(@"could not rewrite %@, passed through", path);
@@ -160,6 +161,7 @@ static void complete(id<NSURLSessionDataDelegate> delegate, NSURLSession *sessio
         finish(nil);
         return;
     }
+    SGAdBlockSawOne(@"Requests");
     switch (classify(url)) {
         case SGNetBlock:
             SGAdBlockCountOne(@"Requests");
@@ -228,6 +230,7 @@ static void complete(id<NSURLSessionDataDelegate> delegate, NSURLSession *sessio
     BOOL spotify = has(host, @"spotify") || has(host, @"spclient");
     if (spotify && elapsed() > 30 && (has(path, @"deletetoken") || has(path, @"signup/public") || has(path, @"pses/screenconfig")
                                       || isCustomize(path) || has(host, @"apresolve"))) {
+        SGAdBlockSawOne(@"Requests");
         SGAdBlockCountOne(@"Requests");
         SGLog(@"canceled %@%@ before it left", host, path);
         [self cancel];

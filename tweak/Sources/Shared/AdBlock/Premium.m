@@ -364,9 +364,31 @@ static void setValue(NSMutableArray<SGPBField *> *value, SGPBField *replacement)
     [value addObject:replacement];
 }
 
+// The configuration as the server sent it, one "scope.name = value" a line, in Caches/Vitrine/live-config.txt: what a
+// Free account in this country is told, to set beside a Premium one when ads still play. Names and values only;
+// replaced by each fetch.
+static void keepLiveConfiguration(NSArray<SGPBField *> *fields) {
+    NSMutableString *text = [NSMutableString string];
+    for (SGPBField *field in fields) {
+        NSArray<SGPBField *> *value = field.number == 3 && field.wire == 2 ? SGPBParse(field.payload) : nil;
+        NSArray<SGPBField *> *parts = SGPBFirst(value, 1) ? SGPBParse(SGPBFirst(value, 1).payload) : nil;
+        if (!parts) continue;
+        NSString *shown = @"?";
+        if (SGPBFirst(value, 3)) shown = SGPBFirst(SGPBParse(SGPBFirst(value, 3).payload), 1).varint ? @"true" : @"false";
+        else if (SGPBFirst(value, 4)) shown = @(SGPBFirst(SGPBParse(SGPBFirst(value, 4).payload), 1).varint).stringValue;
+        else if (SGPBFirst(value, 5)) shown = SGPBText(SGPBFirst(SGPBParse(SGPBFirst(value, 5).payload), 1)) ?: @"";
+        [text appendFormat:@"%@.%@ = %@\n", SGPBText(SGPBFirst(parts, 1)) ?: @"", SGPBText(SGPBFirst(parts, 2)) ?: @"", shown];
+    }
+    NSURL *caches = [NSFileManager.defaultManager URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask].firstObject;
+    NSURL *folder = [caches URLByAppendingPathComponent:@"Vitrine" isDirectory:YES];
+    [NSFileManager.defaultManager createDirectoryAtURL:folder withIntermediateDirectories:YES attributes:nil error:nil];
+    [text writeToURL:[folder URLByAppendingPathComponent:@"live-config.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+}
+
 static NSData *patchConfiguration(NSData *configuration) {
     NSMutableArray<SGPBField *> *fields = SGPBParse(configuration);
     if (!fields) return nil;
+    keepLiveConfiguration(fields);
     NSMutableArray<SGPBField *> *out = [NSMutableArray array];
     NSMutableSet<NSString *> *present = [NSMutableSet set];
     for (SGPBField *field in fields) {
