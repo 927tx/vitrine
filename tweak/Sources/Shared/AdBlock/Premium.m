@@ -105,6 +105,10 @@ static const SGRule rules[] = {
     {"ios-feature-settings", "automix_enabled", SGRuleForce, YES, NULL},
     {"core-playback-setup", "crossfade_enabled", SGRuleForce, YES, NULL},
     {"core-automix", "automix_enabled", SGRuleForce, YES, NULL},
+    // The player core's own ad machinery. A Free account's config leaves these out, so the core runs its defaults; a
+    // Premium account's sets both off (compared on 2026-10-09: the other core-ads values are the same for both).
+    {"core-ads", "enable_state_fetch_system", SGRuleForce, NO, NULL},
+    {"core-ad-detection", "use_ad_placements_beta", SGRuleForce, NO, NULL},
     {"ios-feature-settings", "use_playback_settings_crossfade", SGRuleForce, NO, NULL},
     {"ios-feature-settings", "use_playback_settings_gapless", SGRuleForce, NO, NULL},
     {NULL, "enable_common_capping", SGRuleRemove, NO, NULL},
