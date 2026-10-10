@@ -66,6 +66,10 @@ SGDSPReverb *SGDSPReverbCreate(double rate, int preset, float amount);
 void SGDSPReverbSet(SGDSPReverb *reverb, int preset, float amount);
 void SGDSPReverbRun(void *reverb, float *left, float *right, uint32_t frames);
 void SGDSPReverbFree(void *reverb);
+// Wet only, for a send: what comes out is the room alone, none of what went in.
+void SGDSPReverbSetSend(SGDSPReverb *reverb, int preset);
+// Empties the room's tail. Off the render thread, or on it between two runs.
+void SGDSPReverbReset(SGDSPReverb *reverb);
 
 // A script in JSFX's shape: a desc: line and sliderN: defaults, then @init, @slider, @block and @sample
 // sections, spl0 and spl1 the samples, srate the rate. NULL and why, with the file's line, when it does

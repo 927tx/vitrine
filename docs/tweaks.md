@@ -312,9 +312,11 @@ Shared:
                   thermal state Serious up Karaoke is held and lets the model go,
                   unless Ignore heat warnings is on, and runs again at Fair. Spatial
                   voice holds the separated vocals in front as the head turns: HeadGestures' motion gives the yaw off a
-                  front that follows the head over 20 s, and the render thread pans the vocals' middle at equal power,
+                  front that follows the head (Back in front, 5 s unless set), and the render thread pans the vocals' middle at equal power,
                   narrowed, with the far ear up to 0.65 ms late and low-passed; it stands down for iOS's own spatial
-                  audio. The Spatial voice page's preview (SGSpatialPreview.m) turns a disc of dots under the listener by
+                  audio. Its Sound section sets Distance (the voice down by the square root of the distance), Room
+                  (a wet-only AUReverb2 fed the voice's middle, emptied by a seek) and Instruments width (the rest's side
+                  scaled); off, all three leave the song exactly as it was. The Spatial voice page's preview (SGSpatialPreview.m) turns a disc of dots under the listener by
                   the same front (SGSpatialVoiceAngle, SGSingEngine.h), on Core Animation alone and only while the page
                   shows. The mic is on the redesign's lyrics (Redesigned/Lyrics/SGRSingButton.m). Tested on the Mac
                   against harness/sing/ (the lead, its cap, a slow decoder, a track boundary, spatial voice and its front without the model: `build/sing spatial`; the

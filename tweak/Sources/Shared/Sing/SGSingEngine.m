@@ -3,6 +3,7 @@
 #import <stdatomic.h>
 #import "SGSingEngine.h"
 #import "SGSingSeparator.h"
+#import "Shared/AudioEffects/SGDSPEffects.h"
 
 enum {
     kRing = kSGSingRate * 10,        // what the rings hold: the longest lead and a window, with room to spare
@@ -38,6 +39,13 @@ static const float kVoiceWidth = 0.5f;
 static const float kVoiceDelay = 0.00065f * kSGSingRate;
 static const float kVoiceShadow = 0.35f;
 static const float kVoiceGlideSeconds = 0.05f;
+// Distance and Room, with Spatial voice on: the voice is at its own level at kNearest and quieter farther off, by the
+// square root of the distance (gentler than a free field's 1/d, so the far end still sings); the room's share grows from
+// half of Room's at the nearest to all of it at the farthest. The room is AUReverb2's medium room, wet only, fed the
+// voice's middle so its tail stays put as the head turns, and let ring kRoomTailSeconds after the voice stops reaching it.
+static const float kNearest = 1, kFarthest = 6.5f;
+static const int kRoomPreset = 2;
+static const float kRoomTailSeconds = 4;
 
 struct SGSingEngine {
     float *left, *right, *vocalsLeft, *vocalsRight;   // rings, a frame at position p at p % kRing
@@ -61,6 +69,13 @@ struct SGSingEngine {
     struct { double when; uint64_t ahead; } asked[kAsked];
     unsigned askedNext;
     atomic_uint levelBits, targetLead, voiceAngleBits;
+    atomic_bool spatial;                // Spatial voice on: Distance and Room apply
+    atomic_uint distanceBits, roomBits; // meters, and 0 to 1
+    atomic_uint widthBits;              // the instruments' stereo width, 1 as the song has it
+    SGDSPReverb *room;                  // NULL where AUReverb2 is missing (the Mac): no room
+    float *send[2];                     // the room's input and output, kSGDSPEffectMaxFrames each
+    float directGain, sendGain, width;  // the render's, gliding to what Distance, Room and width ask for
+    uint64_t roomTail;                  // frames the room still rings after the voice stops reaching it
     atomic_uint leadCap;          // frames the lead may hold at most, separating or not (SGSingEngineSetLeadCap)
 
     // The render thread's own.
@@ -106,6 +121,9 @@ static void storeFloat(atomic_uint *slot, float value) {
 
 // Starts the rings over where the mixer is now.
 static void startOver(SGSingEngine *engine) {
+    // The room's tail is the old place's: it does not ring on over the new one.
+    if (engine->room) SGDSPReverbReset(engine->room);
+    engine->roomTail = 0;
     uint64_t written = atomic_load_explicit(&engine->written, memory_order_relaxed);
     atomic_fetch_add(&engine->dropped, written - atomic_load_explicit(&engine->played, memory_order_relaxed));
     atomic_store(&engine->played, written);
@@ -251,6 +269,16 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
     float vocalsTo, otherTo;
     gainsFor(loadFloat(&engine->levelBits), &vocalsTo, &otherTo);
     float vocalsStep = (vocalsTo - engine->vocalsGain) / frames, otherStep = (otherTo - engine->otherGain) / frames;
+    float directTo = 1, sendTo = 0, widthTo = 1;
+    if (atomic_load_explicit(&engine->spatial, memory_order_relaxed)) {
+        widthTo = loadFloat(&engine->widthBits);
+        float distance = fmaxf(kNearest, loadFloat(&engine->distanceBits)), room = loadFloat(&engine->roomBits);
+        directTo = sqrtf(kNearest / distance);
+        sendTo = engine->room ? room * (0.5f + 0.5f * (distance - kNearest) / (kFarthest - kNearest)) : 0;
+    }
+    float directStep = (directTo - engine->directGain) / frames, sendStep = (sendTo - engine->sendGain) / frames;
+    float widthStep = (widthTo - engine->width) / frames;
+    bool sending = engine->room && (sendTo > 0 || engine->sendGain > 0 || engine->roomTail > 0);
     float fade = 1.0f / (kFadeSeconds * kSGSingRate), amountTo = on && mixing ? 1 : 0;
 
     // The voice's angle glides the short way round toward the one set, and lands on it; within the buffer
@@ -269,6 +297,10 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
         float x = engine->left[index], y = engine->right[index];
         engine->vocalsGain += vocalsStep;
         engine->otherGain += otherStep;
+        engine->directGain += directStep;
+        engine->sendGain += sendStep;
+        engine->width += widthStep;
+        float voiceSend = 0;
         if (position < ready) {
             engine->amount += fmaxf(-fade, fminf(amountTo - engine->amount, fade));
             float a = engine->amount, otherGain = engine->otherGain - 1;
@@ -286,15 +318,35 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
             } else {
                 engine->shadowLeft = engine->shadowRight = (v + w) * 0.5f;
             }
-            left[i] = fmaxf(-1, fminf(x + a * (engine->vocalsGain * placedLeft - v + otherGain * (x - v)), 1));
-            right[i] = fmaxf(-1, fminf(y + a * (engine->vocalsGain * placedRight - w + otherGain * (y - w)), 1));
+            float voice = engine->vocalsGain * engine->directGain;
+            voiceSend = a * engine->vocalsGain * engine->sendGain * (v + w) * 0.5f;
+            // Instruments width: the rest's side (half its left less its right) scaled, its middle kept.
+            float side = (engine->width - 1) * ((x - v) - (y - w)) * 0.5f * engine->otherGain;
+            left[i] = fmaxf(-1, fminf(x + a * (voice * placedLeft - v + otherGain * (x - v) + side), 1));
+            right[i] = fmaxf(-1, fminf(y + a * (voice * placedRight - w + otherGain * (y - w) - side), 1));
         } else {
             engine->amount = 0;
             left[i] = x;
             right[i] = y;
             dry += working;
         }
+        if (sending) engine->send[0][i % kSGDSPEffectMaxFrames] = voiceSend;
+        // The room's next stretch, once its input is full or the buffer ends: rung through and added.
+        if (sending && ((i + 1) % kSGDSPEffectMaxFrames == 0 || i + 1 == frames)) {
+            UInt32 count = i % kSGDSPEffectMaxFrames + 1, first = i + 1 - count;
+            memcpy(engine->send[1], engine->send[0], count * sizeof(float));
+            SGDSPReverbRun(engine->room, engine->send[0], engine->send[1], count);
+            for (UInt32 j = 0; j < count; j++) {
+                left[first + j] = fmaxf(-1, fminf(left[first + j] + engine->send[0][j], 1));
+                right[first + j] = fmaxf(-1, fminf(right[first + j] + engine->send[1][j], 1));
+            }
+        }
     }
+    if (sending) engine->roomTail = sendTo > 0 || engine->sendGain > 1e-4f ? (uint64_t)(kRoomTailSeconds * kSGSingRate)
+                                                                          : engine->roomTail > frames ? engine->roomTail - frames : 0;
+    engine->directGain = directTo;
+    engine->sendGain = sendTo;
+    engine->width = widthTo;
     engine->vocalsGain = vocalsTo;
     engine->otherGain = otherTo;
     played += frames;
@@ -439,8 +491,20 @@ SGSingEngine *SGSingEngineCreate(void) {
         engine->window[c] = calloc(kSGSingWindowFrames, sizeof(float));
         engine->vocals[c] = calloc(kSGSingWindowFrames, sizeof(float));
     }
-    engine->vocalsGain = engine->otherGain = 1;
+    engine->vocalsGain = engine->otherGain = engine->directGain = engine->width = 1;
+    storeFloat(&engine->widthBits, 1);
     storeFloat(&engine->levelBits, 1);
+    storeFloat(&engine->distanceBits, kNearest);
+    engine->room = SGDSPReverbCreate(kSGSingRate, kRoomPreset, 0);
+    if (engine->room) {
+        SGDSPReverbSetSend(engine->room, kRoomPreset);
+        engine->send[0] = calloc(kSGDSPEffectMaxFrames, sizeof(float));
+        engine->send[1] = calloc(kSGDSPEffectMaxFrames, sizeof(float));
+        if (!engine->send[0] || !engine->send[1]) {
+            SGDSPReverbFree(engine->room);
+            engine->room = NULL;
+        }
+    }
     updateTarget(engine, 1);
     atomic_store(&engine->leadCap, UINT_MAX);
     atomic_store(&engine->alive, true);
@@ -468,6 +532,9 @@ void SGSingEngineDestroy(SGSingEngine *engine) {
     free(engine->right);
     free(engine->vocalsLeft);
     free(engine->vocalsRight);
+    SGDSPReverbFree(engine->room);
+    free(engine->send[0]);
+    free(engine->send[1]);
     free(engine);
 }
 
@@ -509,6 +576,13 @@ bool SGSingEngineSeparating(SGSingEngine *engine) {
 
 void SGSingEngineSetLevel(SGSingEngine *engine, float level) {
     storeFloat(&engine->levelBits, level);
+}
+
+void SGSingEngineSetSpatial(SGSingEngine *engine, bool on, float meters, float room, float width) {
+    storeFloat(&engine->widthBits, isfinite(width) ? fminf(2, fmaxf(0, width)) : 1);
+    storeFloat(&engine->distanceBits, isfinite(meters) ? fminf(kFarthest, fmaxf(kNearest, meters)) : kNearest);
+    storeFloat(&engine->roomBits, isfinite(room) ? fminf(1, fmaxf(0, room)) : 0);
+    atomic_store(&engine->spatial, on);
 }
 
 void SGSingEngineSetVoiceAngle(SGSingEngine *engine, float radians) {

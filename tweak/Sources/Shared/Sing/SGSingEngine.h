@@ -57,9 +57,13 @@ void SGSingEngineSetLevel(SGSingEngine *engine, float level);
 // behind sounds as the front does): 0, where it starts, leaves the vocals exactly as the song has them. The
 // render glides to a new angle over a few tens of milliseconds, so it can be set as often as the head moves.
 void SGSingEngineSetVoiceAngle(SGSingEngine *engine, float radians);
+// Spatial voice's Distance (meters, 1 to 6.5), Room (0 to 1) and Instruments width (0 to 2, 1 as the song has them),
+// which apply while `on`: farther, the voice is quieter and more of it is the room; wider, the rest of the song spreads
+// further to each side. Off, or at 1 m, no room and width 1, the song is as the angle alone leaves it. Any thread.
+void SGSingEngineSetSpatial(SGSingEngine *engine, bool on, float meters, float room, float width);
 
 // Where spatial voice holds the voice, for Sing.x and the Spatial voice page's preview alike: off a front that
-// follows where the head points over 20 s, so the voice drifts back ahead of a head that stays turned and the
+// follows where the head points, 95% of the way there `frontSeconds` after it turned (Back in front, 20 s unless set), so the voice drifts back ahead of a head that stays turned and the
 // attitude's own drift never carries it off. A gap in the motion over 1 s (headphones out and in again), or a
 // front cleared to zero, starts it over where the head points.
 typedef struct {
@@ -68,14 +72,15 @@ typedef struct {
 } SGSpatialFront;
 
 // The voice's angle off the head in radians to its right, from a head motion's yaw and timestamp (seconds).
-static inline double SGSpatialVoiceAngle(SGSpatialFront *f, double yaw, double time) {
+static inline double SGSpatialVoiceAngle(SGSpatialFront *f, double yaw, double time, double frontSeconds) {
     // CoreMotion's yaw turns counterclockwise seen from above, so it grows as the head turns left, and the voice
     // held ahead is then off to the head's right. Not yet heard on AirPods; flip it here.
     const double yawToRight = 1;
-    const double frontSeconds = 20, motionGap = 1;
+    const double motionGap = 1;
     double since = time - f->last;
     if (!f->hasFront || since < 0 || since > motionGap) f->front = yaw;
-    else f->front = remainder(f->front + remainder(yaw - f->front, 2 * M_PI) * (1 - exp(-since / frontSeconds)), 2 * M_PI);
+    // Three time constants: e^-3 of the turn, 5%, is left after frontSeconds.
+    else f->front = remainder(f->front + remainder(yaw - f->front, 2 * M_PI) * (1 - exp(-3 * since / frontSeconds)), 2 * M_PI);
     f->hasFront = true;
     f->last = time;
     return yawToRight * remainder(yaw - f->front, 2 * M_PI);

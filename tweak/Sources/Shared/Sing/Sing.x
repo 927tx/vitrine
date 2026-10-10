@@ -50,8 +50,8 @@
 // comes back; Spotify decides whether it resumes.
 //
 // Spatial voice listens to Shared/HeadGestures' motion (the app's one CMHeadphoneMotionManager) while Sing is
-// on and Spotify plays, and hands the engine the head's yaw off a front that follows where the head points over
-// 20 s, so the voice drifts back ahead of a head that stays turned and the attitude's own drift never carries
+// on and Spotify plays, and hands the engine the head's yaw off a front that follows where the head points (Back in front,
+// 5 s unless set), so the voice drifts back ahead of a head that stays turned and the attitude's own drift never carries
 // it off. With no motion (no such headphones, Motion & Fitness not allowed) the voice stays ahead. iOS's own
 // spatial audio on the route already holds the whole song in place, so spatial voice stands down for it.
 //
@@ -322,6 +322,8 @@ static void prepareAheadSoon(void) {
 static BOOL sg_spatialListening;
 // On HeadGestures' motion queue only.
 static SGSpatialFront sg_front;
+// Back in front, read on the motion queue: stored on the main thread.
+static _Atomic double sg_frontSeconds = 5;
 
 static void headMoved(CMDeviceMotion *motion) {
     SGSingEngine *engine = atomic_load_explicit(&sg_engine, memory_order_acquire);
@@ -330,7 +332,7 @@ static void headMoved(CMDeviceMotion *motion) {
         if (engine) SGSingEngineSetVoiceAngle(engine, 0);
         return;
     }
-    double angle = SGSpatialVoiceAngle(&sg_front, motion.attitude.yaw, motion.timestamp);
+    double angle = SGSpatialVoiceAngle(&sg_front, motion.attitude.yaw, motion.timestamp, sg_frontSeconds);
     if (engine) SGSingEngineSetVoiceAngle(engine, (float)angle);
 }
 
@@ -362,10 +364,48 @@ BOOL SGSingSpatial(void) {
     return SGHidden(SGKeySingSpatial);
 }
 
+static double storedNumber(NSString *key, double fallback, double low, double high) {
+    id value = [NSUserDefaults.standardUserDefaults objectForKey:key];
+    double number = [value isKindOfClass:NSNumber.class] ? [value doubleValue] : fallback;
+    return isfinite(number) ? fmin(high, fmax(low, number)) : fallback;
+}
+
+double SGSingSpatialDistance(void) {
+    return storedNumber(SGKeySingSpatialDistance, 1.5, 1, 6.5);
+}
+
+double SGSingSpatialRoom(void) {
+    return storedNumber(SGKeySingSpatialRoom, 25, 0, 100);
+}
+
+double SGSingSpatialFront(void) {
+    return storedNumber(SGKeySingSpatialFront, 5, 5, 60);
+}
+
+double SGSingSpatialWidth(void) {
+    return storedNumber(SGKeySingSpatialWidth, 110, 0, 200);
+}
+
+// The engine's Distance and Room, on while Spatial voice is.
+static void applySpatialSound(SGSingEngine *engine) {
+    if (engine) SGSingEngineSetSpatial(engine, SGSingSpatial(), SGSingSpatialDistance(), SGSingSpatialRoom() / 100, SGSingSpatialWidth() / 100);
+}
+
+void SGSetSingSpatialSound(double meters, double roomPercent, double frontSeconds, double widthPercent) {
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    [defaults setDouble:meters forKey:SGKeySingSpatialDistance];
+    [defaults setDouble:roomPercent forKey:SGKeySingSpatialRoom];
+    [defaults setDouble:frontSeconds forKey:SGKeySingSpatialFront];
+    [defaults setDouble:widthPercent forKey:SGKeySingSpatialWidth];
+    sg_frontSeconds = SGSingSpatialFront();
+    applySpatialSound(atomic_load(&sg_engine));
+}
+
 static void updateRest(void);
 
 void SGSetSingSpatial(BOOL on) {
     SGSetEnabled(SGKeySingSpatial, on);
+    applySpatialSound(atomic_load(&sg_engine));
     // Asked while the Sing page is in front, rather than with the next song.
     if (on) SGHeadMotionAskPermission();
     updateSpatial();
@@ -400,6 +440,7 @@ static void apply(void) {
             return;
         }
         SGSingEngineSetLevel(engine, SGSingLevel());
+        applySpatialSound(engine);
         atomic_store_explicit(&sg_engine, engine, memory_order_release);
     }
     BOOL held = sg_hot && !SGHidden(SGKeySingIgnoreHeat);
@@ -1166,6 +1207,7 @@ static void readHeat(void) {
     sg_outputReachable = SGPlayerWatchMusicOutput(musicOutputChanged);
     if (!sg_outputReachable) SGLog(@"sing: Spotify's output cannot be watched, Sing cannot read its format");
     SGPlayerSetStage(stage);
+    sg_frontSeconds = SGSingSpatialFront();
     %init;
     SGRequireClasses(@[@"SPTPlayerState", @"SPTEsperantoPlayer"]);
     // Runs on is Automatic or CPU only: GPU, Neural Engine and GPU and Neural Engine (2-4) are Automatic now, as is every

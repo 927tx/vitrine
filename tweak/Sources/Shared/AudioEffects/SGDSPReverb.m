@@ -75,9 +75,8 @@ SGDSPReverb *SGDSPReverbCreate(double rate, int preset, float amount) {
     return reverb;
 }
 
-void SGDSPReverbSet(SGDSPReverb *reverb, int preset, float amount) {
+static void setPreset(SGDSPReverb *reverb, int preset, float mix) {
     const Preset *p = &kPresets[preset < 0 ? 0 : preset >= SGDSPReverbPresetCount ? SGDSPReverbPresetCount - 1 : preset];
-    float mix = fminf(100, p->mix * fmaxf(0, amount) / 50);
     const struct { AudioUnitParameterID id; float value; } values[] = {
         {kReverb2Param_DryWetMix, mix}, {kReverb2Param_Gain, 0}, {kReverb2Param_MinDelayTime, p->minDelay},
         {kReverb2Param_MaxDelayTime, p->maxDelay}, {kReverb2Param_DecayTimeAt0Hz, p->decay},
@@ -86,6 +85,19 @@ void SGDSPReverbSet(SGDSPReverb *reverb, int preset, float amount) {
     for (size_t i = 0; i < sizeof values / sizeof *values; i++) {
         AudioUnitSetParameter(reverb->unit, values[i].id, kAudioUnitScope_Global, 0, values[i].value, 0);
     }
+}
+
+void SGDSPReverbSet(SGDSPReverb *reverb, int preset, float amount) {
+    int index = preset < 0 ? 0 : preset >= SGDSPReverbPresetCount ? SGDSPReverbPresetCount - 1 : preset;
+    setPreset(reverb, index, fminf(100, kPresets[index].mix * fmaxf(0, amount) / 50));
+}
+
+void SGDSPReverbSetSend(SGDSPReverb *reverb, int preset) {
+    setPreset(reverb, preset, 100);
+}
+
+void SGDSPReverbReset(SGDSPReverb *reverb) {
+    AudioUnitReset(reverb->unit, kAudioUnitScope_Global, 0);
 }
 
 void SGDSPReverbRun(void *state, float *left, float *right, uint32_t frames) {

@@ -346,7 +346,7 @@ static CAGradientLayer *floorLight(CGPoint at, CGFloat size, UIColor *color, CGF
     // as the song has played, and the two agree once the head has been still a while.
     __block SGSpatialFront front = {0};
     SGHeadMotionListen(kListener, ^(CMDeviceMotion *motion) {
-        double angle = motion ? SGSpatialVoiceAngle(&front, motion.attitude.yaw, motion.timestamp) : NAN;
+        double angle = motion ? SGSpatialVoiceAngle(&front, motion.attitude.yaw, motion.timestamp, SGSingSpatialFront()) : NAN;
         if (!motion) front.hasFront = false;
         NSTimeInterval at = motion.timestamp;
         dispatch_async(dispatch_get_main_queue(), ^{ [weakSelf followed:angle at:at]; });

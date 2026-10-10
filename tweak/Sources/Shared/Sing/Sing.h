@@ -49,6 +49,13 @@ extern NSNotificationName const SGSingButtonDidChangeNotification;
 // Spatial voice: through headphones that track the head, the vocals stay in front as it turns; off until
 // switched on, and at once.
 #define SGKeySingSpatial @"spotifyglass.sing.spatial"
+// Spatial voice's sound: how far ahead the voice is (meters, 1.5 until set), how much of it is the room (percent, 25
+// until set), how long a head that stays turned takes to bring it back in front (seconds, 5 until set), and how wide
+// the instruments spread (percent, 110 until set).
+#define SGKeySingSpatialDistance @"spotifyglass.sing.spatial.distance"
+#define SGKeySingSpatialRoom @"spotifyglass.sing.spatial.room"
+#define SGKeySingSpatialFront @"spotifyglass.sing.spatial.front"
+#define SGKeySingSpatialWidth @"spotifyglass.sing.spatial.width"
 
 // Posted on the main thread whenever what Sing is doing, or its model's download, changes.
 extern NSString *const SGSingChangedNotification;
@@ -98,6 +105,13 @@ BOOL SGSingSpatialAvailable(void);
 BOOL SGSingSpatial(void);
 // Stored, the motion's permission asked for when it goes on, and applied at once.
 void SGSetSingSpatial(BOOL on);
+// Distance, Room, Back in front and Instruments width: read as stored, and stored and applied at once. Any thread for
+// the getters.
+double SGSingSpatialDistance(void);
+double SGSingSpatialRoom(void);
+double SGSingSpatialFront(void);
+double SGSingSpatialWidth(void);
+void SGSetSingSpatialSound(double meters, double roomPercent, double frontSeconds, double widthPercent);
 
 // The top of the Spatial voice page: listener and voice on a field of dots seen from behind the head, which
 // follows the head through HeadGestures' motion while it is on screen and the motion is allowed, and idles

@@ -11,5 +11,6 @@ OUT=build/sing${SANITIZE:+-$SANITIZE}
 mkdir -p build
 xcrun clang -fobjc-arc -O2 -g -Wall -Werror -target arm64-apple-macos15.0 ${SANITIZE:+-fsanitize=$SANITIZE -O1 -fno-omit-frame-pointer} \
     -I shim -I ../../tweak/Sources main.m "$SING"/SGSingLoader.m "$SING"/SGSingSeparator.m "$SING"/SGSingEngine.m \
+    ../../tweak/Sources/Shared/AudioEffects/SGDSPReverb.m \
     -framework Foundation -framework AudioToolbox -framework Accelerate -framework CoreML -o "$OUT"
 echo "built $OUT"

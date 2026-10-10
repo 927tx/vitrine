@@ -1077,27 +1077,47 @@ static void checkSpatial(void) {
           step, toneStep, loudest);
     writeWAV(@"spatial.wav", out);
     SGSingEngineDestroy(engine);
+
+    // Distance: at 4 m, straight ahead and with no room, the voice is at the square root of 1/4 of its level, -6.02 dB.
+    engine = SGSingEngineCreate();
+    SGSingEngineSetSeparator(engine, [[SGWholeSeparator alloc] initWithModel:nil]);
+    SGSingEngineSetLevel(engine, 1);
+    SGSingEngineSetSpatial(engine, true, 4, 0, 1);
+    SGSingEngineSetOn(engine, true);
+    source = (Source){tone, 0};
+    Audio far = play(engine, tone, &source, 1024, 8, ^(double played) {});
+    size_t from = 5 * kSGSingRate, to = 7 * kSGSingRate;
+    double farDB = 10 * log10(energy(far.left, from, to) / energy(tone.left, from, to));
+    CHECK(fabs(farDB + 6.02) < 0.2, "at 4 m the voice is %.2f dB (the square root of 1/4: -6.02)", farDB);
+    // Room, where AUReverb2 is (not on the Mac): the room adds to the far voice.
+    SGSingEngineSetSpatial(engine, true, 4, 1, 1);
+    source = (Source){tone, 0};
+    Audio roomy = play(engine, tone, &source, 1024, 8, ^(double played) {});
+    double roomDB = 10 * log10(energy(roomy.left, from, to) / energy(tone.left, from, to));
+    printf("note: with Room at 100%% the voice at 4 m is %.2f dB (%s)\n", roomDB,
+           roomDB > farDB + 0.5 ? "the room is heard" : "no room here: AUReverb2 is missing or silent");
+    SGSingEngineDestroy(engine);
 }
 
 // The front the voice is held off (SGSpatialVoiceAngle), fed at 25 Hz as AirPods send their motion.
 static void checkFront(void) {
     SGSpatialFront front = {0};
-    double angle = SGSpatialVoiceAngle(&front, 0.3, 10);
+    double angle = SGSpatialVoiceAngle(&front, 0.3, 10, 20);
     CHECK(angle == 0, "the first motion is the front: the voice straight ahead (%.3f)", angle);
     // The head turned 60 degrees left (yaw grows) at once, then held there.
-    double turned = SGSpatialVoiceAngle(&front, 0.3 + M_PI / 3, 10.04), held = turned;
+    double turned = SGSpatialVoiceAngle(&front, 0.3 + M_PI / 3, 10.04, 20), held = turned;
     double time = 10.04;
-    for (; time < 30.04 - 1e-9; time += 0.04) held = SGSpatialVoiceAngle(&front, 0.3 + M_PI / 3, time + 0.04);
-    CHECK(fabs(turned - M_PI / 3) < 0.01 && fabs(held - M_PI / 3 * exp(-1)) < 0.01,
-          "a head turned 60 degrees left has the voice %.1f degrees right, and 20 s on %.1f (the front's 1/e: %.1f)",
-          turned * 180 / M_PI, held * 180 / M_PI, 60 * exp(-1));
+    for (; time < 30.04 - 1e-9; time += 0.04) held = SGSpatialVoiceAngle(&front, 0.3 + M_PI / 3, time + 0.04, 20);
+    CHECK(fabs(turned - M_PI / 3) < 0.01 && fabs(held - M_PI / 3 * exp(-3)) < 0.01,
+          "a head turned 60 degrees left has the voice %.1f degrees right, and 20 s on %.1f (5%% of the turn left: %.1f)",
+          turned * 180 / M_PI, held * 180 / M_PI, 60 * exp(-3));
     // Across the back: yaw wraps from +179 to -179 degrees, which is 2 degrees further left, not 358 right.
     SGSpatialFront back = {0};
-    SGSpatialVoiceAngle(&back, M_PI - 0.01, 0);
-    double wrapped = SGSpatialVoiceAngle(&back, -M_PI + 0.01, 0.04);
+    SGSpatialVoiceAngle(&back, M_PI - 0.01, 0, 20);
+    double wrapped = SGSpatialVoiceAngle(&back, -M_PI + 0.01, 0.04, 20);
     CHECK(fabs(wrapped - 0.02) < 0.001, "across +-180 degrees the voice moves %.2f degrees", wrapped * 180 / M_PI);
     // Headphones out for 2 s and in again: the front starts over where the head points.
-    double again = SGSpatialVoiceAngle(&front, -1, time + 2);
+    double again = SGSpatialVoiceAngle(&front, -1, time + 2, 20);
     CHECK(again == 0, "after a gap in the motion the voice is ahead again (%.3f)", again);
 }
 
