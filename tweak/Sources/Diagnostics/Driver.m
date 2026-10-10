@@ -274,7 +274,15 @@ static BOOL matches(UIView *view, NSDictionary *p) {
     return YES;
 }
 
-// Every view the selector matches, in the tree's order.
+static UIViewController *topController(NSMutableArray<NSString *> *path, NSMutableArray<NSString *> *presented);
+
+// The view of the page in front: a sheet over the player, Mod Settings over Home.
+static UIView *frontView(void) {
+    return topController([NSMutableArray array], [NSMutableArray array]).viewIfLoaded;
+}
+
+// Every view the selector matches, the page in front's first, then the tree's order: a sheet's rows come after
+// the page under it in the windows, and a search capped at 100 would end on that page.
 static NSArray<UIView *> *findAll(NSDictionary *p, UIView *root) {
     NSMutableArray<UIView *> *found = [NSMutableArray array];
     for (UIView *top in root ? @[root] : windows()) {
@@ -282,7 +290,13 @@ static NSArray<UIView *> *findAll(NSDictionary *p, UIView *root) {
             if (matches(view, p)) [found addObject:view];
         });
     }
-    return found;
+    UIView *front = root ? nil : frontView();
+    if (!front) return found;
+    NSIndexSet *inFront = [found indexesOfObjectsPassingTest:^BOOL(UIView *view, NSUInteger i, BOOL *stop) { return [view isDescendantOfView:front]; }];
+    NSMutableArray<UIView *> *ordered = [[found objectsAtIndexes:inFront] mutableCopy];
+    [found removeObjectsAtIndexes:inFront];
+    [ordered addObjectsFromArray:found];
+    return ordered;
 }
 
 // The view a selector means: with an index, that one of the matches in the tree's order; without, the
@@ -507,11 +521,31 @@ static NSArray<UIView *> *tabItems(NSMutableArray<NSString *> *titles) {
         if (!bar) continue;
         NSMutableArray<UIView *> *items = [NSMutableArray array];
         if ([bar isKindOfClass:UITabBar.class]) {
-            for (UITabBarItem *item in ((UITabBar *)bar).items) {
+            NSArray<UITabBarItem *> *barItems = ((UITabBar *)bar).items;
+            for (UITabBarItem *item in barItems) {
                 UIView *view = item.title ? titled(item.title, ^BOOL(UIView *v) { return [v isDescendantOfView:bar]; }) : nil;
                 if (!view) continue;
                 [items addObject:view];
                 [titles addObject:item.title];
+            }
+            // The redesign's bar draws only the selected tab's title: its buttons instead, leading first.
+            if (items.count < barItems.count) {
+                [items removeAllObjects];
+                [titles removeAllObjects];
+                NSMutableArray<UIView *> *buttons = [NSMutableArray array];
+                SGForEachView(bar, ^(UIView *v) {
+                    if ([v isKindOfClass:UIControl.class] && [NSStringFromClass(v.class) containsString:@"TabButton"] && isShown(v)) [buttons addObject:v];
+                });
+                [buttons sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
+                    return CGRectGetMinX(screenFrame(a)) < CGRectGetMinX(screenFrame(b)) ? NSOrderedAscending : NSOrderedDescending;
+                }];
+                // The glass bar stacks two buttons on each tab: one a tab, by where it sits.
+                for (UIView *button in buttons) {
+                    if (items.count && fabs(CGRectGetMidX(screenFrame(button)) - CGRectGetMidX(screenFrame(items.lastObject))) < 4) continue;
+                    NSUInteger i = items.count;
+                    [items addObject:button];
+                    [titles addObject:i < barItems.count ? barItems[i].title ?: button.accessibilityLabel ?: @"" : button.accessibilityLabel ?: @""];
+                }
             }
         } else {
             for (UIView *item in SGRowIn(bar).arrangedSubviews) {
@@ -529,11 +563,14 @@ static NSArray<UIView *> *tabItems(NSMutableArray<NSString *> *titles) {
     return @[];
 }
 
-// The largest scroll view shown in the key window, the page's own list.
+// The largest scroll view shown in the page in front, the page's own list; the key window's when there is no page.
 static UIScrollView *mainScrollView(void) {
+    UIView *front = frontView();
+    // A table page's view is its list.
+    if ([front isKindOfClass:UIScrollView.class] && isShown(front)) return (UIScrollView *)front;
     __block UIScrollView *best = nil;
     __block CGFloat bestArea = 0;
-    SGForEachView(keyWindow(), ^(UIView *view) {
+    SGForEachView(front ?: keyWindow(), ^(UIView *view) {
         if (![view isKindOfClass:UIScrollView.class] || !isShown(view)) return;
         CGRect frame = screenFrame(view);
         if (frame.size.width * frame.size.height > bestArea) {
@@ -666,7 +703,12 @@ static NSDictionary<NSString *, SGCommand> *commands(void) {
                     }];
                     UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithBounds:key.bounds format:format];
                     NSData *png = [renderer PNGDataWithActions:^(UIGraphicsImageRendererContext *context) {
-                        for (UIWindow *window in all) [window drawViewHierarchyInRect:window.frame afterScreenUpdates:NO];
+                        for (UIWindow *window in all) {
+                            // The keyboard is drawn by another process: its window draws as a white sheet over all.
+                            NSString *name = NSStringFromClass(window.class);
+                            if (window.hidden || window.alpha < 0.01 || [name containsString:@"Keyboard"] || [name containsString:@"TextEffects"]) continue;
+                            [window drawViewHierarchyInRect:window.frame afterScreenUpdates:NO];
+                        }
                     }];
                     return @{@"png" : [png base64EncodedStringWithOptions:0], @"size" : pair(CGPointMake(key.bounds.size.width * format.scale, key.bounds.size.height * format.scale))};
                 });
