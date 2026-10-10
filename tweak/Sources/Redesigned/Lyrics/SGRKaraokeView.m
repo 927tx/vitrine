@@ -1583,8 +1583,11 @@ typedef struct {
 - (void)didMoveToWindow {
     [super didMoveToWindow];
     if (!self.window) {
+        // The scroll goes back with the browsing: lines are placed for an offset of 0, and one left from a page
+        // scrolled and closed before followSong drew every line off the anchor, none of them lit.
         [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(followSong) object:nil];
         _browsing = NO;
+        _scroll.contentOffset = CGPointZero;
     }
     [self scheduleLink];
 }
@@ -2259,6 +2262,7 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     if (showing == _showing) return;
     _showing = showing;
     self.hidden = !showing;
+    if (showing && !_browsing) _scroll.contentOffset = CGPointZero;
     _credit.hidden = !showing || !_credit.text.length;
     for (UIView *sibling in self.superview.subviews) {
         if (sibling != self) sibling.alpha = showing ? 0 : 1;
