@@ -4,14 +4,31 @@
 // system font at the same size, with the weight its name ends in. The rounded, serif and monospaced designs
 // reach the system font too, so the mod's own text follows. An imported family and a family iOS carries
 // take its place at the same size, each weight as the family's nearest face. Read at launch.
+#import <CoreText/CoreText.h>
 #import "Core/SGCore.h"
 #import "Shared/Fonts/Fonts.h"
 
 static SGAppFont sg_font;
 static NSString *sg_family;   // the chosen family: one iOS carries, or the imported one once Core Text has it
 
+// A font name ("SpotifyMixUI-Bold") or family name ("Spotify Mix UI", which is how Spotify's text components ask) of
+// Spotify's: the family name has spaces, and matching only the font name left most of the app in Spotify's font.
 static BOOL spotifys(NSString *name) {
-    return [name hasPrefix:@"CircularSp"] || [name hasPrefix:@"SpotifyMix"] || [name hasPrefix:@"Circular"];
+    NSString *joined = [name stringByReplacingOccurrencesOfString:@" " withString:@""];
+    return [joined hasPrefix:@"CircularSp"] || [joined hasPrefix:@"SpotifyMix"] || [joined hasPrefix:@"Circular"];
+}
+
+// The weight a descriptor asks for: its traits', else its variable font's weight axis ('wght', 100 to 900), else
+// none, for the name to say.
+static NSNumber *weightAsked(UIFontDescriptor *descriptor) {
+    NSDictionary *attributes = descriptor.fontAttributes;
+    NSNumber *trait = attributes[UIFontDescriptorTraitsAttribute][UIFontWeightTrait];
+    if ([trait isKindOfClass:NSNumber.class]) return trait;
+    NSNumber *axis = attributes[(__bridge NSString *)kCTFontVariationAttribute][@(0x77676874)];   // 'wght'
+    if (![axis isKindOfClass:NSNumber.class]) return nil;
+    // CSS weights to UIFont's: 400 is regular (0), 700 bold (0.4), 900 black (0.62).
+    double css = axis.doubleValue;
+    return @(css <= 400 ? (css - 400) / 375 : css <= 700 ? (css - 400) / 750 : 0.4 + (css - 700) / 900);
 }
 
 // "CircularSp-Bold", "SpotifyMixUITitle-Arab-Extrabold": the weight is the last word.
@@ -63,7 +80,12 @@ static UIFont *systemFor(NSString *name, CGFloat size) {
 
 + (UIFont *)fontWithDescriptor:(UIFontDescriptor *)descriptor size:(CGFloat)size {
     NSString *name = descriptor.fontAttributes[UIFontDescriptorNameAttribute] ?: descriptor.fontAttributes[UIFontDescriptorFamilyAttribute];
-    UIFont *font = spotifys(name) ? systemFor(name, size > 0 ? size : descriptor.pointSize) : nil;
+    if (!spotifys(name)) return %orig;
+    CGFloat points = size > 0 ? size : descriptor.pointSize;
+    NSNumber *weight = weightAsked(descriptor);
+    UIFont *font = !weight ? systemFor(name, points)
+        : sg_font >= SGAppFontCustom ? family(points, weight.doubleValue)
+        : designed([UIFont systemFontOfSize:points weight:weight.doubleValue]);
     return font ?: %orig;
 }
 %end
