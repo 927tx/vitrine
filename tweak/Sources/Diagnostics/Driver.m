@@ -344,6 +344,13 @@ static NSDictionary *describe(UIView *view) {
         d[@"selected"] = @(((UIControl *)view).selected);
     }
     if ([view isKindOfClass:UISwitch.class]) d[@"on"] = @(((UISwitch *)view).on);
+    // The font a label draws in: its attributed text's when it has one, which wins over its font.
+    if ([view isKindOfClass:UILabel.class]) {
+        UILabel *label = (UILabel *)view;
+        UIFont *font = label.font;
+        if (label.attributedText.length) font = [label.attributedText attribute:NSFontAttributeName atIndex:0 effectiveRange:NULL] ?: font;
+        if (font) d[@"font"] = [NSString stringWithFormat:@"%@ %.1f", font.fontName, font.pointSize];
+    }
     if ([view isKindOfClass:UIScrollView.class]) {
         UIScrollView *scroll = (UIScrollView *)view;
         d[@"contentOffset"] = pair(scroll.contentOffset);
@@ -837,6 +844,17 @@ static NSDictionary<NSString *, SGCommand> *commands(void) {
                 result[@"tabs"] = where[@"tabs"];
                 return result;
             },
+            // One of Vitrine's settings, for a test that needs a setting changed and Spotify relaunched rather than
+            // a picker driven: --key spotifyglass.x --value 6 (a whole number), or --text for a string, or --remove 1.
+            @"pref" : ^NSDictionary *(NSDictionary *p) {
+                NSString *key = p[@"key"];
+                if (![key hasPrefix:@"spotifyglass."]) fail(@"pref takes --key spotifyglass.<name>");
+                NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+                if (p[@"remove"]) [store removeObjectForKey:key];
+                else if (p[@"text"]) [store setObject:p[@"text"] forKey:key];
+                else if (p[@"value"]) [store setInteger:[p[@"value"] integerValue] forKey:key];
+                return @{@"key" : key, @"now" : [store objectForKey:key] ?: [NSNull null]};
+            },
             @"settings.open" : ^NSDictionary *(NSDictionary *p) {
                 return onMain(^id {
                     UIViewController *top = topController([NSMutableArray array], [NSMutableArray array]);
@@ -886,7 +904,23 @@ BOOL SGDriverHandles(NSString *command) {
     return commands()[command] != nil;
 }
 
+// The screen stays on while the driver is in use, so a test does not end on a locked phone: each command holds
+// the idle timer off for kAwakeFor, and the phone locks as usual once the commands stop.
+static const NSTimeInterval kAwakeFor = 600;
+
+static void stayAwake(void) {
+    static NSUInteger sg_awake;   // main queue only
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSUInteger mine = ++sg_awake;
+        UIApplication.sharedApplication.idleTimerDisabled = YES;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kAwakeFor * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (mine == sg_awake) UIApplication.sharedApplication.idleTimerDisabled = NO;
+        });
+    });
+}
+
 NSData *SGDriverRun(NSString *command, NSDictionary<NSString *, NSString *> *params) {
+    stayAwake();
     NSMutableDictionary *answer = [NSMutableDictionary dictionaryWithObject:command forKey:@"cmd"];
     if (![readOnly() containsObject:command]) sg_actionSeq = SGLogLastSeq();
     @try {
