@@ -899,13 +899,44 @@ BOOL SGPlayerSpeedAllowed(void) {
     return tapped();
 }
 
-// The own clock (see the top): `on` while it counts, from `position` song seconds when `played` was
-// playedSeconds(), for `track`. `armed` takes the first report stamped at or after `notBefore` as its start.
+// The position Spotify counted in the last -position on this thread, before the own clock and before Sing's lead.
+static _Thread_local double sg_spotifyPosition;
+
+// The own clock (see the top), in what is heard: `on` while it counts, from `position` song seconds heard when
+// `played` was playedSeconds() and Sing held `lead` ahead, for `track`. `armed` takes the first report stamped at or
+// after `notBefore` as its start. What it hands back is in Spotify's terms, a report's own lead on top, which Sing's
+// -position (outside this one) takes off again: a report after the lead was built carries all of it, one before it none.
 static struct {
     BOOL on, armed;
     CFAbsoluteTime notBefore;
-    double position, played;
+    double position, played, lead;
 } sg_clock;
+
+// Sing's -position asks [self position] again for the raw one, and its readers below may too, so this hook may run
+// inside itself; only the outer one corrects.
+static _Thread_local BOOL sg_correcting;
+
+// Sing's lead (Shared/Sing): what it holds ahead now, and a report's correction. 0 without Sing.
+static SGPlayerHeldLead sg_heldLead;
+static SGPlayerLeadOf sg_leadOf;
+
+void SGPlayerSetLeadReaders(SGPlayerHeldLead held, SGPlayerLeadOf of) {
+    sg_heldLead = held;
+    sg_leadOf = of;
+}
+
+static double heldLeadNow(void) {
+    return sg_heldLead ? sg_heldLead() : 0;
+}
+
+static double leadOfState(SPTPlayerState *state) {
+    if (!sg_leadOf || !state) return 0;
+    BOOL was = sg_correcting;
+    sg_correcting = YES;
+    double lead = sg_leadOf(state);
+    sg_correcting = was;
+    return lead;
+}
 // The newest report seen, to tell a seek from elsewhere (another device over Connect) by its position: one
 // further than kSeekGap from where the report before would be by then, both made since the speed last changed
 // (sg_speedChangedAt). A false stall moves it 1.2 s at most.
@@ -931,12 +962,15 @@ static void handBack(void) {
 
 void SGSetPlayerSpeed(double speed) {
     if (!tapped()) return;
-    // Spotify's clock is right until the speed leaves 1x, so it is read before.
+    // Spotify's clock is right until the speed leaves 1x, so it is read before, as Spotify counts it: Sing's
+    // -position, outside this file's, takes its lead off what this one returns.
     SPTPlayerState *state = SGPlayerState();
-    double position = state.position;
+    sg_spotifyPosition = -1;
+    [state position];
+    double position = sg_spotifyPosition, lead = leadOfState(state), held = heldLeadNow();
     os_unfair_lock_lock(&sg_clockLock);
     if (!sg_clock.on && !sg_clock.armed && speed != 1 && state && position >= 0) {
-        sg_clock = (typeof(sg_clock)){.on = YES, .position = position, .played = playedSeconds()};
+        sg_clock = (typeof(sg_clock)){.on = YES, .position = position - lead, .played = playedSeconds(), .lead = held};
         sg_clockTrack = trackOf(state);
     }
     if ((float)speed != sg_speed) sg_speedChangedAt = CFAbsoluteTimeGetCurrent();
@@ -1031,9 +1065,6 @@ BOOL SGPlayerWatchMusicOutput(SGPlayerOutputWatcher watcher) {
 
 #pragma mark - Spotify's clock
 
-// Sing's -position asks [self position] again for the raw one, so this hook may run inside itself; only the
-// outer one corrects.
-static _Thread_local BOOL sg_correcting;
 
 %hook SPTPlayerState
 - (double)playbackSpeed {
@@ -1047,11 +1078,17 @@ static _Thread_local BOOL sg_correcting;
     sg_correcting = YES;
     double position = %orig;
     sg_correcting = NO;
+    sg_spotifyPosition = position;
     if (position < 0) return position;
     NSString *track = trackOf(self);
     double played = playedSeconds();
     CFAbsoluteTime stamp = self.timestamp.timeIntervalSinceReferenceDate;
-    double asOf = self.positionAsOfTimestamp, speed = self.isPaused ? 0 : self.playbackSpeed;
+    // Spotify's own, from the position it counted: Sing's positionAsOfTimestamp has its lead taken off, which
+    // turning Sing on or off would show as a seek.
+    double speed = self.isPaused ? 0 : self.playbackSpeed, asOf = position - (CFAbsoluteTimeGetCurrent() - stamp) * speed;
+    // Read before the lock, as Sing's readers may come back through this hook.
+    BOOL counting = sg_clock.on || sg_clock.armed;
+    double lead = counting ? leadOfState(self) : 0, held = counting ? heldLeadNow() : 0;
     os_unfair_lock_lock(&sg_clockLock);
     BOOL seeked = NO;
     if (stamp > sg_lastReport.stamp) {
@@ -1063,11 +1100,11 @@ static _Thread_local BOOL sg_correcting;
         sg_clock = (typeof(sg_clock)){.armed = loadFloat(&sg_speedBits) != 1};
     }
     if (!sg_clock.on && sg_clock.armed && stamp >= sg_clock.notBefore) {
-        sg_clock = (typeof(sg_clock)){.on = YES, .position = position, .played = played};
+        sg_clock = (typeof(sg_clock)){.on = YES, .position = position - lead, .played = played, .lead = held};
         sg_clockTrack = track;
     }
-    // Paused too: the paused report is as far behind.
-    if (sg_clock.on) position = sg_clock.position + played - sg_clock.played;
+    // Paused too: the paused report is as far behind. Heard is what was pulled less what Sing holds ahead of it.
+    if (sg_clock.on) position = sg_clock.position + (played - sg_clock.played) - (held - sg_clock.lead) + lead;
     os_unfair_lock_unlock(&sg_clockLock);
     if (seekedAway) SGLog(@"speed: Spotify moved to %.1f s without a seek here; its clock starts over", asOf);
     return position;

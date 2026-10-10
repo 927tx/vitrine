@@ -67,6 +67,12 @@ void SGPlayerShowSpeedPitchPanel(UIView *from);
 typedef OSStatus (*SGPlayerPull)(void *context, UInt32 frames, AudioBufferList *data, UInt32 *sounding);
 typedef OSStatus (*SGPlayerStage)(UInt32 frames, AudioBufferList *data, SGPlayerPull pull, void *context);
 void SGPlayerSetStage(SGPlayerStage stage);
+@class SPTPlayerState;
+// Sing's lead, for the own clock -[SPTPlayerState position] keeps away from 1x (SpeedPitch.x): the seconds it holds ahead
+// of what plays now, and the correction it takes off a report. Set once by Sing.x.
+typedef double (*SGPlayerHeldLead)(void);
+typedef double (*SGPlayerLeadOf)(SPTPlayerState *state);
+void SGPlayerSetLeadReaders(SGPlayerHeldLead held, SGPlayerLeadOf of);
 
 // The music's output: of the RemoteIO units Spotify runs at once (a chain per sample rate, and voice search's),
 // the one that carries every processor of its sound (speed and pitch, Sing's stage, the audio effects, Music

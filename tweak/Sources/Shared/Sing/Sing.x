@@ -1245,6 +1245,7 @@ static void readHeat(void) {
     sg_outputReachable = SGPlayerWatchMusicOutput(musicOutputChanged);
     if (!sg_outputReachable) SGLog(@"sing: Spotify's output cannot be watched, Sing cannot read its format");
     SGPlayerSetStage(stage);
+    SGPlayerSetLeadReaders(SGSingHeldLead, SGSingLeadOf);
     sg_frontSeconds = SGSingSpatialFront();
     %init;
     SGRequireClasses(@[@"SPTPlayerState", @"SPTEsperantoPlayer"]);
