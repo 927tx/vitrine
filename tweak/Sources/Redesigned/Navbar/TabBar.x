@@ -912,9 +912,24 @@ static void itemDidLayOut(UIView *item) {
 }
 %end
 
+// Spotify's own fade under its bar, 219 pt down to black from 9.1.90 (TabBarGradientView), stacked with SGRBarFade
+// into a band near black over the page's foot. SGRBarFade is the redesign's, so Spotify's stays clear.
+%group SpotifyBarFade
+%hook _TtC23NavigationUI_TabBarImpl18TabBarGradientView
+- (void)didMoveToWindow {
+    %orig;
+    ((UIView *)self).alpha = 0;
+}
+- (void)setAlpha:(CGFloat)alpha {
+    %orig(0);
+}
+%end
+%end
+
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;
+    if (objc_getClass("_TtC23NavigationUI_TabBarImpl18TabBarGradientView")) %init(SpotifyBarFade);
     SGRequireClasses(@[
         @"_TtC23NavigationUI_TabBarImpl10TabBarView",
         @"_TtC23NavigationUI_TabBarImpl21TabBarItemElementView",
