@@ -167,7 +167,7 @@ API_AVAILABLE(ios(18.0))
 - (void)showStatus {
     NSString *status;
     if (!_enabled) status = @"Off in iOS";
-    else if (!_active) status = @"Paused";
+    else if (!_active) status = @"Paused in Control Center";
     else if (_phase == SGNativeChecking) status = @"Checking";
     else if (_phase == SGNativeUnavailable) status = @"Unavailable";
     else if (_phase == SGNativeWaiting) status = @"Waiting";
